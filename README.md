@@ -2,7 +2,7 @@
 
 <img width="1512" height="830" alt="Screenshot 2026-10-24 at 16 08 03" src="https://github.com/user-attachments/assets/6bb628c7-cc4b-424b-a004-409b6e4c09ef" />
 
-A local topographic background generator with a cursor-driven hill, glass style panel, shareable designs, and SVG/PNG export. Everything runs in the browser; no accounts or backend. Generated landscapes work offline. The experimental real-terrain option downloads public elevation tiles when requested.
+A local topographic background generator with a cursor-driven hill, glass style panel, shareable designs, and SVG/PNG export. Everything runs in the browser; no accounts or backend. Generated landscapes work offline. The real-terrain option downloads public elevation tiles when requested.
 
 ## Run locally
 
@@ -105,9 +105,9 @@ Appearance changes reuse cached contours. Output geometry is separate from curso
 
 These are synthetic terrain contours, not survey or navigation data. The original proof-of-concept requirements are recorded in `PRD.md`.
 
-## Real terrain experiment
+## Real terrain
 
-On `experiment/real-terrain-grid`, open **Real terrain · experiment**, pick a preset or enter latitude/longitude and an area span (2–200 km), then click **Load terrain**. Tiles come directly from the public AWS Mapzen Terrarium dataset without an API key. Loading failures retain the previous landscape. **Use generated** returns to seeded terrain.
+Open **Real terrain**, pick a preset or enter latitude/longitude and an area span (2–200 km), then click **Load terrain**. Tiles come directly from the public AWS Mapzen Terrarium dataset without an API key. Loading failures retain the previous landscape. **Use generated** returns to seeded terrain.
 
 Real terrain is centered and cropped to fit the canvas without stretching. Its elevation range is normalized for the existing density control; these are decorative contours, not labeled survey elevations. Cursor deformation is disabled while real terrain is active. Scale and detail apply to generated terrain. Locations are session-only and are not restored by Copy link. Exports use the loaded terrain and include source attribution.
 

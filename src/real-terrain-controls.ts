@@ -1,3 +1,4 @@
+import { realTerrainPresets } from './constants/real-terrain';
 import { loadRealTerrain } from './real-terrain';
 import type { RealTerrain } from './real-terrain';
 
@@ -9,9 +10,14 @@ export function mountRealTerrainControls(
   const section = document.createElement('details');
 
   section.className = 'real-terrain-controls';
-  section.innerHTML = `<summary>Real terrain · experiment<span aria-hidden="true">+</span></summary><div class="detail-content">
-    <div class="select-row"><label for="terrain-place">Location</label><select id="terrain-place"><option value="53.01,-6.33">Wicklow Mountains</option><option value="45.83,6.86">Mont Blanc</option><option value="36.11,-112.11">Grand Canyon</option><option value="27.99,86.93">Everest</option></select></div>
-    <div class="control-grid"><label>Latitude<input id="terrain-latitude" type="number" min="-85" max="85" step="any" value="53.01"></label><label>Longitude<input id="terrain-longitude" type="number" min="-180" max="180" step="any" value="-6.33"></label></div>
+  section.innerHTML = `<summary>Real terrain<span aria-hidden="true">+</span></summary><div class="detail-content">
+    <div class="select-row"><label for="terrain-place">Location</label><select id="terrain-place">${realTerrainPresets
+      .map(
+        ({ name, latitude, longitude }) =>
+          `<option value="${latitude},${longitude}">${name}</option>`,
+      )
+      .join('')}</select></div>
+    <div class="control-grid"><label>Latitude<input id="terrain-latitude" type="number" min="-85" max="85" step="any" value="${realTerrainPresets[0].latitude}"></label><label>Longitude<input id="terrain-longitude" type="number" min="-180" max="180" step="any" value="${realTerrainPresets[0].longitude}"></label></div>
     <label>Area span (km)<input id="terrain-span" type="number" min="2" max="200" value="25"></label>
     <div class="actions"><button type="button" data-load class="primary-button">Load terrain</button><button type="button" data-generated class="text-button">Use generated</button></div>
     <p data-credit></p><p data-status role="status">Loads public elevation tiles. Location is session-only; Copy link saves styling only.</p>
