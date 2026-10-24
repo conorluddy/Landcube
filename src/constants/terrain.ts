@@ -1,12 +1,10 @@
-
-
 export const seededRandomIncrement = 0x6d2b79f5;
 export const unsignedIntegerRange = 4294967296;
 export const noisePermutationSize = 256;
 export const noisePermutationMask = noisePermutationSize - 1;
 export const noiseGradientCount = 16;
 export const noiseGradients = Array.from({ length: noiseGradientCount }, (_, gradientIndex) => {
-  const gradientAngleRadians = gradientIndex * Math.PI / (noiseGradientCount / 2);
+  const gradientAngleRadians = (gradientIndex * Math.PI) / (noiseGradientCount / 2);
   return [Math.cos(gradientAngleRadians), Math.sin(gradientAngleRadians)] as const;
 });
 export const terrainOffsetSeedMask = 0x9e3779b9;

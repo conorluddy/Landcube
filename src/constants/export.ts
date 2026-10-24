@@ -1,5 +1,3 @@
-
-
 export const imageMimeTypes = { svg: 'image/svg+xml', png: 'image/png' } as const;
 export const downloadUrlReleaseDelayMs = 1000;
 export const outputSizePresets = [

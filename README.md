@@ -4,7 +4,7 @@ A local topographic background generator with a cursor-driven hill, glass style 
 
 ## Run locally
 
-Requires Node.js 22.12+ (or Node.js 20.19+) and npm.
+Requires Node.js 22.13+ (or 20.19+ / 24+) and npm.
 
 ```sh
 npm install
@@ -19,16 +19,25 @@ npm run test:coverage # Node's coverage report; use Node 22.12+
 npm run build        # Strict TypeScript checking and production build
 npm run preview      # Serve dist/ locally
 npm run test:e2e     # Critical browser journeys; requires installed Google Chrome
+npm run lint         # Strict type-aware linting; zero warnings allowed
+npm run lint:fix     # Apply safe automatic lint fixes
+npm run format       # Format source, styles, configuration, and documentation
+npm run format:check # Check formatting without changing files
 ```
 
 Browser tests inline the production bundle into `.cache/browser-fixture.html`, so they need no HTTP server or runtime network. They cover link restoration, SVG/PNG downloads, transparency, resolution, mobile layout, clipboard fallback, and keyboard navigation. Build artifacts, browser traces, and screenshots are ignored. The Node coverage report covers the imported logic modules; it does not measure the browser interface.
 
+## Code quality
+
+ESLint uses the TypeScript ESLint strict and stylistic presets with type information. It rejects unsafe `any` usage, non-null assertions, unhandled promises, nullable values in boolean conditions, loose equality, unused code, and incomplete switches over unions. Public module boundaries require explicit types; type imports and braces are enforced. Intentional unused parameters in stubs use an `_` prefix.
+
+Prettier owns formatting: single quotes, trailing commas, and a 100-character target line width. Generated output, validation images, caches, and the npm-managed lockfile are excluded from formatting. CI fails on formatting differences or any lint warning.
+
 ## CI and GitHub Pages
 
-[Build and package site](.github/workflows/build.yml) runs on pushes, pull requests, and manual dispatch. It installs locked dependencies with Node.js 22, runs the logic tests, builds the production site into `dist/`, and uploads that directory as the `github-pages` artifact.
+[Build and deploy site](.github/workflows/build.yml) runs on pushes, pull requests, and manual dispatch. It installs locked dependencies with Node.js 22, checks formatting and linting, runs the logic tests, builds the production site into `dist/`, and uploads that directory as the `github-pages` artifact. Successful builds on `main` also deploy the artifact to GitHub Pages; pull requests only run the checks and build.
 
-The build uses relative asset URLs, so the directory can be hosted at `https://conorluddy.github.io/Topogra/` or on a custom domain. To publish through Actions, select **Settings → Pages → Build and deployment → Source → GitHub Actions**, then add an `actions/deploy-pages` job that depends on the build job. The current workflow prepares the artifact; publishing is a separate step. See [GitHub’s custom Pages workflow guide](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages) for the deployment job and its permissions.
-
+The build uses relative asset URLs and publishes to `https://conorluddy.github.io/Topogra/`. The repository’s Pages source must be **GitHub Actions**, so deployment serves the compiled `dist/` artifact. See [GitHub’s custom Pages workflow guide](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages) for the deployment job and its permissions.
 
 ## Style controls
 
@@ -61,13 +70,13 @@ A plain URL starts a fresh landscape, preferring a locally locked seed. An expli
 
 Generated links include `v=1` and all fields, even defaults and inactive settings. Colours are six-digit hex strings including `#`, encoded by `URLSearchParams`; booleans are `true`/`false`. Missing fields use immutable version-one defaults; missing seed uses the locally locked seed or a fresh one on initial load. Plain visits capture initial viewport dimensions. Partial design links otherwise use 1440 × 900 output defaults.
 
-| Group | Query parameters |
-| --- | --- |
-| Terrain | `seed`, `featureScale`, `detail`, `contourCount` |
-| Appearance | `background`, `lineColor`, `strokeOpacity`, `strokeWidth` |
+| Group          | Query parameters                                                        |
+| -------------- | ----------------------------------------------------------------------- |
+| Terrain        | `seed`, `featureScale`, `detail`, `contourCount`                        |
+| Appearance     | `background`, `lineColor`, `strokeOpacity`, `strokeWidth`               |
 | Index contours | `indexStyle`, `indexEvery`, `indexStrokeWidth`, `dashLength`, `dashGap` |
-| Cursor | `cursorEnabled`, `cursorRadius`, `cursorHeight`, `cursorResponseMs` |
-| Output | `format`, `width`, `height`, `pngScale`, `transparent` |
+| Cursor         | `cursorEnabled`, `cursorRadius`, `cursorHeight`, `cursorResponseMs`     |
+| Output         | `format`, `width`, `height`, `pngScale`, `transparent`                  |
 
 `seed` is an unsigned 32-bit integer. Numeric ranges and steps match the controls and are defined in `src/constants/design.ts`. `indexStyle` is `dashed`, `solid`, or `off`; `format` is `svg` or `png`; `pngScale` is `1` or `2`. Invalid individual values revert to their version-one defaults with one notice. Unsupported versions load defaults with a notice. Unknown parameters are ignored and omitted when the URL is synchronized.
 

@@ -1,5 +1,3 @@
-
-
 export interface TerrainConfiguration {
   featureScale: number;
   noiseOctaves: readonly { frequency: number; amplitude: number }[];
@@ -8,7 +6,10 @@ export interface TerrainConfiguration {
   maxSamples: number;
 }
 
-export interface EngineConfiguration extends Pick<TerrainConfiguration, 'sampleSpacing' | 'overscan' | 'maxSamples'> {
+export interface EngineConfiguration extends Pick<
+  TerrainConfiguration,
+  'sampleSpacing' | 'overscan' | 'maxSamples'
+> {
   elevationMin: number;
   elevationMax: number;
   resizeDebounceMs: number;

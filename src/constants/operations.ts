@@ -1,5 +1,3 @@
-
-
 export const operationErrorCodes = {
   invalidSettings: 'INVALID_SETTINGS',
   unsupportedVersion: 'UNSUPPORTED_VERSION',

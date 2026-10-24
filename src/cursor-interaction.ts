@@ -3,8 +3,14 @@ import type { DesignSettings } from './types/design';
 import type { HeightField } from './types/terrain';
 
 /** Add a compact, smooth hill without changing the cached seeded landscape. */
-export function applyCursorElevation(field: HeightField, cursor: CursorInfluence, settings: Pick<DesignSettings, 'cursorRadius' | 'cursorHeight'>): HeightField {
-  if (cursor.strength <= 0) return field;
+export function applyCursorElevation(
+  field: HeightField,
+  cursor: CursorInfluence,
+  settings: Pick<DesignSettings, 'cursorRadius' | 'cursorHeight'>,
+): HeightField {
+  if (cursor.strength <= 0) {
+    return field;
+  }
   const values = field.values.slice();
   const { columns, rows, originX, originY, spacing } = field;
   const radius = settings.cursorRadius;
@@ -17,9 +23,12 @@ export function applyCursorElevation(field: HeightField, cursor: CursorInfluence
       const distanceX = originX + column * spacing - cursor.x;
       const distanceY = originY + row * spacing - cursor.y;
       const distanceSquared = (distanceX * distanceX + distanceY * distanceY) / (radius * radius);
-      if (distanceSquared >= 1) continue;
+      if (distanceSquared >= 1) {
+        continue;
+      }
       // Value, slope, and curvature all approach zero at the influence boundary.
-      values[row * columns + column] += settings.cursorHeight * cursor.strength * (1 - distanceSquared) ** 3;
+      values[row * columns + column] +=
+        settings.cursorHeight * cursor.strength * (1 - distanceSquared) ** 3;
     }
   }
   return { ...field, values };

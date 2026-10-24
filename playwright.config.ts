@@ -6,5 +6,10 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   timeout: 30_000,
-  use: { channel: 'chrome', headless: true, viewport: { width: 1280, height: 800 }, trace: 'retain-on-failure' },
+  use: {
+    channel: 'chrome',
+    headless: true,
+    viewport: { width: 1280, height: 800 },
+    trace: 'retain-on-failure',
+  },
 });

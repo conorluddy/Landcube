@@ -1,5 +1,3 @@
-
-
 export interface CursorInfluence {
   x: number;
   y: number;

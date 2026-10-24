@@ -1,4 +1,14 @@
-import { noiseGradientCount, noiseGradients, noisePermutationMask, noisePermutationSize, seededRandomIncrement, terrainNoiseOffsetRange, terrainOffsetSeedMask, terrainRotationRadians, unsignedIntegerRange } from './constants/terrain';
+import {
+  noiseGradientCount,
+  noiseGradients,
+  noisePermutationMask,
+  noisePermutationSize,
+  seededRandomIncrement,
+  terrainNoiseOffsetRange,
+  terrainOffsetSeedMask,
+  terrainRotationRadians,
+  unsignedIntegerRange,
+} from './constants/terrain';
 import type { HeightField, TerrainConfiguration } from './types/terrain';
 
 /** Mulberry32: deterministic, local randomness; no noise-library dependency. */
@@ -19,7 +29,10 @@ export function createSeededNoiseSampler(seed: number): (x: number, y: number) =
   const permutation = Array.from({ length: noisePermutationSize }, (_, index) => index);
   for (let permutationIndex = noisePermutationMask; permutationIndex > 0; permutationIndex--) {
     const shuffledIndex = Math.floor(random() * (permutationIndex + 1));
-    [permutation[permutationIndex], permutation[shuffledIndex]] = [permutation[shuffledIndex], permutation[permutationIndex]];
+    [permutation[permutationIndex], permutation[shuffledIndex]] = [
+      permutation[shuffledIndex],
+      permutation[permutationIndex],
+    ];
   }
   const repeatedPermutation = [...permutation, ...permutation];
   /** Makes interpolation smooth at lattice boundaries. */
@@ -39,16 +52,46 @@ export function createSeededNoiseSampler(seed: number): (x: number, y: number) =
     const wrappedRow = floorY & noisePermutationMask;
     const fractionalX = x - floorX;
     const fractionalY = y - floorY;
-    return Math.SQRT2 * interpolateLinearly(
-      interpolateLinearly(calculateGradientDotProduct(repeatedPermutation[repeatedPermutation[wrappedColumn] + wrappedRow], fractionalX, fractionalY), calculateGradientDotProduct(repeatedPermutation[repeatedPermutation[wrappedColumn + 1] + wrappedRow], fractionalX - 1, fractionalY), calculateFadeWeight(fractionalX)),
-      interpolateLinearly(calculateGradientDotProduct(repeatedPermutation[repeatedPermutation[wrappedColumn] + wrappedRow + 1], fractionalX, fractionalY - 1), calculateGradientDotProduct(repeatedPermutation[repeatedPermutation[wrappedColumn + 1] + wrappedRow + 1], fractionalX - 1, fractionalY - 1), calculateFadeWeight(fractionalX)),
-      calculateFadeWeight(fractionalY),
+    return (
+      Math.SQRT2 *
+      interpolateLinearly(
+        interpolateLinearly(
+          calculateGradientDotProduct(
+            repeatedPermutation[repeatedPermutation[wrappedColumn] + wrappedRow],
+            fractionalX,
+            fractionalY,
+          ),
+          calculateGradientDotProduct(
+            repeatedPermutation[repeatedPermutation[wrappedColumn + 1] + wrappedRow],
+            fractionalX - 1,
+            fractionalY,
+          ),
+          calculateFadeWeight(fractionalX),
+        ),
+        interpolateLinearly(
+          calculateGradientDotProduct(
+            repeatedPermutation[repeatedPermutation[wrappedColumn] + wrappedRow + 1],
+            fractionalX,
+            fractionalY - 1,
+          ),
+          calculateGradientDotProduct(
+            repeatedPermutation[repeatedPermutation[wrappedColumn + 1] + wrappedRow + 1],
+            fractionalX - 1,
+            fractionalY - 1,
+          ),
+          calculateFadeWeight(fractionalX),
+        ),
+        calculateFadeWeight(fractionalY),
+      )
     );
   };
 }
 
 /** Builds a stable world-space height sampler for one landscape seed. */
-export function createTerrainSampler(seed: number, settings: Readonly<TerrainConfiguration>): (x: number, y: number) => number {
+export function createTerrainSampler(
+  seed: number,
+  settings: Readonly<TerrainConfiguration>,
+): (x: number, y: number) => number {
   const noise = createSeededNoiseSampler(seed);
   const random = createSeededRandomGenerator(seed ^ terrainOffsetSeedMask);
   const offsetX = random() * terrainNoiseOffsetRange;
@@ -59,10 +102,13 @@ export function createTerrainSampler(seed: number, settings: Readonly<TerrainCon
     // Rotate the noise lattice and offset away from integer-lattice symmetry.
     const rotatedX = (x * Math.cos(angle) - y * Math.sin(angle)) / settings.featureScale;
     const rotatedY = (x * Math.sin(angle) + y * Math.cos(angle)) / settings.featureScale;
-    return settings.noiseOctaves.reduce((height, octave) => height + octave.amplitude * noise(
-      rotatedX * octave.frequency + offsetX,
-      rotatedY * octave.frequency + offsetY,
-    ), 0);
+    return settings.noiseOctaves.reduce(
+      (height, octave) =>
+        height +
+        octave.amplitude *
+          noise(rotatedX * octave.frequency + offsetX, rotatedY * octave.frequency + offsetY),
+      0,
+    );
   };
 }
 
@@ -76,8 +122,12 @@ export function sampleTerrain(
   let spacing: number = settings.sampleSpacing;
   /** Includes overscan at the current sampling resolution. */
   const calculateSampleDimensions = () => ({
-    columns: Math.ceil((width + settings.overscan) / spacing) + Math.ceil(settings.overscan / spacing) + 1,
-    rows: Math.ceil((height + settings.overscan) / spacing) + Math.ceil(settings.overscan / spacing) + 1,
+    columns:
+      Math.ceil((width + settings.overscan) / spacing) + Math.ceil(settings.overscan / spacing) + 1,
+    rows:
+      Math.ceil((height + settings.overscan) / spacing) +
+      Math.ceil(settings.overscan / spacing) +
+      1,
   });
   let { columns, rows } = calculateSampleDimensions();
   while (columns * rows > settings.maxSamples) {

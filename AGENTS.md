@@ -66,6 +66,13 @@
 - Name tests for the behavior and conditions they cover.
 - Add or update tests for meaningful behavior changes and shared logic.
 
+## Automated Checks
+
+- Run `npm run lint`, `npm run format:check`, and `npm run build` before committing; run tests appropriate to the change.
+- Use `npm run lint:fix` and `npm run format` for mechanical fixes. ESLint owns correctness; Prettier owns formatting.
+- Keep strict type-aware rules enabled. Fix unsafe lookups and unhandled promises at their boundaries; do not silence findings with `any`, non-null assertions, or blanket rule disables.
+- Keep public module contracts explicit. Prefix intentionally unused stub parameters with `_`.
+
 ## Observability
 
 - Log at meaningful system boundaries, especially external calls and handled failures.

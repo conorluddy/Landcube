@@ -1,7 +1,7 @@
 import type { operationErrorCodes } from '../constants/operations';
 
 export interface OperationError {
-  code: typeof operationErrorCodes[keyof typeof operationErrorCodes];
+  code: (typeof operationErrorCodes)[keyof typeof operationErrorCodes];
   message: string;
   retryable: boolean;
 }
