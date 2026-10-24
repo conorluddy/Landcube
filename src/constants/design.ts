@@ -35,6 +35,9 @@ export const designChangePriority = {
 
 export const versionOneDesignDefaults: Readonly<DesignSettings> = Object.freeze({
   seed: 0,
+  gridStyle: 'off',
+  gridSpacing: 80,
+  gridOpacity: 0.15,
   background: '#202326',
   lineColor: '#a4adb0',
   strokeWidth: 0.85,
@@ -64,6 +67,8 @@ export const versionOneDesignDefaults: Readonly<DesignSettings> = Object.freeze(
 
 export const designNumberConstraints = {
   seed: [0, maximumSeedValue, 1],
+  gridSpacing: [20, 240, 10],
+  gridOpacity: [0.05, 1, 0.01],
   strokeWidth: [0.3, 3, 0.05],
   strokeOpacity: [0.05, 1, 0.01],
   contourCount: [7, 49, 2],

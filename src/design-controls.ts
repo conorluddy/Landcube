@@ -109,6 +109,7 @@ export function mountDesignControls(actions: DesignControlActions): DesignContro
           ${createRangeControlMarkup('featureScale', 'Scale', ' px')}
         </div>
         ${createRangeControlMarkup('detail', 'Terrain detail')}
+        <div data-real-terrain-slot></div>
         <details><summary>Index contours<span aria-hidden="true">+</span></summary><div class="detail-content">
           <div class="select-row"><label for="indexStyle">Style</label><select id="indexStyle">${indexContourStyles.map((style) => `<option value="${style}">${style[0].toUpperCase()}${style.slice(1)}</option>`).join('')}</select></div>
           ${createRangeControlMarkup('indexEvery', 'Every N levels')}
@@ -119,6 +120,12 @@ export function mountDesignControls(actions: DesignControlActions): DesignContro
           <div class="select-row"><label for="summitMarkerSize">Size</label><select id="summitMarkerSize">${summitMarkerSizes.map((size) => `<option value="${size}">${size}</option>`).join('')}</select></div>
           <label class="toggle-row" for="summitTrianglesEnabled">Triangles<input type="checkbox" id="summitTrianglesEnabled" role="switch"></label>
           <label class="toggle-row" for="summitCrossesEnabled">Crosses<input type="checkbox" id="summitCrossesEnabled" role="switch"></label>
+        </div></details>
+        <details><summary>Grid overlay<span aria-hidden="true">+</span></summary><div class="detail-content">
+          <div class="select-row"><label for="gridStyle">Style</label><select id="gridStyle"><option value="off">Off</option><option value="squares">Squares</option><option value="crosses">Crosses</option></select></div>
+          ${createRangeControlMarkup('gridSpacing', 'Spacing', ' px')}
+          ${createRangeControlMarkup('gridOpacity', 'Opacity')}
+          <p>Decorative grid, spaced in pixels.</p>
         </div></details>
         <details><summary>Cursor interaction<span aria-hidden="true">+</span></summary><div class="detail-content">
           <label class="toggle-row" for="cursorEnabled">Enable interaction<input type="checkbox" id="cursorEnabled" role="switch"></label>

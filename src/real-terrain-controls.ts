@@ -1,0 +1,93 @@
+import { loadRealTerrain } from './real-terrain';
+import type { RealTerrain } from './real-terrain';
+
+/** Mounts explicit network loading controls; failed requests retain the current landscape. */
+export function mountRealTerrainControls(
+  panel: HTMLElement,
+  applyTerrain: (terrain: RealTerrain | undefined) => void,
+): void {
+  const section = document.createElement('details');
+
+  section.className = 'real-terrain-controls';
+  section.innerHTML = `<summary>Real terrain · experiment<span aria-hidden="true">+</span></summary><div class="detail-content">
+    <div class="select-row"><label for="terrain-place">Location</label><select id="terrain-place"><option value="53.01,-6.33">Wicklow Mountains</option><option value="45.83,6.86">Mont Blanc</option><option value="36.11,-112.11">Grand Canyon</option><option value="27.99,86.93">Everest</option></select></div>
+    <div class="control-grid"><label>Latitude<input id="terrain-latitude" type="number" min="-85" max="85" step="any" value="53.01"></label><label>Longitude<input id="terrain-longitude" type="number" min="-180" max="180" step="any" value="-6.33"></label></div>
+    <label>Area span (km)<input id="terrain-span" type="number" min="2" max="200" value="25"></label>
+    <div class="actions"><button type="button" data-load class="primary-button">Load terrain</button><button type="button" data-generated class="text-button">Use generated</button></div>
+    <p data-credit></p><p data-status role="status">Loads public elevation tiles. Location is session-only; Copy link saves styling only.</p>
+    <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">Terrain data sources & attribution ↗</a>
+  </div>`;
+  const slot = panel.querySelector('[data-real-terrain-slot]');
+
+  if (!slot) {
+    throw new Error('Real terrain control slot is missing.');
+  }
+
+  slot.replaceWith(section);
+  const latitude = section.querySelector<HTMLInputElement>('#terrain-latitude');
+  const longitude = section.querySelector<HTMLInputElement>('#terrain-longitude');
+  const span = section.querySelector<HTMLInputElement>('#terrain-span');
+  const loadButton = section.querySelector<HTMLButtonElement>('[data-load]');
+  const status = section.querySelector<HTMLElement>('[data-status]');
+  let requestVersion = 0;
+
+  if (!latitude || !longitude || !span || !loadButton || !status) {
+    throw new Error('Real terrain controls are incomplete.');
+  }
+
+  section.querySelector('select')?.addEventListener('change', (event) => {
+    if (event.target instanceof HTMLSelectElement) {
+      const coordinates = event.target.value.split(',');
+
+      latitude.value = coordinates[0];
+      longitude.value = coordinates[1];
+    }
+  });
+  section.querySelector('[data-generated]')?.addEventListener('click', () => {
+    requestVersion++;
+    loadButton.disabled = false;
+    applyTerrain(undefined);
+    status.textContent = 'Using generated terrain.';
+  });
+  loadButton.addEventListener('click', () => {
+    const version = ++requestVersion;
+
+    loadButton.disabled = true;
+    status.textContent = 'Downloading elevation tiles…';
+    void loadRealTerrain(latitude.valueAsNumber, longitude.valueAsNumber, span.valueAsNumber)
+      .then((terrain) => {
+        if (version !== requestVersion) {
+          return;
+        }
+
+        applyTerrain(terrain);
+        const credit = section.querySelector('[data-credit]');
+
+        if (credit) {
+          credit.textContent = terrain.attribution;
+        }
+
+        status.textContent =
+          'Real terrain loaded. Cursor deformation is disabled. Location is session-only.';
+        console.info(
+          JSON.stringify({
+            event: 'real_terrain_loaded',
+            latitude: latitude.valueAsNumber,
+            longitude: longitude.valueAsNumber,
+          }),
+        );
+      })
+      .catch((error: unknown) => {
+        if (version === requestVersion) {
+          status.textContent =
+            error instanceof Error ? error.message : 'Terrain could not load. Please retry.';
+          console.error('Terrain loading failed', error);
+        }
+      })
+      .finally(() => {
+        if (version === requestVersion) {
+          loadButton.disabled = false;
+        }
+      });
+  });
+}

@@ -1,3 +1,4 @@
+import type { RealTerrain } from './real-terrain';
 import { findTerrainSummits } from './summit-markers';
 import type { ContourPoint } from './types/contours';
 import { extractContours } from './contour-extraction';
@@ -33,10 +34,13 @@ export function generateLandscapeContours(
 export function generateLandscapeGeometry(
   settings: Readonly<DesignSettings>,
   engineConfiguration: Readonly<EngineConfiguration>,
+  realTerrain?: RealTerrain,
 ): { contours: Contour[]; summits: ContourPoint[] } {
   const terrainSettings = deriveTerrainConfiguration(settings, engineConfiguration);
   const field = sampleTerrain(
-    createTerrainSampler(settings.seed, terrainSettings),
+    realTerrain
+      ? (x, y) => realTerrain.sample(x, y, settings.width, settings.height)
+      : createTerrainSampler(settings.seed, terrainSettings),
     settings.width,
     settings.height,
     terrainSettings,

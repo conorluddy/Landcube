@@ -7,6 +7,9 @@ import type {
 
 export interface DesignSettings {
   seed: number;
+  gridStyle: 'off' | 'squares' | 'crosses';
+  gridSpacing: number;
+  gridOpacity: number;
   background: string;
   lineColor: string;
   strokeWidth: number;

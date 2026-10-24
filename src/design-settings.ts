@@ -218,6 +218,10 @@ function parseDesignSettingValue(
     return serializedValue === 'true' ? true : serializedValue === 'false' ? false : undefined;
   }
 
+  if (key === 'gridStyle') {
+    return ['off', 'squares', 'crosses'].includes(serializedValue) ? serializedValue : undefined;
+  }
+
   if (key === 'summitMarkerSize') {
     return summitMarkerSizes.some((size) => size === serializedValue) ? serializedValue : undefined;
   }
