@@ -35,6 +35,8 @@ Prettier handles layout: two-space indentation, single quotes, semicolons, trail
 
 Run `npm run lint:fix` followed by `npm run format` to apply both spacing and layout. Generated output, validation images, caches, and the npm-managed lockfile are excluded from formatting. CI fails on formatting differences or any lint warning.
 
+`npm install` also installs the Husky pre-commit hook. Each commit runs Prettier on staged files through lint-staged and stages the formatting changes automatically. Unstaged edits are preserved, and unsupported files and paths in `.prettierignore` are skipped.
+
 ## CI and GitHub Pages
 
 [Build and deploy site](.github/workflows/build.yml) runs on pushes, pull requests, and manual dispatch. It installs locked dependencies with Node.js 22, checks formatting and linting, runs the logic tests, builds the production site into `dist/`, and uploads that directory as the `github-pages` artifact. Successful builds on `main` also deploy the artifact to GitHub Pages; pull requests only run the checks and build.
