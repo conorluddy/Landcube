@@ -348,3 +348,113 @@ test('summit markers retain their elements and transition as cursor terrain chan
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(marker).toHaveCSS('transition-duration', '0s');
 });
+
+for (const markers of [
+  'summitTrianglesEnabled=true',
+  'summitCrossesEnabled=true',
+  'summitTrianglesEnabled=true&summitCrossesEnabled=true',
+]) {
+  test(`preview and PNG decode with ${markers}`, async ({ page }) => {
+    await page.goto(`${fixtureUrl}?v=1&seed=234&width=480&height=320&${markers}`);
+    await page.getByRole('button', { name: 'Export ↗' }).click();
+    const preview = page.locator('#output-preview-image');
+
+    await expect(preview).toBeVisible();
+    const svg = await preview.evaluate(async (element) => {
+      const image = element as HTMLImageElement;
+
+      await image.decode();
+
+      return fetch(image.src).then((response) => response.text());
+    });
+
+    expect(svg).toContain('data-summit-markers=""');
+    expect(svg).toContain('transform="translate(');
+    expect((await readDownload(await downloadImage(page, 'Download SVG'))).toString()).toBe(svg);
+    await page.getByLabel('Format', { exact: true }).selectOption('png');
+    expect(
+      await readPng(page, await readDownload(await downloadImage(page, 'Download PNG'))),
+    ).toMatchObject({ width: 480, height: 320, cornerAlpha: 255 });
+  });
+}
+
+test('preview preserves the decoded image on failure and retries the same design on reopening', async ({
+  page,
+}) => {
+  await page.goto(`${fixtureUrl}?v=1&seed=123&width=480&height=320`);
+  await page.getByRole('button', { name: 'Export ↗' }).click();
+  const preview = page.locator('#output-preview-image');
+
+  await expect(preview).toBeVisible();
+  const originalUrl = await preview.getAttribute('src');
+
+  await page.evaluate(() => {
+    const decode = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'decode')?.value as (
+      this: HTMLImageElement,
+    ) => Promise<void>;
+
+    HTMLImageElement.prototype.decode = function () {
+      HTMLImageElement.prototype.decode = decode;
+
+      return Promise.reject(new Error('Simulated decode failure'));
+    };
+  });
+  await page.getByLabel('Transparent background').check();
+  await expect(page.locator('#preview-error')).toBeVisible();
+  await expect(preview).toHaveAttribute('src', originalUrl ?? '');
+  await expect(preview).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download SVG', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Export ↗' }).click();
+  await expect(preview).not.toHaveAttribute('src', originalUrl ?? '');
+  await expect(page.locator('#preview-error')).toBeHidden();
+});
+
+test('a late preview cannot overwrite newer settings and page restoration recreates released images', async ({
+  page,
+}) => {
+  await page.goto(`${fixtureUrl}?v=1&seed=123&width=480&height=320`);
+  await page.getByRole('button', { name: 'Export ↗' }).click();
+  const preview = page.locator('#output-preview-image');
+
+  await expect(preview).toBeVisible();
+  await page.evaluate(() => {
+    const decode = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'decode')?.value as (
+      this: HTMLImageElement,
+    ) => Promise<void>;
+
+    HTMLImageElement.prototype.decode = async function () {
+      HTMLImageElement.prototype.decode = decode;
+      await decode.call(this);
+      document.documentElement.dataset.delayedPreview = 'waiting';
+      await new Promise<void>((resolve) => {
+        document.addEventListener(
+          'release-preview',
+          () => {
+            resolve();
+          },
+          { once: true },
+        );
+      });
+      document.documentElement.dataset.delayedPreview = 'finished';
+    };
+  });
+  await page.getByLabel('Width', { exact: true }).fill('640');
+  await page.getByLabel('Width', { exact: true }).press('Tab');
+  await expect(page.locator('html')).toHaveAttribute('data-delayed-preview', 'waiting');
+  await page.getByLabel('Height', { exact: true }).fill('480');
+  await page.getByLabel('Height', { exact: true }).press('Tab');
+  await expect
+    .poll(() => preview.evaluate((image) => (image as HTMLImageElement).naturalHeight))
+    .toBe(480);
+  const latestUrl = await preview.getAttribute('src');
+
+  await page.evaluate(() => document.dispatchEvent(new Event('release-preview')));
+  await expect(page.locator('html')).toHaveAttribute('data-delayed-preview', 'finished');
+  await expect(preview).toHaveAttribute('src', latestUrl ?? '');
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
+  await expect(preview).toBeHidden();
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow')));
+  await expect(preview).toBeVisible();
+  await expect(preview).not.toHaveAttribute('src', latestUrl ?? '');
+});

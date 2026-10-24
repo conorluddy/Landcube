@@ -43,7 +43,8 @@ export function mountExportControls(
     <p id="dimension-hint" class="export-hint"></p>
     <div id="png-options" class="select-row"><label for="pngScale">Resolution</label><select id="pngScale">${pngResolutionScales.map((scale) => `<option value="${scale}">${scale}×</option>`).join('')}</select></div>
     <label class="toggle-row" for="transparent">Transparent background<input id="transparent" type="checkbox" role="switch"></label>
-    <div class="output-preview"><img id="output-preview-image" alt="Settled landscape export preview"></div>
+    <p id="preview-error" role="status" hidden></p>
+    <div class="output-preview"><img id="output-preview-image" alt="Settled landscape export preview" hidden></div>
     <p id="output-dimensions" class="export-hint"></p><p id="export-error" role="status" hidden></p>
     <button type="button" id="download" class="primary-button">Download SVG</button>`;
   getRequiredElement(panel, '#shared-footer', HTMLElement).before(content);
@@ -52,11 +53,14 @@ export function mountExportControls(
   const settingsContent = getRequiredElement(panel, '#settings-content', HTMLElement);
   const downloadButton = getRequiredElement(content, '#download', HTMLButtonElement);
   const previewImage = getRequiredElement(content, '#output-preview-image', HTMLImageElement);
+  const previewErrorText = getRequiredElement(content, '#preview-error', HTMLElement);
   const errorText = getRequiredElement(content, '#export-error', HTMLElement);
   let state: ExportState = { phase: 'idle' };
   let previewUrl: string | undefined;
   let previousSvg: string | undefined;
   let previewAnimationFrameIdentifier: number | undefined;
+  let previewRevision = 0;
+  let pendingSvg: string | undefined;
 
   /** Keeps export failure state and accessible feedback consistent. */
   const reportError = (error: OperationError, isDownloadError = false) => {
@@ -127,32 +131,78 @@ export function mountExportControls(
     previewAnimationFrameIdentifier = requestAnimationFrame(() => {
       previewAnimationFrameIdentifier = undefined;
 
-      try {
-        const svg = createExportPreviewSvg(actions.getSettings(), renderer);
-
-        if (svg === previousSvg) {
-          return;
-        }
-
-        const nextUrl = URL.createObjectURL(new Blob([svg], { type: imageMimeTypes.svg }));
-
-        if (previewUrl !== undefined) {
-          URL.revokeObjectURL(previewUrl);
-        }
-
-        previousSvg = svg;
-        previewUrl = nextUrl;
-        previewImage.hidden = false;
-        previewImage.src = nextUrl;
-      } catch {
-        previousSvg = undefined;
-        reportError({
-          code: operationErrorCodes.exportFailed,
-          message: 'Could not generate the preview. Reduce the output dimensions and try again.',
-          retryable: true,
-        });
-      }
+      void updatePreview();
     });
+  }
+
+  /** Publishes only decoded images and ignores obsolete asynchronous results. */
+  async function updatePreview(): Promise<void> {
+    let nextUrl: string | undefined;
+    let revision = previewRevision;
+    let hasPendingRequest = false;
+
+    try {
+      const svg = createExportPreviewSvg(actions.getSettings(), renderer);
+
+      if (svg === previousSvg) {
+        previewRevision++;
+        pendingSvg = undefined;
+        previewErrorText.hidden = true;
+
+        return;
+      }
+
+      if (svg === pendingSvg) {
+        return;
+      }
+
+      revision = ++previewRevision;
+      pendingSvg = svg;
+      hasPendingRequest = true;
+      nextUrl = URL.createObjectURL(new Blob([svg], { type: imageMimeTypes.svg }));
+      const candidate = new Image();
+
+      candidate.src = nextUrl;
+      await candidate.decode();
+
+      if (revision !== previewRevision) {
+        return;
+      }
+
+      const previousUrl = previewUrl;
+
+      previewImage.src = nextUrl;
+      previewImage.hidden = false;
+      previewUrl = nextUrl;
+      nextUrl = undefined;
+      previousSvg = svg;
+
+      if (previousUrl !== undefined) {
+        URL.revokeObjectURL(previousUrl);
+      }
+
+      previewErrorText.hidden = true;
+    } catch {
+      if (revision === previewRevision) {
+        const error = {
+          code: operationErrorCodes.exportFailed,
+          message: 'Could not display the preview. Reopen Export to try again.',
+          retryable: true,
+        };
+
+        logOperationError(error);
+        previewErrorText.textContent = error.message;
+        previewErrorText.hidden = false;
+      }
+    } finally {
+      if (nextUrl !== undefined) {
+        URL.revokeObjectURL(nextUrl);
+      }
+
+      if (hasPendingRequest && revision === previewRevision) {
+        pendingSvg = undefined;
+      }
+    }
   }
 
   /** Shows one stage at a time while preserving edits and export state. */
@@ -261,21 +311,16 @@ export function mountExportControls(
       refreshExportControls();
     });
   });
-  previewImage.addEventListener('error', () => {
-    previewImage.hidden = true;
-    previousSvg = undefined;
-    reportError({
-      code: operationErrorCodes.exportFailed,
-      message: 'The preview could not be displayed. Try reopening Export or choose a smaller size.',
-      retryable: true,
-    });
-  });
   window.addEventListener('pagehide', () => {
     /** Releases preview resources when the document leaves the active page. */
     if (previewUrl !== undefined) {
       URL.revokeObjectURL(previewUrl);
     }
 
+    previewRevision++;
+    pendingSvg = undefined;
+    previewImage.hidden = true;
+    previewImage.removeAttribute('src');
     previewUrl = previousSvg = undefined;
 
     if (previewAnimationFrameIdentifier !== undefined) {

@@ -68,7 +68,7 @@ export function createSummitMarkerMarkup(
   const triangle = settings.summitTrianglesEnabled ? '<path d="M0,-7L6,4L-6,4Z"/>' : '';
   const cross = settings.summitCrossesEnabled ? '<path d="M-2.5,0H2.5M0,-2.5V2.5"/>' : '';
 
-  return `<g data-summit-markers fill="none" stroke="${settings.lineColor}" stroke-width="${settings.strokeWidth}" stroke-opacity="${settings.strokeOpacity}" stroke-linecap="round" stroke-linejoin="round">${summits.map(({ x, y }) => `<g transform="translate(${x},${y}) scale(${scale})">${triangle}${cross}</g>`).join('')}</g>`;
+  return `<g data-summit-markers="" fill="none" stroke="${settings.lineColor}" stroke-width="${settings.strokeWidth}" stroke-opacity="${settings.strokeOpacity}" stroke-linecap="round" stroke-linejoin="round">${summits.map(({ x, y }) => `<g transform="translate(${x},${y}) scale(${scale})">${triangle}${cross}</g>`).join('')}</g>`;
 }
 
 /** Retains nearby live marker elements so CSS can interpolate their movement between samples. */
