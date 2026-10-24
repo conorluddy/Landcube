@@ -1,5 +1,8 @@
 # Topogra
 
+<img width="1512" height="830" alt="Screenshot 2026-10-24 at 16 08 03" src="https://github.com/user-attachments/assets/6bb628c7-cc4b-424b-a004-409b6e4c09ef" />
+
+
 A local topographic background generator with a cursor-driven hill, glass style panel, shareable designs, and SVG/PNG export. Everything runs in the browser; no accounts, backend, external assets, or runtime network requests.
 
 ## Run locally
