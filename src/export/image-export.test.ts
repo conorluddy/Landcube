@@ -4,7 +4,12 @@ import { parseDesignParameters, validateDesignSettings } from '../design-setting
 import { generateLandscapeContours } from '../landscape-composition';
 import { createSvgDocument } from '../svg-rendering';
 import type { DesignSettings } from '../types/design';
-import { createExportFile, createOutputRenderer, getRasterDimensions } from './image-export';
+import {
+  createExportPreviewSvg,
+  createExportFile,
+  createOutputRenderer,
+  getRasterDimensions,
+} from './image-export';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
@@ -296,4 +301,28 @@ await test('extra-large PNG limits include resolution scaling', () => {
     getRasterDimensions(design({ width: 6145, pngScale: 2, allowExtraLargeExports: true })).ok,
     false,
   );
+});
+
+await test('large export previews cap intrinsic size while preserving full geometry and download dimensions', () => {
+  for (const [width, height, previewWidth, previewHeight] of [
+    [12288, 12288, 1024, 1024],
+    [12288, 6144, 1024, 512],
+    [6144, 12288, 512, 1024],
+    [320, 240, 320, 240],
+  ]) {
+    const settings = design({ width, height, allowExtraLargeExports: true });
+    const renderer = createOutputRenderer(engineConfiguration);
+    const fullSvg = renderer.getSvg(settings);
+    const previewSvg = createExportPreviewSvg(settings, renderer);
+
+    assert.ok(
+      previewSvg.startsWith(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${previewWidth}" height="${previewHeight}"`,
+      ),
+    );
+    assert.ok(previewSvg.includes(`viewBox="0 0 ${width} ${height}"`));
+    assert.deepEqual(geometry(previewSvg), geometry(fullSvg));
+    assert.equal(renderer.getSvg(settings), fullSvg);
+    assert.equal(previewSvg.slice(previewSvg.indexOf('>')), fullSvg.slice(fullSvg.indexOf('>')));
+  }
 });

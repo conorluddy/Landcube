@@ -15,7 +15,12 @@ import { logOperationError } from '../operation-logging';
 import type { DesignSettings } from '../types/design';
 import type { ExportActions, ExportState, OutputRenderer } from '../types/export';
 import type { OperationError } from '../types/operations';
-import { createExportFile, downloadExport, getRasterDimensions } from './image-export';
+import {
+  createExportPreviewSvg,
+  createExportFile,
+  downloadExport,
+  getRasterDimensions,
+} from './image-export';
 
 // === PUBLIC API ===
 /** Coordinates export options, settled previews, and download feedback. */
@@ -123,7 +128,7 @@ export function mountExportControls(
       previewAnimationFrameIdentifier = undefined;
 
       try {
-        const svg = renderer.getSvg(actions.getSettings());
+        const svg = createExportPreviewSvg(actions.getSettings(), renderer);
 
         if (svg === previousSvg) {
           return;
@@ -137,6 +142,7 @@ export function mountExportControls(
 
         previousSvg = svg;
         previewUrl = nextUrl;
+        previewImage.hidden = false;
         previewImage.src = nextUrl;
       } catch {
         previousSvg = undefined;
@@ -256,6 +262,7 @@ export function mountExportControls(
     });
   });
   previewImage.addEventListener('error', () => {
+    previewImage.hidden = true;
     previousSvg = undefined;
     reportError({
       code: operationErrorCodes.exportFailed,

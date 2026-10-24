@@ -508,3 +508,13 @@ input[aria-invalid='true'] {
 .random-swatch {
   background: conic-gradient(from 30deg, #d5a0bf, #b8cf91, #8cb8cc, #d5a0bf);
 }
+
+.summit-marker {
+  transition: transform 120ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .summit-marker {
+    transition: none;
+  }
+}

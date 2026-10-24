@@ -2,7 +2,11 @@ import {
   maximumOutputDimensionPixels,
   maximumExtraLargeOutputDimensionPixels,
 } from '../constants/design';
-import { downloadUrlReleaseDelayMs, imageMimeTypes } from '../constants/export';
+import {
+  downloadUrlReleaseDelayMs,
+  imageMimeTypes,
+  maximumPreviewDimensionPixels,
+} from '../constants/export';
 import { operationErrorCodes } from '../constants/operations';
 import { generateLandscapeGeometry } from '../landscape-composition';
 import { createSvgDocument } from '../svg-rendering';
@@ -40,6 +44,27 @@ export function createOutputRenderer(
       return createSvgDocument(geometry.contours, settings, geometry.summits);
     },
   };
+}
+
+/** Caps the preview's intrinsic raster size while preserving the full export framing and geometry. */
+export function createExportPreviewSvg(
+  settings: ValidatedDesignSettings,
+  renderer: OutputRenderer,
+): string {
+  const scale = Math.min(
+    1,
+    maximumPreviewDimensionPixels / Math.max(settings.width, settings.height),
+  );
+  const width = Math.max(1, Math.round(settings.width * scale));
+  const height = Math.max(1, Math.round(settings.height * scale));
+
+  return renderer
+    .getSvg(settings)
+    .replace(/^<svg\b[^>]*>/, (root) =>
+      root
+        .replace(/\bwidth="[^"]*"/, `width="${width}"`)
+        .replace(/\bheight="[^"]*"/, `height="${height}"`),
+    );
 }
 
 /** Rejects PNG scales that exceed the final pixel budget. */

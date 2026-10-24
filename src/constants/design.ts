@@ -75,7 +75,7 @@ export const designNumberConstraints = {
   dashGap: [1, 20, 1],
   cursorRadius: [60, 400, 10],
   cursorHeight: [-0.6, 0.6, 0.02],
-  cursorResponseMs: [20, 500, 10],
+  cursorResponseMs: [20, 3000, 10],
   width: [minimumOutputDimensionPixels, maximumExtraLargeOutputDimensionPixels, 1],
   height: [minimumOutputDimensionPixels, maximumExtraLargeOutputDimensionPixels, 1],
 } as const;

@@ -70,3 +70,83 @@ export function createSummitMarkerMarkup(
 
   return `<g data-summit-markers fill="none" stroke="${settings.lineColor}" stroke-width="${settings.strokeWidth}" stroke-opacity="${settings.strokeOpacity}" stroke-linecap="round" stroke-linejoin="round">${summits.map(({ x, y }) => `<g transform="translate(${x},${y}) scale(${scale})">${triangle}${cross}</g>`).join('')}</g>`;
 }
+
+/** Retains nearby live marker elements so CSS can interpolate their movement between samples. */
+export function updateLiveSummitMarkers(
+  svg: SVGSVGElement,
+  summits: readonly ContourPoint[],
+  settings: Readonly<DesignSettings>,
+): void {
+  let markerLayer = svg.querySelector<SVGGElement>('[data-summit-markers]');
+  const markup = createSummitMarkerMarkup(summits, settings);
+
+  if (!markup) {
+    markerLayer?.remove();
+
+    return;
+  }
+
+  const template = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+  template.innerHTML = markup;
+  const nextLayer = template.querySelector<SVGGElement>('[data-summit-markers]');
+
+  if (!nextLayer) {
+    throw new Error('Summit marker markup must contain a marker layer.');
+  }
+
+  if (!markerLayer) {
+    markerLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    svg.append(markerLayer);
+  }
+
+  for (const attribute of nextLayer.attributes) {
+    markerLayer.setAttribute(attribute.name, attribute.value);
+  }
+
+  const unmatchedMarkers = new Set(markerLayer.querySelectorAll<SVGGElement>(':scope > g'));
+  const scale = summitMarkerSizeScales[settings.summitMarkerSize];
+
+  for (const [index, summit] of summits.entries()) {
+    let nearestMarker: SVGGElement | undefined;
+    let nearestDistancePixels = minimumSummitSeparationPixels * 2;
+
+    for (const marker of unmatchedMarkers) {
+      const distancePixels = Math.hypot(
+        Number(marker.dataset.summitX) - summit.x,
+        Number(marker.dataset.summitY) - summit.y,
+      );
+
+      if (distancePixels < nearestDistancePixels) {
+        nearestMarker = marker;
+        nearestDistancePixels = distancePixels;
+      }
+    }
+
+    const nextMarker = nextLayer.children.item(index);
+
+    if (!nextMarker) {
+      throw new Error('Each terrain summit must have a marker element.');
+    }
+
+    const marker = nearestMarker ?? document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+    unmatchedMarkers.delete(marker);
+    marker.classList.add('summit-marker');
+    marker.dataset.summitX = String(summit.x);
+    marker.dataset.summitY = String(summit.y);
+    marker.style.transform = `translate(${summit.x}px, ${summit.y}px) scale(${scale})`;
+
+    if (marker.innerHTML !== nextMarker.innerHTML) {
+      marker.innerHTML = nextMarker.innerHTML;
+    }
+
+    if (!nearestMarker) {
+      markerLayer.append(marker);
+    }
+  }
+
+  for (const marker of unmatchedMarkers) {
+    marker.remove();
+  }
+}

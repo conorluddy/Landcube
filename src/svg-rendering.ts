@@ -1,4 +1,4 @@
-import { createSummitMarkerMarkup } from './summit-markers';
+import { createSummitMarkerMarkup, updateLiveSummitMarkers } from './summit-markers';
 import type { Contour, ContourPoint } from './types/contours';
 import type { DesignSettings } from './types/design';
 
@@ -18,8 +18,16 @@ export function renderContoursIntoSvg(
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   svg.setAttribute('width', String(width));
   svg.setAttribute('height', String(height));
-  svg.innerHTML =
-    getContourMarkup(contours, settings) + createSummitMarkerMarkup(summits, settings);
+  let contourLayer = svg.querySelector<SVGGElement>('[data-contours]');
+
+  if (!contourLayer) {
+    contourLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    contourLayer.setAttribute('data-contours', '');
+    svg.prepend(contourLayer);
+  }
+
+  contourLayer.innerHTML = getContourMarkup(contours, settings);
+  updateLiveSummitMarkers(svg, summits, settings);
 }
 
 /** Creates a standalone, clipped SVG with explicit appearance settings. */

@@ -198,7 +198,10 @@ test('mobile controls, invalid links, clipboard fallback and keyboard collapse s
   await expect(page.locator('#manual-link')).toBeVisible();
   expect(await page.locator('#manual-link').inputValue()).toContain('seed=123');
   await page.getByRole('button', { name: 'Export ↗' }).click();
-  await page.getByLabel('Size', { exact: true }).selectOption('1080x1920');
+  await page
+    .locator('#export-content')
+    .getByLabel('Size', { exact: true })
+    .selectOption('1080x1920');
   await expect(page.getByLabel('Height', { exact: true })).toHaveValue('1920');
   await page.getByLabel('Height', { exact: true }).press('Escape');
   await expect(page.locator('#export-content')).toBeHidden();
@@ -309,4 +312,39 @@ test('Random is a fifth palette option and generates new colours without changin
   await expect(page.locator('[data-preset][aria-pressed="true"]')).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: 'test-results/random-palette-mobile.png' });
+});
+
+test('summit markers retain their elements and transition as cursor terrain changes', async ({
+  page,
+}) => {
+  await page.goto(`${fixtureUrl}?v=1&seed=234&summitTrianglesEnabled=true&cursorResponseMs=120`);
+  const summit = await page.locator('.summit-marker').evaluateAll((markers) => {
+    const marker = markers.find(
+      (element) =>
+        Number((element as SVGGElement).dataset.summitX) > 500 &&
+        Number((element as SVGGElement).dataset.summitX) < 1100 &&
+        Number((element as SVGGElement).dataset.summitY) > 100 &&
+        Number((element as SVGGElement).dataset.summitY) < 650,
+    ) as SVGGElement | undefined;
+
+    if (!marker) {
+      throw new Error('Expected an unobstructed summit in the fixture');
+    }
+
+    marker.setAttribute('data-tracked-summit', '');
+
+    return {
+      x: Number(marker.dataset.summitX),
+      y: Number(marker.dataset.summitY),
+      transform: marker.style.transform,
+    };
+  });
+  const marker = page.locator('[data-tracked-summit]');
+
+  await expect(marker).toHaveCSS('transition-duration', '0.12s');
+  await page.mouse.move(summit.x + 70, summit.y + 30);
+  await expect(marker).not.toHaveAttribute('style', `transform: ${summit.transform};`);
+  await expect(marker).toHaveCount(1);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(marker).toHaveCSS('transition-duration', '0s');
 });
