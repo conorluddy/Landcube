@@ -1,3 +1,4 @@
+import { findTerrainSummits } from './summit-markers';
 import { getRequiredElement } from './dom-elements';
 import './landscape-studio.css';
 import { designChangePriority, versionOneDesignDefaults } from './constants/design';
@@ -79,6 +80,7 @@ let width = innerWidth;
 let height = innerHeight;
 let baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
 let contourElevations = calculateContourElevations(settings, engineConfiguration);
+let summits: ReturnType<typeof findTerrainSummits> = [];
 let contours: ReturnType<typeof extractContours> = [];
 let cursorAnimationFrameIdentifier: number | undefined;
 let lastCursorFrameTimeMs = 0;
@@ -188,7 +190,7 @@ function updateSettings(nextDesignSettings: DesignSettings): boolean {
     }
 
     if (change === 'appearance') {
-      renderContoursIntoSvg(terrainSvgElement, contours, width, height, settings);
+      renderContoursIntoSvg(terrainSvgElement, contours, width, height, settings, summits);
     } else if (change !== 'output') {
       renderCurrentLandscape();
     }
@@ -214,11 +216,11 @@ function applyPageStyle(): void {
 
 /** Renders the current cursor influence over cached base terrain. */
 function renderCurrentLandscape(): void {
-  contours = extractContours(
-    applyCursorElevation(baseHeightField, cursor, settings),
-    contourElevations,
-  );
-  renderContoursIntoSvg(terrainSvgElement, contours, width, height, settings);
+  const field = applyCursorElevation(baseHeightField, cursor, settings);
+
+  contours = extractContours(field, contourElevations);
+  summits = findTerrainSummits(field);
+  renderContoursIntoSvg(terrainSvgElement, contours, width, height, settings, summits);
 }
 
 /** Eases cursor deformation with capped frame pacing until settled. */

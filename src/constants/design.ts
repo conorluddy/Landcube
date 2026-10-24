@@ -6,7 +6,9 @@ export const minimumOutputDimensionPixels = 64;
 export const maximumOutputDimensionPixels = 4096;
 export const maximumExtraLargeOutputDimensionPixels = 12288;
 export const numericStepTolerance = 1e-6;
-export const indexContourStyles = ['dashed', 'solid', 'off'] as const;
+export const summitMarkerSizes = ['S', 'M', 'L'] as const;
+export const summitMarkerSizeScales = { S: 1, M: 1.5, L: 2 } as const;
+export const indexContourStyles = ['dashed', 'solid', 'alternating', 'off'] as const;
 export const imageExportFormats = ['svg', 'png'] as const;
 export const pngResolutionScales = [1, 2] as const;
 export const terrainSettingKeys: readonly (keyof DesignSettings)[] = [
@@ -45,6 +47,9 @@ export const versionOneDesignDefaults: Readonly<DesignSettings> = Object.freeze(
   indexStrokeWidth: 0.85,
   dashLength: 7,
   dashGap: 5,
+  summitMarkerSize: 'S',
+  summitTrianglesEnabled: false,
+  summitCrossesEnabled: false,
   cursorEnabled: true,
   cursorRadius: 190,
   cursorHeight: 0.32,

@@ -1,3 +1,5 @@
+import { findTerrainSummits } from './summit-markers';
+import type { ContourPoint } from './types/contours';
 import { extractContours } from './contour-extraction';
 import { deriveTerrainConfiguration } from './design-settings';
 import { createTerrainSampler, sampleTerrain } from './terrain-generation';
@@ -24,6 +26,14 @@ export function generateLandscapeContours(
   settings: Readonly<DesignSettings>,
   engineConfiguration: Readonly<EngineConfiguration>,
 ): Contour[] {
+  return generateLandscapeGeometry(settings, engineConfiguration).contours;
+}
+
+/** Samples settled terrain once for contour paths and summit symbols. */
+export function generateLandscapeGeometry(
+  settings: Readonly<DesignSettings>,
+  engineConfiguration: Readonly<EngineConfiguration>,
+): { contours: Contour[]; summits: ContourPoint[] } {
   const terrainSettings = deriveTerrainConfiguration(settings, engineConfiguration);
   const field = sampleTerrain(
     createTerrainSampler(settings.seed, terrainSettings),
@@ -32,5 +42,8 @@ export function generateLandscapeContours(
     terrainSettings,
   );
 
-  return extractContours(field, calculateContourElevations(settings, engineConfiguration));
+  return {
+    contours: extractContours(field, calculateContourElevations(settings, engineConfiguration)),
+    summits: findTerrainSummits(field),
+  };
 }

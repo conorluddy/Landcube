@@ -3,6 +3,7 @@ import { getRequiredElement } from './dom-elements';
 import {
   designNumberConstraints,
   indexContourStyles,
+  summitMarkerSizes,
   versionOneDesignDefaults,
 } from './constants/design';
 import { readDesignControlValue } from './design-control-values';
@@ -113,6 +114,11 @@ export function mountDesignControls(actions: DesignControlActions): DesignContro
           ${createRangeControlMarkup('indexEvery', 'Every N levels')}
           ${createRangeControlMarkup('indexStrokeWidth', 'Weight', ' px')}
           <div class="control-grid">${createRangeControlMarkup('dashLength', 'Dash', ' px')}${createRangeControlMarkup('dashGap', 'Gap', ' px')}</div>
+        </div></details>
+        <details><summary>Summit markers<span aria-hidden="true">+</span></summary><div class="detail-content">
+          <div class="select-row"><label for="summitMarkerSize">Size</label><select id="summitMarkerSize">${summitMarkerSizes.map((size) => `<option value="${size}">${size}</option>`).join('')}</select></div>
+          <label class="toggle-row" for="summitTrianglesEnabled">Triangles<input type="checkbox" id="summitTrianglesEnabled" role="switch"></label>
+          <label class="toggle-row" for="summitCrossesEnabled">Crosses<input type="checkbox" id="summitCrossesEnabled" role="switch"></label>
         </div></details>
         <details><summary>Cursor interaction<span aria-hidden="true">+</span></summary><div class="detail-content">
           <label class="toggle-row" for="cursorEnabled">Enable interaction<input type="checkbox" id="cursorEnabled" role="switch"></label>

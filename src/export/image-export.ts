@@ -4,7 +4,7 @@ import {
 } from '../constants/design';
 import { downloadUrlReleaseDelayMs, imageMimeTypes } from '../constants/export';
 import { operationErrorCodes } from '../constants/operations';
-import { generateLandscapeContours } from '../landscape-composition';
+import { generateLandscapeGeometry } from '../landscape-composition';
 import { createSvgDocument } from '../svg-rendering';
 import type { DesignSettings, ValidatedDesignSettings } from '../types/design';
 import type { ImageDimensions } from '../types/dimensions';
@@ -18,7 +18,7 @@ export function createOutputRenderer(
   engineConfiguration: Readonly<EngineConfiguration>,
 ): OutputRenderer {
   let cachedGeometryKey: string | undefined;
-  let contours: ReturnType<typeof generateLandscapeContours> = [];
+  let geometry: ReturnType<typeof generateLandscapeGeometry> = { contours: [], summits: [] };
 
   return {
     /** Reuses cached contours until a geometry-affecting setting changes. */
@@ -33,11 +33,11 @@ export function createOutputRenderer(
       ]);
 
       if (geometryCacheKey !== cachedGeometryKey) {
-        contours = generateLandscapeContours(settings, engineConfiguration);
+        geometry = generateLandscapeGeometry(settings, engineConfiguration);
         cachedGeometryKey = geometryCacheKey;
       }
 
-      return createSvgDocument(contours, settings);
+      return createSvgDocument(geometry.contours, settings, geometry.summits);
     },
   };
 }

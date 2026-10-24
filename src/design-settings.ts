@@ -3,6 +3,7 @@ import {
   designUrlVersion,
   imageExportFormats,
   indexContourStyles,
+  summitMarkerSizes,
   numericStepTolerance,
   maximumOutputDimensionPixels,
   outputSettingKeys,
@@ -207,8 +208,18 @@ function parseDesignSettingValue(
     return /^#[0-9a-f]{6}$/i.test(serializedValue) ? serializedValue.toLowerCase() : undefined;
   }
 
-  if (key === 'cursorEnabled' || key === 'transparent' || key === 'allowExtraLargeExports') {
+  if (
+    key === 'summitTrianglesEnabled' ||
+    key === 'summitCrossesEnabled' ||
+    key === 'cursorEnabled' ||
+    key === 'transparent' ||
+    key === 'allowExtraLargeExports'
+  ) {
     return serializedValue === 'true' ? true : serializedValue === 'false' ? false : undefined;
+  }
+
+  if (key === 'summitMarkerSize') {
+    return summitMarkerSizes.some((size) => size === serializedValue) ? serializedValue : undefined;
   }
 
   if (key === 'indexStyle') {

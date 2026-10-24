@@ -1,5 +1,6 @@
 import type {
   imageExportFormats,
+  summitMarkerSizes,
   indexContourStyles,
   pngResolutionScales,
 } from '../constants/design';
@@ -18,6 +19,9 @@ export interface DesignSettings {
   indexStrokeWidth: number;
   dashLength: number;
   dashGap: number;
+  summitMarkerSize: (typeof summitMarkerSizes)[number];
+  summitTrianglesEnabled: boolean;
+  summitCrossesEnabled: boolean;
   cursorEnabled: boolean;
   cursorRadius: number;
   cursorHeight: number;
