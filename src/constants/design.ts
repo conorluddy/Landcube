@@ -4,6 +4,7 @@ export const designUrlVersion = '1';
 export const maximumSeedValue = 0xffffffff;
 export const minimumOutputDimensionPixels = 64;
 export const maximumOutputDimensionPixels = 4096;
+export const maximumExtraLargeOutputDimensionPixels = 12288;
 export const numericStepTolerance = 1e-6;
 export const indexContourStyles = ['dashed', 'solid', 'off'] as const;
 export const imageExportFormats = ['svg', 'png'] as const;
@@ -13,7 +14,14 @@ export const terrainSettingKeys: readonly (keyof DesignSettings)[] = [
   'featureScale',
   'detail',
 ];
-export const outputSettingKeys = ['format', 'width', 'height', 'pngScale', 'transparent'] as const;
+export const outputSettingKeys = [
+  'format',
+  'width',
+  'height',
+  'pngScale',
+  'transparent',
+  'allowExtraLargeExports',
+] as const;
 
 export const designChangePriority = {
   output: 0,
@@ -46,6 +54,7 @@ export const versionOneDesignDefaults: Readonly<DesignSettings> = Object.freeze(
   height: 900,
   pngScale: 1,
   transparent: false,
+  allowExtraLargeExports: false,
 });
 
 export const designNumberConstraints = {
@@ -62,6 +71,6 @@ export const designNumberConstraints = {
   cursorRadius: [60, 400, 10],
   cursorHeight: [-0.6, 0.6, 0.02],
   cursorResponseMs: [20, 500, 10],
-  width: [minimumOutputDimensionPixels, maximumOutputDimensionPixels, 1],
-  height: [minimumOutputDimensionPixels, maximumOutputDimensionPixels, 1],
+  width: [minimumOutputDimensionPixels, maximumExtraLargeOutputDimensionPixels, 1],
+  height: [minimumOutputDimensionPixels, maximumExtraLargeOutputDimensionPixels, 1],
 } as const;

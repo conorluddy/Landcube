@@ -8,16 +8,20 @@ const fixtureUrl = pathToFileURL(resolve('.cache/browser-fixture.html')).href;
 /** Waits for the file produced by the chosen download action. */
 async function downloadImage(page: Page, label: string): Promise<Download> {
   const waiting = page.waitForEvent('download');
+
   await page.getByRole('button', { name: label, exact: true }).click();
+
   return waiting;
 }
 
 /** Reads a completed browser download from its saved path. */
 async function readDownload(download: Download): Promise<Buffer> {
   const file = await download.path();
+
   if (!file) {
     throw new Error('Download was not saved');
   }
+
   return readFile(file);
 }
 
@@ -29,16 +33,21 @@ async function readPng(
   return page.evaluate(async (base64) => {
     /** Inspects rendered output inside the browser. */
     const image = new Image();
+
     image.src = `data:image/png;base64,${base64}`;
     await image.decode();
     const canvas = document.createElement('canvas');
+
     canvas.width = image.width;
     canvas.height = image.height;
     const context = canvas.getContext('2d');
+
     if (!context) {
       throw new Error('Canvas unavailable');
     }
+
     context.drawImage(image, 0, 0);
+
     return {
       width: image.width,
       height: image.height,
@@ -53,6 +62,7 @@ test('editing, copying and reopening restores the full design and settled previe
 }) => {
   /** Verifies editing, copying and reopening restores the full design and settled preview. */
   const errors: string[] = [];
+
   page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', {
@@ -60,6 +70,7 @@ test('editing, copying and reopening restores the full design and settled previe
       value: {
         writeText: (value: string) => {
           document.documentElement.dataset.copiedLink = value;
+
           return Promise.resolve();
         },
       },
@@ -76,17 +87,22 @@ test('editing, copying and reopening restores the full design and settled previe
   await page.getByRole('button', { name: 'Copy link', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Link copied' })).toBeVisible();
   const url = await page.locator('html').getAttribute('data-copied-link');
+
   expect(url).toBeTruthy();
+
   if (url === null) {
     throw new Error('Copy link did not provide a URL');
   }
+
   expect(new URL(url).searchParams.get('detail')).toBe('0.99');
   await expect(page.locator('#output-preview-image')).toHaveAttribute('src', /^blob:/);
   const firstPreview = await page.locator('#output-preview-image').evaluate(async (image) => {
     await (image as HTMLImageElement).decode();
+
     return fetch((image as HTMLImageElement).src).then((response) => response.text());
   });
   const reopened = await context.newPage();
+
   await reopened.goto(url);
   await expect(reopened.getByRole('slider', { name: 'Terrain detail', exact: true })).toHaveValue(
     '0.99',
@@ -102,8 +118,10 @@ test('editing, copying and reopening restores the full design and settled previe
   await expect(reopened.locator('#output-preview-image')).toHaveAttribute('src', /^blob:/);
   const secondPreview = await reopened.locator('#output-preview-image').evaluate(async (image) => {
     await (image as HTMLImageElement).decode();
+
     return fetch((image as HTMLImageElement).src).then((response) => response.text());
   });
+
   expect(secondPreview).toBe(firstPreview);
   expect(errors).toEqual([]);
 });
@@ -115,11 +133,14 @@ test('SVG and PNG downloads match dimensions, transparency and the settled previ
   await page.goto(`${fixtureUrl}?v=1&seed=123&width=320&height=240&cursorEnabled=false`);
   await page.getByRole('button', { name: 'Export ↗' }).click();
   const opaqueSvg = (await readDownload(await downloadImage(page, 'Download SVG'))).toString();
+
   expect(opaqueSvg).toContain('fill="#202326"');
   await page.getByLabel('Transparent background').check();
   const svgDownload = await downloadImage(page, 'Download SVG');
+
   expect(svgDownload.suggestedFilename()).toBe('topogra-123-320x240.svg');
   const svg = (await readDownload(svgDownload)).toString();
+
   expect(svg).not.toContain('fill="#202326"');
   expect(svg).not.toContain('control-panel');
   const preview = await page
@@ -127,11 +148,14 @@ test('SVG and PNG downloads match dimensions, transparency and the settled previ
     .evaluate(async (image) =>
       fetch((image as HTMLImageElement).src).then((response) => response.text()),
     );
+
   expect(svg).toBe(preview);
   await page.getByLabel('Format', { exact: true }).selectOption('png');
+
   for (const scale of [1, 2]) {
     await page.getByLabel('Resolution', { exact: true }).selectOption(String(scale));
     const png = await downloadImage(page, 'Download PNG');
+
     expect(png.suggestedFilename()).toBe(`topogra-123-${320 * scale}x${240 * scale}.png`);
     expect(await readPng(page, await readDownload(png))).toEqual({
       width: 320 * scale,
@@ -139,11 +163,13 @@ test('SVG and PNG downloads match dimensions, transparency and the settled previ
       cornerAlpha: 0,
     });
   }
+
   await page.getByLabel('Transparent background').uncheck();
   const opaquePng = await readPng(
     page,
     await readDownload(await downloadImage(page, 'Download PNG')),
   );
+
   expect(opaquePng.cornerAlpha).toBe(255);
   await page.getByLabel('Width', { exact: true }).fill('4096');
   await page.getByLabel('Width', { exact: true }).press('Tab');
@@ -184,10 +210,103 @@ test('mobile controls, invalid links, clipboard fallback and keyboard collapse s
   await page.getByRole('button', { name: 'Expand controls' }).click();
   await expect(page.locator('#panel-body')).toBeVisible();
   const bounds = await page.locator('.control-panel').boundingBox();
+
   if (bounds === null) {
     throw new Error('The control panel has no layout bounds');
   }
+
   expect(bounds.width).toBeLessThanOrEqual(358);
   expect(bounds.height).toBeLessThanOrEqual(812);
   await page.screenshot({ path: 'test-results/mobile-controls.png' });
+});
+
+test('settings and export are separate stages that preserve edits', async ({ page }) => {
+  await page.goto(`${fixtureUrl}?v=1&seed=123&width=480&height=320`);
+  const settingsButton = page.getByRole('button', { name: 'Settings', exact: true });
+  const exportButton = page.getByRole('button', { name: 'Export ↗' });
+
+  await expect(settingsButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#export-content')).toBeHidden();
+  await page.getByRole('button', { name: 'Paper', exact: true }).click();
+  await exportButton.click();
+  await expect(page.locator('#settings-content')).toBeHidden();
+  await expect(exportButton).toHaveAttribute('aria-pressed', 'true');
+  await page.getByLabel('Width', { exact: true }).fill('640');
+  await page.getByLabel('Width', { exact: true }).press('Tab');
+  await settingsButton.click();
+  await expect(page.locator('#export-content')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Paper', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await exportButton.click();
+  await expect(page.getByLabel('Width', { exact: true })).toHaveValue('640');
+  await exportButton.press('Escape');
+  await expect(settingsButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(exportButton).toBeFocused();
+  await expect(page.getByRole('link', { name: 'GitHub' })).toHaveAttribute(
+    'href',
+    'https://github.com/conorluddy/Topogra',
+  );
+  await expect(page.getByRole('link', { name: 'conor.fyi' })).toHaveAttribute(
+    'href',
+    'https://conor.fyi',
+  );
+  await page.screenshot({ path: 'test-results/settings-mode.png' });
+  await exportButton.click();
+  await page.screenshot({ path: 'test-results/export-mode.png' });
+});
+
+test('extra-large exports require opt-in and return to standard sizes when disabled', async ({
+  page,
+}) => {
+  await page.goto(`${fixtureUrl}?v=1&seed=123&width=320&height=240`);
+  await page.getByRole('button', { name: 'Export ↗' }).click();
+  const width = page.getByLabel('Width', { exact: true });
+  const allowExtraLarge = page.getByLabel('Allow extra-large exports');
+
+  await expect(width).toHaveAttribute('max', '4096');
+  await expect(allowExtraLarge).not.toBeChecked();
+  await expect(page.locator('#large-export-warning')).toContainText('memory');
+  await allowExtraLarge.check();
+  await expect(width).toHaveAttribute('max', '12288');
+  await width.fill('6144');
+  await width.press('Tab');
+  const svg = (await readDownload(await downloadImage(page, 'Download SVG'))).toString();
+
+  expect(svg).toContain('viewBox="0 0 6144 240"');
+  await page.getByLabel('Format', { exact: true }).selectOption('png');
+  await page.getByLabel('Resolution', { exact: true }).selectOption('2');
+  await expect(page.getByRole('button', { name: 'Download PNG' })).toBeEnabled();
+  const largePng = await downloadImage(page, 'Download PNG');
+
+  expect(await readPng(page, await readDownload(largePng))).toMatchObject({
+    width: 12288,
+    height: 480,
+  });
+  await allowExtraLarge.uncheck();
+  await expect(width).toHaveValue('4096');
+  await expect(page.getByRole('button', { name: 'Download PNG' })).toBeDisabled();
+  await page.getByLabel('Resolution', { exact: true }).selectOption('1');
+  await expect(page.getByRole('button', { name: 'Download PNG' })).toBeEnabled();
+});
+
+test('Random is a fifth palette option and generates new colours without changing terrain', async ({
+  page,
+}) => {
+  await page.goto(`${fixtureUrl}?v=1&seed=123&width=320&height=240`);
+  await expect(page.locator('.presets button')).toHaveCount(5);
+  const background = page.getByLabel('Canvas', { exact: true });
+  const originalBackground = await background.inputValue();
+
+  await page.getByRole('button', { name: 'Random', exact: true }).click();
+  await expect(background).not.toHaveValue(originalBackground);
+  const firstBackground = await background.inputValue();
+
+  await page.getByRole('button', { name: 'Random', exact: true }).click();
+  await expect(background).not.toHaveValue(firstBackground);
+  await expect(page.locator('#seed-value')).toHaveText('123');
+  await expect(page.locator('[data-preset][aria-pressed="true"]')).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: 'test-results/random-palette-mobile.png' });
 });

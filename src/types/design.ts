@@ -27,6 +27,7 @@ export interface DesignSettings {
   height: number;
   pngScale: (typeof pngResolutionScales)[number];
   transparent: boolean;
+  allowExtraLargeExports: boolean;
 }
 
 declare const validatedDesign: unique symbol;

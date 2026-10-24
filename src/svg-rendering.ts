@@ -25,20 +25,25 @@ export function createSvgDocument(contours: Contour[], settings: Readonly<Design
   const backdrop = transparent
     ? ''
     : `<rect width="${width}" height="${height}" fill="${background}"/>`;
+
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" overflow="hidden"><defs><clipPath id="landscape-crop"><rect width="${width}" height="${height}"/></clipPath></defs><g clip-path="url(#landscape-crop)">${backdrop}${getContourMarkup(contours, settings)}</g></svg>`;
 }
 
 /** Groups ordinary and index contours into consistently styled paths. */
 function getContourMarkup(contours: Contour[], settings: Readonly<DesignSettings>): string {
   const interval = contours.length > 1 ? contours[1].elevation - contours[0].elevation : 1;
+
   /** Recognizes index levels despite floating-point elevation rounding. */
   const isIndexContour = (contour: Contour) => {
     if (settings.indexStyle === 'off') {
       return false;
     }
+
     const multiple = contour.elevation / (interval * settings.indexEvery);
+
     return Math.abs(multiple - Math.round(multiple)) < indexContourElevationTolerance;
   };
+
   return [false, true]
     .map((index) => {
       /** Keeps index strokes separate while preserving contour topology. */
@@ -60,6 +65,7 @@ function getContourMarkup(contours: Contour[], settings: Readonly<DesignSettings
           ),
         )
         .join('');
+
       return `<path fill="none" stroke="${settings.lineColor}" stroke-width="${index ? settings.indexStrokeWidth : settings.strokeWidth}" stroke-opacity="${settings.strokeOpacity}" stroke-linejoin="round" stroke-linecap="round"${dashAttribute} d="${pathData}"/>`;
     })
     .join('');

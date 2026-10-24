@@ -24,6 +24,7 @@ await test('cursor adds a smooth local hill, preserves cached terrain, and resto
     raised.values[
       ((y - base.originY) / base.spacing) * base.columns + (x - base.originX) / base.spacing
     ];
+
   assert.equal(at(200, 200), versionOneDesignDefaults.cursorHeight);
   assert.equal(at(200 + versionOneDesignDefaults.cursorRadius, 200), 0);
   assert.equal(at(0, 0), 0);
@@ -40,11 +41,13 @@ await test('cursor adds a smooth local hill, preserves cached terrain, and resto
     { x: 200, y: 200, strength: 0.5 },
     versionOneDesignDefaults,
   );
+
   assert.ok(partial.values.every((value, index) => value === raised.values[index] * 0.5));
 });
 
 await test('cursor-influenced contours remain closed or terminate on the field boundary', () => {
   const base = sampleTerrain(createTerrainSampler(7, terrainSettings), 390, 844, terrainSettings);
+
   for (const position of [
     { x: 0, y: 0 },
     { x: 195, y: 422 },
@@ -55,6 +58,7 @@ await test('cursor-influenced contours remain closed or terminate on the field b
       { ...position, strength: 1 },
       versionOneDesignDefaults,
     );
+
     for (const elevation of calculateContourElevations(
       versionOneDesignDefaults,
       engineConfiguration,

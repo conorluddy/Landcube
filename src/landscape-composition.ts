@@ -31,5 +31,6 @@ export function generateLandscapeContours(
     settings.height,
     terrainSettings,
   );
+
   return extractContours(field, calculateContourElevations(settings, engineConfiguration));
 }

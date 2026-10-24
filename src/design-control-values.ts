@@ -8,5 +8,6 @@ export function readDesignControlValue(
   if (element instanceof HTMLInputElement && element.type === 'checkbox') {
     return element.checked;
   }
+
   return typeof currentValue === 'number' ? Number(element.value) : element.value;
 }

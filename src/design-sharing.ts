@@ -17,15 +17,19 @@ export function loadInitialDesign(
 ): Result<LoadedDesign> {
   const hasDesign =
     parameters.has('v') || Object.keys(versionOneDesignDefaults).some((key) => parameters.has(key));
+
   if (hasDesign) {
     const result = parseDesignParameters(parameters);
+
     if (!result.ok || parameters.has('seed')) {
       return result;
     }
+
     return parseDesignParameters(
       new URLSearchParams([...parameters, ['seed', String(storedSeed ?? randomSeed)]]),
     );
   }
+
   return parseDesignParameters(new URLSearchParams(), {
     ...versionOneDesignDefaults,
     seed: storedSeed ?? randomSeed,
@@ -38,12 +42,15 @@ export function loadInitialDesign(
 export function readLockedSeed(storage: Storage): Result<number | null> {
   try {
     const raw = storage.getItem(lockedSeedStorageKey);
+
     if (raw === null) {
       return { ok: true, data: null };
     }
+
     if (/^\d+$/.test(raw) && Number(raw) <= maximumSeedValue) {
       return { ok: true, data: Number(raw) };
     }
+
     return {
       ok: false,
       error: {
@@ -73,6 +80,7 @@ export function saveLockedSeed(storage: Storage, seed: number | null): Result<vo
     } else {
       storage.setItem(lockedSeedStorageKey, String(seed));
     }
+
     return { ok: true, data: undefined };
   } catch {
     return {
@@ -95,7 +103,9 @@ export async function copyDesignLink(
     if (!clipboard) {
       throw new Error('Clipboard unavailable');
     }
+
     await clipboard.writeText(url);
+
     return { ok: true, data: undefined };
   } catch {
     return {
@@ -116,6 +126,7 @@ export function replaceDesignUrl(
   history: Pick<History, 'replaceState' | 'state'>,
 ): string {
   const url = getDesignUrl(baseUrl, settings);
+
   try {
     history.replaceState(history.state, '', url);
   } catch {
@@ -125,5 +136,6 @@ export function replaceDesignUrl(
       retryable: true,
     });
   }
+
   return url;
 }

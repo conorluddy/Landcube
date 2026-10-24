@@ -40,6 +40,7 @@ const startupStartedAtMs = performance.now();
 /** Uses browser randomness for a fresh unsigned landscape seed. */
 const generateRandomSeed = () => crypto.getRandomValues(new Uint32Array(1))[0];
 let storedSeedResult: Result<number | null>;
+
 try {
   storedSeedResult = readLockedSeed(localStorage);
 } catch {
@@ -52,6 +53,7 @@ try {
     },
   };
 }
+
 const initialDesignResult = loadInitialDesign(
   new URLSearchParams(location.search),
   { width: innerWidth, height: innerHeight },
@@ -59,9 +61,11 @@ const initialDesignResult = loadInitialDesign(
   storedSeedResult.ok ? storedSeedResult.data : null,
 );
 const fallbackDesignResult = parseDesignParameters(new URLSearchParams(), versionOneDesignDefaults);
+
 if (!fallbackDesignResult.ok) {
   throw new Error('Invalid built-in settings');
 }
+
 let settings = initialDesignResult.ok
   ? initialDesignResult.data.settings
   : fallbackDesignResult.data.settings;
@@ -91,6 +95,7 @@ const controls = mountDesignControls({
   lockSeed: (isLocked) => {
     try {
       const result = saveLockedSeed(localStorage, isLocked ? settings.seed : null);
+
       if (!result.ok) {
         logOperationError(result.error);
         controls.notify(result.error.message);
@@ -112,15 +117,18 @@ const refreshExportControls = mountExportControls(
   { getSettings: () => settings, updateSettings, notify: controls.notify },
   createOutputRenderer(engineConfiguration),
 );
+
 if (!storedSeedResult.ok) {
   logOperationError(storedSeedResult.error);
   controls.notify(storedSeedResult.error.message);
 }
+
 if (!initialDesignResult.ok) {
   logOperationError(initialDesignResult.error);
   controls.notify(initialDesignResult.error.message);
 } else if (initialDesignResult.data.warnings.length) {
   const message = `Unsupported values for ${initialDesignResult.data.warnings.join(', ')} were reset to defaults.`;
+
   logOperationError({ code: operationErrorCodes.invalidSettings, message, retryable: true });
   controls.notify(message);
 }
@@ -128,56 +136,73 @@ if (!initialDesignResult.ok) {
 /** Commits a validated edit and batches the required rendering work. */
 function updateSettings(nextDesignSettings: DesignSettings): boolean {
   const result = validateDesignSettings(nextDesignSettings);
+
   if (!result.ok) {
     logOperationError(result.error);
     controls.notify(result.error.message);
+
     return false;
   }
+
   const changed = (Object.keys(nextDesignSettings) as (keyof DesignSettings)[]).filter(
     (key) => nextDesignSettings[key] !== settings[key],
   );
+
   settings = result.data;
+
   for (const key of changed) {
     const kind = classifyDesignSettingChange(key);
+
     if (!pendingChange || designChangePriority[kind] > designChangePriority[pendingChange]) {
       pendingChange = kind;
     }
   }
+
   clearTimeout(designUrlDebounceTimer);
   designUrlDebounceTimer = setTimeout(synchronizeDesignUrl, designUrlDebounceMs);
+
   if (settingsUpdateFrameIdentifier !== undefined || !pendingChange) {
     return true;
   }
+
   settingsUpdateFrameIdentifier = requestAnimationFrame(() => {
     /** Batches edits so each frame performs only the most expensive required refresh. */
     settingsUpdateFrameIdentifier = undefined;
     const change = pendingChange;
+
     pendingChange = undefined;
     applyPageStyle();
+
     if (!settings.cursorEnabled) {
       cursor.strength = targetCursorInfluence.strength = 0;
     }
+
     if (change === 'terrain') {
       terrainSettings = deriveTerrainConfiguration(settings, engineConfiguration);
       terrain = createTerrainSampler(settings.seed, terrainSettings);
       baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
     }
+
     if (change === 'terrain' || change === 'contours') {
       contourElevations = calculateContourElevations(settings, engineConfiguration);
     }
+
     if (change === 'appearance') {
       renderContoursIntoSvg(terrainSvgElement, contours, width, height, settings);
     } else if (change !== 'output') {
       renderCurrentLandscape();
     }
+
     refreshExportControls();
   });
+
   return true;
 }
 
 /** Flushes pending edits into the current share URL. */
 function synchronizeDesignUrl(): string {
   clearTimeout(designUrlDebounceTimer);
+
   return replaceDesignUrl(location.href, settings, history);
 }
 
@@ -199,21 +224,27 @@ function renderCurrentLandscape(): void {
 /** Eases cursor deformation with capped frame pacing until settled. */
 function animateCursorInfluence(time: number): void {
   cursorAnimationFrameIdentifier = undefined;
+
   if (document.hidden) {
     return;
   }
+
   if (time - lastContourRenderTimeMs < millisecondsPerSecond / engineConfiguration.cursorMaxFps) {
     cursorAnimationFrameIdentifier = requestAnimationFrame(animateCursorInfluence);
+
     return;
   }
+
   const elapsedFrameTimeMs = lastCursorFrameTimeMs
     ? Math.min(time - lastCursorFrameTimeMs, maximumCursorFrameElapsedMs)
     : millisecondsPerSecond / engineConfiguration.cursorMaxFps;
+
   lastCursorFrameTimeMs = time;
   lastContourRenderTimeMs = time;
   const cursorInterpolationWeight = reducedMotionPreference.matches
     ? 1
     : 1 - Math.exp(-elapsedFrameTimeMs / settings.cursorResponseMs);
+
   cursor.x += (targetCursorInfluence.x - cursor.x) * cursorInterpolationWeight;
   cursor.y += (targetCursorInfluence.y - cursor.y) * cursorInterpolationWeight;
   cursor.strength += (targetCursorInfluence.strength - cursor.strength) * cursorInterpolationWeight;
@@ -221,10 +252,13 @@ function animateCursorInfluence(time: number): void {
     Math.abs(targetCursorInfluence.x - cursor.x) < cursorPositionSettlingTolerancePixels &&
     Math.abs(targetCursorInfluence.y - cursor.y) < cursorPositionSettlingTolerancePixels &&
     Math.abs(targetCursorInfluence.strength - cursor.strength) < cursorStrengthSettlingTolerance;
+
   if (isSettled) {
     Object.assign(cursor, targetCursorInfluence);
   }
+
   renderCurrentLandscape();
+
   if (!isSettled) {
     cursorAnimationFrameIdentifier = requestAnimationFrame(animateCursorInfluence);
   }
@@ -235,6 +269,7 @@ function scheduleCursorAnimation(): void {
   if (cursorAnimationFrameIdentifier !== undefined || document.hidden) {
     return;
   }
+
   lastCursorFrameTimeMs = 0;
   cursorAnimationFrameIdentifier = requestAnimationFrame(animateCursorInfluence);
 }
@@ -248,15 +283,19 @@ function moveCursor(event: PointerEvent): void {
     if (targetCursorInfluence.strength !== 0) {
       releaseCursor();
     }
+
     return;
   }
+
   if (event.pointerType === 'touch' && event.buttons === 0) {
     return;
   }
+
   if (cursor.strength === 0) {
     cursor.x = event.clientX;
     cursor.y = event.clientY;
   }
+
   Object.assign(targetCursorInfluence, { x: event.clientX, y: event.clientY, strength: 1 });
   scheduleCursorAnimation();
 }
@@ -283,6 +322,7 @@ document.addEventListener('visibilitychange', () => {
     if (cursorAnimationFrameIdentifier !== undefined) {
       cancelAnimationFrame(cursorAnimationFrameIdentifier);
     }
+
     cursorAnimationFrameIdentifier = undefined;
     cursor.strength = targetCursorInfluence.strength = 0;
     synchronizeDesignUrl();
@@ -294,15 +334,19 @@ window.addEventListener('pagehide', synchronizeDesignUrl);
 window.addEventListener('popstate', () => {
   /** Restores design state when browser navigation changes the shared URL. */
   const result = parseDesignParameters(new URLSearchParams(location.search));
+
   if (!result.ok) {
     controls.notify(result.error.message);
     logOperationError(result.error);
+
     return;
   }
+
   updateSettings(result.data.settings);
   controls.sync();
 });
 let viewportResizeDebounceTimer: ReturnType<typeof setTimeout>;
+
 window.addEventListener('resize', () => {
   /** Updates framing immediately and defers expensive terrain resampling. */
   terrainSvgElement.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`);

@@ -1,4 +1,7 @@
-import { maximumOutputDimensionPixels } from '../constants/design';
+import {
+  maximumOutputDimensionPixels,
+  maximumExtraLargeOutputDimensionPixels,
+} from '../constants/design';
 import { downloadUrlReleaseDelayMs, imageMimeTypes } from '../constants/export';
 import { operationErrorCodes } from '../constants/operations';
 import { generateLandscapeContours } from '../landscape-composition';
@@ -16,6 +19,7 @@ export function createOutputRenderer(
 ): OutputRenderer {
   let cachedGeometryKey: string | undefined;
   let contours: ReturnType<typeof generateLandscapeContours> = [];
+
   return {
     /** Reuses cached contours until a geometry-affecting setting changes. */
     getSvg(settings) {
@@ -27,10 +31,12 @@ export function createOutputRenderer(
         settings.width,
         settings.height,
       ]);
+
       if (geometryCacheKey !== cachedGeometryKey) {
         contours = generateLandscapeContours(settings, engineConfiguration);
         cachedGeometryKey = geometryCacheKey;
       }
+
       return createSvgDocument(contours, settings);
     },
   };
@@ -40,17 +46,22 @@ export function createOutputRenderer(
 export function getRasterDimensions(settings: Readonly<DesignSettings>): Result<ImageDimensions> {
   const width = settings.width * settings.pngScale;
   const height = settings.height * settings.pngScale;
-  if (width > maximumOutputDimensionPixels || height > maximumOutputDimensionPixels) {
+
+  const maximumDimensionPixels = settings.allowExtraLargeExports
+    ? maximumExtraLargeOutputDimensionPixels
+    : maximumOutputDimensionPixels;
+
+  if (width > maximumDimensionPixels || height > maximumDimensionPixels) {
     return {
       ok: false,
       error: {
         code: operationErrorCodes.invalidSettings,
-        message:
-          'PNG dimensions must be at most 4096 px per side. Choose 1× or reduce the output size.',
+        message: `PNG dimensions must be at most ${maximumDimensionPixels} px per side. Choose 1× or reduce the output size.`,
         retryable: true,
       },
     };
   }
+
   return { ok: true, data: { width, height } };
 }
 
@@ -63,15 +74,18 @@ export async function createExportFile(
     settings.format === 'png'
       ? getRasterDimensions(settings)
       : { ok: true as const, data: { width: settings.width, height: settings.height } };
+
   if (!dimensions.ok) {
     return dimensions;
   }
+
   try {
     const svg = renderer.getSvg(settings);
     const blob =
       settings.format === 'svg'
         ? new Blob([svg], { type: imageMimeTypes.svg })
         : await encodeSvgAsPng(svg, dimensions.data.width, dimensions.data.height);
+
     return {
       ok: true,
       data: {
@@ -94,26 +108,33 @@ export async function createExportFile(
 /** Starts a browser download and releases temporary resources. */
 export function downloadExport(file: ExportFile): Result<void> {
   let url: string | undefined;
+
   try {
     url = URL.createObjectURL(file.blob);
     const anchor = document.createElement('a');
+
     anchor.href = url;
     anchor.download = file.filename;
     document.body.append(anchor);
+
     try {
       anchor.click();
     } finally {
       anchor.remove();
     }
+
     const downloadUrl = url;
+
     setTimeout(() => {
       URL.revokeObjectURL(downloadUrl);
     }, downloadUrlReleaseDelayMs);
+
     return { ok: true, data: undefined };
   } catch {
     if (url !== undefined) {
       URL.revokeObjectURL(url);
     }
+
     return {
       ok: false,
       error: {
@@ -130,28 +151,35 @@ async function encodeSvgAsPng(svg: string, width: number, height: number): Promi
   const url = URL.createObjectURL(new Blob([svg], { type: imageMimeTypes.svg }));
   let image: HTMLImageElement | undefined;
   let canvas: HTMLCanvasElement | undefined;
+
   try {
     image = new Image();
     canvas = document.createElement('canvas');
     const loadingImage = image;
+
     await new Promise<void>((resolve, reject) => {
       /** Waits for SVG decoding before attempting canvas encoding. */
       loadingImage.onload = () => {
         resolve();
       };
+
       loadingImage.onerror = () => {
         reject(new Error('SVG decoding failed'));
       };
+
       loadingImage.src = url;
     });
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext('2d');
+
     if (!context) {
       throw new Error('Canvas is unavailable');
     }
+
     context.drawImage(image, 0, 0, width, height);
     const encodingCanvas = canvas;
+
     return await new Promise<Blob>((resolve, reject) => {
       encodingCanvas.toBlob((blob) => {
         if (blob === null) {
@@ -163,10 +191,12 @@ async function encodeSvgAsPng(svg: string, width: number, height: number): Promi
     });
   } finally {
     URL.revokeObjectURL(url);
+
     if (image) {
       image.onload = image.onerror = null;
       image.src = '';
     }
+
     if (canvas) {
       canvas.width = canvas.height = 0;
     }

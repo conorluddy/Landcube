@@ -42,6 +42,7 @@ await test('a complete design survives a share link, including inactive index an
   /** Verifies a complete design survives a share link, including inactive index and cursor settings. */
   const url = getDesignUrl('https://topogra.example/studio?old=value#design', customized);
   const parsed = parseDesignParameters(new URL(url).searchParams);
+
   assert.ok(parsed.ok);
   assert.deepEqual(parsed.data.settings, customized);
   assert.deepEqual(parsed.data.warnings, []);
@@ -56,6 +57,7 @@ await test('a complete design survives a share link, including inactive index an
 await test('partial links use stable version-one defaults', () => {
   /** Verifies partial links use stable version-one defaults. */
   const result = parseDesignParameters(new URLSearchParams('seed=12&lineColor=%23ABCDEF'));
+
   assert.ok(result.ok);
   assert.deepEqual(result.data.settings, {
     ...versionOneDesignDefaults,
@@ -67,11 +69,15 @@ await test('partial links use stable version-one defaults', () => {
 for (const [key, [min, max, step]] of Object.entries(designNumberConstraints)) {
   await test(`${key} accepts supported boundaries and rejects malformed, out-of-range, and off-step values`, () => {
     for (const value of [min, max, Number((min + step).toFixed(4))]) {
-      const result = parseDesignParameters(new URLSearchParams({ [key]: String(value) }));
+      const result = parseDesignParameters(
+        new URLSearchParams({ [key]: String(value), allowExtraLargeExports: 'true' }),
+      );
+
       assert.ok(result.ok);
       assert.deepEqual(result.data.warnings, []);
       assert.equal(result.data.settings[key as keyof typeof designNumberConstraints], value);
     }
+
     for (const raw of [
       '',
       'NaN',
@@ -83,6 +89,7 @@ for (const [key, [min, max, step]] of Object.entries(designNumberConstraints)) {
       String(min + step / 2),
     ]) {
       const result = parseDesignParameters(new URLSearchParams({ [key]: raw }));
+
       assert.ok(result.ok);
       assert.deepEqual(result.data.warnings, [key]);
       assert.equal(
@@ -106,6 +113,7 @@ await test('invalid colours, booleans and enums fall back without losing valid f
     pngScale: '3',
   };
   const result = parseDesignParameters(new URLSearchParams(invalid));
+
   assert.ok(result.ok);
   assert.deepEqual(result.data.settings, { ...versionOneDesignDefaults, seed: 42 });
   assert.equal(result.data.warnings.length, 7);
@@ -116,6 +124,7 @@ await test('invalid colours, booleans and enums fall back without losing valid f
 await test('unsupported versions return an actionable typed error', () => {
   /** Verifies unsupported versions return an actionable typed error. */
   const result = parseDesignParameters(new URLSearchParams('v=2&seed=56'));
+
   assert.ok(!result.ok);
   assert.equal(result.error.code, 'UNSUPPORTED_VERSION');
   assert.match(result.error.message, /v=1/);
@@ -140,11 +149,13 @@ await test('terrain detail has a constant total amplitude and does not mutate en
       { ...versionOneDesignDefaults, detail },
       engineConfiguration,
     );
+
     assert.ok(
       Math.abs(derived.noiseOctaves.reduce((sum, octave) => sum + octave.amplitude, 0) - 1) < 1e-12,
     );
     assert.equal(derived.maxSamples, engineConfiguration.maxSamples);
   }
+
   assert.ok(Object.isFrozen(engineConfiguration));
   assert.ok(Object.isFrozen(versionOneDesignDefaults));
 });
@@ -159,10 +170,34 @@ await test('settings changes select the necessary update without regenerating te
         ? 'contours'
         : key.startsWith('cursor')
           ? 'cursor'
-          : ['format', 'width', 'height', 'pngScale', 'transparent'].includes(key)
+          : [
+                'format',
+                'width',
+                'height',
+                'pngScale',
+                'transparent',
+                'allowExtraLargeExports',
+              ].includes(key)
             ? 'output'
             : 'appearance';
+
     assert.equal(classifyDesignSettingChange(key), expected);
   }
+
   assert.equal(serializeDesignParameters(versionOneDesignDefaults).get('transparent'), 'false');
+});
+
+await test('extra-large dimensions require explicit opt-in and survive sharing and style reset', () => {
+  assert.equal(validateDesignSettings({ ...customized, width: 12288 }).ok, false);
+  const settings = { ...customized, width: 12288, allowExtraLargeExports: true };
+  const validated = validateDesignSettings(settings);
+
+  assert.ok(validated.ok);
+  const restored = parseDesignParameters(serializeDesignParameters(settings));
+
+  assert.ok(restored.ok);
+  assert.equal(restored.data.settings.width, 12288);
+  assert.equal(restored.data.settings.allowExtraLargeExports, true);
+  assert.equal(resetDesignStyle(settings).allowExtraLargeExports, true);
+  assert.equal(validateDesignSettings({ ...settings, height: 12289 }).ok, false);
 });

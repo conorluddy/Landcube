@@ -9,6 +9,7 @@ export function isPointOnHeightFieldBoundary(
   if (point === undefined) {
     return false;
   }
+
   return (
     point.x === field.originX ||
     point.y === field.originY ||

@@ -4,6 +4,7 @@ import {
   imageExportFormats,
   indexContourStyles,
   numericStepTolerance,
+  maximumOutputDimensionPixels,
   outputSettingKeys,
   terrainSettingKeys,
   versionOneDesignDefaults,
@@ -26,6 +27,7 @@ export function parseDesignParameters(
   defaults: Readonly<DesignSettings> = versionOneDesignDefaults,
 ): Result<LoadedDesign> {
   const version = parameters.get('v');
+
   if (version !== null && version !== designUrlVersion) {
     return {
       ok: false,
@@ -36,20 +38,33 @@ export function parseDesignParameters(
       },
     };
   }
+
   const settings = { ...defaults };
   const warnings: string[] = [];
+
   for (const key of Object.keys(versionOneDesignDefaults) as (keyof DesignSettings)[]) {
     const serializedValue = parameters.get(key);
+
     if (serializedValue === null) {
       continue;
     }
+
     const value = parseDesignSettingValue(key, serializedValue);
+
     if (value === undefined) {
       warnings.push(key);
     } else {
       Object.assign(settings, { [key]: value });
     }
   }
+
+  for (const key of ['width', 'height'] as const) {
+    if (!settings.allowExtraLargeExports && settings[key] > maximumOutputDimensionPixels) {
+      settings[key] = defaults[key];
+      warnings.push(key);
+    }
+  }
+
   return {
     ok: true,
     data: { settings: Object.freeze(settings) as ValidatedDesignSettings, warnings },
@@ -59,9 +74,11 @@ export function parseDesignParameters(
 /** Validates an entire edit before it can enter application state. */
 export function validateDesignSettings(settings: DesignSettings): Result<ValidatedDesignSettings> {
   const result = parseDesignParameters(serializeDesignParameters(settings));
+
   if (!result.ok) {
     return result;
   }
+
   if (result.data.warnings.length) {
     return {
       ok: false,
@@ -72,22 +89,27 @@ export function validateDesignSettings(settings: DesignSettings): Result<Validat
       },
     };
   }
+
   return { ok: true, data: result.data.settings };
 }
 
 /** Serializes all design fields so links preserve inactive settings. */
 export function serializeDesignParameters(settings: Readonly<DesignSettings>): URLSearchParams {
   const parameters = new URLSearchParams({ v: designUrlVersion });
+
   for (const key of Object.keys(versionOneDesignDefaults) as (keyof DesignSettings)[]) {
     parameters.set(key, String(settings[key]));
   }
+
   return parameters;
 }
 
 /** Builds a shareable URL while preserving its path and fragment. */
 export function getDesignUrl(baseUrl: string, settings: Readonly<DesignSettings>): string {
   const url = new URL(baseUrl);
+
   url.search = serializeDesignParameters(settings).toString();
+
   return url.href;
 }
 
@@ -96,15 +118,19 @@ export function classifyDesignSettingChange(key: keyof DesignSettings): DesignCh
   if (terrainSettingKeys.includes(key)) {
     return 'terrain';
   }
+
   if (key === 'contourCount') {
     return 'contours';
   }
+
   if (key.startsWith('cursor')) {
     return 'cursor';
   }
+
   if (outputSettingKeys.some((outputSettingKey) => outputSettingKey === key)) {
     return 'output';
   }
+
   return 'appearance';
 }
 
@@ -128,14 +154,24 @@ export function deriveTerrainConfiguration(
 
 /** Restores appearance and interaction while preserving seed and output options. */
 export function resetDesignStyle(settings: Readonly<DesignSettings>): DesignSettings {
-  const { seed, format, width, height, pngScale, transparent } = settings;
-  return { ...versionOneDesignDefaults, seed, format, width, height, pngScale, transparent };
+  const { seed, format, width, height, pngScale, transparent, allowExtraLargeExports } = settings;
+
+  return {
+    ...versionOneDesignDefaults,
+    seed,
+    format,
+    width,
+    height,
+    pngScale,
+    transparent,
+    allowExtraLargeExports,
+  };
 }
 
 /** Bounds viewport dimensions to the supported output range. */
 export function clampOutputDimensionPixels(dimensionPixels: number): number {
   return Math.min(
-    designNumberConstraints.width[1],
+    maximumOutputDimensionPixels,
     Math.max(designNumberConstraints.width[0], dimensionPixels),
   );
 }
@@ -149,9 +185,11 @@ function parseDesignSettingValue(
     if (!/^-?\d+(\.\d+)?$/.test(serializedValue)) {
       return undefined;
     }
+
     const value = Number(serializedValue);
     const [minimumValue, maximumValue, stepSize] =
       designNumberConstraints[key as keyof typeof designNumberConstraints];
+
     if (
       !Number.isFinite(value) ||
       value < minimumValue ||
@@ -161,26 +199,33 @@ function parseDesignSettingValue(
     ) {
       return undefined;
     }
+
     return value;
   }
+
   if (key === 'background' || key === 'lineColor') {
     return /^#[0-9a-f]{6}$/i.test(serializedValue) ? serializedValue.toLowerCase() : undefined;
   }
-  if (key === 'cursorEnabled' || key === 'transparent') {
+
+  if (key === 'cursorEnabled' || key === 'transparent' || key === 'allowExtraLargeExports') {
     return serializedValue === 'true' ? true : serializedValue === 'false' ? false : undefined;
   }
+
   if (key === 'indexStyle') {
     return indexContourStyles.some((style) => style === serializedValue)
       ? serializedValue
       : undefined;
   }
+
   if (key === 'format') {
     return imageExportFormats.some((format) => format === serializedValue)
       ? serializedValue
       : undefined;
   }
+
   if (key === 'pngScale') {
     return serializedValue === '1' ? 1 : serializedValue === '2' ? 2 : undefined;
   }
+
   return undefined;
 }

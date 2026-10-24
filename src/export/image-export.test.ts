@@ -17,9 +17,12 @@ function design(changes: Partial<DesignSettings> = {}) {
     seed: 745,
     ...changes,
   });
+
   assert.ok(result.ok);
+
   return result.data;
 }
+
 /** Extracts path data so tests can compare geometry independently of styling. */
 const geometry = (svg: string) => [...svg.matchAll(/ d="([^"]*)"/g)].map((match) => match[1]);
 
@@ -27,10 +30,12 @@ await test('a standalone SVG has explicit colours, clipping, dimensions, and no 
   /** Verifies a standalone SVG has explicit colours, clipping, dimensions, and no interface or cursor state. */
   const settings = design();
   const result = await createExportFile(settings, createOutputRenderer(engineConfiguration));
+
   assert.ok(result.ok);
   assert.equal(result.data.blob.type, 'image/svg+xml');
   assert.equal(result.data.filename, 'topogra-745-320x240.svg');
   const svg = await result.data.blob.text();
+
   assert.match(svg, /xmlns="http:\/\/www.w3.org\/2000\/svg"/);
   assert.match(svg, /viewBox="0 0 320 240"/);
   assert.match(svg, /clip-path="url\(#landscape-crop\)"/);
@@ -45,6 +50,7 @@ await test('transparent export removes only the background while preserving the 
   const renderer = createOutputRenderer(engineConfiguration);
   const opaque = renderer.getSvg(design());
   const transparent = renderer.getSvg(design({ transparent: true }));
+
   assert.doesNotMatch(transparent, /fill="#202326"/);
   assert.deepEqual(geometry(opaque), geometry(transparent));
 });
@@ -53,14 +59,17 @@ await test('appearance and cursor changes preserve exported geometry, while terr
   /** Verifies appearance and cursor changes preserve exported geometry, while terrain changes alter it. */
   const renderer = createOutputRenderer(engineConfiguration);
   const original = renderer.getSvg(design());
+
   for (const changes of [
     { lineColor: '#ff0000', strokeWidth: 2 },
     { cursorHeight: -0.4, cursorRadius: 300 },
     { format: 'png' as const, pngScale: 2 as const },
   ]) {
     const svg = renderer.getSvg(design(changes));
+
     assert.deepEqual(geometry(svg), geometry(original));
   }
+
   assert.notDeepEqual(geometry(renderer.getSvg(design({ seed: 746 }))), geometry(original));
   assert.notDeepEqual(geometry(renderer.getSvg(design({ detail: 0.8 }))), geometry(original));
   assert.notDeepEqual(geometry(renderer.getSvg(design({ contourCount: 11 }))), geometry(original));
@@ -71,6 +80,7 @@ await test('appearance and cursor changes preserve exported geometry, while terr
 await test('index off, solid and dashed modes preserve their settings and render their own styles', () => {
   /** Verifies index off, solid and dashed modes preserve their settings and render their own styles. */
   const renderer = createOutputRenderer(engineConfiguration);
+
   assert.match(
     renderer.getSvg(design({ indexEvery: 1, dashLength: 13, dashGap: 8, indexStrokeWidth: 2 })),
     /stroke-width="2"[^>]*stroke-dasharray="13 8"/,
@@ -88,11 +98,13 @@ await test('preview and download are identical after saving and restoring a comp
   const parsed = parseDesignParameters(
     new URLSearchParams(Object.entries(settings).map(([key, value]) => [key, String(value)])),
   );
+
   assert.ok(parsed.ok);
   const downloaded = await createExportFile(
     parsed.data.settings,
     createOutputRenderer(engineConfiguration),
   );
+
   assert.ok(downloaded.ok);
   assert.equal(await downloaded.data.blob.text(), preview);
   assert.equal(
@@ -108,14 +120,17 @@ await test('PNG limits apply to final raster dimensions while SVG ignores PNG sc
     data: { width: 4096, height: 2048 },
   });
   const oversized = design({ width: 4096, height: 100, pngScale: 2, format: 'png' });
+
   assert.equal(getRasterDimensions(oversized).ok, false);
   const rejected = await createExportFile(oversized, createOutputRenderer(engineConfiguration));
+
   assert.ok(!rejected.ok);
   assert.equal(rejected.error.code, 'INVALID_SETTINGS');
   const svg = await createExportFile(
     design({ pngScale: 2 }),
     createOutputRenderer(engineConfiguration),
   );
+
   assert.ok(svg.ok);
   assert.equal(svg.data.filename, 'topogra-745-320x240.svg');
 });
@@ -127,6 +142,7 @@ await test('generation failures return a recoverable export error', async () => 
       throw new Error('Unavailable');
     },
   });
+
   assert.ok(!result.ok);
   assert.equal(result.error.code, 'EXPORT_FAILED');
   assert.equal(result.error.retryable, true);
@@ -138,6 +154,7 @@ await test('PNG encoding uses the selected raster resolution and releases image/
   const documentDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
   const revoked: string[] = [];
   let nextUrl = 0;
+
   context.mock.method(URL, 'createObjectURL', () => `blob:test-${++nextUrl}`);
   context.mock.method(URL, 'revokeObjectURL', (url: string) => {
     revoked.push(url);
@@ -159,6 +176,7 @@ await test('PNG encoding uses the selected raster resolution and releases image/
       callback(failure === 'encode' ? null : new Blob(['encoded'], { type }));
     },
   };
+
   class LoadingImage {
     onload: (() => void) | null = null;
     onerror: (() => void) | null = null;
@@ -179,6 +197,7 @@ await test('PNG encoding uses the selected raster resolution and releases image/
     } else {
       Reflect.deleteProperty(globalThis, 'Image');
     }
+
     if (documentDescriptor) {
       Object.defineProperty(globalThis, 'document', documentDescriptor);
     } else {
@@ -188,20 +207,24 @@ await test('PNG encoding uses the selected raster resolution and releases image/
   const renderer = createOutputRenderer(engineConfiguration);
   const settings = design({ format: 'png', pngScale: 2 });
   const success = await createExportFile(settings, renderer);
+
   assert.ok(success.ok);
   assert.equal(success.data.blob.type, 'image/png');
   assert.equal(success.data.filename, 'topogra-745-640x480.png');
   assert.deepEqual(drawnSizes, [[640, 480]]);
   assert.equal(canvas.width, 0);
   assert.equal(canvas.height, 0);
+
   for (const mode of ['decode', 'context', 'encode'] as const) {
     failure = mode;
     const result = await createExportFile(settings, renderer);
+
     assert.ok(!result.ok);
     assert.equal(result.error.code, 'EXPORT_FAILED');
     assert.equal(canvas.width, 0);
     assert.equal(canvas.height, 0);
   }
+
   assert.equal(revoked.length, 4);
 });
 
@@ -224,6 +247,7 @@ await test('downloads clean up their anchor and temporary URL, including when th
       wasRemoved = true;
     },
   };
+
   context.mock.method(URL, 'createObjectURL', () => 'blob:download');
   context.mock.method(URL, 'revokeObjectURL', (url: string) => {
     revoked.push(url);
@@ -241,6 +265,7 @@ await test('downloads clean up their anchor and temporary URL, including when th
     }
   });
   const file = { blob: new Blob(['svg']), filename: 'landscape.svg' };
+
   assert.ok(downloadExport(file).ok);
   assert.equal(anchor.download, 'landscape.svg');
   assert.equal(wasRemoved, true);
@@ -250,8 +275,25 @@ await test('downloads clean up their anchor and temporary URL, including when th
   shouldFail = true;
   wasRemoved = false;
   const rejected = downloadExport(file);
+
   assert.ok(!rejected.ok);
   assert.equal(rejected.error.code, 'EXPORT_FAILED');
   assert.equal(wasRemoved, true);
   assert.equal(revoked.length, 2);
+});
+
+await test('extra-large PNG limits include resolution scaling', () => {
+  assert.deepEqual(
+    getRasterDimensions(
+      design({ width: 6144, height: 64, pngScale: 2, allowExtraLargeExports: true }),
+    ),
+    {
+      ok: true,
+      data: { width: 12288, height: 128 },
+    },
+  );
+  assert.equal(
+    getRasterDimensions(design({ width: 6145, pngScale: 2, allowExtraLargeExports: true })).ok,
+    false,
+  );
 });

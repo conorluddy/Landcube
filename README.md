@@ -31,7 +31,9 @@ Browser tests inline the production bundle into `.cache/browser-fixture.html`, s
 
 ESLint uses the TypeScript ESLint strict and stylistic presets with type information. It rejects unsafe `any` usage, non-null assertions, unhandled promises, nullable values in boolean conditions, loose equality, unused code, and incomplete switches over unions. Public module boundaries require explicit types; type imports and braces are enforced. Intentional unused parameters in stubs use an `_` prefix.
 
-Prettier owns formatting: single quotes, trailing commas, and a 100-character target line width. Generated output, validation images, caches, and the npm-managed lockfile are excluded from formatting. CI fails on formatting differences or any lint warning.
+Prettier handles layout: two-space indentation, single quotes, semicolons, trailing commas, LF line endings, and a 100-character target line width. Objects deliberately written across multiple lines stay expanded. ESLint Stylistic adds blank lines around control-flow blocks and functions, before returns, after import groups, and after variable declaration groups; consecutive declarations stay together. Add blank lines between other logical steps where they help explain the code; Prettier preserves single blank lines.
+
+Run `npm run lint:fix` followed by `npm run format` to apply both spacing and layout. Generated output, validation images, caches, and the npm-managed lockfile are excluded from formatting. CI fails on formatting differences or any lint warning.
 
 ## CI and GitHub Pages
 
@@ -56,7 +58,7 @@ Open Export in the footer to choose SVG or PNG, dimensions, transparency, and PN
 
 Use viewport captures the current browser dimensions. Landscape (1920 × 1080), square (1080 × 1080), portrait (1080 × 1920), and custom dimensions are available. Dimensions remain fixed when the browser resizes; the main background still fills the browser. Larger outputs reveal more of the same terrain from the top-left origin at the same feature scale.
 
-Each output side must be an integer from 64–4096 px. PNG offers 1× and 2×; final raster dimensions cannot exceed 4096 px on either side. The 2× option doubles pixel resolution and stroke pixels while preserving composition. SVG remains vector at its selected dimensions and ignores PNG scale. Transparent previews use a checkerboard that is excluded from the file.
+Each output side must be an integer from 64–4096 px by default. “Allow extra-large exports” raises the limit to 12,288 px per side and displays a memory warning. PNG offers 1× and 2×; final raster dimensions must fit the selected limit. A 12,288² PNG needs 576 MiB for a single pixel buffer, plus rendering and encoding overhead; browser limits still apply. Turning the option off clamps oversized dimensions to 4096 px. The 2× option doubles pixel resolution and stroke pixels while preserving composition. SVG remains vector at its selected dimensions and ignores PNG scale. Transparent previews use a checkerboard that is excluded from the file.
 
 Exports are standalone, clipped to their output frame, and include explicit colours. Filenames use `topogra-SEED-WIDTHxHEIGHT.svg` or `.png`, with actual file dimensions. Export captures settings at download time, so later edits do not change an in-progress download.
 

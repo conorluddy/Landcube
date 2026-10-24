@@ -1,10 +1,11 @@
 import javascript from '@eslint/js';
+import stylistic from '@stylistic/eslint-plugin';
 import prettier from 'eslint-config-prettier/flat';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import typescript from 'typescript-eslint';
 
-/** Enforces correctness with type information while Prettier owns formatting. */
+/** Enforces type-aware correctness and logical spacing alongside Prettier. */
 export default defineConfig(
   globalIgnores(['dist/', '.cache/', 'test-results/', 'playwright-report/', 'validation/']),
   {
@@ -61,5 +62,22 @@ export default defineConfig(
     },
   },
   prettier,
-  { rules: { curly: ['error', 'all'] } },
+  {
+    files: ['**/*.{ts,mjs}'],
+    plugins: { '@stylistic': stylistic },
+    rules: {
+      curly: ['error', 'all'],
+      // Prettier preserves these separators; ESLint inserts them at statement boundaries.
+      '@stylistic/padding-line-between-statements': [
+        'error',
+        { blankLine: 'always', prev: ['const', 'let'], next: '*' },
+        { blankLine: 'any', prev: ['const', 'let'], next: ['const', 'let'] },
+        { blankLine: 'always', prev: '*', next: 'block-like' },
+        { blankLine: 'always', prev: 'block-like', next: '*' },
+        { blankLine: 'always', prev: '*', next: 'return' },
+        { blankLine: 'always', prev: 'import', next: '*' },
+        { blankLine: 'any', prev: 'import', next: 'import' },
+      ],
+    },
+  },
 );

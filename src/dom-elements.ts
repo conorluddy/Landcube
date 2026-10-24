@@ -5,10 +5,12 @@ export function getRequiredElement<ElementType extends Element>(
   elementConstructor: new () => ElementType,
 ): ElementType {
   const element = parent.querySelector(selector);
+
   if (!(element instanceof elementConstructor)) {
     throw new Error(
       `Required interface element "${selector}" is missing or has the wrong type. Check the panel markup.`,
     );
   }
+
   return element;
 }
