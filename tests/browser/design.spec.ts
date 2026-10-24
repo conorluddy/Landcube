@@ -582,7 +582,11 @@ test('real terrain loads decoded tiles, retains geometry on failure and exports 
       },
     }),
   );
-  await page.getByText('Real terrain · experiment', { exact: false }).click();
+  await page.getByText('Real terrain', { exact: false }).click();
+  await expect(page.locator('#terrain-place option')).toHaveCount(20);
+  await page.locator('#terrain-place').selectOption({ label: 'Machu Picchu' });
+  await expect(page.locator('#terrain-latitude')).toHaveValue('-13.1631');
+  await expect(page.locator('#terrain-longitude')).toHaveValue('-72.545');
   await page.getByRole('button', { name: 'Load terrain', exact: true }).click();
   await expect(page.locator('[data-status]')).toContainText('Real terrain loaded');
   const geometry = await page.locator('[data-contours]').innerHTML();
