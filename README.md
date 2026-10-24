@@ -1,5 +1,7 @@
 # Topogra
 
+<img width="1512" height="830" alt="Screenshot 2026-10-24 at 16 08 03" src="https://github.com/user-attachments/assets/6bb628c7-cc4b-424b-a004-409b6e4c09ef" />
+
 A local topographic background generator with a cursor-driven hill, glass style panel, shareable designs, and SVG/PNG export. Everything runs in the browser; no accounts or backend. Generated landscapes work offline. The experimental real-terrain option downloads public elevation tiles when requested.
 
 ## Run locally
@@ -34,6 +36,8 @@ ESLint uses the TypeScript ESLint strict and stylistic presets with type informa
 Prettier handles layout: two-space indentation, single quotes, semicolons, trailing commas, LF line endings, and a 100-character target line width. Objects deliberately written across multiple lines stay expanded. ESLint Stylistic adds blank lines around control-flow blocks and functions, before returns, after import groups, and after variable declaration groups; consecutive declarations stay together. Add blank lines between other logical steps where they help explain the code; Prettier preserves single blank lines.
 
 Run `npm run lint:fix` followed by `npm run format` to apply both spacing and layout. Generated output, validation images, caches, and the npm-managed lockfile are excluded from formatting. CI fails on formatting differences or any lint warning.
+
+`npm install` also installs the Husky pre-commit hook. Each commit runs Prettier on staged files through lint-staged and stages the formatting changes automatically. Unstaged edits are preserved, and unsupported files and paths in `.prettierignore` are skipped.
 
 ## CI and GitHub Pages
 
