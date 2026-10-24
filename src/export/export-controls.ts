@@ -100,7 +100,13 @@ export function mountExportControls(
         throw new Error(`Output control "${key}" must be an input or select element.`);
       }
 
-      if (input.hasAttribute('aria-invalid')) {
+      // Preview refreshes must preserve dimensions that are still being edited.
+      if (
+        input.hasAttribute('aria-invalid') ||
+        (input instanceof HTMLInputElement &&
+          input.type === 'number' &&
+          input === document.activeElement)
+      ) {
         continue;
       }
 

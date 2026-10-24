@@ -1,3 +1,5 @@
+import { mountRealTerrainControls } from './real-terrain-controls';
+import type { RealTerrain } from './real-terrain';
 import { findTerrainSummits } from './summit-markers';
 import { getRequiredElement } from './dom-elements';
 import './landscape-studio.css';
@@ -71,6 +73,7 @@ let settings = initialDesignResult.ok
   ? initialDesignResult.data.settings
   : fallbackDesignResult.data.settings;
 let terrainSettings = deriveTerrainConfiguration(settings, engineConfiguration);
+let realTerrain: RealTerrain | undefined;
 let terrain = createTerrainSampler(settings.seed, terrainSettings);
 const terrainSvgElement = getRequiredElement(document, '#terrain', SVGSVGElement);
 const reducedMotionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -117,8 +120,19 @@ const controls = mountDesignControls({
 const refreshExportControls = mountExportControls(
   controls.panel,
   { getSettings: () => settings, updateSettings, notify: controls.notify },
-  createOutputRenderer(engineConfiguration),
+  createOutputRenderer(engineConfiguration, () => realTerrain),
 );
+
+mountRealTerrainControls(controls.panel, (loadedTerrain) => {
+  realTerrain = loadedTerrain;
+  terrain = realTerrain
+    ? (x, y) => sampleLoadedTerrain(x, y)
+    : createTerrainSampler(settings.seed, terrainSettings);
+  cursor.strength = targetCursorInfluence.strength = 0;
+  baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
+  renderCurrentLandscape();
+  refreshExportControls();
+});
 
 if (!storedSeedResult.ok) {
   logOperationError(storedSeedResult.error);
@@ -181,7 +195,9 @@ function updateSettings(nextDesignSettings: DesignSettings): boolean {
 
     if (change === 'terrain') {
       terrainSettings = deriveTerrainConfiguration(settings, engineConfiguration);
-      terrain = createTerrainSampler(settings.seed, terrainSettings);
+      terrain = realTerrain
+        ? (x, y) => sampleLoadedTerrain(x, y)
+        : createTerrainSampler(settings.seed, terrainSettings);
       baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
     }
 
@@ -216,7 +232,9 @@ function applyPageStyle(): void {
 
 /** Renders the current cursor influence over cached base terrain. */
 function renderCurrentLandscape(): void {
-  const field = applyCursorElevation(baseHeightField, cursor, settings);
+  const field = realTerrain
+    ? baseHeightField
+    : applyCursorElevation(baseHeightField, cursor, settings);
 
   contours = extractContours(field, contourElevations);
   summits = findTerrainSummits(field);
@@ -279,6 +297,7 @@ function scheduleCursorAnimation(): void {
 /** Tracks eligible pointers while keeping control interaction deformation-free. */
 function moveCursor(event: PointerEvent): void {
   if (
+    realTerrain !== undefined ||
     !settings.cursorEnabled ||
     (event.target instanceof Element && event.target.closest('.control-panel'))
   ) {
@@ -376,3 +395,12 @@ requestAnimationFrame(() => {
     }),
   );
 });
+
+/** Keeps the active geographic patch centered as the viewport changes. */
+function sampleLoadedTerrain(x: number, y: number): number {
+  if (!realTerrain) {
+    throw new Error('Real terrain is unavailable.');
+  }
+
+  return realTerrain.sample(x, y, width, height);
+}

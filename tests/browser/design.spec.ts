@@ -538,3 +538,64 @@ test('grouped presets apply paper, phone, monitor and current device dimensions'
   await expect(page.getByLabel('Width', { exact: true })).toHaveValue('844');
   await expect(page.getByLabel('Height', { exact: true })).toHaveValue('390');
 });
+
+test('real terrain loads decoded tiles, retains geometry on failure and exports the grid', async ({
+  page,
+}) => {
+  await page.goto(
+    `${fixtureUrl}?v=1&seed=123&width=480&height=320&cursorEnabled=false&gridStyle=crosses`,
+  );
+  const tile = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+
+    canvas.width = canvas.height = 256;
+    const context = canvas.getContext('2d');
+
+    if (!context) {
+      throw new Error('Canvas unavailable');
+    }
+
+    const pixels = context.createImageData(256, 256);
+
+    for (let y = 0; y < 256; y++) {
+      for (let x = 0; x < 256; x++) {
+        const index = (y * 256 + x) * 4;
+
+        pixels.data[index] = 128;
+        pixels.data[index + 1] = Math.round((x + y) / 2);
+        pixels.data[index + 3] = 255;
+      }
+    }
+
+    context.putImageData(pixels, 0, 0);
+
+    return canvas.toDataURL().split(',')[1];
+  });
+
+  await page.route('https://s3.amazonaws.com/elevation-tiles-prod/**', (route) =>
+    route.fulfill({
+      body: Buffer.from(tile, 'base64'),
+      contentType: 'image/png',
+      headers: {
+        'access-control-allow-origin': '*',
+        'x-amz-meta-x-imagery-sources': 'eudem/test.tif',
+      },
+    }),
+  );
+  await page.getByText('Real terrain · experiment', { exact: false }).click();
+  await page.getByRole('button', { name: 'Load terrain', exact: true }).click();
+  await expect(page.locator('[data-status]')).toContainText('Real terrain loaded');
+  const geometry = await page.locator('[data-contours]').innerHTML();
+
+  await page.route('https://s3.amazonaws.com/elevation-tiles-prod/**', (route) =>
+    route.fulfill({ status: 503 }),
+  );
+  await page.getByRole('button', { name: 'Load terrain', exact: true }).click();
+  await expect(page.locator('[data-status]')).toContainText('503');
+  expect(await page.locator('[data-contours]').innerHTML()).toBe(geometry);
+  await page.getByRole('button', { name: 'Export ↗' }).click();
+  const svg = (await readDownload(await downloadImage(page, 'Download SVG'))).toString();
+
+  expect(svg).toContain('terrain-grid');
+  expect(svg).toContain('Copernicus');
+});

@@ -1,3 +1,4 @@
+import type { RealTerrain } from '../real-terrain';
 import {
   maximumOutputDimensionPixels,
   maximumExtraLargeOutputDimensionPixels,
@@ -20,7 +21,9 @@ import type { EngineConfiguration } from '../types/terrain';
 /** Caches settled geometry independently of appearance and cursor animation. */
 export function createOutputRenderer(
   engineConfiguration: Readonly<EngineConfiguration>,
+  getRealTerrain: () => RealTerrain | undefined = () => undefined,
 ): OutputRenderer {
+  let cachedRealTerrain: RealTerrain | undefined;
   let cachedGeometryKey: string | undefined;
   let geometry: ReturnType<typeof generateLandscapeGeometry> = { contours: [], summits: [] };
 
@@ -36,12 +39,20 @@ export function createOutputRenderer(
         settings.height,
       ]);
 
-      if (geometryCacheKey !== cachedGeometryKey) {
-        geometry = generateLandscapeGeometry(settings, engineConfiguration);
+      const realTerrain = getRealTerrain();
+
+      if (geometryCacheKey !== cachedGeometryKey || realTerrain !== cachedRealTerrain) {
+        geometry = generateLandscapeGeometry(settings, engineConfiguration, realTerrain);
+        cachedRealTerrain = realTerrain;
         cachedGeometryKey = geometryCacheKey;
       }
 
-      return createSvgDocument(geometry.contours, settings, geometry.summits);
+      return createSvgDocument(
+        geometry.contours,
+        settings,
+        geometry.summits,
+        realTerrain?.attribution,
+      );
     },
   };
 }

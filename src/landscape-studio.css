@@ -536,3 +536,24 @@ input[aria-invalid='true'] {
     overscroll-behavior: contain;
   }
 }
+
+.real-terrain-controls .detail-content {
+  display: grid;
+  gap: 12px;
+}
+.real-terrain-controls label {
+  font-size: 11px;
+  color: var(--muted-label-color);
+}
+.real-terrain-controls input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+}
+.real-terrain-controls p,
+.real-terrain-controls a {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--muted-label-color);
+}

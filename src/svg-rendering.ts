@@ -26,7 +26,8 @@ export function renderContoursIntoSvg(
     svg.prepend(contourLayer);
   }
 
-  contourLayer.innerHTML = getContourMarkup(contours, settings);
+  contourLayer.innerHTML =
+    createGridMarkup(width, height, settings) + getContourMarkup(contours, settings);
   updateLiveSummitMarkers(svg, summits, settings);
 }
 
@@ -35,13 +36,14 @@ export function createSvgDocument(
   contours: Contour[],
   settings: Readonly<DesignSettings>,
   summits: readonly ContourPoint[] = [],
+  attribution?: string,
 ): string {
   const { width, height, background, transparent } = settings;
   const backdrop = transparent
     ? ''
     : `<rect width="${width}" height="${height}" fill="${background}"/>`;
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" overflow="hidden"><defs><clipPath id="landscape-crop"><rect width="${width}" height="${height}"/></clipPath></defs><g clip-path="url(#landscape-crop)">${backdrop}${getContourMarkup(contours, settings)}${createSummitMarkerMarkup(summits, settings)}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" overflow="hidden">${attribution !== undefined ? `<metadata>${attribution}</metadata>` : ''}<defs><clipPath id="landscape-crop"><rect width="${width}" height="${height}"/></clipPath></defs><g clip-path="url(#landscape-crop)">${backdrop}${createGridMarkup(width, height, settings)}${getContourMarkup(contours, settings)}${createSummitMarkerMarkup(summits, settings)}${attribution !== undefined ? `<text x="8" y="${height - 8}" fill="${settings.lineColor}" font-family="sans-serif" font-size="${Math.min(9, ((width - 16) / Math.max(1, attribution.length)) * 1.6)}">${attribution}</text>` : ''}</g></svg>`;
 }
 
 /** Groups ordinary and index contours into consistently styled paths. */
@@ -95,4 +97,23 @@ function getContourMarkup(contours: Contour[], settings: Readonly<DesignSettings
       return `<path fill="none" stroke="${settings.lineColor}" stroke-width="${isIndex ? settings.indexStrokeWidth : settings.strokeWidth}" stroke-opacity="${settings.strokeOpacity}" stroke-linejoin="round" stroke-linecap="round"${dashAttribute} d="${pathData}"/>`;
     })
     .join('');
+}
+
+/** Draws a decorative grid with identical framing in live views and exports. */
+export function createGridMarkup(
+  width: number,
+  height: number,
+  settings: Readonly<DesignSettings>,
+): string {
+  if (settings.gridStyle === 'off') {
+    return '';
+  }
+
+  const spacing = settings.gridSpacing;
+  const mark =
+    settings.gridStyle === 'squares'
+      ? `<path d="M${spacing},0H0V${spacing}"/>`
+      : `<path d="M${spacing / 2 - 4},${spacing / 2}h8M${spacing / 2},${spacing / 2 - 4}v8"/>`;
+
+  return `<defs><pattern id="terrain-grid" width="${spacing}" height="${spacing}" patternUnits="userSpaceOnUse"><g fill="none" stroke="${settings.lineColor}" stroke-width="0.6">${mark}</g></pattern></defs><rect width="${width}" height="${height}" fill="url(#terrain-grid)" opacity="${settings.gridOpacity}"/>`;
 }
