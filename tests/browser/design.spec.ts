@@ -218,8 +218,9 @@ test('mobile controls, invalid links, clipboard fallback and keyboard collapse s
     throw new Error('The control panel has no layout bounds');
   }
 
-  expect(bounds.width).toBeLessThanOrEqual(358);
-  expect(bounds.height).toBeLessThanOrEqual(812);
+  expect(bounds.width).toBe(390);
+  expect(bounds.height).toBeLessThanOrEqual(844 * 0.62 + 1);
+  expect(bounds.y + bounds.height).toBeCloseTo(844, 0);
   await page.screenshot({ path: 'test-results/mobile-controls.png' });
 });
 
@@ -457,4 +458,83 @@ test('a late preview cannot overwrite newer settings and page restoration recrea
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow')));
   await expect(preview).toBeVisible();
   await expect(preview).not.toHaveAttribute('src', latestUrl ?? '');
+});
+
+test('mobile panel stays bottom anchored and scrolls internally in both modes', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${fixtureUrl}?v=1&seed=123&width=480&height=320`);
+
+  for (const mode of ['Settings', 'Export ↗']) {
+    await page.getByRole('button', { name: mode, exact: true }).click();
+    const panel = page.locator('.control-panel');
+    const bounds = await panel.boundingBox();
+
+    expect(bounds).not.toBeNull();
+    expect(bounds?.y).toBeGreaterThanOrEqual(844 * 0.38 - 1);
+    expect((bounds?.y ?? 0) + (bounds?.height ?? 0)).toBeCloseTo(844, 0);
+    await page.locator('#panel-body').evaluate((body) => {
+      body.scrollTop = body.scrollHeight;
+    });
+    await expect
+      .poll(() => page.locator('#panel-body').evaluate((body) => body.scrollTop))
+      .toBeGreaterThan(0);
+    await expect(page.getByRole('link', { name: 'conor.fyi' })).toBeInViewport();
+  }
+
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const collapsed = await page.locator('.control-panel').boundingBox();
+
+  expect((collapsed?.y ?? 0) + (collapsed?.height ?? 0)).toBeCloseTo(844, 0);
+  expect(collapsed?.height).toBeLessThan(150);
+});
+
+test('grouped presets apply paper, phone, monitor and current device dimensions', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'devicePixelRatio', { value: 2.625 });
+    Object.defineProperty(window.screen, 'width', { value: 393 });
+    Object.defineProperty(window.screen, 'height', { value: 852 });
+  });
+  await page.goto(`${fixtureUrl}?v=1&seed=123&width=480&height=320`);
+  await page.getByRole('button', { name: 'Export ↗' }).click();
+  const sizes = page.locator('#output-size');
+
+  await expect(sizes.locator('optgroup')).toHaveCount(5);
+
+  for (const [value, width, height] of [
+    ['1240x1754', '1240', '1754'],
+    ['1179x2556', '1179', '2556'],
+    ['3840x2160', '3840', '2160'],
+    ['viewport', '390', '844'],
+  ]) {
+    await sizes.selectOption(value);
+    await expect(page.getByLabel('Width', { exact: true })).toHaveValue(width);
+    await expect(page.getByLabel('Height', { exact: true })).toHaveValue(height);
+    await expect(page.getByRole('button', { name: 'Download SVG', exact: true })).toBeEnabled();
+  }
+
+  const screenDimensions = await page.evaluate(() => ({
+    width: Math.min(4096, Math.max(64, Math.round(screen.width * devicePixelRatio))),
+    height: Math.min(4096, Math.max(64, Math.round(screen.height * devicePixelRatio))),
+  }));
+
+  await sizes.selectOption('screen');
+  await expect(page.getByLabel('Width', { exact: true })).toHaveValue(
+    String(screenDimensions.width),
+  );
+  await expect(page.getByLabel('Height', { exact: true })).toHaveValue(
+    String(screenDimensions.height),
+  );
+  await expect(sizes).toHaveValue('custom');
+  await page.setViewportSize({ width: 844, height: 390 });
+  await expect(sizes.locator('option[value="viewport"]')).toHaveText(
+    'Current viewport · 844 × 390',
+  );
+  await sizes.selectOption('viewport');
+  await expect(page.getByLabel('Width', { exact: true })).toHaveValue('844');
+  await expect(page.getByLabel('Height', { exact: true })).toHaveValue('390');
 });

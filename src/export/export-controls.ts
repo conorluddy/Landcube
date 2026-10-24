@@ -7,7 +7,7 @@ import {
   outputSettingKeys,
   pngResolutionScales,
 } from '../constants/design';
-import { imageMimeTypes, outputSizePresets } from '../constants/export';
+import { imageMimeTypes, outputSizePresetGroups } from '../constants/export';
 import { operationErrorCodes } from '../constants/operations';
 import { readDesignControlValue } from '../design-control-values';
 import { clampOutputDimensionPixels } from '../design-settings';
@@ -36,7 +36,7 @@ export function mountExportControls(
   content.setAttribute('aria-label', 'Export options');
   content.innerHTML = `
     <div class="select-row"><label for="format">Format</label><select id="format">${imageExportFormats.map((format) => `<option value="${format}">${format.toUpperCase()}</option>`).join('')}</select></div>
-    <div class="select-row"><label for="output-size">Size</label><select id="output-size">${outputSizePresets.map((preset) => `<option value="${preset.value}">${preset.label}</option>`).join('')}</select></div>
+    <div class="select-row"><label for="output-size">Size</label><select id="output-size"><option value="custom">Custom</option><optgroup label="This device"><option value="viewport">Current viewport</option><option value="screen">Device screen</option></optgroup>${outputSizePresetGroups.map((group) => `<optgroup label="${group.label}">${group.presets.map((preset) => `<option value="${preset.value}">${preset.label}</option>`).join('')}</optgroup>`).join('')}</select></div>
     <label class="toggle-row" for="allowExtraLargeExports">Allow extra-large exports<input id="allowExtraLargeExports" type="checkbox" aria-describedby="large-export-warning"></label>
     <p id="large-export-warning" class="export-hint">Up to 12,288 px per side. Large PNGs can use over 576 MiB of memory and may freeze or crash this tab, especially on mobile.</p>
     <div class="dimension-row"><label for="width">Width<input id="width" type="number" min="${minimumOutputDimensionPixels}" max="${maximumOutputDimensionPixels}" step="1" inputmode="numeric"></label><span aria-hidden="true">×</span><label for="height">Height<input id="height" type="number" min="${minimumOutputDimensionPixels}" max="${maximumOutputDimensionPixels}" step="1" inputmode="numeric"></label></div>
@@ -76,6 +76,12 @@ export function mountExportControls(
   /** Synchronizes output controls and schedules a settled preview when visible. */
   function refreshExportControls() {
     const settings = actions.getSettings();
+    const devicePixelRatio = window.devicePixelRatio || 1;
+
+    getRequiredElement(content, 'option[value="viewport"]', HTMLOptionElement).textContent =
+      `Current viewport · ${window.innerWidth} × ${window.innerHeight}`;
+    getRequiredElement(content, 'option[value="screen"]', HTMLOptionElement).textContent =
+      `Device screen · ${Math.round(window.screen.width * devicePixelRatio)} × ${Math.round(window.screen.height * devicePixelRatio)}`;
     const maximumDimensionPixels = settings.allowExtraLargeExports
       ? maximumExtraLargeOutputDimensionPixels
       : maximumOutputDimensionPixels;
@@ -248,10 +254,13 @@ export function mountExportControls(
 
     if (input.id === 'output-size') {
       const [width, height] =
-        input.value === 'viewport'
-          ? [window.innerWidth, window.innerHeight].map((value) =>
-              clampOutputDimensionPixels(value),
-            )
+        input.value === 'viewport' || input.value === 'screen'
+          ? (input.value === 'screen'
+              ? [window.screen.width, window.screen.height].map(
+                  (value) => value * (window.devicePixelRatio || 1),
+                )
+              : [window.innerWidth, window.innerHeight]
+            ).map((value) => clampOutputDimensionPixels(Math.round(value)))
           : input.value.split('x').map(Number);
 
       if (input.value === 'custom') {
@@ -286,7 +295,7 @@ export function mountExportControls(
       getRequiredElement(content, '#output-size', HTMLSelectElement).value = 'custom';
     }
 
-    if (input.id === 'output-size' && input.value === 'viewport') {
+    if (input.id === 'output-size' && (input.value === 'viewport' || input.value === 'screen')) {
       input.value = 'custom';
     }
 
@@ -330,6 +339,7 @@ export function mountExportControls(
     previewAnimationFrameIdentifier = undefined;
   });
   window.addEventListener('pageshow', refreshExportControls);
+  window.addEventListener('resize', refreshExportControls);
   refreshExportControls();
 
   return refreshExportControls;
