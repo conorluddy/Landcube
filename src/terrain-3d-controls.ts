@@ -1,3 +1,10 @@
+import {
+  terrainMaterialPresets,
+  landFinishes,
+  waterFinishes,
+  type LandFinish,
+  type WaterFinish,
+} from './terrain-materials';
 import { mountTerrainCropControls } from './terrain-crop-controls';
 import type { TerrainCropSettings } from './terrain-crop';
 import { getTerrainWaterColor } from './terrain-water';
@@ -73,9 +80,22 @@ export function mountTerrain3dControls(
       <fieldset><legend>Shape</legend>
         <label class="range-control" for="terrain-3d-height"><span>Height exaggeration</span><output data-height-value>0.3×</output><input id="terrain-3d-height" data-height type="range" min="0" max="1" step="0.05" value="0.3"></label>
       </fieldset>
+      <fieldset><legend>Materials</legend>
+        <label class="select-row">Material preset<select data-material-preset><option value="custom">Custom</option>${Object.entries(
+          terrainMaterialPresets,
+        )
+          .map(([key, preset]) => `<option value="${key}">${preset.label}</option>`)
+          .join('')}</select></label>
+        <p class="export-hint">Pair land and water colors and finishes, then adjust either below.</p>
+      </fieldset>
       <fieldset><legend>Surface</legend>
-        <label class="toggle-row">Matte surface<input type="checkbox" role="switch" data-surface checked></label>
+        <label class="toggle-row">Show land surface<input type="checkbox" role="switch" data-surface checked></label>
         <div data-surface-options>
+          <label class="select-row">Land finish<select data-land-finish>${Object.entries(
+            landFinishes,
+          )
+            .map(([key, finish]) => `<option value="${key}">${finish.label}</option>`)
+            .join('')}</select></label>
           <label class="toggle-row">Solid base<input type="checkbox" role="switch" data-solid-base></label>
           <label class="toggle-row">Match background<input type="checkbox" role="switch" data-surface-match checked></label>
           <div class="colour-row"><label>Surface color<input type="color" data-surface-color value="#202326" disabled></label></div>
@@ -92,10 +112,18 @@ export function mountTerrain3dControls(
       <fieldset><legend>Water</legend>
         <label class="select-row">Water style<select data-water-style><option value="hatched">Hatched</option><option value="solid" selected>Solid</option><option value="off">Off</option></select></label>
         <div data-water-color-row>
+          <label class="select-row">Water finish<select data-water-finish>${Object.entries(
+            waterFinishes,
+          )
+            .map(([key, finish]) => `<option value="${key}">${finish.label}</option>`)
+            .join('')}</select></label>
           <label class="toggle-row">Match terrain<input type="checkbox" role="switch" data-water-match checked></label>
           <div class="colour-row"><label>Water color<input type="color" data-water-color value="#1c1f21" disabled></label></div>
         </div>
-        <p class="export-hint">Appears where sea level is enabled in Location.</p>
+        <div data-water-opacity-row hidden><label class="range-control" for="water-opacity"><span>Water opacity</span><output data-water-opacity-value>40%</output><input id="water-opacity" data-water-opacity type="range" min="0" max="100" step="1" value="40"></label></div>
+        <label class="toggle-row">Preview water level<input type="checkbox" role="switch" data-preview-water></label>
+        <div data-preview-water-row hidden><label class="range-control" for="preview-water-level"><span>Water level</span><output data-preview-water-value>40%</output><input id="preview-water-level" data-preview-water-level type="range" min="0" max="100" step="1" value="40"></label></div>
+        <p class="export-hint">Uses sea level from Location, or enable Preview water level to flood the current terrain. Translucent resin reveals the seabed through the top and cut edges. Preview levels are relative to the terrain height range and apply only to 3D.</p>
       </fieldset>
       <fieldset data-lighting><legend>Lighting</legend>
         <label class="select-row">Light source<select data-light-mode><option value="sun">Sun</option><option value="moon">Moon</option><option value="off">Off</option></select></label>
@@ -155,6 +183,116 @@ export function mountTerrain3dControls(
         );
     }
   };
+
+  const markCustom = () => {
+    getRequiredElement(section, '[data-material-preset]', HTMLSelectElement).value = 'custom';
+  };
+
+  for (const selector of [
+    '[data-land-finish]',
+    '[data-water-finish]',
+    '[data-surface-match]',
+    '[data-surface-color]',
+    '[data-water-match]',
+    '[data-water-color]',
+    '[data-water-style]',
+  ]) {
+    getRequiredElement(section, selector, HTMLElement).addEventListener('input', markCustom);
+    getRequiredElement(section, selector, HTMLElement).addEventListener('change', markCustom);
+  }
+
+  getRequiredElement(section, '[data-land-finish]', HTMLSelectElement).addEventListener(
+    'change',
+    (event) => {
+      view?.setLandFinish((event.target as HTMLSelectElement).value as LandFinish);
+    },
+  );
+  getRequiredElement(section, '[data-water-finish]', HTMLSelectElement).addEventListener(
+    'change',
+    (event) => {
+      const finish = (event.target as HTMLSelectElement).value as WaterFinish;
+
+      view?.setWaterFinish(finish);
+      getRequiredElement(section, '[data-water-opacity-row]', HTMLElement).hidden =
+        finish !== 'translucent';
+    },
+  );
+  getRequiredElement(section, '[data-material-preset]', HTMLSelectElement).addEventListener(
+    'change',
+    (event) => {
+      const key = (event.target as HTMLSelectElement).value as keyof typeof terrainMaterialPresets;
+      const preset = (
+        terrainMaterialPresets as Partial<
+          Record<string, (typeof terrainMaterialPresets)[keyof typeof terrainMaterialPresets]>
+        >
+      )[key];
+
+      if (!preset) {
+        return;
+      }
+
+      for (const [target, color] of [
+        ['surface', preset.land],
+        ['water', preset.water],
+      ]) {
+        getRequiredElement(section, `[data-${target}-match]`, HTMLInputElement).checked = false;
+        const picker = getRequiredElement(section, `[data-${target}-color]`, HTMLInputElement);
+
+        picker.disabled = false;
+        picker.value = color;
+      }
+
+      getRequiredElement(section, '[data-surface]', HTMLInputElement).checked = true;
+      getRequiredElement(section, '[data-surface-options]', HTMLElement).hidden = false;
+      getRequiredElement(section, '[data-water-style]', HTMLSelectElement).value = 'solid';
+      getRequiredElement(section, '[data-water-color-row]', HTMLElement).hidden = false;
+      getRequiredElement(section, '[data-land-finish]', HTMLSelectElement).value =
+        preset.landFinish;
+      getRequiredElement(section, '[data-water-finish]', HTMLSelectElement).value =
+        preset.waterFinish;
+      getRequiredElement(section, '[data-water-opacity-row]', HTMLElement).hidden = true;
+      view?.setSurface(true);
+      view?.setSurfaceColor(preset.land);
+      view?.setWaterColor(preset.water);
+      view?.setLandFinish(preset.landFinish);
+      view?.setWaterFinish(preset.waterFinish);
+      view?.setWaterStyle('solid');
+    },
+  );
+
+  getRequiredElement(section, '[data-water-opacity]', HTMLInputElement).addEventListener(
+    'input',
+    (event) => {
+      const value = (event.target as HTMLInputElement).valueAsNumber;
+
+      getRequiredElement(section, '[data-water-opacity-value]', HTMLOutputElement).value =
+        `${value}%`;
+      view?.setWaterOpacity(value / 100);
+    },
+  );
+
+  const syncPreviewWater = () => {
+    const enabled = getRequiredElement(section, '[data-preview-water]', HTMLInputElement).checked;
+    const value = getRequiredElement(
+      section,
+      '[data-preview-water-level]',
+      HTMLInputElement,
+    ).valueAsNumber;
+
+    getRequiredElement(section, '[data-preview-water-row]', HTMLElement).hidden = !enabled;
+    getRequiredElement(section, '[data-preview-water-value]', HTMLOutputElement).value =
+      `${value}%`;
+    view?.setPreviewWaterLevel(enabled ? value / 100 : undefined);
+  };
+
+  getRequiredElement(section, '[data-preview-water]', HTMLInputElement).addEventListener(
+    'change',
+    syncPreviewWater,
+  );
+  getRequiredElement(section, '[data-preview-water-level]', HTMLInputElement).addEventListener(
+    'input',
+    syncPreviewWater,
+  );
 
   const download = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
@@ -241,6 +379,17 @@ export function mountTerrain3dControls(
           getRequiredElement(section, '[data-model-height]', HTMLOutputElement).value =
             `${Number(heightMm.toFixed(2))} mm`;
         });
+        view.setLandFinish(
+          getRequiredElement(section, '[data-land-finish]', HTMLSelectElement).value as LandFinish,
+        );
+        view.setWaterFinish(
+          getRequiredElement(section, '[data-water-finish]', HTMLSelectElement)
+            .value as WaterFinish,
+        );
+        view.setWaterOpacity(
+          getRequiredElement(section, '[data-water-opacity]', HTMLInputElement).valueAsNumber / 100,
+        );
+        syncPreviewWater();
         view.setModelSettings(modelSettings);
         view.setLighting(lighting);
         view.setGround(getRequiredElement(section, '[data-ground]', HTMLInputElement).checked);

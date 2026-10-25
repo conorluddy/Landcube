@@ -1,4 +1,10 @@
-import { clipCirclePolygon } from './terrain-crop';
+import {
+  landFinishes,
+  waterFinishes,
+  type LandFinish,
+  type WaterFinish,
+} from './terrain-materials';
+import { createWaterVolume } from './terrain-water-volume';
 import { createTerrainStage, defaultTerrainGroundColor } from './terrain-stage';
 import { getTerrainWaterColor } from './terrain-water';
 import { defaultTerrainLighting, type TerrainLightingSettings } from './terrain-lighting';
@@ -38,6 +44,10 @@ export interface Terrain3d {
   setHeight(value: number): void;
   setModelSettings(value: TerrainModelSettings): void;
   getStl(): ArrayBuffer;
+  setLandFinish(value: LandFinish): void;
+  setWaterFinish(value: WaterFinish): void;
+  setWaterOpacity(value: number): void;
+  setPreviewWaterLevel(value: number | undefined): void;
   setSurface(value: boolean): void;
   setBase(value: boolean): void;
   setGround(value: boolean): void;
@@ -92,7 +102,7 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
   let backgroundColor = '#202326';
   let customGroundColor: string | undefined = defaultTerrainGroundColor;
 
-  const surfaceMaterial = new THREE.MeshStandardMaterial({
+  const surfaceMaterial = new THREE.MeshPhysicalMaterial({
     color: backgroundColor,
     roughness: 1,
     metalness: 0,
@@ -197,22 +207,39 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
     color: getTerrainWaterColor(backgroundColor),
     side: THREE.DoubleSide,
   });
+  const litWaterMaterial = new THREE.MeshPhysicalMaterial({
+    side: THREE.DoubleSide,
+    metalness: 0,
+    clearcoatRoughness: 0.12,
+  });
+  let waterOpacity = 0.4;
+  let previewWaterLevel: number | undefined;
+  let waterFinish: WaterFinish = 'graphic';
+  const activeWaterMaterial = () =>
+    waterFinish === 'graphic' ? solidWaterMaterial : litWaterMaterial;
   let waterStyle: WaterStyle = 'solid';
   let customWaterColor: string | undefined;
 
   const updateWaterColor = () => {
-    solidWaterMaterial.color.set(
-      customWaterColor ?? getTerrainWaterColor(customSurfaceColor ?? backgroundColor),
-    );
+    const color = customWaterColor ?? getTerrainWaterColor(customSurfaceColor ?? backgroundColor);
+
+    solidWaterMaterial.color.set(color);
+    litWaterMaterial.color.set(color);
   };
 
   const sea = new THREE.Mesh<THREE.BufferGeometry, THREE.Material>(
     new THREE.BufferGeometry(),
     seaMaterial,
   );
+  const waterSides = new THREE.Mesh(new THREE.BufferGeometry(), litWaterMaterial);
+
+  const syncWaterSides = () => {
+    waterSides.visible = sea.visible && waterFinish === 'translucent' && waterStyle === 'solid';
+  };
+
   const landscape = new THREE.Group();
 
-  landscape.add(surface, base, contourLayer, sea);
+  landscape.add(surface, base, contourLayer, sea, waterSides);
   scene.add(landscape);
   let visible = false;
   let rotating = false;
@@ -379,36 +406,53 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
         layer.material.gapSize = settings.dashGap;
       }
 
-      const seaPositions: number[] = [];
-      const seaUvs: number[] = [];
+      let level = seaLevel?.elevation;
 
-      for (const sourcePolygon of seaLevel?.polygons ?? []) {
-        const polygon =
-          modelSettings.cropShape === 'circle'
-            ? clipCirclePolygon(sourcePolygon, width)
-            : sourcePolygon;
+      if (previewWaterLevel !== undefined) {
+        let minimum = Infinity;
+        let maximum = -Infinity;
 
-        for (let index = 1; index < polygon.length - 1; index++) {
-          for (const point of [polygon[0], polygon[index], polygon[index + 1]]) {
-            seaPositions.push(
-              (point.x - width / 2) * scale,
-              (seaLevel?.elevation ?? 0) * terrain3dElevationScale * exaggeration +
-                elevationOffset +
-                0.001,
-              (point.y - height / 2) * scale,
-            );
-            seaUvs.push(point.x, point.y);
-          }
+        for (const value of field.values) {
+          minimum = Math.min(minimum, value);
+          maximum = Math.max(maximum, value);
         }
+
+        level = minimum + (maximum - minimum) * previewWaterLevel;
       }
 
-      const seaGeometry = new THREE.BufferGeometry();
+      const water =
+        level === undefined
+          ? { top: [], sides: [] }
+          : createWaterVolume(
+              surface.geometry.getAttribute('position').array,
+              model.surface.indices,
+              level * terrain3dElevationScale * exaggeration + elevationOffset + 0.00005,
+            );
+      const seaUvs: number[] = [];
 
-      seaGeometry.setAttribute('position', new THREE.Float32BufferAttribute(seaPositions, 3));
-      seaGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(seaUvs, 2));
-      sea.geometry.dispose();
-      sea.geometry = seaGeometry;
-      sea.visible = waterStyle !== 'off' && seaPositions.length > 0;
+      for (let i = 0; i < water.top.length; i += 3) {
+        seaUvs.push(water.top[i] / scale + width / 2, water.top[i + 2] / scale + height / 2);
+      }
+
+      for (const [mesh, positions] of [
+        [sea, water.top],
+        [waterSides, water.sides],
+      ] as const) {
+        const geometry = new THREE.BufferGeometry();
+
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+
+        if (mesh === sea) {
+          geometry.setAttribute('uv', new THREE.Float32BufferAttribute(seaUvs, 2));
+        }
+
+        geometry.computeVertexNormals();
+        mesh.geometry.dispose();
+        mesh.geometry = geometry;
+      }
+
+      sea.visible = waterStyle !== 'off' && water.top.length > 0;
+      syncWaterSides();
       seaInk.set(settings.lineColor);
       backgroundColor = settings.background;
       surfaceMaterial.color.set(customSurfaceColor ?? backgroundColor);
@@ -450,6 +494,27 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
       contourLayer.visible = value;
       draw();
     },
+    setLandFinish(value: LandFinish) {
+      surfaceMaterial.roughness = landFinishes[value].roughness;
+      surfaceMaterial.clearcoat = landFinishes[value].clearcoat;
+      draw();
+    },
+    setWaterFinish(value: WaterFinish) {
+      waterFinish = value;
+      litWaterMaterial.transparent = value === 'translucent';
+      litWaterMaterial.opacity = value === 'translucent' ? waterOpacity : 1;
+      litWaterMaterial.depthWrite = value !== 'translucent';
+      litWaterMaterial.needsUpdate = true;
+      litWaterMaterial.roughness = waterFinishes[value].roughness;
+      litWaterMaterial.clearcoat = waterFinishes[value].clearcoat;
+      syncWaterSides();
+
+      if (waterStyle === 'solid') {
+        sea.material = activeWaterMaterial();
+      }
+
+      draw();
+    },
     setSurface(value: boolean) {
       surface.visible = value;
       base.visible = value && solidBase;
@@ -458,12 +523,26 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
     },
     setWaterStyle(value: WaterStyle) {
       waterStyle = value;
-      sea.material = value === 'solid' ? solidWaterMaterial : seaMaterial;
+      sea.material = value === 'solid' ? activeWaterMaterial() : seaMaterial;
       sea.visible =
         value !== 'off' &&
         previousField !== undefined &&
         sea.geometry.getAttribute('position').count > 0;
+      syncWaterSides();
       draw();
+    },
+    setWaterOpacity(value: number) {
+      waterOpacity = Math.max(0, Math.min(1, value));
+
+      if (waterFinish === 'translucent') {
+        litWaterMaterial.opacity = waterOpacity;
+      }
+
+      draw();
+    },
+    setPreviewWaterLevel(value: number | undefined) {
+      previewWaterLevel = value;
+      rebuild();
     },
     setWaterColor(value: string | undefined) {
       customWaterColor = value;

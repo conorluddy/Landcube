@@ -1,4 +1,4 @@
-import { realTerrainPresets } from './constants/real-terrain';
+import { realTerrainPresets, realTerrainPresetGroups } from './constants/real-terrain';
 import { loadBrowserRealTerrain } from './browser-real-terrain';
 import { realTerrainBounds } from './constants/real-terrain';
 import type { RealTerrain } from './real-terrain';
@@ -12,10 +12,15 @@ export function mountRealTerrainControls(
 
   section.className = 'real-terrain-controls';
   section.innerHTML = `<p class="export-hint">Choose a real-world location or use a generated landscape.</p><div class="detail-content">
-    <div class="select-row"><label for="terrain-place">Location</label><select id="terrain-place">${realTerrainPresets
+    <div class="select-row"><label for="terrain-place">Location</label><select id="terrain-place">${realTerrainPresetGroups
       .map(
-        ({ name, latitude, longitude }) =>
-          `<option value="${latitude},${longitude}">${name}</option>`,
+        ({ country, locations }) =>
+          `<optgroup label="${country}">${locations
+            .map(
+              ({ name, latitude, longitude }) =>
+                `<option value="${latitude},${longitude}"${name === realTerrainPresets[0].name ? ' selected' : ''}>${name}</option>`,
+            )
+            .join('')}</optgroup>`,
       )
       .join('')}</select></div>
     <div class="control-grid"><label>Latitude<input id="terrain-latitude" type="number" min="-85" max="85" step="any" value="${realTerrainPresets[0].latitude}"></label><label>Longitude<input id="terrain-longitude" type="number" min="-180" max="180" step="any" value="${realTerrainPresets[0].longitude}"></label></div>

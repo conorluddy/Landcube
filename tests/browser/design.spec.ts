@@ -585,6 +585,22 @@ test('real terrain loads decoded tiles, retains geometry on failure and exports 
   );
   await page.getByRole('button', { name: 'Location', exact: true }).click();
   await expect(page.locator('#terrain-place option')).toHaveCount(42);
+  const groups = await page.locator('#terrain-place optgroup').evaluateAll((elements) =>
+    elements.map((element) => ({
+      country: element.getAttribute('label') ?? '',
+      locations: [...element.querySelectorAll('option')].map((option) => option.textContent),
+    })),
+  );
+  const countryNames = groups.map((group) => group.country);
+
+  expect(countryNames).toEqual([...countryNames].sort((a, b) => a.localeCompare(b, 'en')));
+
+  for (const group of groups) {
+    expect(group.locations).toEqual([...group.locations].sort((a, b) => a.localeCompare(b, 'en')));
+  }
+
+  expect(groups.find((group) => group.country === 'Ireland')?.locations).toContain('Carrauntoohil');
+  await expect(page.locator('#terrain-place')).toHaveValue('53.01,-6.33');
   await page.locator('#terrain-place').selectOption({ label: 'MacGillycuddy’s Reeks' });
   await expect(page.locator('#terrain-span')).toHaveValue('12');
   await expect(page.locator('#terrain-latitude')).toHaveValue('51.997');

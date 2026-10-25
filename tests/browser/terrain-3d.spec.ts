@@ -104,8 +104,77 @@ test('3D controls retain surface, contour and lighting choices across tab and vi
   await expect(height).toHaveValue('0.5');
   await expect(page.getByLabel('Surface color')).toHaveValue('#667788');
   await expect(page.getByRole('switch', { name: 'Contour lines', exact: true })).not.toBeChecked();
-  await page.getByRole('switch', { name: 'Matte surface' }).uncheck();
+  await page.getByRole('switch', { name: 'Show land surface' }).uncheck();
   await expect(page.getByLabel('Surface color')).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('material presets pair colors and allow independent finishes across view changes', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('switch', { name: 'Show raised contours' }).check();
+
+  for (const [preset, land, water, finish] of [
+    ['porcelain', '#e9e2d3', '#165b62', 'satin'],
+    ['plaster', '#eeeae2', '#728b98', 'matte'],
+    ['terracotta', '#b96b4e', '#174c57', 'matte'],
+    ['slate', '#42494e', '#172b36', 'matte'],
+  ]) {
+    await page.getByLabel('Material preset').selectOption(preset);
+    await expect(page.getByLabel('Surface color')).toHaveValue(land);
+    await expect(page.getByLabel('Water color', { exact: true })).toHaveValue(water);
+    await expect(page.getByLabel('Land finish')).toHaveValue(finish);
+    await expect(
+      page.getByRole('switch', { name: 'Match terrain', exact: true }),
+    ).not.toBeChecked();
+  }
+
+  await page.getByLabel('Water finish').selectOption('satin');
+  await expect(page.getByLabel('Material preset')).toHaveValue('custom');
+  await expect(page.getByLabel('Land finish')).toHaveValue('matte');
+  await page.getByRole('switch', { name: 'Show raised contours' }).uncheck();
+  await page.getByRole('switch', { name: 'Show raised contours' }).check();
+  await expect(page.getByLabel('Water finish')).toHaveValue('satin');
+  await expect(page.getByLabel('Surface color')).toHaveValue('#42494e');
+  expect(errors).toEqual([]);
+});
+
+test('translucent water reveals flooded terrain and retains opacity across view changes', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('switch', { name: 'Show raised contours' }).check();
+  await page.getByLabel('Material preset').selectOption('porcelain');
+  await page.getByRole('switch', { name: 'Solid base', exact: true }).check();
+  await page.getByRole('switch', { name: 'Preview water level', exact: true }).check();
+  await page.getByLabel('Water finish').selectOption('translucent');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const clip = { x: 100, y: 150, width: 650, height: 450 };
+  const transparent = PNG.sync.read(await page.screenshot({ clip })).data;
+
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('slider', { name: 'Water opacity' }).fill('100');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const opaque = PNG.sync.read(await page.screenshot({ clip })).data;
+
+  expect(opaque.equals(transparent)).toBe(false);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('slider', { name: 'Water opacity' }).fill('25');
+  await page.getByRole('switch', { name: 'Show raised contours' }).uncheck();
+  await page.getByRole('switch', { name: 'Show raised contours' }).check();
+  await expect(page.getByRole('slider', { name: 'Water opacity' })).toHaveValue('25');
+  await expect(
+    page.getByRole('switch', { name: 'Preview water level', exact: true }),
+  ).toBeChecked();
   expect(errors).toEqual([]);
 });
 
