@@ -66,6 +66,14 @@ Each output side must be an integer from 64–4096 px by default. “Allow extra
 
 Exports are standalone, clipped to their output frame, and include explicit colours. Filenames use `topogra-SEED-WIDTHxHEIGHT.svg` or `.png`, with actual file dimensions. Export captures settings at download time, so later edits do not change an in-progress download.
 
+## CLI (local use)
+
+Build the executable with `npm run build`, then run `node dist-cli/topogra.mjs --help`. `generate` accepts every design setting as a kebab-case flag, including explicit `true`/`false` booleans; it also accepts `--config FILE` or `--url URL` (not both), `--palette`, `--size`, real-terrain coordinates or `--terrain-preset`, `--output`, `--json true`, and `--save-config FILE`. Resolution order is defaults, config or URL, palette/size, then explicit flags. `presets --json true` lists canonical palettes, sizes, and locations; `validate --config FILE` validates a versioned saved envelope. Use `--output -` for image bytes only—structured JSON is intentionally incompatible with it. Existing files require `--force true`; writes use a temporary sibling file and rename, avoiding partial outputs on normal failures.
+
+CLI errors return exit code 2 and diagnostics on stderr; successful generation reports its seed, or emits structured metadata with `--json true`. Saved config contains `{ "version": 1, "settings": ..., "terrain": ... }` and rejects unknown fields. Browser links restore version-one styling but not real-terrain locations, so JSON metadata marks that limitation explicitly. Cursor settings are preserved in CLI output but static exports remain settled, like browser exports.
+
+Real-terrain SVG and PNG output visibly embeds the resolved source attribution by default. Use `--attribution-file credits.txt` to write the same resolved credit as a companion text file for a downstream layout workflow; the final published medium must still display attribution where reasonable. `--attribution embedded` is explicit but equivalent to the default.
+
 ## Share and restore
 
 Every committed edit updates the address bar after 250 ms using `replaceState`, without adding history entries. Reloading that URL restores its design. Copy link immediately flushes pending edits and copies the complete URL; if clipboard access is unavailable, a selectable link appears for manual copying.
