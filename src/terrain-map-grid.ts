@@ -1,5 +1,14 @@
 import * as THREE from 'three';
 
+/** Shared floor ink keeps the grid, scale, and north marker in the same palette. */
+export function getMapGridInk(background: string): { color: string; rgb: string } {
+  const lightFloor = new THREE.Color(background).getHSL({ h: 0, s: 0, l: 0 }).l > 0.35;
+
+  return lightFloor
+    ? { color: '#19272c', rgb: '25, 39, 44' }
+    : { color: '#dce7e4', rgb: '220, 231, 228' };
+}
+
 /** Choose a restrained 1/2/5 interval, targeting roughly eight cells across the model. */
 export function getMapGridSpacing(spanMeters: number): number {
   const target = spanMeters / 8;
@@ -74,8 +83,7 @@ export function createTerrainMapGrid(): {
       const pixelsPerUnit = 2048 / planeSize;
       const spacingMeters = getMapGridSpacing(spanMeters);
       const spacing = (spacingMeters / spanMeters) * extent * pixelsPerUnit;
-      const lightFloor = new THREE.Color(background).getHSL({ h: 0, s: 0, l: 0 }).l > 0.35;
-      const ink = lightFloor ? '25, 39, 44' : '220, 231, 228';
+      const ink = getMapGridInk(background).rgb;
 
       mesh.scale.set(planeSize, planeSize, 1);
       const halfWidth = (width * pixelsPerUnit) / 2;

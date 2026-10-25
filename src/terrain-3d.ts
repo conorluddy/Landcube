@@ -117,8 +117,8 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
 
   surface.castShadow = surface.receiveShadow = true;
   base.castShadow = base.receiveShadow = true;
-  base.visible = false;
-  let solidBase = false;
+  base.visible = true;
+  let solidBase = true;
   let showGround = true;
   const stage = createTerrainStage();
 
@@ -464,7 +464,6 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
         (modelSettings.cropShape === 'circle' ? modelSettings.widthMm : modelSettings.lengthMm) *
           previewScale,
         customGroundColor ?? settings.background,
-        settings.lineColor,
         modelSettings.cropShape === 'circle',
       );
       draw();

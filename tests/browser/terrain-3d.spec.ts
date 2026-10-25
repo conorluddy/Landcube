@@ -36,6 +36,7 @@ test('3D controls retain surface, contour and lighting choices across tab and vi
   const height = page.getByRole('slider', { name: 'Height exaggeration' });
 
   await expect(page.getByRole('switch', { name: 'Studio floor', exact: true })).toBeChecked();
+  await expect(page.getByRole('switch', { name: 'Solid base', exact: true })).toBeChecked();
   await expect(page.getByRole('switch', { name: 'North arrow', exact: true })).toBeDisabled();
   await expect(page.getByRole('switch', { name: 'Map grid', exact: true })).toBeDisabled();
   await expect(page.getByLabel('Water style')).toHaveValue('solid');
@@ -325,7 +326,11 @@ test('loaded location models export STL and companion attribution', async ({ pag
 
   expect(stl.length).toBe(84 + stl.readUInt32LE(80) * 50);
   await expect(page.getByRole('switch', { name: 'North arrow', exact: true })).toBeEnabled();
-  await page.getByRole('switch', { name: 'Solid base', exact: true }).check();
+  await expect(page.getByRole('switch', { name: 'North arrow', exact: true })).toBeChecked();
+  await expect(page.getByRole('switch', { name: 'Map grid', exact: true })).toBeChecked();
+  await expect(page.getByRole('switch', { name: 'Solid base', exact: true })).toBeChecked();
+  await page.getByRole('switch', { name: 'North arrow', exact: true }).uncheck();
+  await page.getByRole('switch', { name: 'Map grid', exact: true }).uncheck();
   await page.getByRole('button', { name: 'Collapse controls' }).click();
   const groundOnly = await page.screenshot();
 

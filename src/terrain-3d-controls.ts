@@ -97,7 +97,7 @@ export function mountTerrain3dControls(
           )
             .map(([key, finish]) => `<option value="${key}">${finish.label}</option>`)
             .join('')}</select></label>
-          <label class="toggle-row">Solid base<input type="checkbox" role="switch" data-solid-base></label>
+          <label class="toggle-row">Solid base<input type="checkbox" role="switch" data-solid-base checked></label>
           <label class="toggle-row">Match background<input type="checkbox" role="switch" data-surface-match checked></label>
           <div class="colour-row"><label>Surface color<input type="color" data-surface-color value="#202326" disabled></label></div>
         </div>
@@ -107,9 +107,9 @@ export function mountTerrain3dControls(
         <label class="toggle-row">Studio floor<input type="checkbox" role="switch" data-ground checked></label>
         <label class="toggle-row">Match canvas<input type="checkbox" role="switch" data-ground-match></label>
         <div class="colour-row"><label>Floor color<input type="color" data-ground-color value="#b4b4b4"></label></div>
-        <label class="toggle-row">Map grid<input type="checkbox" role="switch" data-map-grid disabled></label>
+        <label class="toggle-row">Map grid<input type="checkbox" role="switch" data-map-grid checked disabled></label>
         <p class="export-hint">A subtle ground-distance grid for real locations. Appears outside the model when Studio floor and Solid base are enabled.</p>
-        <label class="toggle-row">North arrow<input type="checkbox" role="switch" data-north disabled></label>
+        <label class="toggle-row">North arrow<input type="checkbox" role="switch" data-north checked disabled></label>
         <p class="export-hint">The studio surrounds the solid base with a continuous floor and real cast shadows. Match the canvas or choose a floor color. The north arrow is available for real locations and stays aligned as you orbit. These decorations are omitted from STL.</p>
       </fieldset>
       <fieldset><legend>Water</legend>

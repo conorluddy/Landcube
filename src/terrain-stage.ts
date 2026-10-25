@@ -1,4 +1,4 @@
-import { createTerrainMapGrid } from './terrain-map-grid';
+import { createTerrainMapGrid, getMapGridInk } from './terrain-map-grid';
 import * as THREE from 'three';
 
 export const defaultTerrainGroundColor = '#b4b4b4';
@@ -6,7 +6,7 @@ export const defaultTerrainGroundColor = '#b4b4b4';
 /** Presentation-only studio floor and geographic marker; never part of the printable model. */
 export function createTerrainStage(): {
   group: THREE.Group;
-  update(width: number, length: number, background: string, ink: string, circular: boolean): void;
+  update(width: number, length: number, background: string, circular: boolean): void;
   setVisible(value: boolean): void;
   setColor(value: string): void;
   setCastShadows(value: boolean): void;
@@ -76,7 +76,14 @@ export function createTerrainStage(): {
   group.add(shadow);
 
   const north = new THREE.Group();
-  const arrowMaterial = new THREE.MeshBasicMaterial({ color: '#e0e8d7', side: THREE.DoubleSide });
+  const arrowMaterial = new THREE.MeshBasicMaterial({
+    color: getMapGridInk(defaultTerrainGroundColor).color,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.38,
+    depthWrite: false,
+    toneMapped: false,
+  });
   const arrowGeometry = new THREE.BufferGeometry();
 
   // In the terrain frame, decreasing Z is geographic north. The arrow is painted on the floor.
@@ -91,7 +98,13 @@ export function createTerrainStage(): {
     ),
   );
   north.add(new THREE.Mesh(arrowGeometry, arrowMaterial));
-  const letterMaterial = new THREE.LineBasicMaterial({ color: '#e0e8d7' });
+  const letterMaterial = new THREE.LineBasicMaterial({
+    color: getMapGridInk(defaultTerrainGroundColor).color,
+    transparent: true,
+    opacity: 0.55,
+    depthWrite: false,
+    toneMapped: false,
+  });
   const letterGeometry = new THREE.BufferGeometry();
 
   letterGeometry.setAttribute(
@@ -117,6 +130,10 @@ export function createTerrainStage(): {
   let stageSize = { width: 2, length: 2, circular: false, background: defaultTerrainGroundColor };
 
   const updateGrid = () => {
+    const ink = getMapGridInk(stageSize.background).color;
+
+    arrowMaterial.color.set(ink);
+    letterMaterial.color.set(ink);
     mapGrid.mesh.visible = gridEnabled && groundSpan !== undefined;
     mapGrid.update(
       stageSize.width,
@@ -129,7 +146,7 @@ export function createTerrainStage(): {
 
   return {
     group,
-    update(width, length, background, ink, circular) {
+    update(width, length, background, circular) {
       stageSize = { width, length, background, circular };
       updateGrid();
 
@@ -147,8 +164,6 @@ export function createTerrainStage(): {
       groundMaterial.color.set(background);
       shadow.scale.set((width * 256) / 192, (length * 256) / 192, 1);
       north.position.set(-width / 2 - 0.2, 0, length / 2 - 0.05);
-      arrowMaterial.color.set(ink);
-      letterMaterial.color.set(ink);
     },
     setCastShadows(value) {
       castShadow.visible = value;
