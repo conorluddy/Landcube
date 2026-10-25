@@ -172,8 +172,30 @@ function parseOptions(argumentsList: string[]) {
     values[toKebab(key)] = { type: 'string' };
   }
 
+  // Node treats a separate negative value as another option. Join only numeric
+  // flags and numeric literals so unknown flags and missing values still fail.
+  const numericFlags = new Set([
+    'latitude',
+    'longitude',
+    'span-km',
+    ...Object.keys(designNumberConstraints).map(toKebab),
+  ]);
+  const normalized: string[] = [];
+  for (let index = 0; index < argumentsList.length; index++) {
+    const argument = argumentsList[index];
+    const next = argumentsList[index + 1];
+    if (
+      argument.startsWith('--') &&
+      numericFlags.has(argument.slice(2)) &&
+      next !== undefined &&
+      /^-(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(next)
+    ) {
+      normalized.push(`${argument}=${next}`);
+      index++;
+    } else normalized.push(argument);
+  }
   const { values: parsed, positionals } = parseArgs({
-    args: argumentsList,
+    args: normalized,
     options: values,
     allowPositionals: true,
     strict: true,

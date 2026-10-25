@@ -253,3 +253,33 @@ void test('output conflicts and staging failures leave no companion config', asy
   );
   assert.equal(await readFile(output, 'utf8'), 'existing');
 });
+
+void test('negative numeric arguments accept separate and equals forms', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'topogra-negative-'));
+  const output = join(directory, 'terrain.svg');
+  const config = join(directory, 'terrain.json');
+  await runCommand([
+    'generate',
+    '--cursor-height',
+    '-0.2',
+    '--output',
+    output,
+    '--save-config',
+    config,
+  ]);
+  assert.equal(JSON.parse(await readFile(config, 'utf8')).settings.cursorHeight, -0.2);
+  // Invalid span fails validation before network access, proving coordinates parsed.
+  for (const coordinates of [
+    ['--latitude', '-54.65', '--longitude', '-8.7'],
+    ['--latitude=-54.65', '--longitude=-8.7'],
+  ]) {
+    await assert.rejects(
+      runCommand(['generate', '--terrain', 'real', ...coordinates, '--span-km', '0']),
+      (error: Error) => /area width of 2–200/.test(error.message),
+    );
+  }
+  await assert.rejects(
+    runCommand(['generate', '--longitude', '--unknown']),
+    /ambiguous|argument|Unknown option/,
+  );
+});
