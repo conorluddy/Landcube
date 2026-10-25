@@ -105,6 +105,10 @@ void test('CLI validates saved configuration, applies explicit overrides, and re
     runCommand(['generate', '--format', 'png', '--output', join(directory, 'incorrect.svg')]),
     /conflicts with --format/,
   );
+  await assert.rejects(
+    runCommand(['generate', '--attribution-file', join(directory, 'credits.txt')]),
+    /requires real terrain/,
+  );
   await writeFile(
     config,
     JSON.stringify({

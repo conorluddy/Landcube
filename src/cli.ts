@@ -161,6 +161,8 @@ function parseOptions(argumentsList: string[]) {
     json: { type: 'string' },
     force: { type: 'string' },
     'save-config': { type: 'string' },
+    attribution: { type: 'string' },
+    'attribution-file': { type: 'string' },
   };
 
   for (const key of designKeys) {
@@ -243,6 +245,17 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
     terrain.mode === 'real'
       ? await loadNodeRealTerrain(terrain.latitude, terrain.longitude, terrain.spanKm)
       : undefined;
+
+  validateAttributionOptions(options, loadedTerrain);
+
+  if (options['attribution-file'] !== undefined && loadedTerrain !== undefined) {
+    await writeAtomically(
+      options['attribution-file'],
+      new TextEncoder().encode(`${loadedTerrain.attribution}\n`),
+      isEnabled(options, 'force'),
+    );
+  }
+
   const result = createNodeExportFile(
     settings,
     createOutputRenderer(engineConfiguration, () => loadedTerrain),
@@ -500,6 +513,22 @@ function metadata(
   };
 }
 
+/** Makes attribution delivery explicit while retaining embedded credits in standalone images. */
+function validateAttributionOptions(
+  options: Record<string, string | undefined>,
+  terrain: RealTerrain | undefined,
+): void {
+  const mode = options.attribution;
+
+  if (mode !== undefined && mode !== 'embedded') {
+    throw new Error('--attribution currently supports only embedded.');
+  }
+
+  if (options['attribution-file'] !== undefined && terrain === undefined) {
+    throw new Error('--attribution-file requires real terrain.');
+  }
+}
+
 async function writeAtomically(path: string, bytes: Uint8Array, force: boolean) {
   const target = resolve(path);
 
@@ -557,7 +586,7 @@ function write(stream: NodeJS.WriteStream, value: string) {
 function printHelp(stdout: NodeJS.WriteStream, isVerbose = false) {
   return write(
     stdout,
-    `Topogra CLI\n\nUsage: topogra generate [options]\n       topogra presets [--json true]\n       topogra validate --config design.json\n\nSources apply as defaults → config or URL → palette/size → explicit flags. --output - writes image bytes; --json true is incompatible with it. Existing files require --force true.\n\nGenerator options:\n  --config FILE | --url URL    Versioned CLI config or v=1 browser URL (mutually exclusive)\n  --palette NAME               ${[...Object.keys(designPalettePresets), 'random'].join(', ')}\n  --size WIDTHxHEIGHT          A listed output size; use presets --json true to discover values\n  --terrain generated|real     Real mode requires coordinates or --terrain-preset NAME\n  --latitude NUMBER --longitude NUMBER --span-km NUMBER\n  --format svg|png --output FILE|- --save-config FILE\n  --json true|false --force true|false\n\nDesign flags (default; range where applicable):\n${getDesignFlagReference(isVerbose)}\n${isVerbose ? '' : '\nUse --help --verbose for a full description of every design flag.\n'}`,
+    `Topogra CLI\n\nUsage: topogra generate [options]\n       topogra presets [--json true]\n       topogra validate --config design.json\n\nSources apply as defaults → config or URL → palette/size → explicit flags. --output - writes image bytes; --json true is incompatible with it. Existing files require --force true.\n\nGenerator options:\n  --config FILE | --url URL    Versioned CLI config or v=1 browser URL (mutually exclusive)\n  --palette NAME               ${[...Object.keys(designPalettePresets), 'random'].join(', ')}\n  --size WIDTHxHEIGHT          A listed output size; use presets --json true to discover values\n  --terrain generated|real     Real mode requires coordinates or --terrain-preset NAME\n  --latitude NUMBER --longitude NUMBER --span-km NUMBER\n  --format svg|png --output FILE|- --save-config FILE\n  --attribution embedded       Keep real-terrain credit visibly embedded (the default)\n  --attribution-file FILE      Write the resolved real-terrain credit alongside the image\n  --json true|false --force true|false\n\nDesign flags (default; range where applicable):\n${getDesignFlagReference(isVerbose)}\n${isVerbose ? '' : '\nUse --help --verbose for a full description of every design flag.\n'}`,
   );
 }
 

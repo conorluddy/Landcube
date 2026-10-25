@@ -72,6 +72,8 @@ Build the executable with `npm run build`, then run `node dist-cli/topogra.mjs -
 
 CLI errors return exit code 2 and diagnostics on stderr; successful generation reports its seed, or emits structured metadata with `--json true`. Saved config contains `{ "version": 1, "settings": ..., "terrain": ... }` and rejects unknown fields. Browser links restore version-one styling but not real-terrain locations, so JSON metadata marks that limitation explicitly. Cursor settings are preserved in CLI output but static exports remain settled, like browser exports.
 
+Real-terrain SVG and PNG output visibly embeds the resolved source attribution by default. Use `--attribution-file credits.txt` to write the same resolved credit as a companion text file for a downstream layout workflow; the final published medium must still display attribution where reasonable. `--attribution embedded` is explicit but equivalent to the default.
+
 ## Share and restore
 
 Every committed edit updates the address bar after 250 ms using `replaceState`, without adding history entries. Reloading that URL restores its design. Copy link immediately flushes pending edits and copies the complete URL; if clipboard access is unavailable, a selectable link appears for manual copying.
