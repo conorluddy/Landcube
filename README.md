@@ -97,7 +97,13 @@ Version-one defaults and engine constants must stay stable to preserve existing 
 - `src/terrain-generation.ts` and `src/contour-extraction.ts`: seeded smooth noise, bounded sampling, marching squares, saddle decisions, and stitched paths.
 - `src/landscape-composition.ts` and `src/svg-rendering.ts`: settled composition generation and SVG markup shared by the background, preview, and export.
 - `src/export/`: output controls, cached settled geometry, SVG files, PNG encoding, and download resource cleanup.
+- `src/export/node-image-export.ts`: Node SVG/PNG byte generation for the CLI, using Resvg so output size, transparency, and SVG composition match the browser contract.
+- `src/real-terrain.ts`, `src/browser-real-terrain.ts`, and `src/node-real-terrain.ts`: shared terrain sampling with platform-specific PNG decoding. Node uses pure-JavaScript `pngjs`; browser decoding remains canvas-based.
 - `src/main.ts`: application state, cursor lifecycle, scheduled rendering, and debounced resizing.
+
+### Node rendering foundation
+
+The forthcoming CLI uses the same settings validation, geometry, and SVG serialization as the browser. Its PNG adapter uses `@resvg/resvg-js`, which installs prebuilt native binaries for supported macOS (Intel and Apple silicon), Linux, and Windows platforms—no `node-gyp` or local Rust toolchain is required for those packages. The project’s supported Node versions remain Node 20.19+, 22.13+, or 24+. `pngjs` decodes Terrarium tiles entirely in JavaScript, avoiding canvas and DOM globals in Node. PNG output is expected to match browser dimensions, composition, colours, and alpha; its encoded bytes and antialiasing are renderer-dependent.
 
 The grid extends beyond the visible frame. Sampling uses CSS pixels, and resizing retains the seed and top-left world origin. Very large frames double grid spacing until they fit the sample budget; this can slightly change polygon approximation while preserving the continuous terrain. Dense sampling keeps contours flowing without curve smoothing that could introduce crossings.
 

@@ -1,3 +1,14 @@
+/** Geographic and area bounds accepted by every real-terrain loader. */
+export const realTerrainBounds = {
+  minimumLatitude: -85,
+  maximumLatitude: 85,
+  minimumLongitude: -180,
+  maximumLongitude: 180,
+  minimumSpanKm: 2,
+  maximumSpanKm: 200,
+  defaultSpanKm: 25,
+} as const;
+
 /** Centers for the real-terrain location selector, in decimal degrees. */
 export const realTerrainPresets = [
   { name: 'Wicklow Mountains', latitude: 53.01, longitude: -6.33 },

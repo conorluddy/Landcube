@@ -1,7 +1,18 @@
+import { realTerrainBounds } from './constants/real-terrain';
+
 export interface RealTerrain {
   sample: (x: number, y: number, width: number, height: number) => number;
   attribution: string;
 }
+
+/** Raw decoded RGBA pixels and source metadata for one 256px Terrarium tile. */
+export interface DecodedTerrainTile {
+  pixels: Uint8Array;
+  imagerySources: string;
+}
+
+/** Keeps fetching and image decoding platform-specific while sharing terrain sampling. */
+export type TerrainTileLoader = (tileUrl: string) => Promise<DecodedTerrainTile>;
 
 const earthCircumferenceMeters = 40075016.686;
 const tileSizePixels = 256;
@@ -16,15 +27,18 @@ export async function loadRealTerrain(
   latitude: number,
   longitude: number,
   spanKm: number,
+  loadTile: TerrainTileLoader,
 ): Promise<RealTerrain> {
   if (
     !Number.isFinite(latitude) ||
-    Math.abs(latitude) > 85 ||
+    latitude < realTerrainBounds.minimumLatitude ||
+    latitude > realTerrainBounds.maximumLatitude ||
     !Number.isFinite(longitude) ||
-    Math.abs(longitude) > 180 ||
+    longitude < realTerrainBounds.minimumLongitude ||
+    longitude > realTerrainBounds.maximumLongitude ||
     !Number.isFinite(spanKm) ||
-    spanKm < 2 ||
-    spanKm > 200
+    spanKm < realTerrainBounds.minimumSpanKm ||
+    spanKm > realTerrainBounds.maximumSpanKm
   ) {
     throw new Error(
       'Use latitude −85 to 85, longitude −180 to 180, and an area width of 2–200 km.',
@@ -50,7 +64,7 @@ export async function loadRealTerrain(
 
   for (let y = startY; y <= endY; y++) {
     for (let x = startX; x <= endX; x++) {
-      requests.push(loadTile(x, y));
+      requests.push(loadTerrainTile(x, y));
     }
   }
 
@@ -100,22 +114,14 @@ export async function loadRealTerrain(
     },
   };
 
-  /** Fetches and decodes one tile, releasing its image resource after copying. */
-  async function loadTile(x: number, y: number): Promise<void> {
+  /** Copies one decoded tile into the shared elevation grid. */
+  async function loadTerrainTile(x: number, y: number): Promise<void> {
     const wrappedX = ((x % tileCount) + tileCount) % tileCount;
     const boundedY = Math.max(0, Math.min(tileCount - 1, y));
-    const response = await fetch(
+    const tile = await loadTile(
       `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${zoom}/${wrappedX}/${boundedY}.png`,
-      { signal: AbortSignal.timeout(20000) },
     );
-
-    if (!response.ok) {
-      throw new Error(
-        `Terrain tile download failed (${response.status}). Try again or choose another area.`,
-      );
-    }
-
-    const sources = response.headers.get('x-amz-meta-x-imagery-sources')?.toLowerCase() ?? '';
+    const sources = tile.imagerySources.toLowerCase();
 
     for (const [identifiers, credit] of terrainCredits) {
       if (identifiers.some((identifier) => sources.includes(identifier)) || sources === '') {
@@ -123,32 +129,22 @@ export async function loadRealTerrain(
       }
     }
 
-    const bitmap = await createImageBitmap(await response.blob());
+    if (tile.pixels.length !== tileSizePixels * tileSizePixels * 4) {
+      throw new Error('Terrain tile has unexpected dimensions.');
+    }
 
-    try {
-      const canvas = document.createElement('canvas');
+    for (let row = 0; row < tileSizePixels; row++) {
+      for (let column = 0; column < tileSizePixels; column++) {
+        const offset = (row * tileSizePixels + column) * 4;
 
-      canvas.width = canvas.height = tileSizePixels;
-      const context = canvas.getContext('2d', { willReadFrequently: true });
-
-      if (!context) {
-        throw new Error('Canvas is unavailable for terrain decoding.');
+        elevations[
+          ((y - startY) * tileSizePixels + row) * columns + (x - startX) * tileSizePixels + column
+        ] = decodeTerrariumElevation(
+          tile.pixels[offset],
+          tile.pixels[offset + 1],
+          tile.pixels[offset + 2],
+        );
       }
-
-      context.drawImage(bitmap, 0, 0);
-      const pixels = context.getImageData(0, 0, tileSizePixels, tileSizePixels).data;
-
-      for (let row = 0; row < tileSizePixels; row++) {
-        for (let column = 0; column < tileSizePixels; column++) {
-          const offset = (row * tileSizePixels + column) * 4;
-
-          elevations[
-            ((y - startY) * tileSizePixels + row) * columns + (x - startX) * tileSizePixels + column
-          ] = decodeTerrariumElevation(pixels[offset], pixels[offset + 1], pixels[offset + 2]);
-        }
-      }
-    } finally {
-      bitmap.close();
     }
   }
 }
