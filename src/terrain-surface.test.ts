@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   clipTerrainSegment,
   createTerrainSurfaceBuffers,
+  createTerrainBaseBuffers,
   sampleHeightField,
   terrain3dElevationScale,
 } from './terrain-surface';
@@ -55,4 +56,24 @@ void test('contours clip to the surface frame without connecting unrelated bound
   ]);
   assert.equal(clipTerrainSegment({ x: -5, y: -5 }, { x: 15, y: -5 }, 10, 10), undefined);
   assert.equal(clipTerrainSegment({ x: -5, y: 5 }, { x: 5, y: 20 }, 10, 10), undefined);
+});
+
+void test('solid base closes every boundary segment below the lowest terrain point', () => {
+  const surface = createTerrainSurfaceBuffers(field, 10, 10);
+  const base = createTerrainBaseBuffers(surface);
+  const floor = Math.min(...surface.positions.filter((_, index) => index % 3 === 1)) - 0.15;
+
+  // Eight boundary segments, each with two wall triangles and one bottom triangle.
+  assert.equal(base.indices.length, 8 * 9);
+
+  for (let offset = 0; offset < base.positions.length; offset += 21) {
+    assert.ok(Math.abs(base.positions[offset + 7] - floor) < 1e-6);
+    assert.ok(Math.abs(base.positions[offset + 10] - floor) < 1e-6);
+    assert.ok(base.positions[offset + 1] > floor);
+    assert.ok(base.positions[offset + 4] > floor);
+  }
+
+  for (const index of base.indices) {
+    assert.ok(index < base.positions.length / 3);
+  }
 });

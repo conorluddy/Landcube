@@ -20,12 +20,16 @@ No account or backend is needed. Generated landscapes run offline once the web a
 ## Use the web app
 
 1. Open **[Topogra](https://conorluddy.github.io/Topogra/)** and choose a palette. Adjust density, scale, and detail, or select **New landscape** to explore another seed.
-2. For a geographic landscape, open **Real terrain**, choose a preset or enter latitude, longitude, and an area span of 2–200 km, then select **Load terrain**. **Use generated** returns to synthetic landscapes.
+2. For a geographic landscape, open **Location**, choose a preset or enter latitude, longitude, and an area span of 2–200 km, then select **Load terrain**. **Use generated** returns to synthetic landscapes. Selecting a preset fills its suggested area span; you can edit it before loading. The 200 km maximum is an application limit shared by browser and CLI.
 3. Adjust contour styling, grids, and summit markers. Lock the seed to keep your generated landscape while experimenting with its appearance.
 4. Open **Export**, choose SVG or PNG, set dimensions and transparency, and download. The preview shows the complete output; exported artwork uses settled terrain without the cursor effect.
 5. Use **Copy link** to share the current design. Reloading the link restores the saved styling and generated seed.
 
-The **3D** tab between Settings and Export contains the experimental raised-contour preview, height exaggeration, a matte surface with its own color picker, adjustable light direction, elevation, intensity and fill, auto-rotation, and camera reset. Switching tabs preserves the current view; 3D controls are session-only and exports remain 2D.
+The tabs are **Settings → Location → 3D → Export**. Location contains real-terrain presets and loading controls. The **3D** tab provides raised contours, a matte surface and optional solid base, Sun/Moon/Off lighting, water styles, auto-rotation, and camera reset.
+
+In 3D, **Model dimensions** sets independent width and length in millimeters (default **150 × 150 mm**) and minimum base thickness below the lowest valley (default **3 mm**). Terrain is cropped without stretching; use the top-down **Crop** preview to choose the area. The source frame is captured when 3D is first enabled, so resizing the browser does not change the model. Height exaggeration affects relief above the base; the overall height is displayed separately.
+
+**Download STL** exports the settled terrain as a closed solid with a flat bottom at Z=0. Import it into your slicer in **millimeters**. The STL includes the base even when hidden in the preview; contours, water, colors, and lighting are omitted. Real-terrain models display source credits and offer **Download attribution** for a companion text file. Browser model settings are session-only, shared links retain the 2D design, and the CLI continues to export SVG/PNG.
 
 Real terrain is centered and cropped without stretching. Cursor deformation is available only for generated terrain; scale and detail also apply to generated terrain.
 
@@ -186,3 +190,13 @@ Start a new conversation after copying. For testing a local marketplace checkout
 ---
 
 For development: `npm install`, then `npm run dev`. Use `npm run check` for source checks, tests, production builds, and package validation; `npm run test:e2e` runs browser journeys with Google Chrome. The [GitHub Actions workflow](https://github.com/conorluddy/Topogra/blob/main/.github/workflows/build.yml) defines deployment and npm publishing.
+
+Location presets include Reine in Lofoten, Ibiza and Es Vedrà, Cape Town, Uluru (Ayers Rock), Kata Tjuta, coastal Rio, Jamaica’s Blue Mountains, Dubrovnik, Makhachkala, and Sulak Canyon. Suggested crop sizes range from 4 km for Es Vedrà to 55 km for Ibiza; these are starting compositions rather than guaranteed shoreline or feature boundaries. CLI `--terrain-preset` uses the same suggested span unless overridden with `--span-km`. Existing presets retain their 25 km default.
+
+The Irish mountain collection includes Carrauntoohil, Croagh Patrick, Benbulben, Errigal, Slieve Donard, Great Sugar Loaf, Lugnaquilla, Mount Brandon, Galtymore, and Diamond Hill. A separate **MacGillycuddy’s Reeks** preset uses a 12 km frame centered across the main summit group; **Carrauntoohil** uses a tighter 6 km frame. All suggested spans remain editable.
+
+In 3D, **Studio floor** presents the solid base inside an enclosing studio box, defaulting to RGB 180 grey (`#b4b4b4`), with directional cast shadows and a subtle contact shadow. The surrounding background follows the floor color, so orbiting never reveals a differently colored sky. Choose a custom floor color or enable **Match canvas**. It is enabled by default and appears when both the matte surface and solid base are visible. **North arrow** is optional for real locations: it is drawn beside the model on the ground and stays aligned to geographic north while orbiting. Ground, shadow, and arrow are presentation elements and are excluded from STL downloads.
+
+The 3D **Crop** controls support **Rectangle** and **Circle**. Circle begins at the largest diameter that fits the source frame. Drag inside the outline to reposition the crop, drag a handle to resize it, or use the **Crop size** slider. **Reset crop** restores the largest centered crop. When the preview is focused, arrow keys move the crop (Shift moves faster), +/− resize it, and Home resets it. Circle uses a **Diameter (mm)** control instead of width/length; changing the selected area changes which terrain fills that physical diameter. The 3D surface, base, contour and water layers follow the crop, and STL exports contain the same closed shape. Crop choices are session-only and leave 2D exports unchanged.
+
+Lighting starts at **10° elevation** with **0.1 fill**. Direction uses compass bearings (0° north, 90° east). When a real location is loaded, a sunrise-side artistic suggestion uses 120° in the northern hemisphere, 60° in the southern hemisphere, or 90° near the equator. It does not calculate solar position from time/date. Manual direction changes are retained across location changes; **Reset lighting** restores the suggestion for the current location. Sun/Moon cast shadows; Off or zero intensity removes the directional floor shadow.

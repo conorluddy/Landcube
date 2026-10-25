@@ -528,7 +528,7 @@ function readTerrain(
       maxDepth: 0,
       latitude: place.latitude,
       longitude: place.longitude,
-      spanKm: Number(options['span-km'] ?? realTerrainBounds.defaultSpanKm),
+      spanKm: Number(options['span-km'] ?? place.spanKm),
     };
   }
 

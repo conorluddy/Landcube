@@ -428,3 +428,55 @@ void test('CLI validates elevation floors and keeps them in real-terrain configu
     /Elevation floor/,
   );
 });
+
+void test('terrain presets use suggested spans while explicit spans override them', async (context) => {
+  const { runCli } = await import('./cli');
+  const { PNG } = await import('pngjs');
+  const directory = await mkdtemp(join(tmpdir(), 'topogra-presets-'));
+  const png = new PNG({ width: 256, height: 256 });
+
+  for (let offset = 0; offset < png.data.length; offset += 4) {
+    png.data[offset] = 128;
+    png.data[offset + 3] = 255;
+  }
+
+  const tile = PNG.sync.write(png);
+
+  context.mock.method(globalThis, 'fetch', () =>
+    Promise.resolve(new Response(new Uint8Array(tile))),
+  );
+  const io = {
+    stdout: { write: () => true },
+    stderr: { write: () => true },
+  } as unknown as Parameters<typeof runCli>[1];
+
+  for (const [name, override, expected] of [
+    ['Ibiza — Es Vedrà', undefined, 4],
+    ['Ibiza', '30', 30],
+    ['Wicklow Mountains', undefined, 25],
+  ] as const) {
+    const config = join(directory, `${expected}.json`);
+    const args = [
+      'generate',
+      '--terrain-preset',
+      name,
+      '--width',
+      '100',
+      '--height',
+      '100',
+      '--output',
+      join(directory, `${expected}.svg`),
+      '--save-config',
+      config,
+    ];
+
+    if (override !== undefined) {
+      args.push('--span-km', override);
+    }
+
+    assert.equal(await runCli(args, io), 0);
+    const saved = JSON.parse(await readFile(config, 'utf8')) as { terrain: { spanKm: number } };
+
+    assert.equal(saved.terrain.spanKm, expected);
+  }
+});

@@ -319,6 +319,7 @@ test('summit markers retain their elements and transition as cursor terrain chan
   page,
 }) => {
   await page.goto(`${fixtureUrl}?v=1&seed=234&summitTrianglesEnabled=true&cursorResponseMs=120`);
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
   const summit = await page.locator('.summit-marker').evaluateAll((markers) => {
     const marker = markers.find(
       (element) =>
@@ -582,9 +583,36 @@ test('real terrain loads decoded tiles, retains geometry on failure and exports 
       },
     }),
   );
-  await page.getByText('Real terrain', { exact: false }).click();
-  await expect(page.locator('#terrain-place option')).toHaveCount(20);
+  await page.getByRole('button', { name: 'Location', exact: true }).click();
+  await expect(page.locator('#terrain-place option')).toHaveCount(42);
+  const groups = await page.locator('#terrain-place optgroup').evaluateAll((elements) =>
+    elements.map((element) => ({
+      country: element.getAttribute('label') ?? '',
+      locations: [...element.querySelectorAll('option')].map((option) => option.textContent),
+    })),
+  );
+  const countryNames = groups.map((group) => group.country);
+
+  expect(countryNames).toEqual([...countryNames].sort((a, b) => a.localeCompare(b, 'en')));
+
+  for (const group of groups) {
+    expect(group.locations).toEqual([...group.locations].sort((a, b) => a.localeCompare(b, 'en')));
+  }
+
+  expect(groups.find((group) => group.country === 'Ireland')?.locations).toContain('Carrauntoohil');
+  await expect(page.locator('#terrain-place')).toHaveValue('53.01,-6.33');
+  await page.locator('#terrain-place').selectOption({ label: 'MacGillycuddy’s Reeks' });
+  await expect(page.locator('#terrain-span')).toHaveValue('12');
+  await expect(page.locator('#terrain-latitude')).toHaveValue('51.997');
+  await expect(page.locator('#terrain-longitude')).toHaveValue('-9.725');
+  await page.locator('#terrain-place').selectOption({ label: 'Carrauntoohil' });
+  await expect(page.locator('#terrain-span')).toHaveValue('6');
+  await page.locator('#terrain-place').selectOption({ label: 'Ibiza — Es Vedrà' });
+  await expect(page.locator('#terrain-span')).toHaveValue('4');
+  await page.locator('#terrain-place').selectOption({ label: 'Ibiza' });
+  await expect(page.locator('#terrain-span')).toHaveValue('55');
   await page.locator('#terrain-place').selectOption({ label: 'Machu Picchu' });
+  await expect(page.locator('#terrain-span')).toHaveValue('25');
   await expect(page.locator('#terrain-latitude')).toHaveValue('-13.1631');
   await expect(page.locator('#terrain-longitude')).toHaveValue('-72.545');
   await page.getByRole('button', { name: 'Load terrain', exact: true }).click();
@@ -619,7 +647,11 @@ test('3D workspace sits between Settings and Export and keeps only one section v
   await page.goto(fixtureUrl);
   const modes = page.locator('.panel-modes button');
 
-  await expect(modes).toHaveText(['Settings', '3D', 'Export ↗']);
+  await expect(modes).toHaveText(['Settings', 'Location', '3D', 'Export ↗']);
+  await page.getByRole('button', { name: 'Location', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Location settings' })).toBeVisible();
+  await expect(page.getByLabel('Latitude', { exact: true })).toBeVisible();
+  await expect(page.locator('#settings-content')).toBeHidden();
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await expect(page.getByRole('region', { name: '3D settings', exact: true })).toBeVisible();
   await expect(page.getByRole('switch', { name: 'Show raised contours' })).toBeVisible();

@@ -1,3 +1,5 @@
+import { cropTerrainModelField } from './terrain-model';
+import type { HeightField } from './types/terrain';
 import { createSeaLevelGeometry, type SeaLevelGeometry } from './sea-level';
 import { mountTerrain3dControls } from './terrain-3d-controls';
 import { mountRealTerrainControls } from './real-terrain-controls';
@@ -218,7 +220,7 @@ function updateSettings(nextDesignSettings: DesignSettings): boolean {
     }
 
     if (change === 'appearance') {
-      terrain3d.update(contours, width, height, settings, baseHeightField, seaLevel);
+      updateTerrain3d();
       renderContoursIntoSvg(
         terrainSvgElement,
         contours,
@@ -261,8 +263,79 @@ function renderCurrentLandscape(): void {
   contours = extractContours(field, contourElevations);
   summits = findTerrainSummits(field);
   seaLevel = createSeaLevelGeometry(field, width, height, realTerrain);
-  terrain3d.update(contours, width, height, settings, baseHeightField, seaLevel);
+  updateTerrain3d();
   renderContoursIntoSvg(terrainSvgElement, contours, width, height, settings, summits, seaLevel);
+}
+
+// The source frame is captured once; viewport resizes never change printable terrain.
+let modelSourceFrame: { width: number; height: number } | undefined;
+let modelSourceSampler: typeof terrain | undefined;
+let modelSourceField: HeightField | undefined;
+let modelCropKey = '';
+let modelCrop: ReturnType<typeof cropTerrainModelField> | undefined;
+
+function updateTerrain3d(): void {
+  if (!terrain3d.isActive()) {
+    return;
+  }
+
+  modelSourceFrame ??= { width, height };
+
+  if (modelSourceSampler !== terrain || !modelSourceField) {
+    const frame = modelSourceFrame;
+    const loaded = realTerrain;
+    const sampler = loaded
+      ? (x: number, y: number) => loaded.sample(x, y, frame.width, frame.height)
+      : terrain;
+
+    modelSourceField = sampleTerrain(sampler, frame.width, frame.height, terrainSettings);
+    modelSourceSampler = terrain;
+    modelCrop = undefined;
+  }
+
+  terrain3d.updateCropPreview(
+    modelSourceField,
+    modelSourceFrame.width,
+    modelSourceFrame.height,
+    settings,
+  );
+  const dimensions = terrain3d.getModelSettings();
+  const crop = terrain3d.getCropSettings();
+  const key = JSON.stringify([dimensions.widthMm, dimensions.lengthMm, dimensions.cropShape, crop]);
+
+  if (!modelCrop || key !== modelCropKey) {
+    modelCrop = cropTerrainModelField(
+      modelSourceField,
+      modelSourceFrame.width,
+      modelSourceFrame.height,
+      dimensions,
+      crop,
+    );
+    modelCropKey = key;
+  }
+
+  const croppedContours = extractContours(modelCrop.field, contourElevations);
+  const croppedSea = createSeaLevelGeometry(
+    modelCrop.field,
+    modelCrop.width,
+    modelCrop.height,
+    realTerrain,
+  );
+
+  terrain3d.update(
+    croppedContours,
+    modelCrop.width,
+    modelCrop.height,
+    settings,
+    modelCrop.field,
+    croppedSea,
+    realTerrain?.attribution,
+    realTerrain?.location,
+    realTerrain?.spanKm === undefined
+      ? undefined
+      : (realTerrain.spanKm * 1000 * Math.max(modelCrop.width, modelCrop.height)) /
+          Math.max(modelSourceFrame.width, modelSourceFrame.height),
+  );
 }
 
 /** Eases cursor deformation with capped frame pacing until settled. */

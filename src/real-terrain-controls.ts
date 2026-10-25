@@ -1,4 +1,4 @@
-import { realTerrainPresets } from './constants/real-terrain';
+import { realTerrainPresets, realTerrainPresetGroups } from './constants/real-terrain';
 import { loadBrowserRealTerrain } from './browser-real-terrain';
 import { realTerrainBounds } from './constants/real-terrain';
 import type { RealTerrain } from './real-terrain';
@@ -8,18 +8,23 @@ export function mountRealTerrainControls(
   panel: HTMLElement,
   applyTerrain: (terrain: RealTerrain | undefined) => void,
 ): void {
-  const section = document.createElement('details');
+  const section = document.createElement('div');
 
   section.className = 'real-terrain-controls';
-  section.innerHTML = `<summary>Real terrain<span aria-hidden="true">+</span></summary><div class="detail-content">
-    <div class="select-row"><label for="terrain-place">Location</label><select id="terrain-place">${realTerrainPresets
+  section.innerHTML = `<p class="export-hint">Choose a real-world location or use a generated landscape.</p><div class="detail-content">
+    <div class="select-row"><label for="terrain-place">Location</label><select id="terrain-place">${realTerrainPresetGroups
       .map(
-        ({ name, latitude, longitude }) =>
-          `<option value="${latitude},${longitude}">${name}</option>`,
+        ({ country, locations }) =>
+          `<optgroup label="${country}">${locations
+            .map(
+              ({ name, latitude, longitude }) =>
+                `<option value="${latitude},${longitude}"${name === realTerrainPresets[0].name ? ' selected' : ''}>${name}</option>`,
+            )
+            .join('')}</optgroup>`,
       )
       .join('')}</select></div>
     <div class="control-grid"><label>Latitude<input id="terrain-latitude" type="number" min="-85" max="85" step="any" value="${realTerrainPresets[0].latitude}"></label><label>Longitude<input id="terrain-longitude" type="number" min="-180" max="180" step="any" value="${realTerrainPresets[0].longitude}"></label></div>
-    <label>Area span (km)<input id="terrain-span" type="number" min="${realTerrainBounds.minimumSpanKm}" max="${realTerrainBounds.maximumSpanKm}" value="${realTerrainBounds.defaultSpanKm}"></label>
+    <label>Area span (km)<input id="terrain-span" type="number" min="${realTerrainBounds.minimumSpanKm}" max="${realTerrainBounds.maximumSpanKm}" value="${realTerrainPresets[0].spanKm}"></label>
     <label>Maximum depth below sea level (m)<input id="terrain-max-depth" type="number" min="0" max="11000" step="any" value="20"></label>
     <label>Elevation floor (m, optional)<input id="terrain-elevation-floor" type="number" min="-11000" max="8900" step="any" placeholder="Include all elevations"></label>
     <label class="toggle-row">Sea-level hatching<input type="checkbox" role="switch" data-sea-level checked></label>
@@ -59,10 +64,18 @@ export function mountRealTerrainControls(
 
   section.querySelector('select')?.addEventListener('change', (event) => {
     if (event.target instanceof HTMLSelectElement) {
-      const coordinates = event.target.value.split(',');
+      const selected = event.target.value;
+      const coordinates = selected.split(',');
 
       latitude.value = coordinates[0];
       longitude.value = coordinates[1];
+      const preset = realTerrainPresets.find(
+        (place) => `${place.latitude},${place.longitude}` === selected,
+      );
+
+      if (preset) {
+        span.value = String(preset.spanKm);
+      }
     }
   });
   section.querySelector('[data-generated]')?.addEventListener('click', () => {

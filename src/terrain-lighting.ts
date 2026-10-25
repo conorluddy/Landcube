@@ -1,16 +1,18 @@
 export interface TerrainLightingSettings {
+  mode: 'sun' | 'moon' | 'off';
   direction: number;
   elevation: number;
   intensity: number;
   fill: number;
 }
 
-/** Session-only lighting starts with the existing soft light from the upper left. */
+/** Session-only lighting starts with warm, low sunlight from the upper left. */
 export const defaultTerrainLighting: Readonly<TerrainLightingSettings> = Object.freeze({
+  mode: 'sun',
   direction: 315,
-  elevation: 55,
+  elevation: 10,
   intensity: 2.5,
-  fill: 1.6,
+  fill: 0.1,
 });
 
 export const terrainLightingControls = [
@@ -19,3 +21,16 @@ export const terrainLightingControls = [
   { key: 'intensity', label: 'Intensity', min: 0, max: 5, step: 0.1, suffix: '' },
   { key: 'fill', label: 'Fill', min: 0, max: 3, step: 0.1, suffix: '' },
 ] as const;
+
+/** An artistic sunrise-side suggestion, not a solar-position calculation. Bearings are clockwise from north. */
+export function getSuggestedTerrainLightDirection(latitude?: number): number {
+  if (latitude === undefined || !Number.isFinite(latitude)) {
+    return defaultTerrainLighting.direction;
+  }
+
+  if (Math.abs(latitude) < 5) {
+    return 90;
+  }
+
+  return latitude > 0 ? 120 : 60;
+}
