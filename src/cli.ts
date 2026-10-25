@@ -25,6 +25,37 @@ const booleanKeys = new Set<keyof DesignSettings>([
   'transparent',
   'allowExtraLargeExports',
 ]);
+const designSettingDescriptions: Record<keyof DesignSettings, string> = {
+  seed: 'Unsigned deterministic terrain seed. Omit it to generate and report a fresh seed.',
+  gridStyle: 'Decorative overlay style: off, squares, or crosses.',
+  gridSpacing: 'Decorative grid cell spacing in output pixels.',
+  gridOpacity: 'Decorative grid opacity.',
+  background: 'Six-digit hexadecimal canvas colour.',
+  lineColor: 'Six-digit hexadecimal contour and marker colour.',
+  strokeWidth: 'Ordinary contour stroke weight in output pixels.',
+  strokeOpacity: 'Contour and marker opacity.',
+  contourCount: 'Number of evenly spaced elevation contours; must be odd.',
+  featureScale: 'Generated terrain feature scale in output pixels.',
+  detail: 'Blend amount for high-frequency generated terrain detail.',
+  indexStyle: 'Index contour style: dashed, solid, alternating, or off.',
+  indexEvery: 'Marks every Nth contour as an index contour.',
+  indexStrokeWidth: 'Index contour stroke weight in output pixels.',
+  dashLength: 'Index-contour dash length in output pixels.',
+  dashGap: 'Index-contour dash gap in output pixels.',
+  summitMarkerSize: 'Summit marker scale: S, M, or L.',
+  summitTrianglesEnabled: 'Draw triangular summit markers.',
+  summitCrossesEnabled: 'Draw cross summit markers.',
+  cursorEnabled: 'Preserved in settings; static CLI output is always settled.',
+  cursorRadius: 'Preserved cursor influence radius in pixels.',
+  cursorHeight: 'Preserved cursor deformation strength; negative values are depressions.',
+  cursorResponseMs: 'Preserved browser cursor response time in milliseconds.',
+  format: 'Output format: svg or png.',
+  width: 'Output frame width in pixels.',
+  height: 'Output frame height in pixels.',
+  pngScale: 'PNG raster scale: 1 or 2; SVG ignores this value.',
+  transparent: 'Removes the background rectangle from SVG and PNG output.',
+  allowExtraLargeExports: 'Raises the per-side limit from 4096 to 12288 pixels.',
+};
 
 type TerrainConfig =
   { mode: 'generated' } | { mode: 'real'; latitude: number; longitude: number; spanKm: number };
@@ -45,7 +76,7 @@ export async function runCli(argv: string[], io: CliIo = process): Promise<numbe
     const [command = 'generate', ...argumentsList] = argv;
 
     if (command === '--help' || command === '-h') {
-      return printHelp(io.stdout);
+      return printHelp(io.stdout, argv.includes('--verbose'));
     }
 
     if (command === '--version') {
@@ -53,7 +84,11 @@ export async function runCli(argv: string[], io: CliIo = process): Promise<numbe
     }
 
     if (argumentsList.includes('--help') || argumentsList.includes('-h')) {
-      return printHelp(io.stdout);
+      return printHelp(io.stdout, argumentsList.includes('--verbose'));
+    }
+
+    if (argumentsList.includes('--verbose')) {
+      throw new Error('--verbose is available only with --help.');
     }
 
     const options = parseOptions(argumentsList);
@@ -491,15 +526,15 @@ function write(stream: NodeJS.WriteStream, value: string) {
   return 0;
 }
 
-function printHelp(stdout: NodeJS.WriteStream) {
+function printHelp(stdout: NodeJS.WriteStream, isVerbose = false) {
   return write(
     stdout,
-    `Topogra CLI\n\nUsage: topogra generate [options]\n       topogra presets [--json true]\n       topogra validate --config design.json\n\nSources apply as defaults → config or URL → palette/size → explicit flags. --output - writes image bytes; --json true is incompatible with it. Existing files require --force true.\n\nGenerator options:\n  --config FILE | --url URL    Versioned CLI config or v=1 browser URL (mutually exclusive)\n  --palette NAME               ${[...Object.keys(designPalettePresets), 'random'].join(', ')}\n  --size WIDTHxHEIGHT          A listed output size; use presets --json true to discover values\n  --terrain generated|real     Real mode requires coordinates or --terrain-preset NAME\n  --latitude NUMBER --longitude NUMBER --span-km NUMBER\n  --format svg|png --output FILE|- --save-config FILE\n  --json true|false --force true|false\n\nDesign flags (default; range where applicable):\n${getDesignFlagReference()}\n`,
+    `Topogra CLI\n\nUsage: topogra generate [options]\n       topogra presets [--json true]\n       topogra validate --config design.json\n\nSources apply as defaults → config or URL → palette/size → explicit flags. --output - writes image bytes; --json true is incompatible with it. Existing files require --force true.\n\nGenerator options:\n  --config FILE | --url URL    Versioned CLI config or v=1 browser URL (mutually exclusive)\n  --palette NAME               ${[...Object.keys(designPalettePresets), 'random'].join(', ')}\n  --size WIDTHxHEIGHT          A listed output size; use presets --json true to discover values\n  --terrain generated|real     Real mode requires coordinates or --terrain-preset NAME\n  --latitude NUMBER --longitude NUMBER --span-km NUMBER\n  --format svg|png --output FILE|- --save-config FILE\n  --json true|false --force true|false\n\nDesign flags (default; range where applicable):\n${getDesignFlagReference(isVerbose)}\n${isVerbose ? '' : '\nUse --help --verbose for a full description of every design flag.\n'}`,
   );
 }
 
 /** Keeps help ranges and defaults in lockstep with the validated settings contract. */
-function getDesignFlagReference(): string {
+function getDesignFlagReference(isVerbose: boolean): string {
   return designKeys
     .map((key) => {
       const range = Object.hasOwn(designNumberConstraints, key)
@@ -510,7 +545,9 @@ function getDesignFlagReference(): string {
           })()
         : '';
 
-      return `  --${toKebab(key)} VALUE    ${String(versionOneDesignDefaults[key])}${range}`;
+      const reference = `  --${toKebab(key)} VALUE    ${String(versionOneDesignDefaults[key])}${range}`;
+
+      return isVerbose ? `${reference}\n      ${designSettingDescriptions[key]}` : reference;
     })
     .join('\n');
 }

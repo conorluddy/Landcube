@@ -50,9 +50,13 @@ void test('CLI generates a resolved SVG and metadata through its process entry p
 
 void test('CLI help exposes canonical design defaults and numeric constraints', async () => {
   const { stdout } = await runCommand(['generate', '--help']);
+  const verbose = await runCommand(['--help', '--verbose']);
 
   assert.match(stdout, /--seed VALUE\s+0; 0–4294967295 step 1/);
   assert.match(stdout, /--cursor-height VALUE\s+0.32; -0.6–0.6 step 0.02/);
+  assert.doesNotMatch(stdout, /Unsigned deterministic terrain seed/);
+  assert.match(verbose.stdout, /Unsigned deterministic terrain seed/);
+  assert.match(verbose.stdout, /static CLI output is always settled/);
 });
 
 void test('CLI validates saved configuration, applies explicit overrides, and rejects incompatible stdout', async () => {
