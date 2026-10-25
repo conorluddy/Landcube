@@ -26,35 +26,63 @@ const booleanKeys = new Set<keyof DesignSettings>([
   'allowExtraLargeExports',
 ]);
 const designSettingDescriptions: Record<keyof DesignSettings, string> = {
-  seed: 'Unsigned deterministic terrain seed. Omit it to generate and report a fresh seed.',
-  gridStyle: 'Decorative overlay style: off, squares, or crosses.',
-  gridSpacing: 'Decorative grid cell spacing in output pixels.',
-  gridOpacity: 'Decorative grid opacity.',
-  background: 'Six-digit hexadecimal canvas colour.',
-  lineColor: 'Six-digit hexadecimal contour and marker colour.',
-  strokeWidth: 'Ordinary contour stroke weight in output pixels.',
-  strokeOpacity: 'Contour and marker opacity.',
-  contourCount: 'Number of evenly spaced elevation contours; must be odd.',
-  featureScale: 'Generated terrain feature scale in output pixels.',
-  detail: 'Blend amount for high-frequency generated terrain detail.',
-  indexStyle: 'Index contour style: dashed, solid, alternating, or off.',
-  indexEvery: 'Marks every Nth contour as an index contour.',
-  indexStrokeWidth: 'Index contour stroke weight in output pixels.',
-  dashLength: 'Index-contour dash length in output pixels.',
-  dashGap: 'Index-contour dash gap in output pixels.',
-  summitMarkerSize: 'Summit marker scale: S, M, or L.',
-  summitTrianglesEnabled: 'Draw triangular summit markers.',
-  summitCrossesEnabled: 'Draw cross summit markers.',
-  cursorEnabled: 'Preserved in settings; static CLI output is always settled.',
-  cursorRadius: 'Preserved cursor influence radius in pixels.',
-  cursorHeight: 'Preserved cursor deformation strength; negative values are depressions.',
-  cursorResponseMs: 'Preserved browser cursor response time in milliseconds.',
-  format: 'Output format: svg or png.',
-  width: 'Output frame width in pixels.',
-  height: 'Output frame height in pixels.',
-  pngScale: 'PNG raster scale: 1 or 2; SVG ignores this value.',
-  transparent: 'Removes the background rectangle from SVG and PNG output.',
-  allowExtraLargeExports: 'Raises the per-side limit from 4096 to 12288 pixels.',
+  seed: 'An unsigned 32-bit value that fully determines generated terrain. Provide it when repeatability matters; if omitted, the CLI creates a new seed and reports it in diagnostics or JSON metadata.',
+  gridStyle:
+    'Adds a decorative, non-geographic overlay. Choose off for none, squares for corner marks, or crosses for centre marks; the same overlay appears in SVG and PNG.',
+  gridSpacing:
+    'Sets the grid’s repeated cell size in output pixels. It affects only squares and crosses, and does not change terrain sampling or contour geometry.',
+  gridOpacity:
+    'Controls how faint the decorative grid appears. It is independent of contour opacity so grid and terrain line contrast can be tuned separately.',
+  background:
+    'The six-digit hexadecimal canvas colour used by opaque exports. It is omitted entirely when transparent output is enabled.',
+  lineColor:
+    'The six-digit hexadecimal colour for contours, the decorative grid, summit symbols, and real-terrain attribution. Quote shell-sensitive values beginning with #.',
+  strokeWidth:
+    'The ordinary contour stroke weight in output pixels. PNG rasterization scales this weight with --png-scale while SVG keeps it as a vector unit.',
+  strokeOpacity:
+    'The opacity applied to ordinary and index contours, as well as summit markers. It is composited over the chosen background in opaque output.',
+  contourCount:
+    'The odd number of evenly spaced elevation levels to extract. More levels create denser line work without changing the underlying sampled terrain.',
+  featureScale:
+    'The characteristic size of generated landforms in output pixels. Larger values produce broader terrain features; this setting is ignored by real terrain.',
+  detail:
+    'Blends high-frequency noise into generated terrain while preserving the engine’s total amplitude. It is ignored by real terrain, whose elevations come from tiles.',
+  indexStyle:
+    'Controls emphasized contours: dashed, solid, alternating between dashed and solid, or off. Index levels are determined from elevation rather than path order.',
+  indexEvery:
+    'Marks every Nth elevation level as an index contour. This remains stored even when index contours are off, allowing a design to be restored without losing inactive choices.',
+  indexStrokeWidth:
+    'The stroke weight for index contours only. It combines with --index-style and does not affect ordinary contour paths.',
+  dashLength:
+    'The painted segment length for dashed index contours, in output pixels. It is inactive for solid or off index styles but remains preserved in configs and URLs.',
+  dashGap:
+    'The empty segment length for dashed index contours, in output pixels. It is inactive for solid or off index styles but remains preserved in configs and URLs.',
+  summitMarkerSize:
+    'Selects small, medium, or large summit symbols. It scales either marker shape around the same detected summit coordinates.',
+  summitTrianglesEnabled:
+    'Enables triangular summit markers. It can be combined with cross markers; neither changes contour extraction or summit detection.',
+  summitCrossesEnabled:
+    'Enables cross-shaped summit markers. It can be combined with triangles; neither changes contour extraction or summit detection.',
+  cursorEnabled:
+    'Preserves the browser interaction preference in configs and browser links. CLI exports are always settled static terrain, so this value never applies a cursor deformation.',
+  cursorRadius:
+    'Preserves the browser cursor influence radius in pixels. It has no visual effect in static CLI output but is retained for round-tripping a design.',
+  cursorHeight:
+    'Preserves browser cursor deformation strength; negative values represent a depression. It has no visual effect in static CLI output but is retained for round-tripping.',
+  cursorResponseMs:
+    'Preserves the browser cursor animation response time in milliseconds. Static CLI output has no animation and therefore does not use this value.',
+  format:
+    'Chooses SVG vector output or PNG raster output. The output filename extension must match this choice unless image bytes are sent to stdout.',
+  width:
+    'Sets the output frame width in pixels. CLI output uses explicit dimensions rather than a viewport or device-screen choice.',
+  height:
+    'Sets the output frame height in pixels. CLI output uses explicit dimensions rather than a viewport or device-screen choice.',
+  pngScale:
+    'Selects 1× or 2× PNG rasterization. It doubles raster dimensions and pixel stroke widths at 2×; SVG ignores it.',
+  transparent:
+    'Removes the background rectangle while retaining contours, grid, markers, and attribution. PNG pixels outside artwork retain alpha zero.',
+  allowExtraLargeExports:
+    'Raises the maximum side from 4096 to 12288 pixels. It is an explicit memory-cost opt-in and still applies after PNG scaling.',
 };
 
 type TerrainConfig =
@@ -547,7 +575,7 @@ function getDesignFlagReference(isVerbose: boolean): string {
 
       const reference = `  --${toKebab(key)} VALUE    ${String(versionOneDesignDefaults[key])}${range}`;
 
-      return isVerbose ? `${reference}\n      ${designSettingDescriptions[key]}` : reference;
+      return isVerbose ? `\n${reference}\n\n${designSettingDescriptions[key]}\n` : reference;
     })
     .join('\n');
 }
