@@ -1,3 +1,10 @@
+import {
+  createCircularTerrainSurface,
+  defaultTerrainCrop,
+  getTerrainCropBounds,
+  type TerrainCropSettings,
+  type TerrainCropShape,
+} from './terrain-crop';
 import { createTerrainSurfaceBuffers } from './terrain-surface';
 import type { TerrainSurfaceBuffers } from './terrain-surface';
 import type { HeightField } from './types/terrain';
@@ -6,6 +13,7 @@ export interface TerrainModelSettings {
   widthMm: number;
   lengthMm: number;
   baseThicknessMm: number;
+  cropShape?: TerrainCropShape;
 }
 
 export const defaultTerrainModelSettings: Readonly<TerrainModelSettings> = Object.freeze({
@@ -45,20 +53,16 @@ export function cropTerrainModelField(
   width: number,
   height: number,
   settings: TerrainModelSettings,
+  crop: TerrainCropSettings = defaultTerrainCrop,
 ): { field: HeightField; width: number; height: number } {
   validateTerrainModelSettings(settings);
-  const ratio = settings.widthMm / settings.lengthMm;
-  const cropWidth = Math.min(width, height * ratio);
-  const cropHeight = Math.min(height, width / ratio);
+  const ratio = settings.cropShape === 'circle' ? 1 : settings.widthMm / settings.lengthMm;
+  const bounds = getTerrainCropBounds(width, height, ratio, crop);
 
   return {
-    field: {
-      ...field,
-      originX: field.originX - (width - cropWidth) / 2,
-      originY: field.originY - (height - cropHeight) / 2,
-    },
-    width: cropWidth,
-    height: cropHeight,
+    field: { ...field, originX: field.originX - bounds.x, originY: field.originY - bounds.y },
+    width: bounds.width,
+    height: bounds.height,
   };
 }
 
@@ -76,8 +80,14 @@ export function createTerrainModel(
     throw new Error('Height exaggeration must be between 0 and 1.');
   }
 
-  const sampled = createTerrainSurfaceBuffers(field, width, height);
-  const mmPerUnit = Math.max(settings.widthMm, settings.lengthMm) / 2;
+  const sampled =
+    settings.cropShape === 'circle'
+      ? createCircularTerrainSurface(field, width)
+      : createTerrainSurfaceBuffers(field, width, height);
+  const mmPerUnit =
+    (settings.cropShape === 'circle'
+      ? settings.widthMm
+      : Math.max(settings.widthMm, settings.lengthMm)) / 2;
   const elevationScaleMm = mmPerUnit * exaggeration;
   let minimum = Infinity;
   let maximum = -Infinity;

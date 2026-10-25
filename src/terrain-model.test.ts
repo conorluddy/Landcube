@@ -108,3 +108,57 @@ void test('invalid dimensions and damaged solids cannot be exported', () => {
     /degenerate/,
   );
 });
+
+for (const size of [1, 0.65, 0.1]) {
+  for (const exaggeration of [0, 0.3, 1]) {
+    void test(`circular crop at ${size} size and ${exaggeration} exaggeration exports a watertight disk`, () => {
+      const settings = { ...defaultTerrainModelSettings, cropShape: 'circle' as const };
+      const crop = cropTerrainModelField(field, 30, 20, settings, {
+        centerX: 0.75,
+        centerY: 0.25,
+        size,
+      });
+
+      assert.equal(crop.width, crop.height);
+      const model = createTerrainModel(crop.field, crop.width, crop.height, settings, exaggeration);
+
+      validatePrintableSolid(model.solid);
+      const stl = createBinaryStl(model.solid);
+
+      assert.equal(new DataView(stl).getUint32(80, true), model.solid.indices.length / 3);
+      let minimum = Infinity;
+
+      for (let index = 0; index < model.surface.positions.length; index += 3) {
+        const [x, y, z] = model.surface.positions.subarray(index, index + 3);
+
+        assert.ok(Math.hypot(x, z) <= 75.00001);
+        minimum = Math.min(minimum, y);
+      }
+
+      assert.ok(Math.abs(minimum - 3) < 1e-5);
+      assert.ok(model.overallHeightMm >= 3);
+    });
+  }
+}
+
+void test('moving a crop changes its terrain without stretching or accumulating selection offsets', () => {
+  const settings = { ...defaultTerrainModelSettings, cropShape: 'circle' as const };
+  const left = cropTerrainModelField(field, 30, 20, settings, {
+    centerX: 0.25,
+    centerY: 0.5,
+    size: 0.5,
+  });
+  const right = cropTerrainModelField(field, 30, 20, settings, {
+    centerX: 0.75,
+    centerY: 0.5,
+    size: 0.5,
+  });
+
+  assert.equal(left.width, right.width);
+  assert.equal(left.field.values, field.values);
+  assert.notEqual(left.field.originX, right.field.originX);
+  assert.notDeepEqual(
+    createTerrainModel(left.field, left.width, left.height, settings, 0.3).surface.positions,
+    createTerrainModel(right.field, right.width, right.height, settings, 0.3).surface.positions,
+  );
+});

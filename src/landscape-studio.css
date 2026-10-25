@@ -662,3 +662,27 @@ input[aria-invalid='true'] {
 .terrain-3d-controls [data-model-credit] {
   overflow-wrap: anywhere;
 }
+
+.terrain-crop-preview {
+  display: block;
+  width: 100%;
+  max-height: 240px;
+  margin: 12px 0 18px;
+  border: 1px solid var(--subtle-border-color);
+  border-radius: 10px;
+  background: #151918;
+  color: #d5dfc8;
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+  overflow: visible;
+}
+.terrain-crop-preview [data-crop-handle] {
+  cursor: nwse-resize;
+}
+.terrain-crop-preview .crop-north {
+  fill: #fff;
+  stroke: #202326;
+  stroke-width: 2px;
+  paint-order: stroke;
+}

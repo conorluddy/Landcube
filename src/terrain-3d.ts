@@ -1,4 +1,5 @@
-import { createTerrainStage } from './terrain-stage';
+import { clipCirclePolygon } from './terrain-crop';
+import { createTerrainStage, defaultTerrainGroundColor } from './terrain-stage';
 import { getTerrainWaterColor } from './terrain-water';
 import { defaultTerrainLighting, type TerrainLightingSettings } from './terrain-lighting';
 import { createTerrainLineBuffers } from './terrain-3d-lines';
@@ -54,6 +55,8 @@ export interface Terrain3d {
 export function createTerrain3d(onModel: (heightMm: number) => void = () => undefined): Terrain3d {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
 
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.domElement.className = 'terrain-3d';
   renderer.domElement.setAttribute(
@@ -87,7 +90,7 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
   contourLayer.add(...Object.values(lineLayers));
   let customSurfaceColor: string | undefined;
   let backgroundColor = '#202326';
-  let customGroundColor: string | undefined;
+  let customGroundColor: string | undefined = defaultTerrainGroundColor;
 
   const surfaceMaterial = new THREE.MeshStandardMaterial({
     color: backgroundColor,
@@ -101,13 +104,20 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
   const surface = new THREE.Mesh(new THREE.BufferGeometry(), surfaceMaterial);
   const base = new THREE.Mesh(new THREE.BufferGeometry(), surfaceMaterial);
 
+  surface.castShadow = surface.receiveShadow = true;
+  base.castShadow = base.receiveShadow = true;
   base.visible = false;
   let solidBase = false;
   let showGround = true;
   const stage = createTerrainStage();
 
   const updateStageVisibility = () => {
-    stage.setVisible(showGround && base.visible);
+    const enabled = showGround && base.visible;
+
+    stage.setVisible(enabled);
+    scene.background = new THREE.Color(
+      enabled ? (customGroundColor ?? backgroundColor) : backgroundColor,
+    );
   };
 
   scene.add(stage.group);
@@ -115,19 +125,30 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
   const sunlight = new THREE.DirectionalLight(0xfff4df, defaultTerrainLighting.intensity);
   const fillLight = new THREE.HemisphereLight(0xe8f0ff, 0x36382c, defaultTerrainLighting.fill);
 
+  sunlight.castShadow = true;
+  sunlight.shadow.mapSize.set(2048, 2048);
+  sunlight.shadow.camera.left = sunlight.shadow.camera.bottom = -4;
+  sunlight.shadow.camera.right = sunlight.shadow.camera.top = 4;
+  sunlight.shadow.camera.near = 0.1;
+  sunlight.shadow.camera.far = 40;
+  sunlight.shadow.normalBias = 0.005;
+  sunlight.shadow.bias = -0.0001;
+  sunlight.shadow.radius = 3;
+
   /** Positions the sun independently of the camera and terrain height. */
   const applyLighting = (lighting: Readonly<TerrainLightingSettings>) => {
     const direction = THREE.MathUtils.degToRad(lighting.direction);
     const elevation = THREE.MathUtils.degToRad(lighting.elevation);
-    const radius = 5;
+    const radius = 10;
 
     sunlight.position.set(
       radius * Math.cos(elevation) * Math.sin(direction),
       radius * Math.sin(elevation),
-      radius * Math.cos(elevation) * Math.cos(direction),
+      -radius * Math.cos(elevation) * Math.cos(direction),
     );
     sunlight.color.set(lighting.mode === 'moon' ? 0xa9c7ff : 0xffd09a);
     sunlight.intensity = lighting.mode === 'off' ? 0 : lighting.intensity;
+    stage.setCastShadows(lighting.mode !== 'off' && lighting.intensity > 0);
     fillLight.intensity = lighting.fill;
   };
 
@@ -264,7 +285,11 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
 
       if (field !== previousField || key !== modelKey) {
         model = createTerrainModel(field, width, height, modelSettings, exaggeration);
-        const previewScale = 2 / Math.max(modelSettings.widthMm, modelSettings.lengthMm);
+        const previewScale =
+          2 /
+          (modelSettings.cropShape === 'circle'
+            ? modelSettings.widthMm
+            : Math.max(modelSettings.widthMm, modelSettings.lengthMm));
 
         for (const [mesh, buffers] of [
           [surface, model.surface],
@@ -298,7 +323,11 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
         onModel(model.overallHeightMm);
       }
 
-      const previewScale = 2 / Math.max(modelSettings.widthMm, modelSettings.lengthMm);
+      const previewScale =
+        2 /
+        (modelSettings.cropShape === 'circle'
+          ? modelSettings.widthMm
+          : Math.max(modelSettings.widthMm, modelSettings.lengthMm));
 
       if (!model) {
         throw new Error('Terrain model is unavailable.');
@@ -307,7 +336,13 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
       const elevationOffset = model.elevationOffsetMm * previewScale;
 
       const scale = 2 / Math.max(width, height);
-      const lineBuffers = createTerrainLineBuffers(contours, width, height, settings);
+      const lineBuffers = createTerrainLineBuffers(
+        contours,
+        width,
+        height,
+        settings,
+        modelSettings.cropShape,
+      );
 
       for (const buffers of Object.values(lineBuffers)) {
         for (let offset = 1; offset < buffers.positions.length; offset += 3) {
@@ -347,7 +382,12 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
       const seaPositions: number[] = [];
       const seaUvs: number[] = [];
 
-      for (const polygon of seaLevel?.polygons ?? []) {
+      for (const sourcePolygon of seaLevel?.polygons ?? []) {
+        const polygon =
+          modelSettings.cropShape === 'circle'
+            ? clipCirclePolygon(sourcePolygon, width)
+            : sourcePolygon;
+
         for (let index = 1; index < polygon.length - 1; index++) {
           for (const point of [polygon[0], polygon[index], polygon[index + 1]]) {
             seaPositions.push(
@@ -373,12 +413,14 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
       backgroundColor = settings.background;
       surfaceMaterial.color.set(customSurfaceColor ?? backgroundColor);
       updateWaterColor();
-      scene.background = new THREE.Color(settings.background);
+      updateStageVisibility();
       stage.update(
         modelSettings.widthMm * previewScale,
-        modelSettings.lengthMm * previewScale,
+        (modelSettings.cropShape === 'circle' ? modelSettings.widthMm : modelSettings.lengthMm) *
+          previewScale,
         customGroundColor ?? settings.background,
         settings.lineColor,
+        modelSettings.cropShape === 'circle',
       );
       draw();
     },
@@ -442,6 +484,7 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
     setGroundColor(value: string | undefined) {
       customGroundColor = value;
       stage.setColor(value ?? backgroundColor);
+      updateStageVisibility();
       draw();
     },
     setNorthArrow(value: boolean) {

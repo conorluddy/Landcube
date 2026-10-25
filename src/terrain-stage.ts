@@ -1,23 +1,39 @@
 import * as THREE from 'three';
 
+export const defaultTerrainGroundColor = '#b4b4b4';
+
 /** Presentation-only studio floor and geographic marker; never part of the printable model. */
 export function createTerrainStage(): {
   group: THREE.Group;
-  update(width: number, length: number, background: string, ink: string): void;
+  update(width: number, length: number, background: string, ink: string, circular: boolean): void;
   setVisible(value: boolean): void;
   setColor(value: string): void;
+  setCastShadows(value: boolean): void;
   setNorthArrow(value: boolean): void;
 } {
   const group = new THREE.Group();
-  const groundMaterial = new THREE.MeshBasicMaterial({ color: '#202326', toneMapped: false });
-  // Larger than the camera's far distance, so no floor edge can enter the view.
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), groundMaterial);
+  const groundMaterial = new THREE.MeshBasicMaterial({
+    color: defaultTerrainGroundColor,
+    side: THREE.BackSide,
+    toneMapped: false,
+  });
+  // An enclosing studio box keeps the floor, walls, and ceiling the same color.
+  const ground = new THREE.Mesh(new THREE.BoxGeometry(400, 200, 400), groundMaterial);
 
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -0.01;
+  ground.position.y = 100 - 0.01;
   group.add(ground);
 
-  // A soft contact shadow grounds the block without another full terrain render per light.
+  const castShadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(400, 400),
+    new THREE.ShadowMaterial({ opacity: 0.65, depthWrite: false }),
+  );
+
+  castShadow.rotation.x = -Math.PI / 2;
+  castShadow.position.y = -0.005;
+  castShadow.receiveShadow = true;
+  group.add(castShadow);
+
+  // A restrained contact shadow supplements the directional shadow at the base.
   const canvas = document.createElement('canvas');
 
   canvas.width = canvas.height = 256;
@@ -27,10 +43,23 @@ export function createTerrainStage(): {
     throw new Error('The terrain ground could not be created.');
   }
 
-  context.shadowColor = 'rgba(0, 0, 0, 0.45)';
-  context.shadowBlur = 18;
-  context.fillStyle = 'rgba(0, 0, 0, 0.3)';
-  context.fillRect(32, 32, 192, 192);
+  const paintShadow = (circular: boolean) => {
+    context.clearRect(0, 0, 256, 256);
+    context.shadowColor = 'rgba(0, 0, 0, 0.18)';
+    context.shadowBlur = 18;
+    context.fillStyle = 'rgba(0, 0, 0, 0.12)';
+
+    if (circular) {
+      context.beginPath();
+      context.arc(128, 128, 96, 0, Math.PI * 2);
+      context.fill();
+    } else {
+      context.fillRect(32, 32, 192, 192);
+    }
+  };
+
+  paintShadow(false);
+  let previousCircular = false;
   const shadow = new THREE.Mesh(
     new THREE.PlaneGeometry(1, 1),
     new THREE.MeshBasicMaterial({
@@ -41,7 +70,7 @@ export function createTerrainStage(): {
   );
 
   shadow.rotation.x = -Math.PI / 2;
-  shadow.position.y = -0.005;
+  shadow.position.y = -0.003;
   group.add(shadow);
 
   const north = new THREE.Group();
@@ -80,12 +109,26 @@ export function createTerrainStage(): {
 
   return {
     group,
-    update(width, length, background, ink) {
+    update(width, length, background, ink, circular) {
+      if (circular !== previousCircular) {
+        paintShadow(circular);
+        const material = shadow.material;
+
+        if (material.map) {
+          material.map.needsUpdate = true;
+        }
+
+        previousCircular = circular;
+      }
+
       groundMaterial.color.set(background);
       shadow.scale.set((width * 256) / 192, (length * 256) / 192, 1);
       north.position.set(-width / 2 - 0.2, 0, length / 2 - 0.05);
       arrowMaterial.color.set(ink);
       letterMaterial.color.set(ink);
+    },
+    setCastShadows(value) {
+      castShadow.visible = value;
     },
     setColor(value) {
       groundMaterial.color.set(value);

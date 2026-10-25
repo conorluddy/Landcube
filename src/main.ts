@@ -293,8 +293,15 @@ function updateTerrain3d(): void {
     modelCrop = undefined;
   }
 
+  terrain3d.updateCropPreview(
+    modelSourceField,
+    modelSourceFrame.width,
+    modelSourceFrame.height,
+    settings,
+  );
   const dimensions = terrain3d.getModelSettings();
-  const key = JSON.stringify([dimensions.widthMm, dimensions.lengthMm]);
+  const crop = terrain3d.getCropSettings();
+  const key = JSON.stringify([dimensions.widthMm, dimensions.lengthMm, dimensions.cropShape, crop]);
 
   if (!modelCrop || key !== modelCropKey) {
     modelCrop = cropTerrainModelField(
@@ -302,6 +309,7 @@ function updateTerrain3d(): void {
       modelSourceFrame.width,
       modelSourceFrame.height,
       dimensions,
+      crop,
     );
     modelCropKey = key;
   }
@@ -322,6 +330,7 @@ function updateTerrain3d(): void {
     modelCrop.field,
     croppedSea,
     realTerrain?.attribution,
+    realTerrain?.location,
   );
 }
 

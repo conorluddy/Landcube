@@ -1,3 +1,5 @@
+import { mountTerrainCropControls } from './terrain-crop-controls';
+import type { TerrainCropSettings } from './terrain-crop';
 import { getTerrainWaterColor } from './terrain-water';
 import {
   defaultTerrainModelSettings,
@@ -6,6 +8,7 @@ import {
 } from './terrain-model';
 import {
   defaultTerrainLighting,
+  getSuggestedTerrainLightDirection,
   terrainLightingControls,
   type TerrainLightingSettings,
 } from './terrain-lighting';
@@ -24,6 +27,13 @@ export function mountTerrain3dControls(
 ): {
   isActive(): boolean;
   getModelSettings(): TerrainModelSettings;
+  getCropSettings(): TerrainCropSettings;
+  updateCropPreview(
+    field: HeightField,
+    width: number,
+    height: number,
+    settings: DesignSettings,
+  ): void;
   update(
     contours: Contour[],
     width: number,
@@ -32,6 +42,7 @@ export function mountTerrain3dControls(
     field: HeightField,
     seaLevel?: SeaLevelGeometry,
     attribution?: string,
+    location?: { latitude: number; longitude: number },
   ): void;
 } {
   const section = document.createElement('section');
@@ -45,13 +56,14 @@ export function mountTerrain3dControls(
     <p class="export-hint">Explore the current landscape in 3D. Palette controls are in Settings; real terrain is in Location.</p>
     <div data-options hidden>
       <label class="toggle-row">Contour lines<input type="checkbox" role="switch" data-show-contours checked></label>
+      <div data-crop-slot></div>
       <fieldset><legend>Model dimensions</legend>
         <div class="control-grid">
-          <label>Width (X, mm)<input data-model="widthMm" type="number" min="1" max="1000" step="any" value="150"></label>
-          <label>Length (Y, mm)<input data-model="lengthMm" type="number" min="1" max="1000" step="any" value="150"></label>
+          <label><span data-model-width-label>Width (X, mm)</span><input data-model="widthMm" type="number" min="1" max="1000" step="any" value="150"></label>
+          <label data-model-length-label>Length (Y, mm)<input data-model="lengthMm" type="number" min="1" max="1000" step="any" value="150"></label>
         </div>
         <label>Base thickness (mm)<input data-model="baseThicknessMm" type="number" min="0.1" max="100" step="any" value="3"></label>
-        <p class="export-hint">Minimum material below the lowest valley. Terrain is cropped around its center to fit.</p>
+        <p class="export-hint">Minimum material below the lowest valley. Terrain uses the selected crop above.</p>
         <p class="export-hint">Model: <output data-model-size>150 × 150 mm</output> · Overall height: <output data-model-height>—</output></p>
         <button type="button" class="primary-button" data-stl>Download STL</button>
         <p class="export-hint">Import units: millimeters. STL includes a solid base and terrain only.</p>
@@ -71,11 +83,11 @@ export function mountTerrain3dControls(
         <p class="export-hint">Turn off the surface for floating contours.</p>
       </fieldset>
       <fieldset><legend>Ground</legend>
-        <label class="toggle-row">Ground plane<input type="checkbox" role="switch" data-ground checked></label>
-        <label class="toggle-row">Match canvas<input type="checkbox" role="switch" data-ground-match checked></label>
-        <div class="colour-row"><label>Floor color<input type="color" data-ground-color value="#202326" disabled></label></div>
+        <label class="toggle-row">Studio floor<input type="checkbox" role="switch" data-ground checked></label>
+        <label class="toggle-row">Match canvas<input type="checkbox" role="switch" data-ground-match></label>
+        <div class="colour-row"><label>Floor color<input type="color" data-ground-color value="#b4b4b4"></label></div>
         <label class="toggle-row">North arrow<input type="checkbox" role="switch" data-north disabled></label>
-        <p class="export-hint">Ground and a soft shadow appear beneath the solid base. Match the canvas or choose a floor color. The north arrow is available for real locations and stays aligned as you orbit. These decorations are omitted from STL.</p>
+        <p class="export-hint">The studio surrounds the solid base with a continuous floor and real cast shadows. Match the canvas or choose a floor color. The north arrow is available for real locations and stays aligned as you orbit. These decorations are omitted from STL.</p>
       </fieldset>
       <fieldset><legend>Water</legend>
         <label class="select-row">Water style<select data-water-style><option value="hatched">Hatched</option><option value="solid" selected>Solid</option><option value="off">Off</option></select></label>
@@ -94,7 +106,7 @@ export function mountTerrain3dControls(
           )
           .join('')}
         <button type="button" class="text-button" data-reset-lighting>Reset lighting</button>
-        <p class="export-hint">Sun casts warm light; Moon casts cool light. Low elevation brings out ridges. Off keeps only the soft fill light.</p>
+        <p class="export-hint">Sun casts warm light; Moon casts cool light. Direction is clockwise from north. Locations suggest a hemisphere-based sunrise angle, rather than an astronomical sun position. Off keeps only the soft fill light.</p>
       </fieldset>
       <fieldset><legend>Camera</legend>
         <label class="toggle-row">Auto-rotate<input type="checkbox" role="switch" data-rotate></label>
@@ -111,6 +123,29 @@ export function mountTerrain3dControls(
   let modelSettings: TerrainModelSettings = { ...defaultTerrainModelSettings };
   let attributionText = '';
   let seed = 0;
+
+  const updateModelLabels = () => {
+    const circular = modelSettings.cropShape === 'circle';
+
+    getRequiredElement(section, '[data-model-width-label]', HTMLElement).textContent = circular
+      ? 'Diameter (mm)'
+      : 'Width (X, mm)';
+    getRequiredElement(section, '[data-model-length-label]', HTMLElement).hidden = circular;
+    getRequiredElement(section, '[data-model-size]', HTMLOutputElement).value = circular
+      ? `${modelSettings.widthMm} mm diameter`
+      : `${modelSettings.widthMm} × ${modelSettings.lengthMm} mm`;
+  };
+
+  const cropControls = mountTerrainCropControls(
+    getRequiredElement(section, '[data-crop-slot]', HTMLElement),
+    () => modelSettings,
+    (shape) => {
+      modelSettings = { ...modelSettings, cropShape: shape };
+      updateModelLabels();
+      view?.setModelSettings(modelSettings);
+      changed();
+    },
+  );
 
   const syncWaterColor = () => {
     if (getRequiredElement(section, '[data-water-match]', HTMLInputElement).checked) {
@@ -142,8 +177,7 @@ export function mountTerrain3dControls(
         validateTerrainModelSettings(candidate);
         modelSettings = candidate;
         view?.setModelSettings(modelSettings);
-        getRequiredElement(section, '[data-model-size]', HTMLOutputElement).value =
-          `${modelSettings.widthMm} × ${modelSettings.lengthMm} mm`;
+        updateModelLabels();
         changed();
       } catch (error) {
         input.value = String(modelSettings[key]);
@@ -160,7 +194,9 @@ export function mountTerrain3dControls(
 
       download(
         new Blob([view.getStl()], { type: 'model/stl' }),
-        `topogra-${seed}-${modelSettings.widthMm}x${modelSettings.lengthMm}mm.stl`,
+        modelSettings.cropShape === 'circle'
+          ? `topogra-${seed}-circle-${modelSettings.widthMm}mm.stl`
+          : `topogra-${seed}-${modelSettings.widthMm}x${modelSettings.lengthMm}mm.stl`,
       );
     } catch (error) {
       notify(error instanceof Error ? error.message : 'STL export failed. Please retry.');
@@ -176,6 +212,19 @@ export function mountTerrain3dControls(
     },
   );
   let lighting: TerrainLightingSettings = { ...defaultTerrainLighting };
+  let locationLatitude: number | undefined;
+  let lastLocationKey = '';
+  let customLightDirection = false;
+
+  const syncLightingControls = () => {
+    for (const { key, suffix } of terrainLightingControls) {
+      getRequiredElement(section, `[data-light="${key}"]`, HTMLInputElement).value = String(
+        lighting[key],
+      );
+      getRequiredElement(section, `[data-light-value="${key}"]`, HTMLOutputElement).value =
+        `${lighting[key]}${suffix}`;
+    }
+  };
 
   toggle.addEventListener('change', () => {
     void activate();
@@ -355,6 +404,11 @@ export function mountTerrain3dControls(
         const value = (event.target as HTMLInputElement).valueAsNumber;
 
         lighting[key] = value;
+
+        if (key === 'direction') {
+          customLightDirection = true;
+        }
+
         getRequiredElement(section, `[data-light-value="${key}"]`, HTMLOutputElement).value =
           `${value}${suffix}`;
         view?.setLighting(lighting);
@@ -365,7 +419,11 @@ export function mountTerrain3dControls(
   getRequiredElement(section, '[data-reset-lighting]', HTMLButtonElement).addEventListener(
     'click',
     () => {
-      lighting = { ...defaultTerrainLighting };
+      customLightDirection = false;
+      lighting = {
+        ...defaultTerrainLighting,
+        direction: getSuggestedTerrainLightDirection(locationLatitude),
+      };
       getRequiredElement(section, '[data-light-mode]', HTMLSelectElement).value = lighting.mode;
 
       for (const { key, suffix } of terrainLightingControls) {
@@ -393,6 +451,10 @@ export function mountTerrain3dControls(
   return {
     isActive: () => active,
     getModelSettings: () => ({ ...modelSettings }),
+    getCropSettings: () => cropControls.getCrop(),
+    updateCropPreview: (field, width, height, settings) => {
+      cropControls.update(field, width, height, settings);
+    },
     update: (
       contours: Contour[],
       width: number,
@@ -401,7 +463,21 @@ export function mountTerrain3dControls(
       field: HeightField,
       seaLevel?: SeaLevelGeometry,
       attribution?: string,
+      location?: { latitude: number; longitude: number },
     ) => {
+      locationLatitude = location?.latitude;
+      const locationKey = location ? `${location.latitude},${location.longitude}` : '';
+
+      if (locationKey !== lastLocationKey) {
+        lastLocationKey = locationKey;
+
+        if (!customLightDirection) {
+          lighting.direction = getSuggestedTerrainLightDirection(locationLatitude);
+          syncLightingControls();
+          view?.setLighting(lighting);
+        }
+      }
+
       seed = settings.seed;
       attributionText = attribution ?? '';
       const north = getRequiredElement(section, '[data-north]', HTMLInputElement);
