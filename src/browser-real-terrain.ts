@@ -9,8 +9,17 @@ export async function loadBrowserRealTerrain(
   latitude: number,
   longitude: number,
   spanKm: number,
+  elevationFloor?: number,
+  maxDepth?: number,
 ): Promise<RealTerrain> {
-  return loadTerrainFromTiles(latitude, longitude, spanKm, decodeBrowserTerrainTile);
+  return loadTerrainFromTiles(
+    latitude,
+    longitude,
+    spanKm,
+    decodeBrowserTerrainTile,
+    elevationFloor,
+    maxDepth,
+  );
 }
 
 /** Downloads and decodes a Terrarium tile through browser canvas APIs. */

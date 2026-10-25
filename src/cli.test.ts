@@ -181,12 +181,14 @@ function toKebab(value: string): string {
   return `--${value.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`;
 }
 
-void test('failed generation leaves no config and can be retried without force', async (context) => {
+void test('failed generation leaves no outputs and the same real-terrain command can be retried', async (context) => {
   const { runCli } = await import('./cli');
   const { access } = await import('node:fs/promises');
+  const { PNG } = await import('pngjs');
   const directory = await mkdtemp(join(tmpdir(), 'topogra-retry-'));
   const output = join(directory, 'terrain.svg');
   const config = join(directory, 'terrain.json');
+  const attribution = join(directory, 'terrain-attribution.txt');
   const args = [
     'generate',
     '--terrain',
@@ -202,31 +204,38 @@ void test('failed generation leaves no config and can be retried without force',
     output,
     '--save-config',
     config,
+    '--attribution-file',
+    attribution,
   ];
-  const io = { stdout: { write: () => true }, stderr: { write: () => true } } as Parameters<
-    typeof runCli
-  >[1];
-  context.mock.method(globalThis, 'fetch', () => Promise.reject(new Error('offline')));
-  assert.equal(await runCli(args, io), 2);
-  await assert.rejects(access(config));
-  await assert.rejects(access(output));
-  assert.equal(
-    await runCli(
-      [
-        'generate',
-        '--width',
-        '100',
-        '--height',
-        '100',
-        '--output',
-        output,
-        '--save-config',
-        config,
-      ],
-      io,
-    ),
-    0,
+  const io = {
+    stdout: { write: () => true },
+    stderr: { write: () => true },
+  } as unknown as Parameters<typeof runCli>[1];
+  const fetchMock = context.mock.method(globalThis, 'fetch', () =>
+    Promise.reject(new Error('offline')),
   );
+
+  assert.equal(await runCli(args, io), 2);
+
+  for (const path of [config, output, attribution]) {
+    await assert.rejects(access(path));
+  }
+
+  const png = new PNG({ width: 256, height: 256 });
+
+  for (let i = 0; i < png.data.length; i += 4) {
+    png.data[i] = 128;
+    png.data[i + 3] = 255;
+  }
+
+  const tile = PNG.sync.write(png);
+
+  fetchMock.mock.mockImplementation(() => Promise.resolve(new Response(new Uint8Array(tile))));
+  assert.equal(await runCli(args, io), 0);
+
+  for (const path of [config, output, attribution]) {
+    await access(path);
+  }
 });
 
 void test('output conflicts and staging failures leave no companion config', async () => {
@@ -234,6 +243,7 @@ void test('output conflicts and staging failures leave no companion config', asy
   const directory = await mkdtemp(join(tmpdir(), 'topogra-conflict-'));
   const config = join(directory, 'terrain.json');
   const output = join(directory, 'terrain.svg');
+
   await writeFile(output, 'existing');
   await assert.rejects(runCommand(['generate', '--output', output, '--save-config', config]));
   await assert.rejects(access(config));
@@ -258,6 +268,7 @@ void test('negative numeric arguments accept separate and equals forms', async (
   const directory = await mkdtemp(join(tmpdir(), 'topogra-negative-'));
   const output = join(directory, 'terrain.svg');
   const config = join(directory, 'terrain.json');
+
   await runCommand([
     'generate',
     '--cursor-height',
@@ -267,7 +278,12 @@ void test('negative numeric arguments accept separate and equals forms', async (
     '--save-config',
     config,
   ]);
-  assert.equal(JSON.parse(await readFile(config, 'utf8')).settings.cursorHeight, -0.2);
+  const saved = JSON.parse(await readFile(config, 'utf8')) as {
+    settings: { cursorHeight: number };
+  };
+
+  assert.equal(saved.settings.cursorHeight, -0.2);
+
   // Invalid span fails validation before network access, proving coordinates parsed.
   for (const coordinates of [
     ['--latitude', '-54.65', '--longitude', '-8.7'],
@@ -275,11 +291,140 @@ void test('negative numeric arguments accept separate and equals forms', async (
   ]) {
     await assert.rejects(
       runCommand(['generate', '--terrain', 'real', ...coordinates, '--span-km', '0']),
-      (error: Error) => /area width of 2–200/.test(error.message),
+      (error: Error) => error.message.includes('area width of 2–200'),
     );
   }
+
   await assert.rejects(
     runCommand(['generate', '--longitude', '--unknown']),
     /ambiguous|argument|Unknown option/,
+  );
+});
+
+void test('CLI validates elevation floors and keeps them in real-terrain configurations', async (context) => {
+  const { runCli } = await import('./cli');
+  const { PNG } = await import('pngjs');
+  const directory = await mkdtemp(join(tmpdir(), 'topogra-floor-'));
+  const output = join(directory, 'terrain.svg');
+  const config = join(directory, 'terrain.json');
+  const png = new PNG({ width: 256, height: 256 });
+
+  for (let i = 0; i < png.data.length; i += 4) {
+    png.data[i] = 128;
+    png.data[i + 1] = 100;
+    png.data[i + 3] = 255;
+  }
+
+  const tile = PNG.sync.write(png);
+
+  context.mock.method(globalThis, 'fetch', () =>
+    Promise.resolve(new Response(new Uint8Array(tile))),
+  );
+  const io = {
+    stdout: { write: () => true },
+    stderr: { write: () => true },
+  } as unknown as Parameters<typeof runCli>[1];
+
+  assert.equal(
+    await runCli(
+      [
+        'generate',
+        '--terrain',
+        'real',
+        '--latitude',
+        '-54',
+        '--longitude',
+        '-8',
+        '--elevation-floor',
+        '-10',
+        '--width',
+        '100',
+        '--height',
+        '100',
+        '--output',
+        output,
+        '--save-config',
+        config,
+      ],
+      io,
+    ),
+    0,
+  );
+  const saved = JSON.parse(await readFile(config, 'utf8')) as {
+    terrain: { elevationFloor: number; maxDepth?: number };
+  };
+
+  assert.equal(saved.terrain.elevationFloor, -10);
+  assert.equal(saved.terrain.maxDepth, 0);
+  const depthConfig = join(directory, 'depth.json');
+
+  assert.equal(
+    await runCli(
+      [
+        'generate',
+        '--config',
+        config,
+        '--max-depth',
+        '100',
+        '--output',
+        join(directory, 'depth.svg'),
+        '--save-config',
+        depthConfig,
+      ],
+      io,
+    ),
+    0,
+  );
+  const depth = JSON.parse(await readFile(depthConfig, 'utf8')) as {
+    terrain: { maxDepth?: number };
+  };
+
+  assert.equal(depth.terrain.maxDepth, 100);
+  delete saved.terrain.maxDepth;
+  await writeFile(config, JSON.stringify(saved));
+  const legacyConfig = join(directory, 'legacy.json');
+
+  assert.equal(
+    await runCli(
+      [
+        'generate',
+        '--config',
+        config,
+        '--output',
+        join(directory, 'legacy.svg'),
+        '--save-config',
+        legacyConfig,
+      ],
+      io,
+    ),
+    0,
+  );
+  const legacy = JSON.parse(await readFile(legacyConfig, 'utf8')) as {
+    terrain: { maxDepth?: number };
+  };
+
+  assert.equal(legacy.terrain.maxDepth, undefined);
+
+  assert.equal(await runCli(['validate', '--config', config], io), 0);
+  assert.equal(
+    await runCli(['generate', '--config', config, '--output', join(directory, 'restored.svg')], io),
+    0,
+  );
+  await assert.rejects(
+    runCommand(['generate', '--elevation-floor', '150']),
+    /requires real terrain/,
+  );
+  await assert.rejects(
+    runCommand([
+      'generate',
+      '--terrain',
+      'real',
+      '--latitude',
+      '54',
+      '--longitude=-8',
+      '--elevation-floor',
+      '9000',
+    ]),
+    /Elevation floor/,
   );
 });

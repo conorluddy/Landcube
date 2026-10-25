@@ -89,7 +89,15 @@ const designSettingDescriptions: Record<keyof DesignSettings, string> = {
 };
 
 type TerrainConfig =
-  { mode: 'generated' } | { mode: 'real'; latitude: number; longitude: number; spanKm: number };
+  | { mode: 'generated' }
+  | {
+      mode: 'real';
+      latitude: number;
+      longitude: number;
+      spanKm: number;
+      elevationFloor?: number;
+      maxDepth?: number;
+    };
 interface CliConfig {
   version: number;
   settings: DesignSettings;
@@ -161,6 +169,8 @@ function parseOptions(argumentsList: string[]) {
     latitude: { type: 'string' },
     longitude: { type: 'string' },
     'span-km': { type: 'string' },
+    'elevation-floor': { type: 'string' },
+    'max-depth': { type: 'string' },
     json: { type: 'string' },
     force: { type: 'string' },
     'save-config': { type: 'string' },
@@ -178,12 +188,16 @@ function parseOptions(argumentsList: string[]) {
     'latitude',
     'longitude',
     'span-km',
+    'elevation-floor',
+    'max-depth',
     ...Object.keys(designNumberConstraints).map(toKebab),
   ]);
   const normalized: string[] = [];
+
   for (let index = 0; index < argumentsList.length; index++) {
     const argument = argumentsList[index];
-    const next = argumentsList[index + 1];
+    const next: string | undefined = argumentsList.at(index + 1);
+
     if (
       argument.startsWith('--') &&
       numericFlags.has(argument.slice(2)) &&
@@ -192,8 +206,11 @@ function parseOptions(argumentsList: string[]) {
     ) {
       normalized.push(`${argument}=${next}`);
       index++;
-    } else normalized.push(argument);
+    } else {
+      normalized.push(argument);
+    }
   }
+
   const { values: parsed, positionals } = parseArgs({
     args: normalized,
     options: values,
@@ -234,6 +251,23 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
 
   source = { ...source, ...readDesignFlags(options) };
   terrain = readTerrain(options, terrain);
+
+  if (options['elevation-floor'] !== undefined) {
+    if (terrain.mode !== 'real') {
+      throw new Error('--elevation-floor requires real terrain.');
+    }
+
+    terrain = { ...terrain, elevationFloor: Number(options['elevation-floor']) };
+  }
+
+  if (options['max-depth'] !== undefined) {
+    if (terrain.mode !== 'real') {
+      throw new Error('--max-depth requires real terrain.');
+    }
+
+    terrain = { ...terrain, maxDepth: Number(options['max-depth']) };
+  }
+
   validateTerrainConfig(terrain);
 
   source.seed ??= randomBytes(4).readUInt32BE();
@@ -261,16 +295,24 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
     options['save-config'],
     options['attribution-file'],
   ].filter((path): path is string => path !== undefined);
+
   if (new Set(destinations.map((path) => resolve(path))).size !== destinations.length) {
     throw new Error('Image, configuration, and attribution must use different output paths.');
   }
+
   for (const path of destinations) {
     await checkOutputDestination(path, isEnabled(options, 'force'));
   }
 
   const loadedTerrain =
     terrain.mode === 'real'
-      ? await loadNodeRealTerrain(terrain.latitude, terrain.longitude, terrain.spanKm)
+      ? await loadNodeRealTerrain(
+          terrain.latitude,
+          terrain.longitude,
+          terrain.spanKm,
+          terrain.elevationFloor,
+          terrain.maxDepth,
+        )
       : undefined;
 
   validateAttributionOptions(options, loadedTerrain);
@@ -285,6 +327,7 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
   }
 
   const files: { path: string; bytes: Uint8Array }[] = [];
+
   if (options['save-config'] !== undefined) {
     files.push({
       path: options['save-config'],
@@ -293,15 +336,23 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
       ),
     });
   }
+
   if (options['attribution-file'] !== undefined && loadedTerrain !== undefined) {
     files.push({
       path: options['attribution-file'],
       bytes: new TextEncoder().encode(`${loadedTerrain.attribution}\n`),
     });
   }
-  if (output !== '-') files.push({ path: output, bytes: result.data.bytes });
+
+  if (output !== '-') {
+    files.push({ path: output, bytes: result.data.bytes });
+  }
+
   await writeOutputFiles(files, isEnabled(options, 'force'));
-  if (output === '-') io.stdout.write(result.data.bytes);
+
+  if (output === '-') {
+    io.stdout.write(result.data.bytes);
+  }
 
   if (isEnabled(options, 'json')) {
     write(
@@ -320,7 +371,11 @@ function validateCommand(options: Record<string, string | undefined>, stdout: No
     throw new Error('validate requires --config FILE.');
   }
 
-  return readConfig(options.config).then(({ settings }) => {
+  return readConfig(options.config).then(({ settings, terrain }) => {
+    if (terrain !== undefined) {
+      validateTerrainConfig(terrain);
+    }
+
     const result = validateDesignSettings(settings);
 
     if (!result.ok) {
@@ -470,6 +525,7 @@ function readTerrain(
 
     return {
       mode: 'real',
+      maxDepth: 0,
       latitude: place.latitude,
       longitude: place.longitude,
       spanKm: Number(options['span-km'] ?? realTerrainBounds.defaultSpanKm),
@@ -485,7 +541,7 @@ function readTerrain(
       throw new Error('Real terrain requires --latitude and --longitude.');
     }
 
-    return { mode: 'real', latitude, longitude, spanKm };
+    return { mode: 'real', latitude, longitude, spanKm, maxDepth: 0 };
   }
 
   return mode === 'generated' ? { mode } : current;
@@ -495,6 +551,22 @@ function readTerrain(
 function validateTerrainConfig(terrain: TerrainConfig): void {
   if (terrain.mode === 'generated') {
     return;
+  }
+
+  if (
+    terrain.maxDepth !== undefined &&
+    (!Number.isFinite(terrain.maxDepth) || terrain.maxDepth < 0 || terrain.maxDepth > 11000)
+  ) {
+    throw new Error('Maximum depth must be between 0 and 11000 meters.');
+  }
+
+  if (
+    terrain.elevationFloor !== undefined &&
+    (!Number.isFinite(terrain.elevationFloor) ||
+      terrain.elevationFloor < -11000 ||
+      terrain.elevationFloor > 8900)
+  ) {
+    throw new Error('Elevation floor must be between −11000 and 8900 meters.');
   }
 
   if (
@@ -564,34 +636,49 @@ function validateAttributionOptions(
 /** Stages every output before publishing; restores prior files if publishing fails. */
 async function writeOutputFiles(files: { path: string; bytes: Uint8Array }[], force: boolean) {
   const staged: { target: string; temporary: string; previous?: Buffer; committed: boolean }[] = [];
+
   try {
     for (const file of files) {
       const target = resolve(file.path);
+
       await checkOutputDestination(target, force);
       let previous: Buffer | undefined;
+
       if (force) {
         try {
           previous = await readFile(target);
         } catch (error) {
-          if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT')
+          if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') {
             throw error;
+          }
         }
       }
+
       const temporary = `${target}.topogra-${process.pid}-${randomBytes(6).toString('hex')}.tmp`;
+
       staged.push({ target, temporary, previous, committed: false });
       await writeFile(temporary, file.bytes, { flag: 'wx' });
     }
+
     for (const file of staged) {
       // A hard link refuses a destination created after preflight, unlike rename.
-      if (force) await rename(file.temporary, file.target);
-      else await link(file.temporary, file.target);
+      if (force) {
+        await rename(file.temporary, file.target);
+      } else {
+        await link(file.temporary, file.target);
+      }
+
       file.committed = true;
     }
   } catch (error) {
     for (const file of staged.filter((file) => file.committed).reverse()) {
-      if (file.previous !== undefined) await writeFile(file.target, file.previous);
-      else await unlink(file.target);
+      if (file.previous !== undefined) {
+        await writeFile(file.target, file.previous);
+      } else {
+        await unlink(file.target);
+      }
     }
+
     throw error;
   } finally {
     await Promise.all(staged.map((file) => unlink(file.temporary).catch(() => undefined)));
@@ -600,6 +687,7 @@ async function writeOutputFiles(files: { path: string; bytes: Uint8Array }[], fo
 
 async function checkOutputDestination(path: string, force: boolean) {
   const target = resolve(path);
+
   if (!force) {
     try {
       await stat(target);
@@ -644,7 +732,7 @@ function write(stream: NodeJS.WriteStream, value: string) {
 function printHelp(stdout: NodeJS.WriteStream, isVerbose = false) {
   return write(
     stdout,
-    `Topogra CLI\n\nUsage: topogra generate [options]\n       topogra presets [--json true]\n       topogra validate --config design.json\n\nSources apply as defaults → config or URL → palette/size → explicit flags. --output - writes image bytes; --json true is incompatible with it. Existing files require --force true.\n\nGenerator options:\n  --config FILE | --url URL    Versioned CLI config or v=1 browser URL (mutually exclusive)\n  --palette NAME               ${[...Object.keys(designPalettePresets), 'random'].join(', ')}\n  --size WIDTHxHEIGHT          A listed output size; use presets --json true to discover values\n  --terrain generated|real     Real mode requires coordinates or --terrain-preset NAME\n  --latitude NUMBER --longitude NUMBER --span-km NUMBER\n  --format svg|png --output FILE|- --save-config FILE\n  --attribution embedded       Keep real-terrain credit visibly embedded (the default)\n  --attribution-file FILE      Write the resolved real-terrain credit alongside the image\n  --json true|false --force true|false\n\nDesign flags (default; range where applicable):\n${getDesignFlagReference(isVerbose)}\n${isVerbose ? '' : '\nUse --help --verbose for a full description of every design flag.\n'}`,
+    `Topogra CLI\n\nUsage: topogra generate [options]\n       topogra presets [--json true]\n       topogra validate --config design.json\n\nSources apply as defaults → config or URL → palette/size → explicit flags. --output - writes image bytes; --json true is incompatible with it. Existing files require --force true.\n\nGenerator options:\n  --config FILE | --url URL    Versioned CLI config or v=1 browser URL (mutually exclusive)\n  --palette NAME               ${[...Object.keys(designPalettePresets), 'random'].join(', ')}\n  --size WIDTHxHEIGHT          A listed output size; use presets --json true to discover values\n  --terrain generated|real     Real mode requires coordinates or --terrain-preset NAME\n  --latitude NUMBER --longitude NUMBER --span-km NUMBER\n  --max-depth NUMBER            Maximum depth below sea level in meters (new real designs: 0; 0–11000)\n  --elevation-floor NUMBER      Omit real terrain below this height in meters (optional; −11000–8900)\n  --format svg|png --output FILE|- --save-config FILE\n  --attribution embedded       Keep real-terrain credit visibly embedded (the default)\n  --attribution-file FILE      Write the resolved real-terrain credit alongside the image\n  --json true|false --force true|false\n\nDesign flags (default; range where applicable):\n${getDesignFlagReference(isVerbose)}\n${isVerbose ? '' : '\nUse --help --verbose for a full description of every design flag.\n'}`,
   );
 }
 

@@ -10,8 +10,17 @@ export async function loadNodeRealTerrain(
   latitude: number,
   longitude: number,
   spanKm: number,
+  elevationFloor?: number,
+  maxDepth?: number,
 ): Promise<RealTerrain> {
-  return loadTerrainFromTiles(latitude, longitude, spanKm, decodeNodeTerrainTile);
+  return loadTerrainFromTiles(
+    latitude,
+    longitude,
+    spanKm,
+    decodeNodeTerrainTile,
+    elevationFloor,
+    maxDepth,
+  );
 }
 
 /** Fetches and decodes a PNG Terrarium tile using a pure Node PNG decoder. */

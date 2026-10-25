@@ -71,3 +71,107 @@ void test('exports invalidate cached geometry when switching terrain sources', (
   activeTerrain = undefined;
   assert.equal(renderer.getSvg(settings), generated);
 });
+
+void test('elevation floors flatten low terrain while preserving legacy sampling when omitted', async () => {
+  const pixels = new Uint8Array(terrainTilePixelCount);
+
+  for (let offset = 0; offset < pixels.length; offset += 4) {
+    const elevation = (offset / 4) % 256 < 128 ? -50 : 300;
+    const encoded = elevation + 32768;
+
+    pixels[offset] = Math.floor(encoded / 256);
+    pixels[offset + 1] = encoded % 256;
+    pixels[offset + 3] = 255;
+  }
+
+  const loader: TerrainTileLoader = () => Promise.resolve({ pixels, imagerySources: 'srtm' });
+  const legacy = await loadRealTerrain(0, 0, 2, loader);
+  const omitted = await loadRealTerrain(0, 0, 2, loader, undefined);
+  const flat = await loadRealTerrain(0, 0, 2, loader, 400);
+
+  for (const x of [0, 25, 50, 75, 100]) {
+    assert.equal(legacy.sample(x, 50, 100, 100), omitted.sample(x, 50, 100, 100));
+    assert.equal(flat.sample(x, 50, 100, 100), -0.8);
+  }
+
+  assert.equal(flat.attribution, legacy.attribution);
+  await assert.rejects(loadRealTerrain(0, 0, 2, loader, NaN), /Elevation floor/);
+  await assert.rejects(loadRealTerrain(0, 0, 2, loader, 9000), /Elevation floor/);
+});
+
+void test('Slieve League coastal fixture loses low-elevation source steps with an explicit floor', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const fixture = JSON.parse(await readFile('tests/fixtures/slieve-league-coast.json', 'utf8')) as {
+    elevations: number[][];
+    imagerySources: string;
+  };
+  const pixels = new Uint8Array(terrainTilePixelCount);
+  const heights = fixture.elevations.flat();
+  const maximum = Math.max(...heights);
+
+  for (let y = 0; y < 256; y++) {
+    for (let x = 0; x < 256; x++) {
+      const elevation =
+        fixture.elevations[y % fixture.elevations.length][x % fixture.elevations[0].length];
+      const encoded = elevation + 32768;
+      const offset = (y * 256 + x) * 4;
+
+      pixels[offset] = Math.floor(encoded / 256);
+      pixels[offset + 1] = Math.floor(encoded % 256);
+      pixels[offset + 2] = Math.round((encoded % 1) * 256);
+      pixels[offset + 3] = 255;
+    }
+  }
+
+  const loader: TerrainTileLoader = () =>
+    Promise.resolve({ pixels, imagerySources: fixture.imagerySources });
+  const legacy = await loadRealTerrain(54.65, -8.7, 8, loader);
+  const clipped = await loadRealTerrain(54.65, -8.7, 8, loader, maximum);
+  const partial = await loadRealTerrain(54.65, -8.7, 8, loader, 150);
+  const partialSamples = Array.from({ length: 100 }, (_, x) => partial.sample(x, 50, 100, 100));
+
+  assert.ok(partialSamples.some((height) => height === -0.8));
+  assert.ok(partialSamples.some((height) => height > 0));
+
+  const samples = Array.from({ length: 100 }, (_, x) => legacy.sample(x, 50, 100, 100));
+
+  assert.ok(Math.max(...samples) - Math.min(...samples) > 0.5);
+
+  for (let x = 0; x < 100; x++) {
+    assert.equal(clipped.sample(x, 50, 100, 100), -0.8);
+  }
+});
+
+void test('maximum depth clips bathymetry and combines with an above-sea elevation floor', async () => {
+  const pixels = new Uint8Array(terrainTilePixelCount);
+
+  for (let y = 0; y < 256; y++) {
+    for (let x = 0; x < 256; x++) {
+      const height = x < 64 ? -200 : x < 128 ? -50 : x < 192 ? 0 : 200;
+      const encoded = height + 32768;
+      const offset = (y * 256 + x) * 4;
+
+      pixels[offset] = Math.floor(encoded / 256);
+      pixels[offset + 1] = encoded % 256;
+      pixels[offset + 3] = 255;
+    }
+  }
+
+  const loader: TerrainTileLoader = () => Promise.resolve({ pixels, imagerySources: 'srtm' });
+  const legacy = await loadRealTerrain(0, 0, 2, loader);
+  const seaLevel = await loadRealTerrain(0, 0, 2, loader, undefined, 0);
+  const hundred = await loadRealTerrain(0, 0, 2, loader, undefined, 100);
+  const unlimited = await loadRealTerrain(0, 0, 2, loader, undefined, 11000);
+  const combined = await loadRealTerrain(0, 0, 2, loader, 250, 100);
+
+  assert.equal(seaLevel.sample(90, 50, 100, 100), -0.8);
+  assert.ok(hundred.sample(90, 50, 100, 100) > -0.8);
+
+  for (let x = 0; x < 100; x++) {
+    assert.equal(unlimited.sample(x, 50, 100, 100), legacy.sample(x, 50, 100, 100));
+    assert.equal(combined.sample(x, 50, 100, 100), -0.8);
+  }
+
+  await assert.rejects(loadRealTerrain(0, 0, 2, loader, undefined, -1), /Maximum depth/);
+  await assert.rejects(loadRealTerrain(0, 0, 2, loader, undefined, Infinity), /Maximum depth/);
+});
