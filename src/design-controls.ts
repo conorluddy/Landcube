@@ -52,6 +52,7 @@ export function mountDesignControls(actions: DesignControlActions): DesignContro
     <div id="panel-body">
       <nav class="panel-modes" aria-label="Studio mode">
         <button type="button" id="settings-toggle" aria-pressed="true" aria-controls="settings-content">Settings</button>
+        <button type="button" id="location-toggle" aria-pressed="false" aria-controls="location-content">Location</button>
         <button type="button" id="three-d-toggle" aria-pressed="false" aria-controls="three-d-content">3D</button>
         <button type="button" id="export-toggle" aria-pressed="false" aria-controls="export-content">Export ↗</button>
       </nav>
@@ -75,7 +76,6 @@ export function mountDesignControls(actions: DesignControlActions): DesignContro
           ${createRangeControlMarkup('featureScale', 'Scale', ' px')}
         </div>
         ${createRangeControlMarkup('detail', 'Terrain detail')}
-        <div data-real-terrain-slot></div>
         <details><summary>Index contours<span aria-hidden="true">+</span></summary><div class="detail-content">
           <div class="select-row"><label for="indexStyle">Style</label><select id="indexStyle">${indexContourStyles.map((style) => `<option value="${style}">${style[0].toUpperCase()}${style.slice(1)}</option>`).join('')}</select></div>
           ${createRangeControlMarkup('indexEvery', 'Every N levels')}
@@ -104,6 +104,9 @@ export function mountDesignControls(actions: DesignControlActions): DesignContro
         <div class="seed-row"><span>Seed <output id="seed-value">${actions.getSettings().seed}</output></span><label class="lock-label" for="seed-lock">Lock<input type="checkbox" id="seed-lock" role="switch"></label></div>
         <div class="actions"><button type="button" id="reset" class="text-button">Reset style</button><button type="button" id="new-landscape" class="primary-button"><span aria-hidden="true">↻</span> New landscape</button></div>
       </footer>
+      </section>
+      <section id="location-content" aria-label="Location settings" hidden>
+        <div data-real-terrain-slot></div>
       </section>
       <footer id="shared-footer">
         <button type="button" id="copy-link" class="text-button">Copy link</button>

@@ -35,6 +35,14 @@ test('3D controls retain surface, contour and lighting choices across tab and vi
   await expect(page.locator('canvas.terrain-3d')).toBeVisible();
   const height = page.getByRole('slider', { name: 'Height exaggeration' });
 
+  await expect(page.getByRole('switch', { name: 'Ground plane', exact: true })).toBeChecked();
+  await expect(page.getByRole('switch', { name: 'North arrow', exact: true })).toBeDisabled();
+  await expect(page.getByLabel('Water style')).toHaveValue('solid');
+  await expect(page.getByRole('switch', { name: 'Match terrain', exact: true })).toBeChecked();
+  await expect(page.getByLabel('Water color', { exact: true })).toHaveValue('#1c1f21');
+  await expect(page.getByLabel('Water color', { exact: true })).toBeDisabled();
+  await expect(page.getByLabel('Light source')).toHaveValue('sun');
+  await expect(page.locator('#terrain-light-elevation')).toHaveValue('15');
   await expect(height).toHaveValue('0.3');
   await expect(height).toHaveAttribute('max', '1');
   await expect(page.getByLabel('Surface color')).toHaveValue('#202326');
@@ -53,6 +61,18 @@ test('3D controls retain surface, contour and lighting choices across tab and vi
 
   expect(relit.equals(baseline)).toBe(false);
   await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByLabel('Light source').selectOption('moon');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const moon = PNG.sync.read(await page.screenshot({ clip })).data;
+
+  expect(moon.equals(relit)).toBe(false);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByLabel('Light source').selectOption('off');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const unlit = PNG.sync.read(await page.screenshot({ clip })).data;
+
+  expect(unlit.equals(moon)).toBe(false);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
   await page.getByRole('button', { name: 'Reset lighting', exact: true }).click();
   await page.getByRole('button', { name: 'Collapse controls' }).click();
   const reset = PNG.sync.read(await page.screenshot({ clip })).data;
@@ -62,13 +82,22 @@ test('3D controls retain surface, contour and lighting choices across tab and vi
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Canvas', { exact: true }).fill('#334455');
   await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.getByLabel('Floor color', { exact: true })).toHaveValue('#334455');
+  await expect(page.getByLabel('Floor color', { exact: true })).toBeDisabled();
+  await page.getByRole('switch', { name: 'Match canvas', exact: true }).uncheck();
+  await page.getByLabel('Floor color', { exact: true }).fill('#8899aa');
   await expect(page.getByLabel('Surface color')).toHaveValue('#334455');
   await page.getByRole('switch', { name: 'Match background' }).uncheck();
   await page.getByLabel('Surface color').fill('#667788');
+  await expect(page.getByLabel('Water color', { exact: true })).toHaveValue('#5a6978');
+  await page.getByRole('switch', { name: 'Match terrain', exact: true }).uncheck();
+  await page.getByLabel('Water color', { exact: true }).fill('#123456');
   await height.fill('0.5');
   await page.getByRole('switch', { name: 'Show raised contours' }).uncheck();
   await expect(page.locator('#terrain')).toBeVisible();
   await page.getByRole('switch', { name: 'Show raised contours' }).check();
+  await expect(page.getByLabel('Water color', { exact: true })).toHaveValue('#123456');
+  await expect(page.getByLabel('Floor color', { exact: true })).toHaveValue('#8899aa');
   await expect(height).toHaveValue('0.5');
   await expect(page.getByLabel('Surface color')).toHaveValue('#667788');
   await expect(page.getByRole('switch', { name: 'Contour lines', exact: true })).not.toBeChecked();
@@ -88,4 +117,180 @@ test('failed WebGL loading leaves the 2D design and controls available', async (
   await expect(page.locator('[data-options]')).toBeHidden();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByLabel('Canvas', { exact: true })).toBeVisible();
+});
+
+test('dimensioned STL matches the model and remains stable across viewport and appearance changes', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('switch', { name: 'Show raised contours' }).check();
+  await expect(page.getByLabel('Width (X, mm)', { exact: true })).toHaveValue('150');
+  await expect(page.getByLabel('Length (Y, mm)', { exact: true })).toHaveValue('150');
+  await page.getByLabel('Width (X, mm)', { exact: true }).fill('180');
+  await page.getByLabel('Width (X, mm)', { exact: true }).press('Tab');
+  await page.getByLabel('Length (Y, mm)', { exact: true }).fill('90');
+  await page.getByLabel('Length (Y, mm)', { exact: true }).press('Tab');
+  await page.getByLabel('Base thickness (mm)', { exact: true }).fill('6');
+  await page.getByLabel('Base thickness (mm)', { exact: true }).press('Tab');
+  await page.getByRole('switch', { name: 'Solid base', exact: true }).check();
+
+  const downloadStl = async () => {
+    const pending = page.waitForEvent('download');
+
+    await page.getByRole('button', { name: 'Download STL', exact: true }).click();
+    const download = await pending;
+
+    expect(download.suggestedFilename()).toBe('topogra-123-180x90mm.stl');
+    const path = await download.path();
+
+    if (!path) {
+      throw new Error('STL download is unavailable.');
+    }
+
+    return readFile(path);
+  };
+
+  await page.screenshot({ path: test.info().outputPath('print-preview.png') });
+  const original = await downloadStl();
+
+  expect(original.length).toBe(84 + original.readUInt32LE(80) * 50);
+  const bounds = [
+    [Infinity, -Infinity],
+    [Infinity, -Infinity],
+    [Infinity, -Infinity],
+  ];
+
+  for (let triangle = 0; triangle < original.readUInt32LE(80); triangle++) {
+    for (let vertex = 0; vertex < 3; vertex++) {
+      for (let axis = 0; axis < 3; axis++) {
+        const value = original.readFloatLE(84 + triangle * 50 + 12 + vertex * 12 + axis * 4);
+
+        bounds[axis][0] = Math.min(bounds[axis][0], value);
+        bounds[axis][1] = Math.max(bounds[axis][1], value);
+      }
+    }
+  }
+
+  expect(bounds[0][1] - bounds[0][0]).toBeCloseTo(180, 3);
+  expect(bounds[1][1] - bounds[1][0]).toBeCloseTo(90, 3);
+  expect(bounds[2][0]).toBe(0);
+  expect(bounds[2][1]).toBeGreaterThan(6);
+
+  await page.setViewportSize({ width: 1200, height: 700 });
+  // Wait for the existing 2D resize debounce; printable framing must remain unchanged.
+  await page.waitForTimeout(400);
+  await page.getByLabel('Light source').selectOption('moon');
+  await page.getByRole('switch', { name: 'Solid base', exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Reset camera', exact: true }).click();
+  expect((await downloadStl()).equals(original)).toBe(true);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByLabel('Canvas', { exact: true }).fill('#556677');
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  expect((await downloadStl()).equals(original)).toBe(true);
+
+  await page.getByLabel('Width (X, mm)', { exact: true }).fill('0');
+  await page.getByLabel('Width (X, mm)', { exact: true }).press('Tab');
+  await expect(page.getByLabel('Width (X, mm)', { exact: true })).toHaveValue('180');
+  await expect(page.locator('#panel-status')).toContainText('between 1 and 1000');
+  expect((await downloadStl()).equals(original)).toBe(true);
+  await page.getByRole('slider', { name: 'Height exaggeration' }).fill('0');
+  await expect(page.locator('[data-model-height]')).toHaveText('6 mm');
+  expect((await downloadStl()).equals(original)).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('loaded location models export STL and companion attribution', async ({ page }) => {
+  const tile = new PNG({ width: 256, height: 256 });
+
+  for (let offset = 0; offset < tile.data.length; offset += 4) {
+    tile.data[offset] = 128;
+    tile.data[offset + 1] = 10;
+    tile.data[offset + 3] = 255;
+  }
+
+  await page.route('https://s3.amazonaws.com/elevation-tiles-prod/**', (route) =>
+    route.fulfill({
+      body: PNG.sync.write(tile),
+      contentType: 'image/png',
+      headers: {
+        'access-control-allow-origin': '*',
+        'x-amz-meta-x-imagery-sources': 'eudem/test.tif',
+      },
+    }),
+  );
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('switch', { name: 'Show raised contours' }).check();
+  const originalHeight = await page.locator('[data-model-height]').textContent();
+
+  await page.getByRole('button', { name: 'Location', exact: true }).click();
+  await page.getByRole('button', { name: 'Load terrain', exact: true }).click();
+  await expect(page.locator('[data-status]')).toContainText('Real terrain loaded');
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.locator('[data-model-credit]')).toContainText('Copernicus');
+  await expect(page.locator('[data-model-height]')).toHaveText('3 mm');
+  expect(originalHeight).not.toBe('3 mm');
+  const pending = page.waitForEvent('download');
+
+  await page.getByRole('button', { name: 'Download STL', exact: true }).click();
+  const download = await pending;
+  const stlPath = await download.path();
+
+  if (!stlPath) {
+    throw new Error('STL download is unavailable.');
+  }
+
+  const stl = await readFile(stlPath);
+
+  expect(stl.length).toBe(84 + stl.readUInt32LE(80) * 50);
+  await expect(page.getByRole('switch', { name: 'North arrow', exact: true })).toBeEnabled();
+  await page.getByRole('switch', { name: 'Solid base', exact: true }).check();
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const groundOnly = await page.screenshot();
+
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('switch', { name: 'North arrow', exact: true }).check();
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const arrow = await page.screenshot({ path: test.info().outputPath('ground-north-arrow.png') });
+
+  expect(arrow.equals(groundOnly)).toBe(false);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('switch', { name: 'Match canvas', exact: true }).uncheck();
+  await page.getByLabel('Floor color', { exact: true }).fill('#778899');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const customFloor = await page.screenshot();
+
+  expect(customFloor.equals(arrow)).toBe(false);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('switch', { name: 'Ground plane', exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const noGround = await page.screenshot();
+
+  expect(noGround.equals(groundOnly)).toBe(false);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  const stagedExport = page.waitForEvent('download');
+
+  await page.getByRole('button', { name: 'Download STL', exact: true }).click();
+  const stagedPath = await (await stagedExport).path();
+
+  if (!stagedPath) {
+    throw new Error('STL download is unavailable.');
+  }
+
+  expect((await readFile(stagedPath)).equals(stl)).toBe(true);
+  const pendingCredit = page.waitForEvent('download');
+
+  await page.getByRole('button', { name: 'Download attribution', exact: true }).click();
+  const creditPath = await (await pendingCredit).path();
+
+  if (!creditPath) {
+    throw new Error('Attribution download is unavailable.');
+  }
+
+  expect(await readFile(creditPath, 'utf8')).toContain('Copernicus');
 });

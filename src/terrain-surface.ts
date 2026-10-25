@@ -9,6 +9,55 @@ export interface TerrainSurfaceBuffers {
   indices: Uint32Array;
 }
 
+/** Closes the surface boundary down to a flat base, with separate vertices for crisp edges. */
+export function createTerrainBaseBuffers(surface: TerrainSurfaceBuffers): TerrainSurfaceBuffers {
+  const edges = new Map<string, [number, number]>();
+  let floor = Infinity;
+
+  for (let offset = 1; offset < surface.positions.length; offset += 3) {
+    floor = Math.min(floor, surface.positions[offset]);
+  }
+
+  floor -= 0.15;
+
+  for (let offset = 0; offset < surface.indices.length; offset += 3) {
+    const triangle = surface.indices.subarray(offset, offset + 3);
+
+    for (let index = 0; index < 3; index++) {
+      const a = triangle[index];
+      const b = triangle[(index + 1) % 3];
+      const key = `${Math.min(a, b)}:${Math.max(a, b)}`;
+
+      if (edges.has(key)) {
+        edges.delete(key);
+      } else {
+        edges.set(key, [a, b]);
+      }
+    }
+  }
+
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  for (const [a, b] of edges.values()) {
+    const ax = surface.positions[a * 3];
+    const ay = surface.positions[a * 3 + 1];
+    const az = surface.positions[a * 3 + 2];
+    const bx = surface.positions[b * 3];
+    const by = surface.positions[b * 3 + 1];
+    const bz = surface.positions[b * 3 + 2];
+    const start = positions.length / 3;
+
+    positions.push(ax, ay, az, bx, by, bz, ax, floor, az, bx, floor, bz);
+    indices.push(start + 1, start, start + 2, start + 1, start + 2, start + 3);
+    // Separate bottom vertices keep its normals independent from the side walls.
+    positions.push(ax, floor, az, bx, floor, bz, 0, floor, 0);
+    indices.push(start + 5, start + 4, start + 6);
+  }
+
+  return { positions: new Float32Array(positions), indices: new Uint32Array(indices) };
+}
+
 /** Samples the existing field at the image boundary without changing terrain generation. */
 export function sampleHeightField(field: HeightField, x: number, y: number): number {
   const column = Math.max(0, Math.min(field.columns - 1, (x - field.originX) / field.spacing));

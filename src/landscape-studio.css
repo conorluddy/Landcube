@@ -64,7 +64,7 @@ select {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: min(360px, calc(100vw - 32px));
+  width: min(400px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   display: flex;
   flex-direction: column;
@@ -207,6 +207,9 @@ legend {
       transparent 6.5px 11px
     ),
     var(--swatch-bg);
+}
+.control-panel label {
+  font-size: 11px;
 }
 .colour-row {
   display: grid;
@@ -495,6 +498,7 @@ footer {
   margin-top: 8px;
 }
 #export-content,
+#location-content,
 #three-d-content {
   padding: 0 22px 20px;
 }
@@ -648,4 +652,13 @@ input[aria-invalid='true'] {
 }
 .terrain-3d-controls .toggle-row {
   gap: 12px;
+}
+
+.terrain-3d-controls [data-model] {
+  display: block;
+  width: 100%;
+  margin: 6px 0 12px;
+}
+.terrain-3d-controls [data-model-credit] {
+  overflow-wrap: anywhere;
 }

@@ -1,14 +1,16 @@
 export interface TerrainLightingSettings {
+  mode: 'sun' | 'moon' | 'off';
   direction: number;
   elevation: number;
   intensity: number;
   fill: number;
 }
 
-/** Session-only lighting starts with the existing soft light from the upper left. */
+/** Session-only lighting starts with warm, low sunlight from the upper left. */
 export const defaultTerrainLighting: Readonly<TerrainLightingSettings> = Object.freeze({
+  mode: 'sun',
   direction: 315,
-  elevation: 55,
+  elevation: 15,
   intensity: 2.5,
   fill: 1.6,
 });
