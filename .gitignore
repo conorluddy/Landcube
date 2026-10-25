@@ -1,6 +1,5 @@
 node_modules/
 dist/
-dist-cli/
 .DS_Store
 .cache/
 test-results/
