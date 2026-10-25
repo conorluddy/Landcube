@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { validateDesignSettings } from './design-settings';
-import type { RealTerrain } from './real-terrain';
+import type { RealTerrain, TerrainTileLoader } from './real-terrain';
 import { decodeTerrariumElevation, loadRealTerrain } from './real-terrain';
 import { createOutputRenderer } from './export/image-export';
 import { engineConfiguration } from './constants/engine';
@@ -14,10 +14,32 @@ void test('Terrarium decoding preserves sea level, negative heights and fraction
   assert.equal(decodeTerrariumElevation(129, 10, 64), 266.25);
 });
 
+const terrainTilePixelCount = 256 * 256 * 4;
+
+const unusedTileLoader: TerrainTileLoader = () =>
+  Promise.reject(new Error('Tile loading should not occur for invalid bounds'));
+
 void test('invalid geographic bounds fail before requesting tiles', async () => {
-  await assert.rejects(loadRealTerrain(90, 0, 25), /latitude/);
-  await assert.rejects(loadRealTerrain(53, NaN, 25), /longitude/);
-  await assert.rejects(loadRealTerrain(53, -6, 0), /2–200/);
+  await assert.rejects(loadRealTerrain(90, 0, 25, unusedTileLoader), /latitude/);
+  await assert.rejects(loadRealTerrain(53, NaN, 25, unusedTileLoader), /longitude/);
+  await assert.rejects(loadRealTerrain(53, -6, 0, unusedTileLoader), /2–200/);
+});
+
+void test('fixture-backed terrain uses decoded pixels, normalized sampling, and source attribution', async () => {
+  const pixels = new Uint8Array(terrainTilePixelCount);
+
+  for (let pixelOffset = 0; pixelOffset < pixels.length; pixelOffset += 4) {
+    pixels[pixelOffset] = pixelOffset % 8 === 0 ? 128 : 129;
+    pixels[pixelOffset + 3] = 255;
+  }
+
+  const terrain = await loadRealTerrain(53, -6, 25, () =>
+    Promise.resolve({ pixels, imagerySources: 'eudem' }),
+  );
+
+  assert.match(terrain.attribution, /Copernicus/);
+  assert.ok(terrain.sample(0, 0, 100, 100) >= -0.8);
+  assert.ok(terrain.sample(100, 100, 100, 100) <= 0.8);
 });
 
 void test('grid options produce square and cross patterns and can be disabled', () => {

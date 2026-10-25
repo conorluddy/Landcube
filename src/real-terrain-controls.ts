@@ -1,5 +1,6 @@
 import { realTerrainPresets } from './constants/real-terrain';
-import { loadRealTerrain } from './real-terrain';
+import { loadBrowserRealTerrain } from './browser-real-terrain';
+import { realTerrainBounds } from './constants/real-terrain';
 import type { RealTerrain } from './real-terrain';
 
 /** Mounts explicit network loading controls; failed requests retain the current landscape. */
@@ -18,7 +19,7 @@ export function mountRealTerrainControls(
       )
       .join('')}</select></div>
     <div class="control-grid"><label>Latitude<input id="terrain-latitude" type="number" min="-85" max="85" step="any" value="${realTerrainPresets[0].latitude}"></label><label>Longitude<input id="terrain-longitude" type="number" min="-180" max="180" step="any" value="${realTerrainPresets[0].longitude}"></label></div>
-    <label>Area span (km)<input id="terrain-span" type="number" min="2" max="200" value="25"></label>
+    <label>Area span (km)<input id="terrain-span" type="number" min="${realTerrainBounds.minimumSpanKm}" max="${realTerrainBounds.maximumSpanKm}" value="${realTerrainBounds.defaultSpanKm}"></label>
     <div class="actions"><button type="button" data-load class="primary-button">Load terrain</button><button type="button" data-generated class="text-button">Use generated</button></div>
     <p data-credit></p><p data-status role="status">Loads public elevation tiles. Location is session-only; Copy link saves styling only.</p>
     <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">Terrain data sources & attribution ↗</a>
@@ -60,7 +61,7 @@ export function mountRealTerrainControls(
 
     loadButton.disabled = true;
     status.textContent = 'Downloading elevation tiles…';
-    void loadRealTerrain(latitude.valueAsNumber, longitude.valueAsNumber, span.valueAsNumber)
+    void loadBrowserRealTerrain(latitude.valueAsNumber, longitude.valueAsNumber, span.valueAsNumber)
       .then((terrain) => {
         if (version !== requestVersion) {
           return;
