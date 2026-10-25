@@ -52,11 +52,11 @@ export async function runCli(argv: string[], io: CliIo = process): Promise<numbe
       return write(io.stdout, 'topogra 0.1.0\n');
     }
 
-    const options = parseOptions(argumentsList);
-
-    if (options.help !== undefined) {
+    if (argumentsList.includes('--help') || argumentsList.includes('-h')) {
       return printHelp(io.stdout);
     }
+
+    const options = parseOptions(argumentsList);
 
     if (command === 'presets') {
       return printPresets(options, io.stdout);
@@ -98,7 +98,6 @@ function parseOptions(argumentsList: string[]) {
     json: { type: 'string' },
     force: { type: 'string' },
     'save-config': { type: 'string' },
-    help: { type: 'string' },
   };
 
   for (const key of designKeys) {
@@ -145,6 +144,7 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
 
   source = { ...source, ...readDesignFlags(options) };
   terrain = readTerrain(options, terrain);
+  validateTerrainConfig(terrain);
 
   source.seed ??= randomBytes(4).readUInt32BE();
 
@@ -173,6 +173,8 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
   if (isEnabled(options, 'json') && output === '-') {
     throw new Error('--json cannot be combined with --output -.');
   }
+
+  validateOutputExtension(output, settings.format);
 
   const loadedTerrain =
     terrain.mode === 'real'
@@ -381,6 +383,42 @@ function readTerrain(
   return mode === 'generated' ? { mode } : current;
 }
 
+/** Applies the browser's geographic bounds to command options and saved configurations. */
+function validateTerrainConfig(terrain: TerrainConfig): void {
+  if (terrain.mode === 'generated') {
+    return;
+  }
+
+  if (
+    !Number.isFinite(terrain.latitude) ||
+    terrain.latitude < realTerrainBounds.minimumLatitude ||
+    terrain.latitude > realTerrainBounds.maximumLatitude ||
+    !Number.isFinite(terrain.longitude) ||
+    terrain.longitude < realTerrainBounds.minimumLongitude ||
+    terrain.longitude > realTerrainBounds.maximumLongitude ||
+    !Number.isFinite(terrain.spanKm) ||
+    terrain.spanKm < realTerrainBounds.minimumSpanKm ||
+    terrain.spanKm > realTerrainBounds.maximumSpanKm
+  ) {
+    throw new Error(
+      'Use latitude −85 to 85, longitude −180 to 180, and an area width of 2–200 km.',
+    );
+  }
+}
+
+/** Avoids generating valid bytes under a misleading filename extension. */
+function validateOutputExtension(output: string, format: DesignSettings['format']): void {
+  if (output === '-') {
+    return;
+  }
+
+  const extension = output.split('.').pop()?.toLowerCase();
+
+  if (extension !== undefined && extension !== format) {
+    throw new Error(`Output extension .${extension} conflicts with --format ${format}.`);
+  }
+}
+
 function metadata(
   filename: string,
   settings: ValidatedDesignSettings,
@@ -456,8 +494,25 @@ function write(stream: NodeJS.WriteStream, value: string) {
 function printHelp(stdout: NodeJS.WriteStream) {
   return write(
     stdout,
-    `Topogra CLI\n\nUsage: topogra generate [options]\n       topogra presets [--json true]\n       topogra validate --config design.json\n\nEvery design field is accepted as a kebab-case flag. Sources apply as defaults → config or URL → palette/size → flags. Use --output FILE (or -), --format svg|png, --palette NAME, --size WIDTHxHEIGHT, --terrain generated|real, --terrain-preset NAME, --latitude, --longitude, --span-km, --save-config FILE, --json true, and --force true.\n`,
+    `Topogra CLI\n\nUsage: topogra generate [options]\n       topogra presets [--json true]\n       topogra validate --config design.json\n\nSources apply as defaults → config or URL → palette/size → explicit flags. --output - writes image bytes; --json true is incompatible with it. Existing files require --force true.\n\nGenerator options:\n  --config FILE | --url URL    Versioned CLI config or v=1 browser URL (mutually exclusive)\n  --palette NAME               ${[...Object.keys(designPalettePresets), 'random'].join(', ')}\n  --size WIDTHxHEIGHT          A listed output size; use presets --json true to discover values\n  --terrain generated|real     Real mode requires coordinates or --terrain-preset NAME\n  --latitude NUMBER --longitude NUMBER --span-km NUMBER\n  --format svg|png --output FILE|- --save-config FILE\n  --json true|false --force true|false\n\nDesign flags (default; range where applicable):\n${getDesignFlagReference()}\n`,
   );
+}
+
+/** Keeps help ranges and defaults in lockstep with the validated settings contract. */
+function getDesignFlagReference(): string {
+  return designKeys
+    .map((key) => {
+      const range = Object.hasOwn(designNumberConstraints, key)
+        ? (() => {
+            const constraint = designNumberConstraints[key as keyof typeof designNumberConstraints];
+
+            return `; ${constraint[0]}–${constraint[1]} step ${constraint[2]}`;
+          })()
+        : '';
+
+      return `  --${toKebab(key)} VALUE    ${String(versionOneDesignDefaults[key])}${range}`;
+    })
+    .join('\n');
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
