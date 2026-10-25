@@ -164,6 +164,9 @@ void test('maximum depth clips bathymetry and combines with an above-sea elevati
   const unlimited = await loadRealTerrain(0, 0, 2, loader, undefined, 11000);
   const combined = await loadRealTerrain(0, 0, 2, loader, 250, 100);
 
+  assert.equal(seaLevel.seaLevel, -0.8);
+  assert.equal(legacy.seaLevel, 0);
+  assert.ok(Math.abs((hundred.seaLevel ?? Infinity) - (-0.5 + 1 / 3) * 1.6) < 1e-12);
   assert.equal(seaLevel.sample(90, 50, 100, 100), -0.8);
   assert.ok(hundred.sample(90, 50, 100, 100) > -0.8);
 

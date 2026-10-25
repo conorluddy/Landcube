@@ -591,7 +591,7 @@ test('real terrain loads decoded tiles, retains geometry on failure and exports 
   await expect(page.locator('[data-status]')).toContainText('Real terrain loaded');
   const originalGeometry = await page.locator('[data-contours]').innerHTML();
 
-  await expect(page.locator('#terrain-max-depth')).toHaveValue('0');
+  await expect(page.locator('#terrain-max-depth')).toHaveValue('20');
   await page.locator('#terrain-max-depth').fill('100');
   await page.locator('#terrain-elevation-floor').fill('100');
   await page.getByRole('button', { name: 'Load terrain', exact: true }).click();
@@ -611,4 +611,26 @@ test('real terrain loads decoded tiles, retains geometry on failure and exports 
 
   expect(svg).toContain('terrain-grid');
   expect(svg).toContain('Copernicus');
+});
+
+test('3D workspace sits between Settings and Export and keeps only one section visible', async ({
+  page,
+}) => {
+  await page.goto(fixtureUrl);
+  const modes = page.locator('.panel-modes button');
+
+  await expect(modes).toHaveText(['Settings', '3D', 'Export ↗']);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.getByRole('region', { name: '3D settings', exact: true })).toBeVisible();
+  await expect(page.getByRole('switch', { name: 'Show raised contours' })).toBeVisible();
+  await expect(page.locator('#settings-content')).toBeHidden();
+  await expect(page.locator('#export-content')).toBeHidden();
+  await page.getByRole('button', { name: 'Export ↗' }).click();
+  await expect(page.locator('#three-d-content')).toBeHidden();
+  await expect(page.locator('#output-preview-image')).toBeVisible();
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#settings-content')).toBeVisible();
+  await expect(page.locator('#three-d-content')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Collapse controls' })).toBeVisible();
 });

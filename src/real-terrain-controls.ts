@@ -20,8 +20,10 @@ export function mountRealTerrainControls(
       .join('')}</select></div>
     <div class="control-grid"><label>Latitude<input id="terrain-latitude" type="number" min="-85" max="85" step="any" value="${realTerrainPresets[0].latitude}"></label><label>Longitude<input id="terrain-longitude" type="number" min="-180" max="180" step="any" value="${realTerrainPresets[0].longitude}"></label></div>
     <label>Area span (km)<input id="terrain-span" type="number" min="${realTerrainBounds.minimumSpanKm}" max="${realTerrainBounds.maximumSpanKm}" value="${realTerrainBounds.defaultSpanKm}"></label>
-    <label>Maximum depth below sea level (m)<input id="terrain-max-depth" type="number" min="0" max="11000" step="any" value="0"></label>
+    <label>Maximum depth below sea level (m)<input id="terrain-max-depth" type="number" min="0" max="11000" step="any" value="20"></label>
     <label>Elevation floor (m, optional)<input id="terrain-elevation-floor" type="number" min="-11000" max="8900" step="any" placeholder="Include all elevations"></label>
+    <label class="toggle-row">Sea-level hatching<input type="checkbox" role="switch" data-sea-level checked></label>
+    <p>Hatches terrain at or below 0 m. This is an elevation indicator, not a water map. Included in exports; session-only.</p>
     <p>Omit low elevations to reduce coastal source artifacts. This does not trace the shoreline.</p>
     <div class="actions"><button type="button" data-load class="primary-button">Load terrain</button><button type="button" data-generated class="text-button">Use generated</button></div>
     <p data-credit></p><p data-status role="status">Loads public elevation tiles. Location is session-only; Copy link saves styling only.</p>
@@ -42,6 +44,14 @@ export function mountRealTerrainControls(
   const loadButton = section.querySelector<HTMLButtonElement>('[data-load]');
   const status = section.querySelector<HTMLElement>('[data-status]');
   let requestVersion = 0;
+  let loadedTerrain: RealTerrain | undefined;
+  const hatching = section.querySelector<HTMLInputElement>('[data-sea-level]');
+
+  hatching?.addEventListener('change', () => {
+    if (loadedTerrain) {
+      applyTerrain({ ...loadedTerrain, seaLevelHatching: hatching.checked });
+    }
+  });
 
   if (!latitude || !longitude || !span || !maxDepth || !elevationFloor || !loadButton || !status) {
     throw new Error('Real terrain controls are incomplete.');
@@ -58,6 +68,7 @@ export function mountRealTerrainControls(
   section.querySelector('[data-generated]')?.addEventListener('click', () => {
     requestVersion++;
     loadButton.disabled = false;
+    loadedTerrain = undefined;
     applyTerrain(undefined);
     status.textContent = 'Using generated terrain.';
   });
@@ -78,7 +89,8 @@ export function mountRealTerrainControls(
           return;
         }
 
-        applyTerrain(terrain);
+        loadedTerrain = terrain;
+        applyTerrain({ ...terrain, seaLevelHatching: hatching?.checked ?? true });
         const credit = section.querySelector('[data-credit]');
 
         if (credit) {

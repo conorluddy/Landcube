@@ -37,7 +37,7 @@ export function mountExportControls(
   content.innerHTML = `
     <div class="select-row"><label for="format">Format</label><select id="format">${imageExportFormats.map((format) => `<option value="${format}">${format.toUpperCase()}</option>`).join('')}</select></div>
     <div class="select-row"><label for="output-size">Size</label><select id="output-size"><option value="custom">Custom</option><optgroup label="This device"><option value="viewport">Current viewport</option><option value="screen">Device screen</option></optgroup>${outputSizePresetGroups.map((group) => `<optgroup label="${group.label}">${group.presets.map((preset) => `<option value="${preset.value}">${preset.label}</option>`).join('')}</optgroup>`).join('')}</select></div>
-    <label class="toggle-row" for="allowExtraLargeExports">Allow extra-large exports<input id="allowExtraLargeExports" type="checkbox" aria-describedby="large-export-warning"></label>
+    <label class="toggle-row" for="allowExtraLargeExports">Allow extra-large exports<input id="allowExtraLargeExports" type="checkbox" role="switch" aria-describedby="large-export-warning"></label>
     <p id="large-export-warning" class="export-hint">Up to 12,288 px per side. Large PNGs can use over 576 MiB of memory and may freeze or crash this tab, especially on mobile.</p>
     <div class="dimension-row"><label for="width">Width<input id="width" type="number" min="${minimumOutputDimensionPixels}" max="${maximumOutputDimensionPixels}" step="1" inputmode="numeric"></label><span aria-hidden="true">×</span><label for="height">Height<input id="height" type="number" min="${minimumOutputDimensionPixels}" max="${maximumOutputDimensionPixels}" step="1" inputmode="numeric"></label></div>
     <p id="dimension-hint" class="export-hint"></p>
@@ -49,8 +49,6 @@ export function mountExportControls(
     <button type="button" id="download" class="primary-button">Download SVG</button>`;
   getRequiredElement(panel, '#shared-footer', HTMLElement).before(content);
   const exportToggleButton = getRequiredElement(panel, '#export-toggle', HTMLButtonElement);
-  const settingsToggleButton = getRequiredElement(panel, '#settings-toggle', HTMLButtonElement);
-  const settingsContent = getRequiredElement(panel, '#settings-content', HTMLElement);
   const downloadButton = getRequiredElement(content, '#download', HTMLButtonElement);
   const previewImage = getRequiredElement(content, '#output-preview-image', HTMLImageElement);
   const previewErrorText = getRequiredElement(content, '#preview-error', HTMLElement);
@@ -217,36 +215,7 @@ export function mountExportControls(
     }
   }
 
-  /** Shows one stage at a time while preserving edits and export state. */
-  function setExportMode(isExportMode: boolean) {
-    content.hidden = !isExportMode;
-    settingsContent.hidden = isExportMode;
-    exportToggleButton.setAttribute('aria-pressed', String(isExportMode));
-    settingsToggleButton.setAttribute('aria-pressed', String(!isExportMode));
-    getRequiredElement(panel, '#panel-body', HTMLElement).scrollTop = 0;
-    refreshExportControls();
-  }
-
-  exportToggleButton.addEventListener('click', () => {
-    setExportMode(true);
-  });
-  settingsToggleButton.addEventListener('click', () => {
-    setExportMode(false);
-  });
-  panel.addEventListener(
-    'keydown',
-    (event) => {
-      /** Returns to design settings before a subsequent Escape collapses controls. */
-      if (event.key !== 'Escape' || content.hidden) {
-        return;
-      }
-
-      event.preventDefault();
-      setExportMode(false);
-      exportToggleButton.focus();
-    },
-    { capture: true },
-  );
+  exportToggleButton.addEventListener('click', refreshExportControls);
   content.addEventListener('change', (event) => {
     /** Keeps invalid edits visible until the user supplies supported dimensions. */
     const input = event.target;

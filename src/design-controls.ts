@@ -52,6 +52,7 @@ export function mountDesignControls(actions: DesignControlActions): DesignContro
     <div id="panel-body">
       <nav class="panel-modes" aria-label="Studio mode">
         <button type="button" id="settings-toggle" aria-pressed="true" aria-controls="settings-content">Settings</button>
+        <button type="button" id="three-d-toggle" aria-pressed="false" aria-controls="three-d-content">3D</button>
         <button type="button" id="export-toggle" aria-pressed="false" aria-controls="export-content">Export ↗</button>
       </nav>
       <section id="settings-content" aria-label="Design settings">
@@ -100,7 +101,7 @@ export function mountDesignControls(actions: DesignControlActions): DesignContro
         </div></details>
       </div>
       <footer>
-        <div class="seed-row"><span>Seed <output id="seed-value">${actions.getSettings().seed}</output></span><label class="lock-label" for="seed-lock"><input type="checkbox" id="seed-lock">Lock</label></div>
+        <div class="seed-row"><span>Seed <output id="seed-value">${actions.getSettings().seed}</output></span><label class="lock-label" for="seed-lock">Lock<input type="checkbox" id="seed-lock" role="switch"></label></div>
         <div class="actions"><button type="button" id="reset" class="text-button">Reset style</button><button type="button" id="new-landscape" class="primary-button"><span aria-hidden="true">↻</span> New landscape</button></div>
       </footer>
       </section>
@@ -111,6 +112,46 @@ export function mountDesignControls(actions: DesignControlActions): DesignContro
       </footer>
     </div>`;
   document.body.append(panel);
+  const modeButtons = [...panel.querySelectorAll<HTMLButtonElement>('.panel-modes button')];
+
+  /** Keeps each workspace independent while retaining its controls and current view. */
+  function selectMode(selected: HTMLButtonElement): void {
+    for (const button of modeButtons) {
+      const contentId = button.getAttribute('aria-controls');
+
+      if (contentId !== null) {
+        const content = getRequiredElement(panel, `#${contentId}`, HTMLElement);
+
+        content.hidden = button !== selected;
+        button.setAttribute('aria-pressed', String(button === selected));
+      }
+    }
+
+    getRequiredElement(panel, '#panel-body', HTMLElement).scrollTop = 0;
+  }
+
+  for (const button of modeButtons) {
+    button.addEventListener('click', () => {
+      selectMode(button);
+    });
+  }
+
+  panel.addEventListener(
+    'keydown',
+    (event) => {
+      const activeMode = modeButtons.find(
+        (button) => button.getAttribute('aria-pressed') === 'true',
+      );
+
+      if (event.key === 'Escape' && activeMode && activeMode.id !== 'settings-toggle') {
+        event.preventDefault();
+        getRequiredElement(panel, '#settings-toggle', HTMLButtonElement).click();
+        activeMode.focus();
+      }
+    },
+    { capture: true },
+  );
+
   /** Resolves a required input within the mounted controls. */
   const getPanelInput = (id: string) => getRequiredElement(panel, `#${id}`, HTMLInputElement);
 
