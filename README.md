@@ -41,6 +41,49 @@ Or request a real location:
 
 The skill saves and validates the configuration, reports the output paths and generation command, and includes a companion credit file for real terrain.
 
+### Other agentic examples:
+
+1. Website hero backgrounds
+
+   “Create a subtle charcoal contour SVG for a hiking brand’s homepage, with enough contrast for white text.”
+   
+2. Presentation backgrounds
+
+   “Generate a light Paper-style terrain background for a 16:9 slide deck that won’t compete with charts.”
+   
+3. Location-specific event artwork
+
+   “Use Wicklow Mountains terrain for a trail-running event poster, and save the source attribution.”
+   
+4. App onboarding illustrations
+
+   “Create three coordinated terrain backgrounds using different seeds and our brand colours.”
+   
+5. Product packaging
+
+   “Generate a monochrome contour pattern for a coffee bag inspired by the region where the beans grow.”
+   
+6. Social media campaigns
+
+   “Export matching square, portrait, and landscape terrain artwork for an outdoor gear launch.”
+   
+7. Developer documentation branding
+
+   “Add a transparent Blueprint contour SVG to the docs site’s header and save its configuration alongside the asset.”
+   
+8. Personalized prints
+
+   “Create minimalist contour artwork centered on Mount Fuji, sized for a portrait print.”
+   
+9. Game and dashboard interface textures
+
+   “Generate a faint green contour overlay for a mission briefing screen, with a cross grid and transparent background.”
+   
+10. Repeatable asset generation in a codebase
+
+    “Create backgrounds for each destination page from its coordinates, using consistent styling and a saved configuration per location.”
+
+
 ## Use with NPX
 
 Requires Node.js 20.19+, 22.13+, or 24+. Run the published CLI without installing it globally:
