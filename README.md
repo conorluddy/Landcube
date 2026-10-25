@@ -1,139 +1,134 @@
 # Topogra
 
-<img width="1512" height="830" alt="Screenshot 2026-10-24 at 16 08 03" src="https://github.com/user-attachments/assets/6bb628c7-cc4b-424b-a004-409b6e4c09ef" />
+Topogra creates topographic artwork from generated landscapes or real-world elevation data. Design backgrounds for websites, presentations, and print in the browser, ask an agent to generate them, or export reproducible SVG and PNG assets from the command line.
 
-A local topographic background generator with a cursor-driven hill, glass style panel, shareable designs, and SVG/PNG export. Everything runs in the browser; no accounts or backend. Generated landscapes work offline. The real-terrain option downloads public elevation tiles when requested.
+**[Open the web app](https://conorluddy.github.io/Topogra/)** · [Install agent plugins](#install-agent-plugins) · [Use with an agent](#use-with-an-agent) · [Use with NPX](#use-with-npx)
 
-## Run locally
+<img width="1512" height="830" alt="Topogra browser editor showing topographic artwork and style controls" src="https://github.com/user-attachments/assets/6bb628c7-cc4b-424b-a004-409b6e4c09ef" />
 
-Requires Node.js 22.13+ (or 20.19+ / 24+) and npm.
+## Features
+
+- **Generated or real terrain.** Explore seeded landscapes, choose a real-world location preset, or enter coordinates and an area span.
+- **Your own visual style.** Start with Charcoal, Paper, Blueprint, Bold, or a random palette; adjust colours, line weight, opacity, terrain scale, detail, and contour density.
+- **Map-inspired details.** Add dashed or solid index contours, square or cross grids, and triangular or cross-shaped summit markers.
+- **Interactive landscapes.** Move the cursor to raise a hill or create a depression in generated terrain.
+- **Ready-to-use exports.** Download standalone SVG or PNG files with custom dimensions, transparent backgrounds, and 1× or 2× PNG resolution.
+- **Reproducible designs.** Reuse a seed, share a browser design link, or save a versioned CLI configuration for later generation.
+
+No account or backend is needed. Generated landscapes run offline once the web app has loaded; real terrain downloads public elevation tiles without an API key.
+
+## Use the web app
+
+1. Open **[Topogra](https://conorluddy.github.io/Topogra/)** and choose a palette. Adjust density, scale, and detail, or select **New landscape** to explore another seed.
+2. For a geographic landscape, open **Real terrain**, choose a preset or enter latitude, longitude, and an area span of 2–200 km, then select **Load terrain**. **Use generated** returns to synthetic landscapes.
+3. Adjust contour styling, grids, and summit markers. Lock the seed to keep your generated landscape while experimenting with its appearance.
+4. Open **Export**, choose SVG or PNG, set dimensions and transparency, and download. The preview shows the complete output; exported artwork uses settled terrain without the cursor effect.
+5. Use **Copy link** to share the current design. Reloading the link restores the saved styling and generated seed.
+
+Real terrain is centered and cropped without stretching. Cursor deformation is available only for generated terrain; scale and detail also apply to generated terrain.
+
+## Use with an agent
+
+Ask for the image you want and where to save it. The skill generates an image and a matching JSON configuration for reproducible exports.
+
+Then ask, for example:
+
+> Use Topogra to create a transparent Blueprint contour background at 1920 × 1080 as an SVG. Save it and its reproducible configuration in public/assets/.
+
+Or request a real location:
+
+> Use Topogra to create a Paper-style PNG of the Wicklow Mountains for a presentation. Save the image, configuration, and attribution text in assets/.
+
+The skill saves and validates the configuration, reports the output paths and generation command, and includes a companion credit file for real terrain.
+
+## Use with NPX
+
+Requires Node.js 20.19+, 22.13+, or 24+. Run the published CLI without installing it globally:
 
 ```sh
-npm install
-npm run dev
+npx --yes topogra generate --palette Blueprint --seed 42 \
+  --width 1920 --height 1080 --output background.svg \
+  --save-config background.json
 ```
 
-Open the URL printed by Vite (normally http://127.0.0.1:5173). Stop the server with Ctrl+C.
+Regenerate the saved design, or export it as PNG:
 
 ```sh
-npm test              # Geometry, settings, sharing, and export logic
-npm run test:package  # Pack, install outside the repo, and test npm help/version/SVG/PNG
-npm run test:coverage # Node's coverage report; use Node 22.12+
-npm run build        # Strict TypeScript checking and production build
-npm run preview      # Serve dist/ locally
-npm run test:e2e     # Critical browser journeys; requires installed Google Chrome
-npm run lint         # Strict type-aware linting; zero warnings allowed
-npm run lint:fix     # Apply safe automatic lint fixes
-npm run format       # Format source, styles, configuration, and documentation
-npm run format:check # Check formatting without changing files
+npx --yes topogra generate --config background.json --output copy.svg
+npx --yes topogra generate --config background.json \
+  --format png --png-scale 2 --output background.png
 ```
 
-Browser tests inline the production bundle into `.cache/browser-fixture.html`, so they need no HTTP server or runtime network. They cover link restoration, SVG/PNG downloads, transparency, resolution, mobile layout, clipboard fallback, and keyboard navigation. Build artifacts, browser traces, and screenshots are ignored. The Node coverage report covers the imported logic modules; it does not measure the browser interface.
+Generate real terrain using a named location:
 
-## Code quality
+```sh
+npx --yes topogra generate --terrain-preset "Wicklow Mountains" \
+  --span-km 25 --palette Paper --output wicklow.svg \
+  --save-config wicklow.json --attribution-file wicklow-attribution.txt
+```
 
-ESLint uses the TypeScript ESLint strict and stylistic presets with type information. It rejects unsafe `any` usage, non-null assertions, unhandled promises, nullable values in boolean conditions, loose equality, unused code, and incomplete switches over unions. Public module boundaries require explicit types; type imports and braces are enforced. Intentional unused parameters in stubs use an `_` prefix.
+Discover palettes, output sizes, locations, and all design flags:
 
-Prettier handles layout: two-space indentation, single quotes, semicolons, trailing commas, LF line endings, and a 100-character target line width. Objects deliberately written across multiple lines stay expanded. ESLint Stylistic adds blank lines around control-flow blocks and functions, before returns, after import groups, and after variable declaration groups; consecutive declarations stay together. Add blank lines between other logical steps where they help explain the code; Prettier preserves single blank lines.
+```sh
+npx --yes topogra presets --json true
+npx --yes topogra --help --verbose
+npx --yes topogra validate --config background.json
+```
 
-Run `npm run lint:fix` followed by `npm run format` to apply both spacing and layout. Generated output, validation images, caches, and the npm-managed lockfile are excluded from formatting. CI fails on formatting differences or any lint warning.
+Every design setting has a kebab-case flag, such as `--transparent true` or `--grid-style crosses`. Palette names are case-sensitive. Settings apply in this order: defaults, configuration or browser URL, palette/size, then explicit flags. Use `--url 'COPIED_DESIGN_URL'` instead of `--config` to start from a browser design.
 
-`npm install` also installs the Husky pre-commit hook. Each commit runs Prettier on staged files through lint-staged and stages the formatting changes automatically. Unstaged edits are preserved, and unsupported files and paths in `.prettierignore` are skipped.
+Existing output files require `--force true` to replace. For automation, `--json true` returns structured generation metadata; `--output -` writes image bytes to stdout and cannot be combined with JSON output. You can also install globally with `npm install --global topogra` and run `topogra` directly.
 
-## CI and GitHub Pages
+## Sharing and output details
 
-[Build, deploy, and publish](.github/workflows/build.yml) runs on pushes, pull requests, and manual dispatch. It installs locked dependencies with Node.js 22, checks formatting and linting, runs the logic tests, builds the production site into `dist/`, and uploads that directory as the `github-pages` artifact. Successful builds on `main` also deploy the artifact to GitHub Pages; pull requests only run checks and builds.
+- Browser links preserve design settings and generated seeds, but **do not restore real-terrain locations**. Save a CLI configuration to preserve terrain settings for regeneration. Seed locking is local to the browser.
+- Exports support 64–4096 px per side by default. Extra-large exports raise the limit to 12,288 px per side; final PNG dimensions, including 2× scaling, must fit the selected limit. Large raster exports can use substantial memory.
+- Real-terrain exports visibly include resolved source attribution. A companion credit file supports downstream layouts; keep the credit visible in the final published medium where reasonable.
+- Contours and grids are decorative artwork, not survey or navigation data. Real-terrain density uses a normalized elevation range, and decorative grids are not geographic coordinate grids.
 
-Package jobs run `npm run test:package` on Linux with Node 20.19.0, 22.13.0, and 24, plus macOS and Windows with Node 22. Each job packs the CLI, installs the tarball into a temporary directory outside the repository, and invokes npm's installed executable wrapper to check help, the package version, SVG output, and native PNG rendering. The test also checks the installed package contains only the intended release files.
+## Install agent plugins
 
-### npm releases
+Topogra supports Codex and Claude Code marketplaces. Both plugins bundle the same [Topogra agent skill](https://github.com/conorluddy/Topogra/blob/main/skills/topogra/SKILL.md), which runs the published CLI through NPX. You need Node.js 20.19+, 22.13+, or 24+ and npm; no repository checkout, global Topogra installation, or Topogra account is required.
 
-The CLI bundle is generated by `npm run build:cli` and is not committed. `prepack` builds only the CLI; `prepublishOnly` runs source validation without rebuilding the website. The package version is the source of truth for `--version`.
+### Codex
 
-To release, bump the patch with `npm version patch --no-git-tag-version` and include both `package.json` and `package-lock.json` in a PR. After merging to `main`, CI publishes an unpublished version only after the site checks and every package job pass. It skips versions already on npm and fails on registry errors. Publishing includes npm provenance.
+Add the marketplace and install the plugin with a Codex CLI that supports plugins:
 
-Add a repository Actions secret named `NPM_TOKEN` containing a granular npm token with write access to `topogra` and bypass 2FA enabled. The package must allow token publishing. If the secret is absent, publishing is skipped with a notice; add it and manually run this workflow on `main` to retry. No token is needed for PR checks or public package installation. See [npm's publishing authentication requirements](https://docs.npmjs.com/requiring-2fa-for-package-publishing-and-settings-modification/). Token-free trusted publishing is a future option; this workflow uses the repository token.
+```sh
+codex plugin marketplace add conorluddy/Topogra
+codex plugin add topogra@topogra
+```
 
-The build uses relative asset URLs and publishes to `https://conorluddy.github.io/Topogra/`. The repository’s Pages source must be **GitHub Actions**, so deployment serves the compiled `dist/` artifact. See [GitHub’s custom Pages workflow guide](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages) for the deployment job and its permissions.
+Alternatively, add `conorluddy/Topogra` in Codex's plugin marketplace picker, then install **Topogra** from that marketplace. Start a new conversation and ask the agent to use Topogra.
 
-## Style controls
+### Claude Code
 
-The minus button collapses the panel to its header; plus reopens it. Escape collapses controls while focus is inside. Small screens scroll within the panel.
+Add the marketplace and install the plugin:
 
-- Choose Charcoal, Paper, Blueprint, or Bold, then adjust canvas/contour colours, opacity, and line weight.
-- Density changes elevation levels; scale changes landform size; detail blends smaller features into the terrain. Style changes retain the seed.
-- Expand Index contours for dashed/solid/off, frequency, weight, and dash/gap lengths. Inactive settings are retained.
-- Expand Cursor interaction for enabled state, radius, strength, and response time. Negative strength creates a depression. Interaction settles while using the panel; reduced motion removes easing.
-- New landscape generates a fresh seed. Lock disables regeneration and saves the seed locally when storage is available.
-- Reset style restores appearance and cursor defaults while preserving seed, lock, and output options.
+```sh
+claude plugin marketplace add conorluddy/Topogra
+claude plugin install topogra@topogra
+```
 
-## Export
+Start a new conversation, then invoke the skill with your brief:
 
-Open Export in the footer to choose SVG or PNG, dimensions, transparency, and PNG resolution. Its preview shows the complete settled output without the cursor hill or interface. Escape closes export options before collapsing the panel.
+```text
+/topogra:topogra Create a transparent Blueprint SVG at 1920 × 1080 in public/assets/.
+```
 
-Use viewport captures the current browser dimensions. Landscape (1920 × 1080), square (1080 × 1080), portrait (1080 × 1920), and custom dimensions are available. Dimensions remain fixed when the browser resizes; the main background still fills the browser. Larger outputs reveal more of the same terrain from the top-left origin at the same feature scale.
+You can also ask Claude to use Topogra in natural language.
 
-Each output side must be an integer from 64–4096 px by default. “Allow extra-large exports” raises the limit to 12,288 px per side and displays a memory warning. PNG offers 1× and 2×; final raster dimensions must fit the selected limit. A 12,288² PNG needs 576 MiB for a single pixel buffer, plus rendering and encoding overhead; browser limits still apply. Turning the option off clamps oversized dimensions to 4096 px. The 2× option doubles pixel resolution and stroke pixels while preserving composition. SVG remains vector at its selected dimensions and ignores PNG scale. Transparent previews use a checkerboard that is excluded from the file.
+### Install only the skill
 
-Exports are standalone, clipped to their output frame, and include explicit colours. Filenames use `topogra-SEED-WIDTHxHEIGHT.svg` or `.png`, with actual file dimensions. Export captures settings at download time, so later edits do not change an in-progress download.
+Copy the repository's `skills/topogra/` directory into your agent's skills directory:
 
-## CLI
+| Agent       | Destination                 |
+| ----------- | --------------------------- |
+| Codex       | `~/.codex/skills/topogra/`  |
+| Claude Code | `~/.claude/skills/topogra/` |
 
-Run the published CLI without installing it with `npx --yes topogra --help`, or install it globally with `npm install --global topogra` and run `topogra --help`. For repository development, build the executable with `npm run build`, then run `node dist-cli/topogra.mjs --help`. `generate` accepts every design setting as a kebab-case flag, including explicit `true`/`false` booleans; it also accepts `--config FILE` or `--url URL` (not both), `--palette`, `--size`, real-terrain coordinates or `--terrain-preset`, `--output`, `--json true`, and `--save-config FILE`. Resolution order is defaults, config or URL, palette/size, then explicit flags. `presets --json true` lists canonical palettes, sizes, and locations; `validate --config FILE` validates a versioned saved envelope. Use `--output -` for image bytes only—structured JSON is intentionally incompatible with it. Existing files require `--force true`; writes use a temporary sibling file and rename, avoiding partial outputs on normal failures.
+Start a new conversation after copying. For testing a local marketplace checkout, run `codex plugin marketplace add .` or `claude plugin marketplace add .` from the repository instead of adding the GitHub source, then use the corresponding install command above.
 
-CLI errors return exit code 2 and diagnostics on stderr; successful generation reports its seed, or emits structured metadata with `--json true`. Saved config contains `{ "version": 1, "settings": ..., "terrain": ... }` and rejects unknown fields. Browser links restore version-one styling but not real-terrain locations, so JSON metadata marks that limitation explicitly. Cursor settings are preserved in CLI output but static exports remain settled, like browser exports.
+---
 
-Real-terrain SVG and PNG output visibly embeds the resolved source attribution by default. Use `--attribution-file credits.txt` to write the same resolved credit as a companion text file for a downstream layout workflow; the final published medium must still display attribution where reasonable. `--attribution embedded` is explicit but equivalent to the default.
-
-## Share and restore
-
-Every committed edit updates the address bar after 250 ms using `replaceState`, without adding history entries. Reloading that URL restores its design. Copy link immediately flushes pending edits and copies the complete URL; if clipboard access is unavailable, a selectable link appears for manual copying.
-
-A plain URL starts a fresh landscape, preferring a locally locked seed. An explicit URL seed overrides local storage without overwriting it. The seed lock and panel expansion are local UI state, not shared design settings. Temporary cursor position and deformation are never saved.
-
-### Version-one URL contract
-
-Generated links include `v=1` and all fields, even defaults and inactive settings. Colours are six-digit hex strings including `#`, encoded by `URLSearchParams`; booleans are `true`/`false`. Missing fields use immutable version-one defaults; missing seed uses the locally locked seed or a fresh one on initial load. Plain visits capture initial viewport dimensions. Partial design links otherwise use 1440 × 900 output defaults.
-
-| Group          | Query parameters                                                        |
-| -------------- | ----------------------------------------------------------------------- |
-| Terrain        | `seed`, `featureScale`, `detail`, `contourCount`                        |
-| Appearance     | `background`, `lineColor`, `strokeOpacity`, `strokeWidth`               |
-| Index contours | `indexStyle`, `indexEvery`, `indexStrokeWidth`, `dashLength`, `dashGap` |
-| Cursor         | `cursorEnabled`, `cursorRadius`, `cursorHeight`, `cursorResponseMs`     |
-| Output         | `format`, `width`, `height`, `pngScale`, `transparent`                  |
-
-`seed` is an unsigned 32-bit integer. Numeric ranges and steps match the controls and are defined in `src/constants/design.ts`. `indexStyle` is `dashed`, `solid`, or `off`; `format` is `svg` or `png`; `pngScale` is `1` or `2`. Invalid individual values revert to their version-one defaults with one notice. Unsupported versions load defaults with a notice. Unknown parameters are ignored and omitted when the URL is synchronized.
-
-Version-one defaults and engine constants must stay stable to preserve existing links. Changes to noise generation, contour interpretation, or saved-default semantics require a new version and a compatible version-one reader/renderer.
-
-## Implementation
-
-- `src/design-settings.ts`: validation, URL serialization, and derived terrain configuration. Shared contracts are in `src/types/`; defaults, numeric constraints, and engine values are in `src/constants/`.
-- `src/design-sharing.ts`: startup seed precedence, local seed storage, address-bar synchronization, and clipboard handling.
-- `src/design-controls.ts`: live style controls, presets, collapse, seed actions, and share feedback.
-- `src/constants/engine.ts`: immutable internal sampling, elevation bounds, and performance constants.
-- `src/terrain-generation.ts` and `src/contour-extraction.ts`: seeded smooth noise, bounded sampling, marching squares, saddle decisions, and stitched paths.
-- `src/landscape-composition.ts` and `src/svg-rendering.ts`: settled composition generation and SVG markup shared by the background, preview, and export.
-- `src/export/`: output controls, cached settled geometry, SVG files, PNG encoding, and download resource cleanup.
-- `src/export/node-image-export.ts`: Node SVG/PNG byte generation for the CLI, using Resvg so output size, transparency, and SVG composition match the browser contract.
-- `src/real-terrain.ts`, `src/browser-real-terrain.ts`, and `src/node-real-terrain.ts`: shared terrain sampling with platform-specific PNG decoding. Node uses pure-JavaScript `pngjs`; browser decoding remains canvas-based.
-- `src/main.ts`: application state, cursor lifecycle, scheduled rendering, and debounced resizing.
-
-### Node rendering foundation
-
-The forthcoming CLI uses the same settings validation, geometry, and SVG serialization as the browser. Its PNG adapter uses `@resvg/resvg-js`, which installs prebuilt native binaries for supported macOS (Intel and Apple silicon), Linux, and Windows platforms—no `node-gyp` or local Rust toolchain is required for those packages. The project’s supported Node versions remain Node 20.19+, 22.13+, or 24+. `pngjs` decodes Terrarium tiles entirely in JavaScript, avoiding canvas and DOM globals in Node. PNG output is expected to match browser dimensions, composition, colours, and alpha; its encoded bytes and antialiasing are renderer-dependent.
-
-The grid extends beyond the visible frame. Sampling uses CSS pixels, and resizing retains the seed and top-left world origin. Very large frames double grid spacing until they fit the sample budget; this can slightly change polygon approximation while preserving the continuous terrain. Dense sampling keeps contours flowing without curve smoothing that could introduce crossings.
-
-Appearance changes reuse cached contours. Output geometry is separate from cursor animation and is cached until seed, terrain, density, or output dimensions change. Cursor updates are capped at 30 FPS, stop when settled, and pause when hidden. Errors use typed results, actionable interface messages, and structured logs.
-
-These are synthetic terrain contours, not survey or navigation data. The original proof-of-concept requirements are recorded in `PRD.md`.
-
-## Real terrain
-
-Open **Real terrain**, pick a preset or enter latitude/longitude and an area span (2–200 km), then click **Load terrain**. Tiles come directly from the public AWS Mapzen Terrarium dataset without an API key. Loading failures retain the previous landscape. **Use generated** returns to seeded terrain.
-
-Real terrain is centered and cropped to fit the canvas without stretching. Its elevation range is normalized for the existing density control; these are decorative contours, not labeled survey elevations. Cursor deformation is disabled while real terrain is active. Scale and detail apply to generated terrain. Locations are session-only and are not restored by Copy link. Exports use the loaded terrain and include source attribution.
-
-**Grid overlay** offers off, squares and crosses, with pixel spacing and opacity controls. The decorative grid appears in live rendering and SVG/PNG exports, and its settings are saved in design links. It is not a geographic coordinate grid.
+For development: `npm install`, then `npm run dev`. Use `npm run check` for source checks, tests, production builds, and package validation; `npm run test:e2e` runs browser journeys with Google Chrome. The [GitHub Actions workflow](https://github.com/conorluddy/Topogra/blob/main/.github/workflows/build.yml) defines deployment and npm publishing.

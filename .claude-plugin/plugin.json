@@ -1,0 +1,13 @@
+{
+  "name": "topogra",
+  "version": "0.1.3",
+  "description": "Generate reproducible topographic SVG and PNG assets from synthetic landscapes or real-world terrain.",
+  "author": {
+    "name": "Conor Luddy",
+    "url": "https://github.com/conorluddy"
+  },
+  "homepage": "https://conorluddy.github.io/Topogra/",
+  "repository": "https://github.com/conorluddy/Topogra",
+  "license": "MIT",
+  "keywords": ["topography", "terrain", "svg", "png", "design"]
+}
