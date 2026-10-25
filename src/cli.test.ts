@@ -180,3 +180,76 @@ void test('CLI SVG output exactly matches the shared browser renderer across the
 function toKebab(value: string): string {
   return `--${value.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`;
 }
+
+void test('failed generation leaves no config and can be retried without force', async (context) => {
+  const { runCli } = await import('./cli');
+  const { access } = await import('node:fs/promises');
+  const directory = await mkdtemp(join(tmpdir(), 'topogra-retry-'));
+  const output = join(directory, 'terrain.svg');
+  const config = join(directory, 'terrain.json');
+  const args = [
+    'generate',
+    '--terrain',
+    'real',
+    '--latitude',
+    '54.65',
+    '--longitude=-8.7',
+    '--width',
+    '100',
+    '--height',
+    '100',
+    '--output',
+    output,
+    '--save-config',
+    config,
+  ];
+  const io = { stdout: { write: () => true }, stderr: { write: () => true } } as Parameters<
+    typeof runCli
+  >[1];
+  context.mock.method(globalThis, 'fetch', () => Promise.reject(new Error('offline')));
+  assert.equal(await runCli(args, io), 2);
+  await assert.rejects(access(config));
+  await assert.rejects(access(output));
+  assert.equal(
+    await runCli(
+      [
+        'generate',
+        '--width',
+        '100',
+        '--height',
+        '100',
+        '--output',
+        output,
+        '--save-config',
+        config,
+      ],
+      io,
+    ),
+    0,
+  );
+});
+
+void test('output conflicts and staging failures leave no companion config', async () => {
+  const { access } = await import('node:fs/promises');
+  const directory = await mkdtemp(join(tmpdir(), 'topogra-conflict-'));
+  const config = join(directory, 'terrain.json');
+  const output = join(directory, 'terrain.svg');
+  await writeFile(output, 'existing');
+  await assert.rejects(runCommand(['generate', '--output', output, '--save-config', config]));
+  await assert.rejects(access(config));
+  assert.equal(await readFile(output, 'utf8'), 'existing');
+  await assert.rejects(
+    runCommand([
+      'generate',
+      '--output',
+      join(directory, 'missing', 'terrain.svg'),
+      '--save-config',
+      config,
+    ]),
+  );
+  await assert.rejects(access(config));
+  await assert.rejects(
+    runCommand(['generate', '--output', output, '--save-config', output, '--force', 'true']),
+  );
+  assert.equal(await readFile(output, 'utf8'), 'existing');
+});

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { realpathSync } from 'node:fs';
-import { readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { link, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
@@ -224,16 +224,6 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
 
   const settings = validation.data;
 
-  if (options['save-config'] !== undefined) {
-    await writeAtomically(
-      options['save-config'],
-      new TextEncoder().encode(
-        `${JSON.stringify({ version: cliConfigVersion, settings, terrain }, null, 2)}\n`,
-      ),
-      isEnabled(options, 'force'),
-    );
-  }
-
   const output =
     options.output ??
     `topogra-${settings.seed}-${settings.width * (settings.format === 'png' ? settings.pngScale : 1)}x${settings.height * (settings.format === 'png' ? settings.pngScale : 1)}.${settings.format}`;
@@ -244,20 +234,24 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
 
   validateOutputExtension(output, settings.format);
 
+  const destinations = [
+    output === '-' ? undefined : output,
+    options['save-config'],
+    options['attribution-file'],
+  ].filter((path): path is string => path !== undefined);
+  if (new Set(destinations.map((path) => resolve(path))).size !== destinations.length) {
+    throw new Error('Image, configuration, and attribution must use different output paths.');
+  }
+  for (const path of destinations) {
+    await checkOutputDestination(path, isEnabled(options, 'force'));
+  }
+
   const loadedTerrain =
     terrain.mode === 'real'
       ? await loadNodeRealTerrain(terrain.latitude, terrain.longitude, terrain.spanKm)
       : undefined;
 
   validateAttributionOptions(options, loadedTerrain);
-
-  if (options['attribution-file'] !== undefined && loadedTerrain !== undefined) {
-    await writeAtomically(
-      options['attribution-file'],
-      new TextEncoder().encode(`${loadedTerrain.attribution}\n`),
-      isEnabled(options, 'force'),
-    );
-  }
 
   const result = createNodeExportFile(
     settings,
@@ -268,11 +262,24 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
     throw new Error(result.error.message);
   }
 
-  if (output === '-') {
-    io.stdout.write(result.data.bytes);
-  } else {
-    await writeAtomically(output, result.data.bytes, isEnabled(options, 'force'));
+  const files: { path: string; bytes: Uint8Array }[] = [];
+  if (options['save-config'] !== undefined) {
+    files.push({
+      path: options['save-config'],
+      bytes: new TextEncoder().encode(
+        `${JSON.stringify({ version: cliConfigVersion, settings, terrain }, null, 2)}\n`,
+      ),
+    });
   }
+  if (options['attribution-file'] !== undefined && loadedTerrain !== undefined) {
+    files.push({
+      path: options['attribution-file'],
+      bytes: new TextEncoder().encode(`${loadedTerrain.attribution}\n`),
+    });
+  }
+  if (output !== '-') files.push({ path: output, bytes: result.data.bytes });
+  await writeOutputFiles(files, isEnabled(options, 'force'));
+  if (output === '-') io.stdout.write(result.data.bytes);
 
   if (isEnabled(options, 'json')) {
     write(
@@ -532,9 +539,45 @@ function validateAttributionOptions(
   }
 }
 
-async function writeAtomically(path: string, bytes: Uint8Array, force: boolean) {
-  const target = resolve(path);
+/** Stages every output before publishing; restores prior files if publishing fails. */
+async function writeOutputFiles(files: { path: string; bytes: Uint8Array }[], force: boolean) {
+  const staged: { target: string; temporary: string; previous?: Buffer; committed: boolean }[] = [];
+  try {
+    for (const file of files) {
+      const target = resolve(file.path);
+      await checkOutputDestination(target, force);
+      let previous: Buffer | undefined;
+      if (force) {
+        try {
+          previous = await readFile(target);
+        } catch (error) {
+          if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT')
+            throw error;
+        }
+      }
+      const temporary = `${target}.topogra-${process.pid}-${randomBytes(6).toString('hex')}.tmp`;
+      staged.push({ target, temporary, previous, committed: false });
+      await writeFile(temporary, file.bytes, { flag: 'wx' });
+    }
+    for (const file of staged) {
+      // A hard link refuses a destination created after preflight, unlike rename.
+      if (force) await rename(file.temporary, file.target);
+      else await link(file.temporary, file.target);
+      file.committed = true;
+    }
+  } catch (error) {
+    for (const file of staged.filter((file) => file.committed).reverse()) {
+      if (file.previous !== undefined) await writeFile(file.target, file.previous);
+      else await unlink(file.target);
+    }
+    throw error;
+  } finally {
+    await Promise.all(staged.map((file) => unlink(file.temporary).catch(() => undefined)));
+  }
+}
 
+async function checkOutputDestination(path: string, force: boolean) {
+  const target = resolve(path);
   if (!force) {
     try {
       await stat(target);
@@ -544,16 +587,6 @@ async function writeAtomically(path: string, bytes: Uint8Array, force: boolean) 
         throw error;
       }
     }
-  }
-
-  const temporary = `${target}.topogra-${process.pid}.tmp`;
-
-  try {
-    await writeFile(temporary, bytes);
-    await rename(temporary, target);
-  } catch (error) {
-    await unlink(temporary).catch(() => undefined);
-    throw error;
   }
 }
 
