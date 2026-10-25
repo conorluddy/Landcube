@@ -1,0 +1,15 @@
+{
+  "name": "topogra",
+  "description": "Topogra skills for reproducible topographic artwork.",
+  "owner": {
+    "name": "Conor Luddy",
+    "url": "https://github.com/conorluddy"
+  },
+  "plugins": [
+    {
+      "name": "topogra",
+      "source": "./",
+      "description": "Generate reproducible topographic SVG and PNG assets from synthetic landscapes or real-world terrain."
+    }
+  ]
+}
