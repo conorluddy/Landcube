@@ -1,7 +1,10 @@
 import { randomBytes } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { pathToFileURL } from 'node:url';
+import { version } from '../package.json';
 import { designNumberConstraints, versionOneDesignDefaults } from './constants/design';
 import { engineConfiguration } from './constants/engine';
 import { outputSizePresetGroups } from './constants/export';
@@ -108,7 +111,7 @@ export async function runCli(argv: string[], io: CliIo = process): Promise<numbe
     }
 
     if (command === '--version') {
-      return write(io.stdout, 'topogra 0.1.0\n');
+      return write(io.stdout, `topogra ${version}\n`);
     }
 
     if (argumentsList.includes('--help') || argumentsList.includes('-h')) {
@@ -609,7 +612,13 @@ function getDesignFlagReference(isVerbose: boolean): string {
     .join('\n');
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// npm exposes package executables through symlinks; compare their resolved file URLs.
+const executablePath = process.argv.at(1);
+
+if (
+  executablePath !== undefined &&
+  import.meta.url === pathToFileURL(realpathSync(executablePath)).href
+) {
   void runCli(process.argv.slice(2)).then((code) => {
     process.exitCode = code;
   });

@@ -1,8 +1,12 @@
 {
   "name": "topogra",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Generate reproducible topographic SVG and PNG backgrounds from the command line.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/conorluddy/Topogra.git"
+  },
   "files": [
     "dist-cli",
     "README.md",
@@ -15,18 +19,20 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build && npm run build:cli",
-    "build:cli": "esbuild src/cli.ts --bundle --platform=node --target=node20 --format=esm --external:@resvg/resvg-js --external:pngjs --banner:js='#!/usr/bin/env node' --outfile=dist-cli/topogra.mjs",
+    "build:cli": "node scripts/build-cli.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --import tsx --test tests/*.test.ts src/*.test.ts src/export/*.test.ts",
+    "test:package": "node scripts/test-package.mjs",
     "test:coverage": "node --import tsx --experimental-test-coverage --test tests/*.test.ts src/*.test.ts src/export/*.test.ts",
     "test:e2e": "npm run build && playwright test",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "npm run lint -- --fix",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "check": "npm run lint && npm run format:check && npm test && npm run build",
-    "prepack": "npm run build",
-    "prepublishOnly": "npm run check",
+    "check:source": "npm run lint && npm run format:check && npm test && tsc --noEmit",
+    "check": "npm run check:source && npm run build && npm run test:package",
+    "prepack": "npm run build:cli",
+    "prepublishOnly": "npm run check:source",
     "prepare": "husky"
   },
   "devDependencies": {
