@@ -1,8 +1,9 @@
+import { getContourStyle } from './contour-style';
+import { createSeaLevelMarkup, type SeaLevelGeometry } from './sea-level';
 import { createSummitMarkerMarkup, updateLiveSummitMarkers } from './summit-markers';
 import type { Contour, ContourPoint } from './types/contours';
 import type { DesignSettings } from './types/design';
 
-const indexContourElevationTolerance = 1e-6;
 const svgCoordinateDecimalPlaces = 3;
 
 // === PUBLIC API ===
@@ -14,6 +15,7 @@ export function renderContoursIntoSvg(
   height: number,
   settings: Readonly<DesignSettings>,
   summits: readonly ContourPoint[] = [],
+  seaLevel?: SeaLevelGeometry,
 ): void {
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   svg.setAttribute('width', String(width));
@@ -27,7 +29,9 @@ export function renderContoursIntoSvg(
   }
 
   contourLayer.innerHTML =
-    createGridMarkup(width, height, settings) + getContourMarkup(contours, settings);
+    createSeaLevelMarkup(seaLevel, settings.lineColor) +
+    createGridMarkup(width, height, settings) +
+    getContourMarkup(contours, settings);
   updateLiveSummitMarkers(svg, summits, settings);
 }
 
@@ -37,37 +41,19 @@ export function createSvgDocument(
   settings: Readonly<DesignSettings>,
   summits: readonly ContourPoint[] = [],
   attribution?: string,
+  seaLevel?: SeaLevelGeometry,
 ): string {
   const { width, height, background, transparent } = settings;
   const backdrop = transparent
     ? ''
     : `<rect width="${width}" height="${height}" fill="${background}"/>`;
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" overflow="hidden">${attribution !== undefined ? `<metadata>${attribution}</metadata>` : ''}<defs><clipPath id="landscape-crop"><rect width="${width}" height="${height}"/></clipPath></defs><g clip-path="url(#landscape-crop)">${backdrop}${createGridMarkup(width, height, settings)}${getContourMarkup(contours, settings)}${createSummitMarkerMarkup(summits, settings)}${attribution !== undefined ? `<text x="8" y="${height - 8}" fill="${settings.lineColor}" font-family="sans-serif" font-size="${Math.min(9, ((width - 16) / Math.max(1, attribution.length)) * 1.6)}">${attribution}</text>` : ''}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" overflow="hidden">${attribution !== undefined ? `<metadata>${attribution}</metadata>` : ''}<defs><clipPath id="landscape-crop"><rect width="${width}" height="${height}"/></clipPath></defs><g clip-path="url(#landscape-crop)">${backdrop}${createSeaLevelMarkup(seaLevel, settings.lineColor)}${createGridMarkup(width, height, settings)}${getContourMarkup(contours, settings)}${createSummitMarkerMarkup(summits, settings)}${attribution !== undefined ? `<text x="8" y="${height - 8}" fill="${settings.lineColor}" font-family="sans-serif" font-size="${Math.min(9, ((width - 16) / Math.max(1, attribution.length)) * 1.6)}">${attribution}</text>` : ''}</g></svg>`;
 }
 
 /** Groups ordinary and index contours into consistently styled paths. */
 function getContourMarkup(contours: Contour[], settings: Readonly<DesignSettings>): string {
   const interval = contours.length > 1 ? contours[1].elevation - contours[0].elevation : 1;
-
-  /** Anchors alternation to elevation so negative levels and disconnected paths stay consistent. */
-  const getContourStyle = (contour: Contour): 'ordinary' | 'solid' | 'dashed' => {
-    if (settings.indexStyle === 'off') {
-      return 'ordinary';
-    }
-
-    const multiple = contour.elevation / (interval * settings.indexEvery);
-    const indexLevel = Math.round(multiple);
-
-    if (Math.abs(multiple - indexLevel) >= indexContourElevationTolerance) {
-      return 'ordinary';
-    }
-
-    return settings.indexStyle === 'dashed' ||
-      (settings.indexStyle === 'alternating' && Math.abs(indexLevel % 2) === 1)
-      ? 'dashed'
-      : 'solid';
-  };
 
   const styles =
     settings.indexStyle === 'alternating'
@@ -80,7 +66,7 @@ function getContourMarkup(contours: Contour[], settings: Readonly<DesignSettings
       const dashAttribute =
         style === 'dashed' ? ` stroke-dasharray="${settings.dashLength} ${settings.dashGap}"` : '';
       const pathData = contours
-        .filter((contour) => getContourStyle(contour) === style)
+        .filter((contour) => getContourStyle(contour.elevation, interval, settings) === style)
         .flatMap((contour) =>
           contour.paths.map(
             ({ points, closed }) =>

@@ -1,3 +1,4 @@
+import { createSeaLevelGeometry, type SeaLevelGeometry } from './sea-level';
 import type { RealTerrain } from './real-terrain';
 import { findTerrainSummits } from './summit-markers';
 import type { ContourPoint } from './types/contours';
@@ -35,7 +36,7 @@ export function generateLandscapeGeometry(
   settings: Readonly<DesignSettings>,
   engineConfiguration: Readonly<EngineConfiguration>,
   realTerrain?: RealTerrain,
-): { contours: Contour[]; summits: ContourPoint[] } {
+): { contours: Contour[]; summits: ContourPoint[]; seaLevel?: SeaLevelGeometry } {
   const terrainSettings = deriveTerrainConfiguration(settings, engineConfiguration);
   const field = sampleTerrain(
     realTerrain
@@ -49,5 +50,6 @@ export function generateLandscapeGeometry(
   return {
     contours: extractContours(field, calculateContourElevations(settings, engineConfiguration)),
     summits: findTerrainSummits(field),
+    seaLevel: createSeaLevelGeometry(field, settings.width, settings.height, realTerrain),
   };
 }

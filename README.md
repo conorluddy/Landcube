@@ -25,6 +25,8 @@ No account or backend is needed. Generated landscapes run offline once the web a
 4. Open **Export**, choose SVG or PNG, set dimensions and transparency, and download. The preview shows the complete output; exported artwork uses settled terrain without the cursor effect.
 5. Use **Copy link** to share the current design. Reloading the link restores the saved styling and generated seed.
 
+The **3D** tab between Settings and Export contains the experimental raised-contour preview, height exaggeration, a matte surface with its own color picker, adjustable light direction, elevation, intensity and fill, auto-rotation, and camera reset. Switching tabs preserves the current view; 3D controls are session-only and exports remain 2D.
+
 Real terrain is centered and cropped without stretching. Cursor deformation is available only for generated terrain; scale and detail also apply to generated terrain.
 
 ## Use with an agent
@@ -109,7 +111,7 @@ npx --yes topogra generate --terrain-preset "Wicklow Mountains" \
   --save-config wicklow.json --attribution-file wicklow-attribution.txt
 ```
 
-New real-terrain designs default to `--max-depth 0`, flattening elevations below sea level. Use `--max-depth 100` to include depths down to 100 m (supported range: 0–11000 m). The browser provides the same **Maximum depth below sea level (m)** control. Saved CLI configurations retain the limit; older configurations without it keep their original unrestricted bathymetry.
+New real-terrain designs default to `--max-depth 0`, flattening elevations below sea level. Use `--max-depth 100` to include depths down to 100 m (supported range: 0–11000 m). The browser provides a **Maximum depth below sea level (m)** control, defaulting to 20 m. **Sea-level hatching** marks terrain at or below 0 m in both 2D and the experimental 3D view, and is included in 2D exports. It indicates elevation, including inland depressions, rather than identifying water; the browser toggle is session-only. Saved CLI configurations retain the limit; older configurations without it keep their original unrestricted bathymetry.
 
 Coastal tiles combine land elevation and bathymetry and can contain stepped source boundaries. Use an explicit elevation floor to omit affected low elevations, for example:
 

@@ -1,3 +1,5 @@
+import { createSeaLevelGeometry, type SeaLevelGeometry } from './sea-level';
+import { mountTerrain3dControls } from './terrain-3d-controls';
 import { mountRealTerrainControls } from './real-terrain-controls';
 import type { RealTerrain } from './real-terrain';
 import { findTerrainSummits } from './summit-markers';
@@ -85,6 +87,7 @@ let baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
 let contourElevations = calculateContourElevations(settings, engineConfiguration);
 let summits: ReturnType<typeof findTerrainSummits> = [];
 let contours: ReturnType<typeof extractContours> = [];
+let seaLevel: SeaLevelGeometry | undefined;
 let cursorAnimationFrameIdentifier: number | undefined;
 let lastCursorFrameTimeMs = 0;
 let lastContourRenderTimeMs = 0;
@@ -133,6 +136,15 @@ mountRealTerrainControls(controls.panel, (loadedTerrain) => {
   renderCurrentLandscape();
   refreshExportControls();
 });
+
+const terrain3d = mountTerrain3dControls(
+  controls.panel,
+  () => {
+    cursor.strength = targetCursorInfluence.strength = 0;
+    renderCurrentLandscape();
+  },
+  controls.notify,
+);
 
 if (!storedSeedResult.ok) {
   logOperationError(storedSeedResult.error);
@@ -206,7 +218,16 @@ function updateSettings(nextDesignSettings: DesignSettings): boolean {
     }
 
     if (change === 'appearance') {
-      renderContoursIntoSvg(terrainSvgElement, contours, width, height, settings, summits);
+      terrain3d.update(contours, width, height, settings, baseHeightField, seaLevel);
+      renderContoursIntoSvg(
+        terrainSvgElement,
+        contours,
+        width,
+        height,
+        settings,
+        summits,
+        seaLevel,
+      );
     } else if (change !== 'output') {
       renderCurrentLandscape();
     }
@@ -232,13 +253,16 @@ function applyPageStyle(): void {
 
 /** Renders the current cursor influence over cached base terrain. */
 function renderCurrentLandscape(): void {
-  const field = realTerrain
-    ? baseHeightField
-    : applyCursorElevation(baseHeightField, cursor, settings);
+  const field =
+    realTerrain || terrain3d.isActive()
+      ? baseHeightField
+      : applyCursorElevation(baseHeightField, cursor, settings);
 
   contours = extractContours(field, contourElevations);
   summits = findTerrainSummits(field);
-  renderContoursIntoSvg(terrainSvgElement, contours, width, height, settings, summits);
+  seaLevel = createSeaLevelGeometry(field, width, height, realTerrain);
+  terrain3d.update(contours, width, height, settings, baseHeightField, seaLevel);
+  renderContoursIntoSvg(terrainSvgElement, contours, width, height, settings, summits, seaLevel);
 }
 
 /** Eases cursor deformation with capped frame pacing until settled. */
@@ -297,6 +321,7 @@ function scheduleCursorAnimation(): void {
 /** Tracks eligible pointers while keeping control interaction deformation-free. */
 function moveCursor(event: PointerEvent): void {
   if (
+    terrain3d.isActive() ||
     realTerrain !== undefined ||
     !settings.cursorEnabled ||
     (event.target instanceof Element && event.target.closest('.control-panel'))

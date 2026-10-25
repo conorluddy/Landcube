@@ -3,6 +3,8 @@ import { realTerrainBounds } from './constants/real-terrain';
 export interface RealTerrain {
   sample: (x: number, y: number, width: number, height: number) => number;
   attribution: string;
+  seaLevel?: number;
+  seaLevelHatching?: boolean;
 }
 
 /** Raw decoded RGBA pixels and source metadata for one 256px Terrarium tile. */
@@ -105,6 +107,7 @@ export async function loadRealTerrain(
 
   return {
     attribution: [...credits].join(' · '),
+    seaLevel: ((0 - minimum) / elevationRange - 0.5) * 1.6,
     sample(x, y, width, height) {
       const frameSize = Math.max(width, height);
       const pixelX = Math.max(

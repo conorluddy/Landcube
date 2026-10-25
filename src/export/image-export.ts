@@ -52,6 +52,7 @@ export function createOutputRenderer(
         settings,
         geometry.summits,
         realTerrain?.attribution,
+        geometry.seaLevel,
       );
     },
   };
