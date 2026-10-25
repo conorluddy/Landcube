@@ -37,6 +37,7 @@ test('3D controls retain surface, contour and lighting choices across tab and vi
 
   await expect(page.getByRole('switch', { name: 'Studio floor', exact: true })).toBeChecked();
   await expect(page.getByRole('switch', { name: 'North arrow', exact: true })).toBeDisabled();
+  await expect(page.getByRole('switch', { name: 'Map grid', exact: true })).toBeDisabled();
   await expect(page.getByLabel('Water style')).toHaveValue('solid');
   await expect(page.getByRole('switch', { name: 'Match terrain', exact: true })).toBeChecked();
   await expect(page.getByLabel('Water color', { exact: true })).toHaveValue('#1c1f21');
@@ -327,6 +328,20 @@ test('loaded location models export STL and companion attribution', async ({ pag
   await page.getByRole('switch', { name: 'Solid base', exact: true }).check();
   await page.getByRole('button', { name: 'Collapse controls' }).click();
   const groundOnly = await page.screenshot();
+
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await expect(page.getByRole('switch', { name: 'Map grid', exact: true })).toBeEnabled();
+  await page.getByRole('switch', { name: 'Map grid', exact: true }).check();
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const withGrid = await page.screenshot({ path: test.info().outputPath('ground-map-grid.png') });
+
+  expect(withGrid.equals(groundOnly)).toBe(false);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('switch', { name: 'Show raised contours' }).uncheck();
+  await page.getByRole('switch', { name: 'Show raised contours' }).check();
+  await expect(page.getByRole('switch', { name: 'Map grid', exact: true })).toBeChecked();
+  await page.getByRole('switch', { name: 'Map grid', exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
 
   await page.getByRole('button', { name: 'Expand controls' }).click();
   await page.getByRole('switch', { name: 'North arrow', exact: true }).check();

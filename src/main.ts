@@ -331,6 +331,10 @@ function updateTerrain3d(): void {
     croppedSea,
     realTerrain?.attribution,
     realTerrain?.location,
+    realTerrain?.spanKm === undefined
+      ? undefined
+      : (realTerrain.spanKm * 1000 * Math.max(modelCrop.width, modelCrop.height)) /
+          Math.max(modelSourceFrame.width, modelSourceFrame.height),
   );
 }
 

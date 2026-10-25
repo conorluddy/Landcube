@@ -3,6 +3,7 @@ import { realTerrainBounds } from './constants/real-terrain';
 export interface RealTerrain {
   sample: (x: number, y: number, width: number, height: number) => number;
   attribution: string;
+  spanKm?: number;
   location?: { latitude: number; longitude: number };
   seaLevel?: number;
   seaLevelHatching?: boolean;
@@ -108,6 +109,7 @@ export async function loadRealTerrain(
 
   return {
     location: { latitude, longitude },
+    spanKm,
     attribution: [...credits].join(' · '),
     seaLevel: ((0 - minimum) / elevationRange - 0.5) * 1.6,
     sample(x, y, width, height) {

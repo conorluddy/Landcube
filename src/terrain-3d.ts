@@ -53,6 +53,7 @@ export interface Terrain3d {
   setGround(value: boolean): void;
   setGroundColor(value: string | undefined): void;
   setNorthArrow(value: boolean): void;
+  setMapGrid(value: boolean, spanMeters: number | undefined): void;
   setWaterStyle(value: WaterStyle): void;
   setWaterColor(value: string | undefined): void;
   setContours(value: boolean): void;
@@ -564,6 +565,10 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
       customGroundColor = value;
       stage.setColor(value ?? backgroundColor);
       updateStageVisibility();
+      draw();
+    },
+    setMapGrid(value: boolean, spanMeters: number | undefined) {
+      stage.setMapGrid(value, spanMeters);
       draw();
     },
     setNorthArrow(value: boolean) {

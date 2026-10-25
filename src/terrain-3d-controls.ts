@@ -50,6 +50,7 @@ export function mountTerrain3dControls(
     seaLevel?: SeaLevelGeometry,
     attribution?: string,
     location?: { latitude: number; longitude: number },
+    groundSpanMeters?: number,
   ): void;
 } {
   const section = document.createElement('section');
@@ -106,6 +107,8 @@ export function mountTerrain3dControls(
         <label class="toggle-row">Studio floor<input type="checkbox" role="switch" data-ground checked></label>
         <label class="toggle-row">Match canvas<input type="checkbox" role="switch" data-ground-match></label>
         <div class="colour-row"><label>Floor color<input type="color" data-ground-color value="#b4b4b4"></label></div>
+        <label class="toggle-row">Map grid<input type="checkbox" role="switch" data-map-grid disabled></label>
+        <p class="export-hint">A subtle ground-distance grid for real locations. Appears outside the model when Studio floor and Solid base are enabled.</p>
         <label class="toggle-row">North arrow<input type="checkbox" role="switch" data-north disabled></label>
         <p class="export-hint">The studio surrounds the solid base with a continuous floor and real cast shadows. Match the canvas or choose a floor color. The north arrow is available for real locations and stays aligned as you orbit. These decorations are omitted from STL.</p>
       </fieldset>
@@ -151,6 +154,7 @@ export function mountTerrain3dControls(
   let modelSettings: TerrainModelSettings = { ...defaultTerrainModelSettings };
   let attributionText = '';
   let seed = 0;
+  let currentGroundSpan: number | undefined;
 
   const updateModelLabels = () => {
     const circular = modelSettings.cropShape === 'circle';
@@ -508,6 +512,12 @@ export function mountTerrain3dControls(
     'input',
     (event) => view?.setGroundColor((event.target as HTMLInputElement).value),
   );
+  getRequiredElement(section, '[data-map-grid]', HTMLInputElement).addEventListener(
+    'change',
+    (event) => {
+      view?.setMapGrid((event.target as HTMLInputElement).checked, currentGroundSpan);
+    },
+  );
   getRequiredElement(section, '[data-north]', HTMLInputElement).addEventListener(
     'change',
     (event) => view?.setNorthArrow((event.target as HTMLInputElement).checked),
@@ -613,7 +623,13 @@ export function mountTerrain3dControls(
       seaLevel?: SeaLevelGeometry,
       attribution?: string,
       location?: { latitude: number; longitude: number },
+      groundSpanMeters?: number,
     ) => {
+      currentGroundSpan = location ? groundSpanMeters : undefined;
+      const gridToggle = getRequiredElement(section, '[data-map-grid]', HTMLInputElement);
+
+      gridToggle.disabled = currentGroundSpan === undefined;
+      view?.setMapGrid(gridToggle.checked && !gridToggle.disabled, currentGroundSpan);
       locationLatitude = location?.latitude;
       const locationKey = location ? `${location.latitude},${location.longitude}` : '';
 

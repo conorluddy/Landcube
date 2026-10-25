@@ -1,3 +1,4 @@
+import { createTerrainMapGrid } from './terrain-map-grid';
 import * as THREE from 'three';
 
 export const defaultTerrainGroundColor = '#b4b4b4';
@@ -10,6 +11,7 @@ export function createTerrainStage(): {
   setColor(value: string): void;
   setCastShadows(value: boolean): void;
   setNorthArrow(value: boolean): void;
+  setMapGrid(value: boolean, spanMeters: number | undefined): void;
 } {
   const group = new THREE.Group();
   const groundMaterial = new THREE.MeshBasicMaterial({
@@ -107,9 +109,30 @@ export function createTerrainStage(): {
   north.visible = false;
   group.add(north);
 
+  const mapGrid = createTerrainMapGrid();
+
+  group.add(mapGrid.mesh);
+  let gridEnabled = false;
+  let groundSpan: number | undefined;
+  let stageSize = { width: 2, length: 2, circular: false, background: defaultTerrainGroundColor };
+
+  const updateGrid = () => {
+    mapGrid.mesh.visible = gridEnabled && groundSpan !== undefined;
+    mapGrid.update(
+      stageSize.width,
+      stageSize.length,
+      stageSize.circular,
+      stageSize.background,
+      groundSpan,
+    );
+  };
+
   return {
     group,
     update(width, length, background, ink, circular) {
+      stageSize = { width, length, background, circular };
+      updateGrid();
+
       if (circular !== previousCircular) {
         paintShadow(circular);
         const material = shadow.material;
@@ -132,9 +155,16 @@ export function createTerrainStage(): {
     },
     setColor(value) {
       groundMaterial.color.set(value);
+      stageSize.background = value;
+      updateGrid();
     },
     setVisible(value) {
       group.visible = value;
+    },
+    setMapGrid(value, spanMeters) {
+      gridEnabled = value;
+      groundSpan = spanMeters;
+      updateGrid();
     },
     setNorthArrow(value) {
       north.visible = value;
