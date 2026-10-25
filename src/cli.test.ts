@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { test } from 'node:test';
+import { version } from '../package.json';
 import { engineConfiguration } from './constants/engine';
 import { versionOneDesignDefaults } from './constants/design';
 import { validateDesignSettings } from './design-settings';
@@ -12,6 +13,29 @@ import { createOutputRenderer } from './export/image-export';
 import type { DesignSettings } from './types/design';
 
 const executeFile = promisify(execFile);
+
+void test('CLI reports the package version', async () => {
+  const { stdout, stderr } = await runCommand(['--version']);
+
+  assert.equal(stdout, `topogra ${version}\n`);
+  assert.equal(stderr, '');
+});
+
+void test('CLI runs through an npm executable symlink in a path containing spaces', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'topogra npm bin '));
+  const executable = join(directory, 'topogra.ts');
+
+  await symlink(resolve('src/cli.ts'), executable);
+  const { stdout, stderr } = await executeFile(process.execPath, [
+    '--import',
+    'tsx',
+    executable,
+    '--help',
+  ]);
+
+  assert.match(stdout, /topogra generate/);
+  assert.equal(stderr, '');
+});
 
 /** Invokes the source entry point exactly as an installed CLI wrapper does. */
 function runCommand(argumentsList: string[]) {

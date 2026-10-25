@@ -1,4 +1,5 @@
 dist/
+dist-cli/
 .cache/
 test-results/
 playwright-report/
