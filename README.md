@@ -109,6 +109,16 @@ npx --yes topogra generate --terrain-preset "Wicklow Mountains" \
   --save-config wicklow.json --attribution-file wicklow-attribution.txt
 ```
 
+New real-terrain designs default to `--max-depth 0`, flattening elevations below sea level. Use `--max-depth 100` to include depths down to 100 m (supported range: 0–11000 m). The browser provides the same **Maximum depth below sea level (m)** control. Saved CLI configurations retain the limit; older configurations without it keep their original unrestricted bathymetry.
+
+Coastal tiles combine land elevation and bathymetry and can contain stepped source boundaries. Use an explicit elevation floor to omit affected low elevations, for example:
+
+```sh
+npx --yes topogra generate --terrain real --latitude 54.651738 --longitude=-8.707332 --span-km 8 --elevation-floor 250 --palette Paper --format png --size 2560x1440 --output slieve-league.png --save-config slieve-league.json --attribution-file slieve-league-attribution.txt
+```
+
+`--elevation-floor` clips source elevations before normalization. It removes low terrain rather than reconstructing a shoreline, and is saved in the CLI terrain configuration. The browser has the same optional **Elevation floor (m)** control. Omit it to retain all terrain above the selected depth limit. Inspect coastal output before publishing; a cutoff suitable for one location may not suit another.
+
 Discover palettes, output sizes, locations, and all design flags:
 
 ```sh

@@ -28,6 +28,8 @@ export async function loadRealTerrain(
   longitude: number,
   spanKm: number,
   loadTile: TerrainTileLoader,
+  elevationFloor?: number,
+  maxDepth?: number,
 ): Promise<RealTerrain> {
   if (
     !Number.isFinite(latitude) ||
@@ -44,6 +46,20 @@ export async function loadRealTerrain(
       'Use latitude −85 to 85, longitude −180 to 180, and an area width of 2–200 km.',
     );
   }
+
+  if (
+    elevationFloor !== undefined &&
+    (!Number.isFinite(elevationFloor) || elevationFloor < -11000 || elevationFloor > 8900)
+  ) {
+    throw new Error('Elevation floor must be between −11000 and 8900 meters.');
+  }
+
+  if (maxDepth !== undefined && (!Number.isFinite(maxDepth) || maxDepth < 0 || maxDepth > 11000)) {
+    throw new Error('Maximum depth must be between 0 and 11000 meters.');
+  }
+
+  const effectiveFloor =
+    maxDepth === undefined ? elevationFloor : Math.max(elevationFloor ?? -Infinity, -maxDepth);
 
   const latitudeRadians = (latitude * Math.PI) / 180;
   const spanFraction = (spanKm * 1000) / (earthCircumferenceMeters * Math.cos(latitudeRadians));
@@ -69,6 +85,14 @@ export async function loadRealTerrain(
   }
 
   await Promise.all(requests);
+
+  // Opt-in clipping avoids inventing coastline geometry or changing legacy terrain.
+  if (effectiveFloor !== undefined) {
+    for (let index = 0; index < elevations.length; index++) {
+      elevations[index] = Math.max(effectiveFloor, elevations[index]);
+    }
+  }
+
   let minimum = Infinity;
   let maximum = -Infinity;
 

@@ -589,7 +589,16 @@ test('real terrain loads decoded tiles, retains geometry on failure and exports 
   await expect(page.locator('#terrain-longitude')).toHaveValue('-72.545');
   await page.getByRole('button', { name: 'Load terrain', exact: true }).click();
   await expect(page.locator('[data-status]')).toContainText('Real terrain loaded');
+  const originalGeometry = await page.locator('[data-contours]').innerHTML();
+
+  await expect(page.locator('#terrain-max-depth')).toHaveValue('0');
+  await page.locator('#terrain-max-depth').fill('100');
+  await page.locator('#terrain-elevation-floor').fill('100');
+  await page.getByRole('button', { name: 'Load terrain', exact: true }).click();
+  await expect(page.locator('[data-status]')).toContainText('Real terrain loaded');
   const geometry = await page.locator('[data-contours]').innerHTML();
+
+  expect(geometry).not.toBe(originalGeometry);
 
   await page.route('https://s3.amazonaws.com/elevation-tiles-prod/**', (route) =>
     route.fulfill({ status: 503 }),

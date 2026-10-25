@@ -20,6 +20,9 @@ export function mountRealTerrainControls(
       .join('')}</select></div>
     <div class="control-grid"><label>Latitude<input id="terrain-latitude" type="number" min="-85" max="85" step="any" value="${realTerrainPresets[0].latitude}"></label><label>Longitude<input id="terrain-longitude" type="number" min="-180" max="180" step="any" value="${realTerrainPresets[0].longitude}"></label></div>
     <label>Area span (km)<input id="terrain-span" type="number" min="${realTerrainBounds.minimumSpanKm}" max="${realTerrainBounds.maximumSpanKm}" value="${realTerrainBounds.defaultSpanKm}"></label>
+    <label>Maximum depth below sea level (m)<input id="terrain-max-depth" type="number" min="0" max="11000" step="any" value="0"></label>
+    <label>Elevation floor (m, optional)<input id="terrain-elevation-floor" type="number" min="-11000" max="8900" step="any" placeholder="Include all elevations"></label>
+    <p>Omit low elevations to reduce coastal source artifacts. This does not trace the shoreline.</p>
     <div class="actions"><button type="button" data-load class="primary-button">Load terrain</button><button type="button" data-generated class="text-button">Use generated</button></div>
     <p data-credit></p><p data-status role="status">Loads public elevation tiles. Location is session-only; Copy link saves styling only.</p>
     <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">Terrain data sources & attribution ↗</a>
@@ -34,11 +37,13 @@ export function mountRealTerrainControls(
   const latitude = section.querySelector<HTMLInputElement>('#terrain-latitude');
   const longitude = section.querySelector<HTMLInputElement>('#terrain-longitude');
   const span = section.querySelector<HTMLInputElement>('#terrain-span');
+  const maxDepth = section.querySelector<HTMLInputElement>('#terrain-max-depth');
+  const elevationFloor = section.querySelector<HTMLInputElement>('#terrain-elevation-floor');
   const loadButton = section.querySelector<HTMLButtonElement>('[data-load]');
   const status = section.querySelector<HTMLElement>('[data-status]');
   let requestVersion = 0;
 
-  if (!latitude || !longitude || !span || !loadButton || !status) {
+  if (!latitude || !longitude || !span || !maxDepth || !elevationFloor || !loadButton || !status) {
     throw new Error('Real terrain controls are incomplete.');
   }
 
@@ -61,7 +66,13 @@ export function mountRealTerrainControls(
 
     loadButton.disabled = true;
     status.textContent = 'Downloading elevation tiles…';
-    void loadBrowserRealTerrain(latitude.valueAsNumber, longitude.valueAsNumber, span.valueAsNumber)
+    void loadBrowserRealTerrain(
+      latitude.valueAsNumber,
+      longitude.valueAsNumber,
+      span.valueAsNumber,
+      elevationFloor.value === '' ? undefined : elevationFloor.valueAsNumber,
+      maxDepth.valueAsNumber,
+    )
       .then((terrain) => {
         if (version !== requestVersion) {
           return;
