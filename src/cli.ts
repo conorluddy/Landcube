@@ -54,6 +54,10 @@ export async function runCli(argv: string[], io: CliIo = process): Promise<numbe
 
     const options = parseOptions(argumentsList);
 
+    if (options.help !== undefined) {
+      return printHelp(io.stdout);
+    }
+
     if (command === 'presets') {
       return printPresets(options, io.stdout);
     }
@@ -158,7 +162,7 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
       new TextEncoder().encode(
         `${JSON.stringify({ version: cliConfigVersion, settings, terrain }, null, 2)}\n`,
       ),
-      options.force === 'true',
+      isEnabled(options, 'force'),
     );
   }
 
@@ -166,7 +170,7 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
     options.output ??
     `topogra-${settings.seed}-${settings.width * (settings.format === 'png' ? settings.pngScale : 1)}x${settings.height * (settings.format === 'png' ? settings.pngScale : 1)}.${settings.format}`;
 
-  if (options.json !== undefined && output === '-') {
+  if (isEnabled(options, 'json') && output === '-') {
     throw new Error('--json cannot be combined with --output -.');
   }
 
@@ -186,10 +190,10 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
   if (output === '-') {
     io.stdout.write(result.data.bytes);
   } else {
-    await writeAtomically(output, result.data.bytes, options.force === 'true');
+    await writeAtomically(output, result.data.bytes, isEnabled(options, 'force'));
   }
 
-  if (options.json !== undefined) {
+  if (isEnabled(options, 'json')) {
     write(
       io.stdout,
       `${JSON.stringify(metadata(result.data.filename, settings, terrain, loadedTerrain, output), null, 2)}\n`,
@@ -228,7 +232,7 @@ function printPresets(options: Record<string, string | undefined>, stdout: NodeJ
 
   write(
     stdout,
-    options.json !== undefined
+    isEnabled(options, 'json')
       ? `${JSON.stringify(presets, null, 2)}\n`
       : `Palettes: ${presets.palettes.join(', ')}\nSizes: ${presets.sizes.map((preset) => preset.value).join(', ')}\nTerrain: ${presets.terrain.map((preset) => preset.name).join(', ')}\n`,
   );
@@ -284,9 +288,20 @@ async function readConfig(path: string): Promise<CliConfig> {
     config === null ||
     typeof config !== 'object' ||
     (config as CliConfig).version !== cliConfigVersion ||
-    !('settings' in config)
+    !('settings' in config) ||
+    Object.keys(config).some((key) => !['version', 'settings', 'terrain'].includes(key))
   ) {
     throw new Error(`Configuration must be a version ${cliConfigVersion} CLI envelope.`);
+  }
+
+  const settings = config.settings;
+
+  if (
+    settings === null ||
+    typeof settings !== 'object' ||
+    Object.keys(settings).some((key) => !designKeys.includes(key as keyof DesignSettings))
+  ) {
+    throw new Error('Configuration settings must contain only supported design fields.');
   }
 
   return config as CliConfig;
@@ -419,6 +434,13 @@ function parseBoolean(value: string, flag: string) {
   }
 
   throw new Error(`--${flag} must be true or false.`);
+}
+
+/** Requires explicit boolean values for CLI control flags. */
+function isEnabled(options: Record<string, string | undefined>, key: 'force' | 'json'): boolean {
+  const value = options[key];
+
+  return value === undefined ? false : parseBoolean(value, key);
 }
 
 function toKebab(value: string) {
