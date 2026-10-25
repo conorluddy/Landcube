@@ -1,6 +1,6 @@
 {
   "name": "topogra",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Generate reproducible topographic SVG and PNG backgrounds from the command line.",
   "license": "MIT",
   "files": [
