@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && npm run build:cli",
+    "build:cli": "esbuild src/cli.ts --bundle --platform=node --target=node20 --format=esm --external:@resvg/resvg-js --external:pngjs --banner:js='#!/usr/bin/env node' --outfile=dist-cli/topogra.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --import tsx --test tests/*.test.ts src/*.test.ts src/export/*.test.ts",
     "test:coverage": "node --import tsx --experimental-test-coverage --test tests/*.test.ts src/*.test.ts src/export/*.test.ts",
@@ -22,6 +23,7 @@
     "@stylistic/eslint-plugin": "5.10.0",
     "@types/node": "^22.0.0",
     "@types/pngjs": "^6.0.5",
+    "esbuild": "^0.28.2",
     "eslint": "10.13.0",
     "eslint-config-prettier": "10.1.8",
     "globals": "17.13.0",
@@ -35,6 +37,9 @@
   },
   "engines": {
     "node": "^20.19.0 || ^22.13.0 || >=24"
+  },
+  "bin": {
+    "topogra": "./dist-cli/topogra.mjs"
   },
   "lint-staged": {
     "*": "prettier --write --ignore-unknown"
