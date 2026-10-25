@@ -7,7 +7,14 @@ import typescript from 'typescript-eslint';
 
 /** Enforces type-aware correctness and logical spacing alongside Prettier. */
 export default defineConfig(
-  globalIgnores(['dist/', '.cache/', 'test-results/', 'playwright-report/', 'validation/']),
+  globalIgnores([
+    'dist/',
+    'dist-cli/',
+    '.cache/',
+    'test-results/',
+    'playwright-report/',
+    'validation/',
+  ]),
   {
     files: ['**/*.mjs'],
     extends: [javascript.configs.recommended],
