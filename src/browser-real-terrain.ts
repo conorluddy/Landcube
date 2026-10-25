@@ -1,8 +1,8 @@
+import { downloadTerrainTile } from './terrain-tile-download';
 import { loadRealTerrain as loadTerrainFromTiles } from './real-terrain';
 import type { DecodedTerrainTile, RealTerrain } from './real-terrain';
 
 const terrainTileSizePixels = 256;
-const terrainTileTimeoutMs = 20000;
 
 /** Loads real terrain using browser image APIs while retaining shared sampling behaviour. */
 export async function loadBrowserRealTerrain(
@@ -15,13 +15,7 @@ export async function loadBrowserRealTerrain(
 
 /** Downloads and decodes a Terrarium tile through browser canvas APIs. */
 async function decodeBrowserTerrainTile(tileUrl: string): Promise<DecodedTerrainTile> {
-  const response = await fetch(tileUrl, { signal: AbortSignal.timeout(terrainTileTimeoutMs) });
-
-  if (!response.ok) {
-    throw new Error(
-      `Terrain tile download failed (${response.status}). Try again or choose another area.`,
-    );
-  }
+  const response = await downloadTerrainTile(tileUrl);
 
   const bitmap = await createImageBitmap(await response.blob());
 
