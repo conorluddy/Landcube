@@ -15,6 +15,7 @@ interface StudioTerrainView {
   modelChanged: () => void;
   resetCamera: () => void;
   applyViewPreset: (preset: TerrainViewPreset) => void;
+  pickFocus: () => Promise<boolean>;
   getStl: () => ArrayBuffer;
   update: (
     contours: Contour[],
@@ -163,6 +164,7 @@ export function createStudioTerrainView(
     },
     resetCamera: () => view?.reset(),
     applyViewPreset: (preset) => view?.applyViewPreset(preset),
+    pickFocus: () => view?.pickFocus() ?? Promise.resolve(false),
     getStl() {
       if (!view || !active) {
         throw new Error('Select the 3D view before downloading STL.');

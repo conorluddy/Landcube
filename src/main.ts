@@ -140,6 +140,7 @@ controls.connect({
   modelChanged: terrain3d.modelChanged,
   resetCamera: terrain3d.resetCamera,
   applyViewPreset: terrain3d.applyViewPreset,
+  pickFocus: terrain3d.pickFocus,
   downloadStl: () => {
     const model = controls.getSnapshot().model.dimensions;
 

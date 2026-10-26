@@ -110,6 +110,7 @@ export interface StudioEffects {
   modelChanged(): void;
   resetCamera(): void;
   applyViewPreset(preset: TerrainViewPreset): void;
+  pickFocus(): Promise<boolean>;
   downloadStl(): void;
 }
 
@@ -143,6 +144,8 @@ export interface StudioController {
   camera: (patch: Partial<TerrainCameraSettings>) => void;
   resetCameraSettings: () => void;
   applyViewPreset: (preset: TerrainViewPreset) => void;
+  /** Arms a one-off terrain click that sets the depth-of-field focus point. */
+  pickFocus: () => Promise<void>;
   model: (patch: Partial<StudioState['model']>) => boolean;
   dimensions: (patch: Partial<TerrainModelSettings>) => boolean;
   metrics: (height: number, layerHeight?: number) => void;
@@ -424,6 +427,16 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       }
 
       effects?.applyViewPreset(preset);
+    },
+    async pickFocus() {
+      notify('Click the terrain to set focus. Press Escape to cancel.');
+      const picked = (await effects?.pickFocus()) ?? false;
+
+      if (picked) {
+        controller.camera({ focusFollowsTarget: false });
+      }
+
+      notify(picked ? 'Focus set.' : 'Focus unchanged.');
     },
     model(patch: Partial<StudioState['model']>) {
       const next = { ...state.model, ...patch };

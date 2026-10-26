@@ -22,6 +22,7 @@ function setup() {
     },
     resetCamera: () => undefined,
     applyViewPreset: () => undefined,
+    pickFocus: () => Promise.resolve(false),
     downloadStl: () => undefined,
   };
   const controller = createStudioController({

@@ -3,7 +3,9 @@ import type { PanelProps } from './panels';
 import { Button, Group, Hint, Range, Segmented, Toggle } from './fields';
 import {
   getNearestStopIndex,
+  terrainApertureStops,
   terrainFocalLengthStopsMm,
+  terrainFocusEffects,
   terrainProjections,
   terrainViewPresets,
   turntableDirections,
@@ -47,6 +49,78 @@ export function CameraPanel({ controller: c, state: s }: PanelProps): ReactNode 
             </Hint>
           </>
         )}
+      </Group>
+      <Group title="Focus">
+        <Segmented
+          label="Effect"
+          value={camera.focusEffect}
+          options={terrainFocusEffects}
+          onChange={(focusEffect) => {
+            c.camera({ focusEffect });
+          }}
+        />
+        {camera.focusEffect === 'tilt-shift' && (
+          <>
+            {(
+              [
+                ['tiltShiftPosition', 'Band position', 0, 100],
+                ['tiltShiftWidth', 'Band width', 5, 60],
+                ['tiltShiftBlur', 'Blur', 0, 100],
+              ] as const
+            ).map(([setting, label, min, max]) => (
+              <Range
+                key={setting}
+                id={`camera-${setting}`}
+                label={label}
+                value={Math.round(camera[setting] * 100)}
+                min={min}
+                max={max}
+                step={1}
+                suffix="%"
+                onChange={(value) => {
+                  c.camera({ [setting]: value / 100 });
+                }}
+              />
+            ))}
+            <Hint>Blurs above and below a sharp band, like a tabletop miniature.</Hint>
+          </>
+        )}
+        {camera.focusEffect === 'depth-of-field' &&
+          (isOrthographic ? (
+            <Hint>Depth of field needs perspective projection.</Hint>
+          ) : (
+            <>
+              <Range
+                id="camera-aperture"
+                label="Aperture"
+                value={getNearestStopIndex(terrainApertureStops, camera.apertureFStop)}
+                min={0}
+                max={terrainApertureStops.length - 1}
+                step={1}
+                displayValue={`f/${camera.apertureFStop}`}
+                onChange={(index) => {
+                  c.camera({ apertureFStop: terrainApertureStops[index] });
+                }}
+              />
+              <Toggle
+                label="Follow orbit target"
+                value={camera.focusFollowsTarget}
+                onChange={(focusFollowsTarget) => {
+                  c.camera({ focusFollowsTarget });
+                }}
+              />
+              <Button
+                onClick={() => {
+                  void c.pickFocus();
+                }}
+              >
+                Pick focus
+              </Button>
+              <Hint>
+                Lower f-numbers blur more. Pick focus, then click the terrain point to keep sharp.
+              </Hint>
+            </>
+          ))}
       </Group>
       <Group title="Exposure">
         <Range

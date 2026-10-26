@@ -28,6 +28,7 @@ import { createTerrainLineBuffers } from './terrain-3d-lines';
 import {
   baseTerrainFovDegrees,
   defaultTerrainCameraSettings,
+  getBokehAperture,
   getCompensatedDistance,
   getDistanceForHalfHeight,
   getOrthographicHalfHeight,
@@ -52,6 +53,7 @@ import { seaLevelHatchSpacing, seaLevelHatchOpacity } from './constants/sea-leve
 import type { SeaLevelGeometry } from './sea-level';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { createTerrainPostProcessing, type TerrainPostProcessing } from './terrain-post-processing';
 import type { Contour } from './types/contours';
 import type { DesignSettings } from './types/design';
 
@@ -95,6 +97,8 @@ export interface Terrain3d {
   setRotating(value: boolean): void;
   setRotationSpeed(value: number): void;
   applyViewPreset(preset: TerrainViewPreset): void;
+  /** Waits for a click on the terrain; resolves false if cancelled with Escape or a miss. */
+  pickFocus(): Promise<boolean>;
   setLighting(settings: Readonly<TerrainLightingSettings>): void;
   setCamera(settings: Readonly<TerrainCameraSettings>): void;
   reset(): void;
@@ -126,6 +130,8 @@ export function createTerrain3d(
   const orthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 200);
   let camera: THREE.PerspectiveCamera | THREE.OrthographicCamera = perspectiveCamera;
   let viewportAspect = 1;
+  let viewportWidth = 1;
+  let viewportHeight = 1;
   let orthographicHalfHeight = 1;
   const controls = new OrbitControls<THREE.PerspectiveCamera | THREE.OrthographicCamera>(
     camera,
@@ -365,11 +371,57 @@ export function createTerrain3d(
   let rotating = false;
   let previousTime = performance.now();
 
+  let cameraSettings: Readonly<TerrainCameraSettings> = defaultTerrainCameraSettings;
+  let postProcessing: TerrainPostProcessing | undefined;
+  let pickedFocusPoint: THREE.Vector3 | undefined;
+
+  /** Depth of field relies on perspective depth, so orthographic views skip it. */
+  const getActiveFocusEffect = () =>
+    cameraSettings.focusEffect === 'depth-of-field' && camera === orthographicCamera
+      ? 'off'
+      : cameraSettings.focusEffect;
+
+  const getFocusDistance = () => {
+    const point =
+      cameraSettings.focusFollowsTarget || !pickedFocusPoint ? controls.target : pickedFocusPoint;
+
+    camera.updateMatrixWorld();
+
+    return -point.clone().applyMatrix4(camera.matrixWorldInverse).z;
+  };
+
   const draw = () => {
-    if (visible && !document.hidden) {
-      updateFog();
+    if (!visible || document.hidden) {
+      return;
+    }
+
+    updateFog();
+
+    if (postProcessing && getActiveFocusEffect() !== 'off') {
+      postProcessing.setDepthOfField(
+        getFocusDistance(),
+        getBokehAperture(cameraSettings.apertureFStop),
+      );
+      postProcessing.render();
+    } else {
       renderer.render(scene, camera);
     }
+  };
+
+  const syncPostProcessing = () => {
+    if (cameraSettings.focusEffect === 'off' && !postProcessing) {
+      return;
+    }
+
+    postProcessing ??= createTerrainPostProcessing(renderer, scene, camera, [contourLayer]);
+    postProcessing.setSize(viewportWidth, viewportHeight, renderer.getPixelRatio());
+    postProcessing.setCamera(camera);
+    postProcessing.setEffect(getActiveFocusEffect());
+    postProcessing.setTiltShift({
+      bandPosition: cameraSettings.tiltShiftPosition,
+      bandWidth: cameraSettings.tiltShiftWidth,
+      blur: cameraSettings.tiltShiftBlur,
+    });
   };
 
   controls.addEventListener('change', draw);
@@ -379,6 +431,9 @@ export function createTerrain3d(
     const height = Math.max(1, viewport.clientHeight);
 
     renderer.setSize(width, height);
+    viewportWidth = width;
+    viewportHeight = height;
+    postProcessing?.setSize(width, height, renderer.getPixelRatio());
     viewportAspect = width / height;
     perspectiveCamera.aspect = viewportAspect;
     perspectiveCamera.updateProjectionMatrix();
@@ -441,6 +496,8 @@ export function createTerrain3d(
     camera = settings.projection === 'orthographic' ? orthographicCamera : perspectiveCamera;
     controls.object = camera;
     placeCamera(direction, distance);
+    cameraSettings = settings;
+    syncPostProcessing();
     draw();
   };
 
@@ -480,20 +537,24 @@ export function createTerrain3d(
 
   const raycaster = new THREE.Raycaster();
 
-  /** Double-click re-centres the orbit on a terrain point without changing the viewing angle. */
-  renderer.domElement.addEventListener('dblclick', (event) => {
+  const getTerrainPointAt = (clientX: number, clientY: number) => {
     const bounds = renderer.domElement.getBoundingClientRect();
 
     raycaster.setFromCamera(
       new THREE.Vector2(
-        ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
-        -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
+        ((clientX - bounds.left) / bounds.width) * 2 - 1,
+        -((clientY - bounds.top) / bounds.height) * 2 + 1,
       ),
       camera,
     );
-    const point = raycaster
-      .intersectObjects([surface, base], false)
-      .find((hit) => hit.object.visible)?.point;
+
+    return raycaster.intersectObjects([surface, base], false).find((hit) => hit.object.visible)
+      ?.point;
+  };
+
+  /** Double-click re-centres the orbit on a terrain point without changing the viewing angle. */
+  renderer.domElement.addEventListener('dblclick', (event) => {
+    const point = getTerrainPointAt(event.clientX, event.clientY);
 
     if (!point) {
       return;
@@ -942,6 +1003,53 @@ export function createTerrain3d(
       draw();
     },
     setCamera: setCameraSettings,
+    pickFocus() {
+      const canvas = renderer.domElement;
+
+      canvas.style.cursor = 'crosshair';
+
+      return new Promise<boolean>((resolve) => {
+        let downAt: { x: number; y: number } | undefined;
+
+        const finish = (picked: boolean) => {
+          canvas.style.cursor = '';
+          canvas.removeEventListener('pointerdown', onDown);
+          canvas.removeEventListener('pointerup', onUp);
+          document.removeEventListener('keydown', onKey);
+          resolve(picked);
+        };
+
+        const onDown = (event: PointerEvent) => {
+          downAt = { x: event.clientX, y: event.clientY };
+        };
+
+        // A drag is still an orbit; only a near-stationary click picks focus.
+        const onUp = (event: PointerEvent) => {
+          if (!downAt || Math.hypot(event.clientX - downAt.x, event.clientY - downAt.y) > 4) {
+            return;
+          }
+
+          const point = getTerrainPointAt(event.clientX, event.clientY);
+
+          if (point) {
+            pickedFocusPoint = point;
+            draw();
+          }
+
+          finish(point !== undefined);
+        };
+
+        const onKey = (event: KeyboardEvent) => {
+          if (event.key === 'Escape') {
+            finish(false);
+          }
+        };
+
+        canvas.addEventListener('pointerdown', onDown);
+        canvas.addEventListener('pointerup', onUp);
+        document.addEventListener('keydown', onKey);
+      });
+    },
     setRotationSpeed(value: number) {
       controls.autoRotateSpeed = value;
     },

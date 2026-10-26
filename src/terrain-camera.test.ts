@@ -5,6 +5,7 @@ import {
   defaultRotationSeconds,
   defaultTerrainCameraSettings,
   getAutoRotateSpeed,
+  getBokehAperture,
   getCompensatedDistance,
   getDistanceForHalfHeight,
   getNearestStopIndex,
@@ -55,4 +56,10 @@ void test('focal lengths between stops show on the nearest stop', () => {
 void test('turntable speed matches the original auto-rotate at 30 seconds per revolution', () => {
   assert.equal(getAutoRotateSpeed(defaultRotationSeconds, 'counterclockwise'), 2);
   assert.equal(getAutoRotateSpeed(120, 'clockwise'), -0.5);
+});
+
+void test('wider apertures blur more and the default sits mid-range', () => {
+  assert.ok(getBokehAperture(1.4) > getBokehAperture(22) * 15);
+  assert.equal(defaultTerrainCameraSettings.apertureFStop, 2.8);
+  assert.equal(defaultTerrainCameraSettings.focusEffect, 'off');
 });
