@@ -2,6 +2,7 @@ name: Build, deploy, and publish
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -97,15 +98,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Check release version and credentials
+      - name: Check release version
         id: release
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "::notice::Publishing skipped: add the NPM_TOKEN repository secret, then rerun this workflow on main."
-            exit 0
-          fi
           node --input-type=module <<'NODE'
           import { appendFileSync, readFileSync } from 'node:fs';
           const { name, version } = JSON.parse(readFileSync('package.json', 'utf8'));
@@ -129,6 +124,11 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
+      # Trusted publishing (OIDC) needs npm 11.5.1 or later
+      - name: Update npm
+        if: steps.release.outputs.should-publish == 'true'
+        run: npm install --global npm@latest
+
       - name: Install dependencies
         if: steps.release.outputs.should-publish == 'true'
         run: npm ci
@@ -136,8 +136,6 @@ jobs:
       - name: Publish new version with provenance
         if: steps.release.outputs.should-publish == 'true'
         run: npm publish --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   deploy:
     name: Deploy GitHub Pages
