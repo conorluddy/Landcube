@@ -844,17 +844,9 @@ export function OverlaysPanel({ controller: c, state: s }: PanelProps): ReactNod
               c.scene({ floorStyle: value as typeof s.scene.floorStyle });
             }}
           />
-          <Toggle
-            label="North arrow"
-            value={s.scene.north}
-            disabled={!s.source.terrain || !s.scene.ground || !s.scene.base || !s.scene.surface}
-            onChange={(value) => {
-              c.scene({ north: value });
-            }}
-          />
           <Hint>
-            Map grid, floor styles and north arrow require a real location, studio floor and solid
-            base. Floor styles other than Grid draw their own north marker. Omitted from STL.
+            Map grid and floor styles require a real location, studio floor and solid base. Each
+            floor style draws its own north marker. Omitted from STL.
           </Hint>
         </Group>
       )}

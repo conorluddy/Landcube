@@ -116,7 +116,6 @@ export function createStudioTerrainView(
       interval,
       scene.floorStyle,
     );
-    view.setNorthArrow(scene.north && controller.getSnapshot().source.terrain !== undefined);
   };
 
   return {
@@ -185,7 +184,6 @@ export function createStudioTerrainView(
           interval,
           scene.floorStyle,
         );
-        view.setNorthArrow(scene.north && place !== undefined);
         view.update(contours, width, height, settings, field, seaLevel, terraceLevels);
       }
     },

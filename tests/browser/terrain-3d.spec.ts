@@ -165,7 +165,6 @@ test('real location controls share contour intervals and export model attributio
   await page.getByLabel('Interval (m)').press('Tab');
   await page.getByRole('button', { name: 'Overlays', exact: true }).click();
   await expect(page.getByRole('switch', { name: 'Map grid', exact: true })).toBeEnabled();
-  await expect(page.getByRole('switch', { name: 'North arrow', exact: true })).toBeEnabled();
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Export ↗' }).click();
   const credit = await download(page, 'Download attribution');
@@ -189,7 +188,7 @@ test('cartographic floor styles repaint the floor without changing the STL', asy
 
   await page.keyboard.press('Escape');
 
-  for (const style of ['survey', 'plinth', 'rose', 'graticule', 'crop', 'grid']) {
+  for (const style of ['survey', 'plinth', 'rose', 'graticule', 'crop']) {
     await page.getByRole('button', { name: 'Overlays', exact: true }).click();
     await page.getByLabel('Floor style', { exact: true }).selectOption(style);
     await page.keyboard.press('Escape');

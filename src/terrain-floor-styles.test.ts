@@ -14,9 +14,7 @@ const squareCrop = { x: 5, y: 0, width: 20, height: 20 };
 const nonSquareCrop = { x: 20, y: 2, width: 8, height: 4 };
 const aso = { location: { latitude: 32.8842, longitude: 131.104 }, spanKm: 30 };
 const custom = { location: { latitude: 10, longitude: 20 }, spanKm: 30 };
-const cartographicStyles = (Object.keys(floorStyles) as FloorStyle[]).filter(
-  (style): style is Exclude<FloorStyle, 'grid'> => style !== 'grid',
-);
+const cartographicStyles = Object.keys(floorStyles) as FloorStyle[];
 
 void test('every cartographic style draws finite lines and labels around a named model', () => {
   for (const style of cartographicStyles) {
@@ -99,7 +97,7 @@ function getFrame(crop: typeof squareCrop): Omit<FloorFrame, 'context'> {
 }
 
 function paintFloor(
-  style: Exclude<FloorStyle, 'grid'>,
+  style: FloorStyle,
   place: FloorPlace,
   crop: typeof squareCrop,
 ): { calls: RecordedCall[]; texts: string } {

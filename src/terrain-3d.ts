@@ -66,7 +66,6 @@ export interface Terrain3d {
   setBase(value: boolean): void;
   setGround(value: boolean): void;
   setGroundColor(value: string | undefined): void;
-  setNorthArrow(value: boolean): void;
   setMapGrid(
     value: boolean,
     place: FloorPlace | undefined,
@@ -738,10 +737,6 @@ export function createTerrain3d(
       floorStyle: FloorStyle,
     ) {
       stage.setMapGrid(value, place, contourIntervalMeters, floorStyle);
-      draw();
-    },
-    setNorthArrow(value: boolean) {
-      stage.setNorthArrow(value);
       draw();
     },
     setSurfaceColor(value: string | undefined) {
