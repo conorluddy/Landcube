@@ -7,6 +7,7 @@ import { createCropPreview } from './studio/crop-preview';
 import { mountStudio } from './studio/app';
 import { downloadBlob } from './studio/export-panel';
 import { encodeTerrainStill } from './export/still-export';
+import { createBinaryStl } from './export/stl-export';
 import type { RealTerrain } from './real-terrain';
 import { createFloorPlace } from './floor-geo';
 import { findTerrainSummits } from './summit-markers';
@@ -157,6 +158,13 @@ controls.connect({
     );
 
     return { width: frame.width, height: frame.height };
+  },
+  frameChanged: terrain3d.frameChanged,
+  downloadFrameStl: (part) => {
+    downloadBlob(
+      new Blob([createBinaryStl(part.solid, `Topogra ${part.id}`)], { type: 'model/stl' }),
+      `topogra-${settings.seed}-${part.id}.stl`,
+    );
   },
   downloadStl: () => {
     const model = controls.getSnapshot().model.dimensions;

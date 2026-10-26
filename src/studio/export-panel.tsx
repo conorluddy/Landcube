@@ -375,6 +375,35 @@ export function ExportPanel({
           )}
         </Group>
       )}
+      {s.workspace.view === '3d' && s.frame.settings.preset !== 'none' && (
+        <Group title="Frame STL">
+          {s.frame.assembly?.ok === false && <p role="alert">{s.frame.assembly.error.message}</p>}
+          {(s.frame.assembly?.ok === true ? s.frame.assembly.data.parts : []).map((part) => (
+            <div key={part.id}>
+              <Hint>
+                {part.id}: {formatMm(part.sizeMm.x)} × {formatMm(part.sizeMm.z)} ×{' '}
+                {formatMm(part.sizeMm.y)} mm · print {part.printOrientation}
+              </Hint>
+              <Button
+                onClick={() => {
+                  c.downloadFrameStl(part.id);
+                }}
+              >
+                Download {part.id} STL
+              </Button>
+            </div>
+          ))}
+          {s.frame.assembly?.ok !== true && (
+            <Button disabled onClick={() => undefined}>
+              Download frame STL
+            </Button>
+          )}
+        </Group>
+      )}
     </>
   );
+}
+
+function formatMm(valueMm: number): string {
+  return String(Math.round(valueMm * 10) / 10);
 }

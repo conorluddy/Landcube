@@ -64,14 +64,20 @@ export function validatePrintableSolid(mesh: TerrainSurfaceBuffers): void {
   }
 }
 
-/** Binary STL in millimeters; rotates Y-up model coordinates into Z-up print coordinates. */
-export function createBinaryStl(mesh: TerrainSurfaceBuffers): ArrayBuffer {
+/**
+ * Binary STL in millimeters; rotates Y-up model coordinates into Z-up print coordinates.
+ * `label` leads the 80-byte header, so slicers show which part a file holds.
+ */
+export function createBinaryStl(
+  mesh: TerrainSurfaceBuffers,
+  label = 'Topogra terrain model',
+): ArrayBuffer {
   validatePrintableSolid(mesh);
   const count = mesh.indices.length / 3;
   const buffer = new ArrayBuffer(84 + count * 50);
   const bytes = new Uint8Array(buffer);
 
-  bytes.set(new TextEncoder().encode('Topogra terrain model | units: millimeters | Z up'));
+  bytes.set(new TextEncoder().encode(`${label} | units: millimeters | Z up`));
   const data = new DataView(buffer);
 
   data.setUint32(80, count, true);

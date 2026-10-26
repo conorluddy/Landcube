@@ -25,6 +25,8 @@ function setup() {
     pickFocus: () => Promise.resolve(false),
     downloadStill: () => Promise.resolve({ width: 1, height: 1 }),
     downloadStl: () => undefined,
+    frameChanged: () => undefined,
+    downloadFrameStl: () => undefined,
   };
   const controller = createStudioController({
     getSettings: () => design,
@@ -219,3 +221,40 @@ function stubBrowserTileDecoding(t: TestContext): void {
     Reflect.deleteProperty(globalThis, 'document');
   });
 }
+
+void test('frame assembly waits for the model height, then follows model and frame edits', () => {
+  const { controller: c } = setup();
+
+  c.frame({ preset: 'tray' });
+  assert.equal(c.getSnapshot().frame.assembly, undefined);
+
+  c.metrics(24);
+  const tray = c.getSnapshot().frame.assembly;
+
+  assert.ok(tray?.ok === true);
+  assert.deepEqual(
+    tray.data.parts.map(({ id }) => id),
+    ['frame'],
+  );
+  assert.ok(Math.abs(tray.data.parts[0].sizeMm.x - 170.6) < 1e-4);
+
+  assert.ok(c.dimensions({ cropShape: 'circle' }));
+  const round = c.getSnapshot().frame.assembly;
+
+  assert.ok(round?.ok === true);
+  assert.ok(Math.abs(round.data.parts[0].sizeMm.x - (150 + 2 * 10.3)) < 1e-3);
+});
+
+void test('an unprintable frame keeps its error and blocks part downloads', () => {
+  const { controller: c } = setup();
+
+  c.metrics(24);
+  c.frame({ preset: 'tray', borderWidthMm: 0.5 });
+  const assembly = c.getSnapshot().frame.assembly;
+
+  assert.ok(assembly?.ok === false);
+  assert.match(assembly.error.message, /minimum is 1\.2 mm/);
+
+  c.downloadFrameStl('frame');
+  assert.match(c.getSnapshot().status, /Frame part frame is not available/);
+});

@@ -95,9 +95,14 @@ export function resolveRimHeightMm(
   model: TerrainModelSettings,
   overallHeightMm: number,
 ): number {
-  return rimHeight.reference === 'model-base'
-    ? model.baseThicknessMm + rimHeight.aboveMm
-    : overallHeightMm - rimHeight.belowMm;
+  switch (rimHeight.reference) {
+    case 'model-base':
+      return model.baseThicknessMm + rimHeight.aboveMm;
+    case 'model-top':
+      return overallHeightMm - rimHeight.belowMm;
+    case 'floor':
+      return rimHeight.heightMm;
+  }
 }
 
 // === PART PROFILES ===

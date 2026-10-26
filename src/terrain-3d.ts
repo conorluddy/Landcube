@@ -19,6 +19,8 @@ import { createTerraceContours, type TerrainTerraceLevels } from './terrain-terr
 import { sampleHeightField } from './terrain-surface';
 import { createWaterVolume } from './terrain-water-volume';
 import { createTerrainStage, defaultTerrainGroundColor } from './terrain-stage';
+import { createTerrainFramePreview } from './terrain-frame-preview';
+import type { FramePart } from './types/frame';
 import type { FloorPlace } from './floor-geo';
 import type { FloorStyle } from './terrain-floor-styles';
 import { getTerrainWaterColor } from './terrain-water';
@@ -81,6 +83,8 @@ export interface Terrain3d {
   /** Pass false when a terrain update follows, so the new height morphs with it. */
   setHeight(value: number, shouldRebuild?: boolean): void;
   setModelSettings(value: TerrainModelSettings): void;
+  /** Shows frame parts around the model and lifts the model onto `seatHeightMm`. */
+  setFrame(parts: readonly FramePart[], seatHeightMm: number): void;
   getStl(): ArrayBuffer;
   setLandFinish(value: LandFinish): void;
   setElevationGradient(value: ElevationGradientSettings): void;
@@ -425,6 +429,9 @@ export function createTerrain3d(
 
   landscape.add(surface, base, contourLayer, sea, waterSides);
   scene.add(landscape);
+  const framePreview = createTerrainFramePreview();
+
+  scene.add(framePreview.group);
   let visible = false;
   let rotating = false;
   let previousTime = performance.now();
@@ -1142,6 +1149,17 @@ export function createTerrain3d(
     },
     setModelSettings(value: TerrainModelSettings) {
       modelSettings = { ...value };
+    },
+    setFrame(parts, seatHeightMm) {
+      const previewScale =
+        2 /
+        (modelSettings.cropShape === 'circle'
+          ? modelSettings.widthMm
+          : Math.max(modelSettings.widthMm, modelSettings.lengthMm));
+
+      framePreview.update(parts, previewScale);
+      landscape.position.y = seatHeightMm * previewScale;
+      draw();
     },
     getStl() {
       if (!model) {
