@@ -11,7 +11,7 @@ import {
   TerrainPanel,
   type PanelProps,
 } from './panels';
-import { Button, Group, Hint, NumberField, Range, Select } from './fields';
+import { Button, Group, Hint, NumberField, Range, Select, Toggle } from './fields';
 import { ExportPanel } from './export-panel';
 import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
@@ -175,6 +175,11 @@ function ModelPanel({
           options={['smooth', 'terraced']}
           onChange={(value) => c.dimensions({ terrainShape: value })}
         />
+        <Toggle
+          label="Auto height for location"
+          value={model.autoExaggeration}
+          onChange={(value) => c.model({ autoExaggeration: value })}
+        />
         <Range
           label="Height exaggeration"
           value={model.exaggeration}
@@ -182,7 +187,7 @@ function ModelPanel({
           max={1}
           step={0.05}
           suffix="×"
-          onChange={(value) => c.model({ exaggeration: value })}
+          onChange={(value) => c.model({ exaggeration: value, autoExaggeration: false })}
         />
         {model.dimensions.terrainShape === 'terraced' && (
           <Hint>
