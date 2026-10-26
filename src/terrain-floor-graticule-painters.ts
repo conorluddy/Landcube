@@ -93,10 +93,24 @@ export function paintSurveyLabels(
 
   pen.fill(inkAlpha.text);
 
+  const textWidth = block.width - 20;
+
   if (place.name !== undefined) {
-    pen.font(15, sans, 700, 0.06);
-    pen.text(place.name.toUpperCase(), block.x + 10, cursor, 'left', 'top');
-    cursor += 19;
+    // Long names break at their em dash, then shrink until every line fits the block.
+    const titleLines = place.name.toUpperCase().split(/\s+—\s+/);
+    let titleSize = 15;
+
+    pen.font(titleSize, sans, 700, 0.06);
+
+    while (titleSize > 9 && titleLines.some((line) => pen.measure(line) > textWidth)) {
+      titleSize -= 1;
+      pen.font(titleSize, sans, 700, 0.06);
+    }
+
+    for (const line of titleLines) {
+      pen.text(line, block.x + 10, cursor, 'left', 'top');
+      cursor += titleSize + 4;
+    }
 
     if (place.region !== undefined) {
       pen.font(10, sans, 400, 0.04);
@@ -110,13 +124,27 @@ export function paintSurveyLabels(
   }
 
   const contours =
-    contourIntervalMeters === undefined ? '' : ` · contours ${contourIntervalMeters} m`;
+    contourIntervalMeters === undefined ? undefined : `contours ${contourIntervalMeters} m`;
+  const sizeLine = `${formatModelSize(place)} · ${contours}`;
 
   pen.font(10, mono);
-  pen.text(formatDecimalPair(place), block.x + 10, cursor, 'left', 'top');
-  pen.text(`${formatModelSize(place)}${contours}`, block.x + 10, cursor + 13, 'left', 'top');
+
+  const detailLines = [
+    formatDecimalPair(place),
+    ...(contours === undefined
+      ? [formatModelSize(place)]
+      : pen.measure(sizeLine) <= textWidth
+        ? [sizeLine]
+        : [formatModelSize(place), contours]),
+  ];
+
+  for (const line of detailLines) {
+    pen.text(line, block.x + 10, cursor, 'left', 'top');
+    cursor += 13;
+  }
+
   pen.stroke(inkAlpha.text, 2);
-  pen.strokeRect(block.x, block.y, block.width, cursor + 13 + 18 - block.y);
+  pen.strokeRect(block.x, block.y, block.width, cursor + 5 - block.y);
 }
 
 export function paintGraticuleLines(pen: FloorPen, place: FloorPlace): void {

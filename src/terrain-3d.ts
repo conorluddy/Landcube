@@ -1,5 +1,8 @@
 import { createTerrainElevationMaterial } from './terrain-elevation-material';
-import type { ElevationGradientSettings } from './terrain-elevation-gradient';
+import {
+  interpolateElevationGradient,
+  type ElevationGradientSettings,
+} from './terrain-elevation-gradient';
 import {
   landFinishes,
   waterFinishes,
@@ -120,6 +123,7 @@ interface RunningTerrainTransition {
   outgoingContours: LineSegments2[];
   outgoingStrokeOpacity: number;
   previousGradientRange: GradientRange;
+  previousGradient?: ElevationGradientSettings;
   incomingOpacity: number;
 }
 
@@ -179,6 +183,21 @@ export function createTerrain3d(
   let isTransitionArmed = false;
   let transition: RunningTerrainTransition | undefined;
   let pendingMapGrid: Parameters<Terrain3d['setMapGrid']> | undefined;
+  // Like the map grid, a gradient arriving with a terrain change waits to blend with the morph.
+  let targetGradient: ElevationGradientSettings | undefined;
+  let shownGradient: ElevationGradientSettings | undefined;
+
+  const showGradient = (value: ElevationGradientSettings) => {
+    elevationGradient.setSettings(value);
+    shownGradient = value;
+  };
+
+  const showTargetGradient = () => {
+    if (targetGradient && targetGradient !== shownGradient) {
+      showGradient(targetGradient);
+    }
+  };
+
   let strokeOpacity = 1;
   // Engraving and water are built for the destination, so they wait for the incoming fade.
   const shouldHideDecorations = () => transition?.incomingOpacity === 0;
@@ -688,6 +707,7 @@ export function createTerrain3d(
       outgoingContours,
       outgoingStrokeOpacity: strokeOpacity,
       previousGradientRange,
+      previousGradient: shownGradient,
       incomingOpacity: 0,
     };
     // Bounds lag the morphing vertices, so culling could drop terrain or its shadow mid-blend.
@@ -723,6 +743,18 @@ export function createTerrain3d(
       (1 - progress) * fromMaximum + progress * toMaximum,
     );
 
+    const { previousGradient } = transition;
+
+    if (
+      previousGradient?.enabled === true &&
+      targetGradient?.enabled === true &&
+      previousGradient !== targetGradient
+    ) {
+      showGradient(interpolateElevationGradient(previousGradient, targetGradient, progress));
+    } else {
+      showTargetGradient();
+    }
+
     for (const line of transition.outgoingContours) {
       line.material.opacity = transition.outgoingStrokeOpacity * frame.outgoingOpacity;
     }
@@ -750,6 +782,7 @@ export function createTerrain3d(
     }
 
     elevationGradient.setRange(...gradientRange);
+    showTargetGradient();
     syncDecorations();
     renderer.domElement.dataset.terrainTransition = 'settled';
 
@@ -1049,6 +1082,7 @@ export function createTerrain3d(
 
       if (!transition) {
         applyPendingMapGrid();
+        showTargetGradient();
       }
 
       seaInk.set(settings.lineColor);
@@ -1106,7 +1140,12 @@ export function createTerrain3d(
       draw();
     },
     setElevationGradient(value: ElevationGradientSettings) {
-      elevationGradient.setSettings(value);
+      targetGradient = value;
+
+      if (!isTransitionArmed && !transition) {
+        showGradient(value);
+      }
+
       draw();
     },
     setLandFinish(value: LandFinish) {

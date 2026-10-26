@@ -1,3 +1,5 @@
+import { mixOklch } from './color/oklch';
+
 export interface ElevationColorStop {
   position: number;
   color: string;
@@ -161,6 +163,54 @@ export type LandscapeType = LandscapeGradientKey extends `landscape-${infer Type
 
 export function getLandscapeGradientKey(landscape: LandscapeType): LandscapeGradientKey {
   return `landscape-${landscape}`;
+}
+
+/** Blends stop-for-stop in OKLCH; both gradients are first resampled at shared positions. */
+export function interpolateElevationGradient(
+  from: ElevationGradientSettings,
+  to: ElevationGradientSettings,
+  fraction: number,
+): ElevationGradientSettings {
+  const union = [...new Set([...from.stops, ...to.stops].map((stop) => stop.position))].sort(
+    (a, b) => a - b,
+  );
+  const positions =
+    union.length > maximumElevationColorStops
+      ? Array.from(
+          { length: maximumElevationColorStops },
+          (_, i) => i / (maximumElevationColorStops - 1),
+        )
+      : union;
+  const fromStops = resampleElevationGradient(from.stops, positions);
+  const toStops = resampleElevationGradient(to.stops, positions);
+
+  return {
+    ...to,
+    stops: positions.map((position, i) => ({
+      position,
+      color: mixOklch(fromStops[i].color, toStops[i].color, fraction),
+    })),
+  };
+}
+
+/** Samples a soft gradient's colour at each position, mixing neighbours in linear light. */
+export function resampleElevationGradient(
+  stops: readonly ElevationColorStop[],
+  positions: readonly number[],
+): ElevationColorStop[] {
+  return positions.map((position) => {
+    const upperIndex = stops.findIndex((stop) => stop.position >= position);
+    const upper = stops[upperIndex];
+
+    if (upperIndex <= 0 || upper.position === position) {
+      return { position, color: upper.color };
+    }
+
+    const lower = stops[upperIndex - 1];
+    const fraction = (position - lower.position) / (upper.position - lower.position);
+
+    return { position, color: mixElevationColors(lower.color, upper.color, fraction) };
+  });
 }
 
 export function copyElevationGradient(
