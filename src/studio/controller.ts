@@ -47,7 +47,6 @@ export interface SceneSettings {
   groundColor: string;
   mapGrid: boolean;
   floorStyle: FloorStyle;
-  north: boolean;
   waterStyle: WaterStyle;
   waterFinish: WaterFinish;
   waterMatch: boolean;
@@ -181,7 +180,6 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       groundColor: '#b4b4b4',
       mapGrid: true,
       floorStyle: 'survey',
-      north: true,
       waterStyle: 'solid',
       waterFinish: natural.waterFinish,
       waterMatch: false,

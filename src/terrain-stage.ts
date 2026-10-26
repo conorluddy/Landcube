@@ -1,18 +1,17 @@
-import { createTerrainMapGrid, getMapGridInk } from './terrain-map-grid';
+import { createTerrainMapGrid } from './terrain-map-grid';
 import type { FloorPlace } from './floor-geo';
 import type { FloorStyle } from './terrain-floor-styles';
 import * as THREE from 'three';
 
 export const defaultTerrainGroundColor = '#b4b4b4';
 
-/** Presentation-only studio floor and geographic marker; never part of the printable model. */
+/** Presentation-only studio floor and map dressing; never part of the printable model. */
 export function createTerrainStage(): {
   group: THREE.Group;
   update(width: number, length: number, background: string, circular: boolean): void;
   setVisible(value: boolean): void;
   setColor(value: string): void;
   setCastShadows(value: boolean): void;
-  setNorthArrow(value: boolean): void;
   setMapGrid(
     value: boolean,
     place: FloorPlace | undefined,
@@ -95,71 +94,17 @@ export function createTerrainStage(): {
   shadow.position.y = -0.003;
   group.add(shadow);
 
-  const north = new THREE.Group();
-  const arrowMaterial = new THREE.MeshBasicMaterial({
-    color: getMapGridInk(defaultTerrainGroundColor).color,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.38,
-    depthWrite: false,
-    toneMapped: false,
-  });
-  const arrowGeometry = new THREE.BufferGeometry();
-
-  // In the terrain frame, decreasing Z is geographic north. The arrow is painted on the floor.
-  arrowGeometry.setAttribute(
-    'position',
-    new THREE.Float32BufferAttribute(
-      [
-        0, 0, -0.3, -0.065, 0, -0.13, 0.065, 0, -0.13, -0.012, 0, -0.14, -0.012, 0, 0, 0.012, 0, 0,
-        -0.012, 0, -0.14, 0.012, 0, 0, 0.012, 0, -0.14,
-      ],
-      3,
-    ),
-  );
-  north.add(new THREE.Mesh(arrowGeometry, arrowMaterial));
-  const letterMaterial = new THREE.LineBasicMaterial({
-    color: getMapGridInk(defaultTerrainGroundColor).color,
-    transparent: true,
-    opacity: 0.55,
-    depthWrite: false,
-    toneMapped: false,
-  });
-  const letterGeometry = new THREE.BufferGeometry();
-
-  letterGeometry.setAttribute(
-    'position',
-    new THREE.Float32BufferAttribute(
-      [
-        -0.035, 0, -0.35, -0.035, 0, -0.44, -0.035, 0, -0.44, 0.035, 0, -0.35, 0.035, 0, -0.35,
-        0.035, 0, -0.44,
-      ],
-      3,
-    ),
-  );
-  north.add(new THREE.LineSegments(letterGeometry, letterMaterial));
-  north.position.y = 0;
-  north.visible = false;
-  group.add(north);
-
   const mapGrid = createTerrainMapGrid();
 
   group.add(mapGrid.mesh);
   let gridEnabled = false;
-  let northEnabled = false;
   let floorPlace: FloorPlace | undefined;
   let contourInterval: number | undefined;
   let style: FloorStyle = 'survey';
   let stageSize = { width: 2, length: 2, circular: false, background: defaultTerrainGroundColor };
 
   const updateGrid = () => {
-    const ink = getMapGridInk(stageSize.background).color;
-
-    arrowMaterial.color.set(ink);
-    letterMaterial.color.set(ink);
     mapGrid.mesh.visible = gridEnabled && floorPlace !== undefined;
-    // Every cartographic floor style paints its own north marker.
-    north.visible = northEnabled && !mapGrid.mesh.visible;
     mapGrid.update(
       stageSize.width,
       stageSize.length,
@@ -190,7 +135,6 @@ export function createTerrainStage(): {
 
       groundMaterial.color.set(background);
       shadow.scale.set((width * 256) / 192, (length * 256) / 192, 1);
-      north.position.set(-width / 2 - 0.2, 0, length / 2 - 0.05);
     },
     setCastShadows(value) {
       shadowEnabled.value = value ? 1 : 0;
@@ -208,10 +152,6 @@ export function createTerrainStage(): {
       gridEnabled = value;
       floorPlace = place;
       style = floorStyle;
-      updateGrid();
-    },
-    setNorthArrow(value) {
-      northEnabled = value;
       updateGrid();
     },
   };
