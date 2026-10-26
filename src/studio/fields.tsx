@@ -197,6 +197,7 @@ export function Range({
   max,
   step,
   suffix = '',
+  displayValue,
   id,
   disabled = false,
 }: {
@@ -207,6 +208,8 @@ export function Range({
   max: number;
   step: number;
   suffix?: string;
+  /** Shown and announced instead of `value`, for sliders that step through a list of stops. */
+  displayValue?: string;
   id?: string;
   disabled?: boolean;
 }): ReactNode {
@@ -216,10 +219,7 @@ export function Range({
   return (
     <div className="range-control">
       <label htmlFor={fieldId}>{label}</label>
-      <output htmlFor={fieldId}>
-        {Number(value.toFixed(2))}
-        {suffix}
-      </output>
+      <output htmlFor={fieldId}>{displayValue ?? `${Number(value.toFixed(2))}${suffix}`}</output>
       <input
         id={fieldId}
         type="range"
@@ -227,6 +227,7 @@ export function Range({
         max={max}
         step={step}
         value={value}
+        aria-valuetext={displayValue}
         disabled={disabled}
         onChange={(event) => {
           onChange(event.target.valueAsNumber);

@@ -9,6 +9,12 @@ export const realTerrainBounds = {
   defaultSpanKm: 25,
 } as const;
 
+/** Span slider stops: roughly logarithmic so small crops stay precise. Every preset span is a stop. */
+export const realTerrainSpanStopsKm = [
+  2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90,
+  100, 120, 140, 160, 180, 200,
+] as const;
+
 /** Suggested centered crops; spans remain editable in the browser and CLI. */
 export const realTerrainPresets = [
   { name: 'Wicklow Mountains', country: 'Ireland', latitude: 53.01, longitude: -6.33, spanKm: 25 },
