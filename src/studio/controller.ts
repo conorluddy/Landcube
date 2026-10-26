@@ -30,7 +30,7 @@ import {
   validateElevationGradient,
   type ElevationGradientSettings,
 } from '../terrain-elevation-gradient';
-import { realTerrainPresets } from '../constants/real-terrain';
+import { realTerrainPresetGroups, realTerrainPresets } from '../constants/real-terrain';
 import { loadBrowserRealTerrain } from '../browser-real-terrain';
 import { validateRealContourInterval } from '../real-terrain-contours';
 import type { RealTerrain } from '../real-terrain';
@@ -89,6 +89,8 @@ export interface TerrainSourceState {
   hatching: boolean;
   loading: boolean;
   status: string;
+  /** Steps through preset locations in menu order, waiting after each load settles. */
+  autoplay: { enabled: boolean; delaySeconds: number };
 }
 export interface StudioState {
   design: ValidatedDesignSettings;
@@ -162,6 +164,7 @@ export interface StudioController {
   /** Switches to real terrain, opening its location controls and loading the selected place. */
   useCoordinates: () => Promise<void>;
   loadTerrain: () => Promise<void>;
+  autoplay: (patch: Partial<TerrainSourceState['autoplay']>) => Promise<void>;
   interval: (value: 'auto' | number) => boolean;
   hatching: (value: boolean) => void;
   resetCamera: () => void;
@@ -187,6 +190,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       hatching: true,
       loading: false,
       status: '',
+      autoplay: { enabled: false, delaySeconds: 10 },
     },
     scene: {
       contours: true,
@@ -244,6 +248,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
   let effects: StudioEffects | undefined;
   let requestVersion = 0;
   // Procedural mode parks the last real terrain so switching back is instant.
+  let autoplayTimer: ReturnType<typeof setTimeout> | undefined;
   let parked: { terrain: RealTerrain; fieldsKey: string } | undefined;
   let loadedFieldsKey = '';
   const listeners = new Set<() => void>();
@@ -504,6 +509,48 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       state = { ...state, metrics: { height, layerHeight } };
       publish();
     },
+    async autoplay(patch) {
+      const wasEnabled = state.source.autoplay.enabled;
+
+      controller.source({ autoplay: { ...state.source.autoplay, ...patch } });
+      clearTimeout(autoplayTimer);
+
+      if (!state.source.autoplay.enabled) {
+        return;
+      }
+
+      if (!wasEnabled && state.source.selected !== 'real') {
+        await controller.useCoordinates();
+      }
+
+      const scheduleNextPlace = () => {
+        clearTimeout(autoplayTimer);
+
+        // Re-read after each load: the tour may have been switched off mid-download.
+        if (!state.source.autoplay.enabled) {
+          return;
+        }
+
+        autoplayTimer = setTimeout(() => {
+          void showNextPlace();
+        }, state.source.autoplay.delaySeconds * 1000);
+      };
+
+      const showNextPlace = async () => {
+        const next = getNextAutoplayPlace(state.source.place);
+
+        controller.source({
+          place: `${next.latitude},${next.longitude}`,
+          latitude: next.latitude,
+          longitude: next.longitude,
+          spanKm: next.spanKm,
+        });
+        await controller.loadTerrain();
+        scheduleNextPlace();
+      };
+
+      scheduleNextPlace();
+    },
     source(patch: Partial<TerrainSourceState>) {
       state = { ...state, source: { ...state.source, ...patch } };
       publish();
@@ -512,6 +559,8 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       if (state.source.selected === 'generated') {
         return;
       }
+
+      void controller.autoplay({ enabled: false });
 
       requestVersion++;
 
@@ -682,4 +731,14 @@ function applyLocationGradient(
     }),
     gradientPreset: key,
   };
+}
+
+/** Follows the grouped menu order so autoplay matches what the location select shows. */
+function getNextAutoplayPlace(place: string): (typeof realTerrainPresets)[number] {
+  const places = realTerrainPresetGroups.flatMap((group) => group.locations);
+  const index = places.findIndex(
+    (candidate) => `${candidate.latitude},${candidate.longitude}` === place,
+  );
+
+  return places[(index + 1) % places.length];
 }

@@ -75,6 +75,29 @@ export function TerrainPanel({ controller: c, state: s }: PanelProps): ReactNode
 
   return (
     <>
+      <Group title="Autoplay">
+        <Toggle
+          label="Tour preset locations"
+          value={source.autoplay.enabled}
+          onChange={(value) => {
+            void c.autoplay({ enabled: value });
+          }}
+        />
+        {source.autoplay.enabled && (
+          <Range
+            id="autoplay-delay"
+            label="Delay"
+            value={source.autoplay.delaySeconds}
+            min={5}
+            max={60}
+            step={1}
+            suffix=" s"
+            onChange={(value) => {
+              void c.autoplay({ delaySeconds: value });
+            }}
+          />
+        )}
+      </Group>
       {source.selected === 'generated' ? (
         <Group title="Procedural landscape">
           <Hint>

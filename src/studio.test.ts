@@ -163,6 +163,27 @@ void test('location gradient follows loaded places until the user picks one', as
   assert.equal(c.getSnapshot().scene.gradientPreset, 'landscape-coastal');
 });
 
+void test('autoplay tours preset locations after each delay until switched off', async (t) => {
+  const { controller: c } = setup();
+
+  stubBrowserTileDecoding(t);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  await c.autoplay({ enabled: true, delaySeconds: 5 });
+  const firstPlace = c.getSnapshot().source.place;
+
+  assert.equal(c.getSnapshot().source.selected, 'real');
+  t.mock.timers.tick(5000);
+  await new Promise(setImmediate);
+  assert.notEqual(c.getSnapshot().source.place, firstPlace);
+
+  const secondPlace = c.getSnapshot().source.place;
+
+  await c.autoplay({ enabled: false });
+  t.mock.timers.tick(60_000);
+  await new Promise(setImmediate);
+  assert.equal(c.getSnapshot().source.place, secondPlace);
+});
+
 /** Serves flat Terrarium tiles through the browser decoding path without a network or canvas. */
 function stubBrowserTileDecoding(t: TestContext): void {
   const tileSizePixels = 256;
