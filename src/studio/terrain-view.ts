@@ -13,6 +13,8 @@ interface StudioTerrainView {
   sceneChanged: (previous: SceneSettings) => void;
   modelChanged: () => void;
   resetCamera: () => void;
+  /** Arms a morph for the next 3D rebuild; the 2D view and an inactive 3D view always cut. */
+  requestTransition: () => void;
   getStl: () => ArrayBuffer;
   update: (
     contours: Contour[],
@@ -152,6 +154,11 @@ export function createStudioTerrainView(
       changed();
     },
     resetCamera: () => view?.reset(),
+    requestTransition() {
+      if (active) {
+        view?.requestTransition();
+      }
+    },
     getStl() {
       if (!view || !active) {
         throw new Error('Select the 3D view before downloading STL.');

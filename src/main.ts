@@ -105,7 +105,13 @@ let settingsUpdateFrameIdentifier: number | undefined;
 const controls = createStudioController({
   getSettings: () => settings,
   updateSettings,
-  newLandscape: () => updateSettings({ ...settings, seed: generateRandomSeed() }),
+  newLandscape: () => {
+    if (!realTerrain) {
+      requestTerrainTransition();
+    }
+
+    updateSettings({ ...settings, seed: generateRandomSeed() });
+  },
   isSeedLocked: storedSeedResult.ok && storedSeedResult.data === settings.seed,
   lockSeed: (isLocked) => {
     try {
@@ -149,7 +155,11 @@ controls.connect({
         : `topogra-${settings.seed}-${model.widthMm}x${model.lengthMm}mm.stl`,
     );
   },
-  applyTerrain: (loadedTerrain) => {
+  applyTerrain: (loadedTerrain, shouldTransition) => {
+    if (shouldTransition) {
+      requestTerrainTransition();
+    }
+
     realTerrain = loadedTerrain;
     contourElevations = calculateContourElevations(settings, engineConfiguration, realTerrain);
     terrain = realTerrain
@@ -251,6 +261,13 @@ function updateSettings(nextDesignSettings: DesignSettings): boolean {
   });
 
   return true;
+}
+
+/** Arms a 3D landscape morph for the next rebuild; reduced motion always cuts. */
+function requestTerrainTransition(): void {
+  if (!reducedMotionPreference.matches) {
+    terrain3d.requestTransition();
+  }
 }
 
 /** Flushes pending edits into the current share URL. */
