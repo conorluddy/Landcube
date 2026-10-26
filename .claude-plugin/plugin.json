@@ -1,6 +1,6 @@
 {
   "name": "topogra",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Generate reproducible topographic SVG and PNG assets from synthetic landscapes or real-world terrain.",
   "author": {
     "name": "Conor Luddy",
