@@ -186,7 +186,7 @@ function findTraySettingsError(
   }
 
   if (outerHalfExtentMm <= 0) {
-    return `borderWidthMm ${tray.borderWidthMm} collapses the tray's outer edge to a half-extent of ${outerHalfExtentMm} mm. Use a border of at least ${minimumFrameWallMm} mm.`;
+    return `borderWidthMm ${tray.borderWidthMm} with clearanceMm ${tray.clearanceMm} collapses the tray's outer edge to a half-extent of ${outerHalfExtentMm} mm. Increase borderWidthMm or clearanceMm so they sum to more than ${-getOutlineHalfExtentMm(footprint, 0)} mm.`;
   }
 
   return undefined;

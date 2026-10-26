@@ -108,6 +108,37 @@ void test('a border that collapses the outer ring names borderWidthMm', () => {
   assert.match(message, /borderWidthMm/);
 });
 
+void test('an outer edge collapsed by clearance names both settings', () => {
+  const message = expectErrorMessage(
+    createFrameAssembly(
+      rectangleModel,
+      overallHeightMm,
+      tray(rectangleModel, { borderWidthMm: -90, clearanceMm: 10 }),
+    ),
+  );
+
+  assert.match(message, /Increase borderWidthMm or clearanceMm so they sum to more than -75 mm/);
+});
+
+void test('square outline does not match a non-square rectangle', () => {
+  const model = { widthMm: 120, lengthMm: 80, baseThicknessMm: 3 };
+  const message = expectErrorMessage(
+    createFrameAssembly(model, overallHeightMm, tray(model, { outline: 'square' })),
+  );
+
+  assert.match(message, /use outline match/);
+});
+
+void test('an invalid overall height is rejected', () => {
+  for (const height of [0, Number.NaN]) {
+    const message = expectErrorMessage(
+      createFrameAssembly(rectangleModel, height, tray(rectangleModel)),
+    );
+
+    assert.match(message, /overallHeightMm/);
+  }
+});
+
 void test('a clearance that collapses the opening names clearanceMm', () => {
   const message = expectErrorMessage(
     createFrameAssembly(

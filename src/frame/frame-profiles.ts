@@ -12,6 +12,8 @@ export interface TrayProfileDimensions {
 }
 
 const overhangToleranceDegrees = 1e-9;
+/** Computed bed heights can miss the minimum by rounding; that face still rests on the bed. */
+const bedToleranceMm = 1e-9;
 
 // === PUBLIC API ===
 
@@ -92,7 +94,9 @@ export function validateProfileOverhang(profile: FrameProfile): Result<FrameProf
     const start = faces[index];
     const end = faces[index + 1];
     const lengthMm = Math.hypot(end.offsetMm - start.offsetMm, end.heightMm - start.heightMm);
-    const isOnBed = start.heightMm === bedHeightMm && end.heightMm === bedHeightMm;
+    const isOnBed =
+      Math.abs(start.heightMm - bedHeightMm) < bedToleranceMm &&
+      Math.abs(end.heightMm - bedHeightMm) < bedToleranceMm;
 
     if (isOnBed || lengthMm === 0) {
       continue;
