@@ -14,6 +14,20 @@ export function sweepFrameProfile(
     throw new Error(`A frame profile needs at least 2 points; got ${points.length}.`);
   }
 
+  // Repeated points would sweep into zero-area triangles that fail as a misleading STL error.
+  for (let index = 1; index < points.length; index++) {
+    const previous = points[index - 1];
+
+    if (
+      points[index].offsetMm === previous.offsetMm &&
+      points[index].heightMm === previous.heightMm
+    ) {
+      throw new Error(
+        `Frame profile points ${index - 1} and ${index} repeat (${previous.offsetMm}, ${previous.heightMm}). Remove the duplicate point.`,
+      );
+    }
+  }
+
   const positions: number[] = [];
   let ringSize = 0;
 

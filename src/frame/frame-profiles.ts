@@ -194,12 +194,16 @@ function describeFace(
   end: FrameProfilePoint,
 ): string {
   if (index === 0) {
-    return `The start cap at height ${start.heightMm} mm`;
+    return `The start cap at height ${roundMm(start.heightMm)} mm`;
   }
 
   if (index === faceCount - 2) {
-    return `The end cap at height ${start.heightMm} mm`;
+    return `The end cap at height ${roundMm(start.heightMm)} mm`;
   }
 
-  return `Profile segment ${index - 1} from (${start.offsetMm}, ${start.heightMm}) to (${end.offsetMm}, ${end.heightMm})`;
+  return `Profile segment ${index - 1} from (${roundMm(start.offsetMm)}, ${roundMm(start.heightMm)}) to (${roundMm(end.offsetMm)}, ${roundMm(end.heightMm)})`;
+}
+
+function roundMm(valueMm: number): number {
+  return Math.round(valueMm * 100) / 100;
 }

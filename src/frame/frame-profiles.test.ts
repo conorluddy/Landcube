@@ -42,6 +42,7 @@ void test('a 60° upright overhang is rejected and its segment named', () => {
 
   assert.match(message, /^Profile segment 1 /);
   assert.match(message, /60\.0°/);
+  assert.match(message, /to \(11\.73, 6\)/);
 });
 
 void test('an overhang of exactly 45° is accepted', () => {

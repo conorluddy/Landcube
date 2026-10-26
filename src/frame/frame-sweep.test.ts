@@ -24,3 +24,16 @@ for (const footprint of [
     assert.equal(solid.indices.length / 3, ringSize * 4);
   });
 }
+
+void test('repeated profile points are rejected before they become zero-area triangles', () => {
+  assert.throws(
+    () =>
+      sweepFrameProfile({ shape: 'circle', radiusMm: 20 }, [
+        { offsetMm: 5, heightMm: 0 },
+        { offsetMm: 5, heightMm: 2 },
+        { offsetMm: 5, heightMm: 2 },
+        { offsetMm: 0, heightMm: 2 },
+      ]),
+    /points 1 and 2 repeat/,
+  );
+});
