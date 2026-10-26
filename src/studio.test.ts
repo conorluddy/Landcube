@@ -61,6 +61,7 @@ void test('studio switches views without losing independent sections or project 
 
   c.selectSection('Colour');
   c.selectSection('Model');
+  c.selectSection('Camera');
   assert.equal(c.getSnapshot().workspace.sections['2d'], 'Colour');
   await c.selectView('3d');
   c.selectSection('Model');

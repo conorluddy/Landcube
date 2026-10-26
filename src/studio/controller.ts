@@ -264,6 +264,8 @@ export function createStudioController(actions: DesignControlActions): StudioCon
     publish();
   };
 
+  let latestFocusPickId = 0;
+
   const applySource = (terrain: RealTerrain | undefined, shouldTransition: boolean) => {
     const previousLocation = state.source.terrain?.location;
     const nextLocation = terrain?.location;
@@ -434,8 +436,15 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       effects?.applyViewPreset(preset);
     },
     async pickFocus() {
+      const pickId = ++latestFocusPickId;
+
       notify('Click the terrain to set focus. Press Escape to cancel.');
       const picked = (await effects?.pickFocus()) ?? false;
+
+      // A newer pick superseded this one and owns the status message.
+      if (pickId !== latestFocusPickId) {
+        return;
+      }
 
       if (picked) {
         controller.camera({ focusFollowsTarget: false });
