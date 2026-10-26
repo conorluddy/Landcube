@@ -146,6 +146,22 @@ void test('location loads and source switches morph terrain while interval and h
   assert.deepEqual(transitions, [true, false, false, true, true]);
 });
 
+void test('location gradient follows loaded places until the user picks one', async (t) => {
+  const { controller: c } = setup();
+
+  stubBrowserTileDecoding(t);
+  await c.loadTerrain();
+  assert.equal(c.getSnapshot().scene.gradientPreset, 'landscape-temperate');
+
+  c.scene({ gradientPreset: 'paper', gradientSource: 'user' });
+  c.source({ latitude: 53.2707, longitude: -9.0568 });
+  await c.loadTerrain();
+  assert.equal(c.getSnapshot().scene.gradientPreset, 'paper');
+
+  c.scene({ gradientSource: 'location' });
+  assert.equal(c.getSnapshot().scene.gradientPreset, 'landscape-coastal');
+});
+
 /** Serves flat Terrarium tiles through the browser decoding path without a network or canvas. */
 function stubBrowserTileDecoding(t: TestContext): void {
   const tileSizePixels = 256;

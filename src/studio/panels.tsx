@@ -339,7 +339,11 @@ function Gradient({ controller: c, state: s }: PanelProps): ReactNode {
   const gradient = s.scene.gradient;
 
   const update = (patch: Partial<typeof gradient>) => {
-    c.scene({ gradient: { ...gradient, ...patch }, gradientPreset: 'custom' });
+    c.scene({
+      gradient: { ...gradient, ...patch },
+      gradientPreset: 'custom',
+      gradientSource: 'user',
+    });
   };
 
   return (
@@ -348,20 +352,27 @@ function Gradient({ controller: c, state: s }: PanelProps): ReactNode {
         label="Color by elevation"
         value={gradient.enabled}
         onChange={(value) => {
-          update({ enabled: value });
+          c.scene({ gradient: { ...gradient, enabled: value } });
         }}
       />
       {gradient.enabled && (
         <>
           <Select
             label="Gradient preset"
-            value={s.scene.gradientPreset}
+            value={s.scene.gradientSource === 'location' ? 'location' : s.scene.gradientPreset}
             options={[
+              { value: 'location', label: 'Match location' },
               { value: 'custom', label: 'Custom' },
               { group: 'Studio', options: namedOptions(elevationGradientPresets) },
               { group: 'Landscapes', options: namedOptions(landscapeGradientPresets) },
             ]}
             onChange={(key) => {
+              if (key === 'location') {
+                c.scene({ gradientSource: 'location' });
+
+                return;
+              }
+
               const preset = (
                 {
                   ...elevationGradientPresets,
@@ -373,6 +384,7 @@ function Gradient({ controller: c, state: s }: PanelProps): ReactNode {
                 c.scene({
                   gradient: { ...gradient, stops: preset.stops.map((stop) => ({ ...stop })) },
                   gradientPreset: key,
+                  gradientSource: 'user',
                 });
               }
             }}
@@ -382,7 +394,7 @@ function Gradient({ controller: c, state: s }: PanelProps): ReactNode {
             value={gradient.transition}
             options={['soft', 'hard']}
             onChange={(value) => {
-              update({ transition: value });
+              c.scene({ gradient: { ...gradient, transition: value } });
             }}
           />
           <div
