@@ -50,7 +50,11 @@ export function Select<T extends string>({
 }: {
   label: string;
   value: T;
-  options: readonly (T | { value: T; label: string })[];
+  options: readonly (
+    | T
+    | { value: T; label: string }
+    | { group: string; options: readonly { value: T; label: string }[] }
+  )[];
   onChange: (value: T) => void;
   disabled?: boolean;
   id?: string;
@@ -69,6 +73,18 @@ export function Select<T extends string>({
         }}
       >
         {options.map((option) => {
+          if (typeof option === 'object' && 'group' in option) {
+            return (
+              <optgroup key={option.group} label={option.group}>
+                {option.options.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </optgroup>
+            );
+          }
+
           const item = typeof option === 'string' ? { value: option, label: option } : option;
 
           return (

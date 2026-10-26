@@ -31,7 +31,9 @@ import { floorStyles } from '../terrain-floor-styles';
 import {
   elevationGradientPresets,
   getElevationGradientCss,
+  landscapeGradientPresets,
   maximumElevationColorStops,
+  type ElevationColorStop,
 } from '../terrain-elevation-gradient';
 import { getTerrainWaterColor } from '../terrain-water';
 import type { DesignSettings } from '../types/design';
@@ -337,7 +339,11 @@ function Gradient({ controller: c, state: s }: PanelProps): ReactNode {
   const gradient = s.scene.gradient;
 
   const update = (patch: Partial<typeof gradient>) => {
-    c.scene({ gradient: { ...gradient, ...patch }, gradientPreset: 'custom' });
+    c.scene({
+      gradient: { ...gradient, ...patch },
+      gradientPreset: 'custom',
+      gradientSource: 'user',
+    });
   };
 
   return (
@@ -346,32 +352,39 @@ function Gradient({ controller: c, state: s }: PanelProps): ReactNode {
         label="Color by elevation"
         value={gradient.enabled}
         onChange={(value) => {
-          update({ enabled: value });
+          c.scene({ gradient: { ...gradient, enabled: value } });
         }}
       />
       {gradient.enabled && (
         <>
           <Select
             label="Gradient preset"
-            value={s.scene.gradientPreset}
+            value={s.scene.gradientSource === 'location' ? 'location' : s.scene.gradientPreset}
             options={[
+              { value: 'location', label: 'Match location' },
               { value: 'custom', label: 'Custom' },
-              ...namedOptions(elevationGradientPresets),
+              { group: 'Studio', options: namedOptions(elevationGradientPresets) },
+              { group: 'Landscapes', options: namedOptions(landscapeGradientPresets) },
             ]}
             onChange={(key) => {
+              if (key === 'location') {
+                c.scene({ gradientSource: 'location' });
+
+                return;
+              }
+
               const preset = (
-                elevationGradientPresets as Partial<
-                  Record<
-                    string,
-                    (typeof elevationGradientPresets)[keyof typeof elevationGradientPresets]
-                  >
-                >
+                {
+                  ...elevationGradientPresets,
+                  ...landscapeGradientPresets,
+                } as Partial<Record<string, { stops: readonly ElevationColorStop[] }>>
               )[key];
 
               if (preset) {
                 c.scene({
                   gradient: { ...gradient, stops: preset.stops.map((stop) => ({ ...stop })) },
                   gradientPreset: key,
+                  gradientSource: 'user',
                 });
               }
             }}
@@ -381,7 +394,7 @@ function Gradient({ controller: c, state: s }: PanelProps): ReactNode {
             value={gradient.transition}
             options={['soft', 'hard']}
             onChange={(value) => {
-              update({ transition: value });
+              c.scene({ gradient: { ...gradient, transition: value } });
             }}
           />
           <div
