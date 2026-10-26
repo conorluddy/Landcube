@@ -544,10 +544,8 @@ input[type='range']::-moz-range-thumb {
     padding: 0 10px;
     gap: 10px;
   }
-  .studio-brand small {
-    display: none;
-  }
-  .studio-brand > span {
+  /* Phones need the header width for the view and terrain-source switches. */
+  .studio-brand {
     display: none;
   }
   .header-actions {
@@ -560,6 +558,7 @@ input[type='range']::-moz-range-thumb {
   .view-switch button {
     min-width: 30px;
     padding: 4px 7px;
+    font-size: 10px;
   }
   .studio-inspector {
     position: fixed;

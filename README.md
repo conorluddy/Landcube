@@ -20,7 +20,7 @@ No account or backend is needed. Generated landscapes run offline once the web a
 ## Use the web app
 
 1. Open **[Topogra](https://conorluddy.github.io/Topogra/)**. In **Terrain**, adjust generated scale and detail or select **New landscape**. Lock the seed to retain a landscape while styling it.
-2. For a geographic landscape, choose **Terrain → Terrain source → Real location**, select a preset or enter coordinates and an area span of 2–200 km, then select **Load terrain**. Choose **Generated** to return to synthetic landscapes. Presets fill a suggested span that you can edit before loading.
+2. For a geographic landscape, select **Coordinates** in the header. The selected preset loads straight away; choose another preset or enter coordinates and an area span of 2–200 km, then select **Load terrain**. Select **Procedural** to return to synthetic landscapes; switching back restores the last loaded place instantly. Presets fill a suggested span that you can edit before loading, and downloaded elevation tiles are cached in the browser.
 3. Use **Contours** for density or real-terrain meter intervals, line appearance and index contours. **Colour** contains canvas colour and palette presets. Palette presets also change contour colours and weights.
 4. Switch directly between **2D / 3D** in the header. **Scene** contains cursor interaction in 2D and lighting, floor, surface visibility and water presentation in 3D. **Model**, available in 3D, contains crop, physical dimensions and terrain shape.
 5. Use the footer's **Overlays** shortcut for grids, summit markers, sea-level hatching and geographic decorations. **Camera**, available in 3D, contains auto-rotate and reset. These tools remain accessible when controls are collapsed.

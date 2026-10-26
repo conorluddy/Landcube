@@ -220,9 +220,57 @@ test('real terrain interval, overlays and failed loading retain the current land
   await page.getByRole('button', { name: 'Export ↗' }).click();
   expect((await download(page, 'Download SVG')).bytes.equals(original.bytes)).toBe(true);
   await page.getByRole('button', { name: 'Close Export' }).click();
-  await page.getByLabel('Terrain source', { exact: true }).selectOption('generated');
+  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
+  await expect(page.getByText('Procedural landscape')).toBeVisible();
   await section(page, 'Contours');
   await expect(page.getByRole('slider', { name: 'Density' })).toBeVisible();
+});
+
+test('real terrain switches back instantly and revisited places load from the tile cache', async ({
+  page,
+}) => {
+  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
+  await loadLocation(page);
+  let tileRequests = 0;
+
+  page.on('request', (request) => {
+    if (request.url().includes('/terrarium/')) {
+      tileRequests++;
+    }
+  });
+  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
+  await expect(page.getByText(/^Procedural · /)).toBeVisible();
+  await page.getByRole('button', { name: 'Coordinates', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Real terrain restored' })).toBeVisible();
+  expect(tileRequests).toBe(0);
+
+  await page.reload();
+  await page.getByRole('button', { name: 'Coordinates', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible();
+  expect(tileRequests).toBe(0);
+});
+
+test('coordinates edited before switching away load fresh terrain instead of restoring', async ({
+  page,
+}) => {
+  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
+  await loadLocation(page);
+  await page.getByLabel('Latitude', { exact: true }).fill('10');
+  await page.getByLabel('Latitude', { exact: true }).press('Tab');
+  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
+  await page.getByRole('button', { name: 'Coordinates', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible();
+});
+
+test('coordinates retries after a failed first load', async ({ page }) => {
+  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
+  await page.route('https://s3.amazonaws.com/elevation-tiles-prod/terrarium/**', (route) =>
+    route.abort(),
+  );
+  await page.getByRole('button', { name: 'Coordinates', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'download failed' })).toBeVisible();
+  await page.unroute('https://s3.amazonaws.com/elevation-tiles-prod/terrarium/**');
+  await loadLocation(page);
 });
 
 test('failed preview decoding retains the last image and obsolete previews cannot replace newer output', async ({

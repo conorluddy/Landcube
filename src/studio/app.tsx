@@ -262,6 +262,26 @@ function Studio({
             </button>
           ))}
         </div>
+        <div className="view-switch" role="group" aria-label="Terrain source">
+          <button
+            type="button"
+            aria-pressed={state.source.selected === 'generated'}
+            onClick={() => {
+              c.useGenerated();
+            }}
+          >
+            Procedural
+          </button>
+          <button
+            type="button"
+            aria-pressed={state.source.selected === 'real'}
+            onClick={() => {
+              void c.useCoordinates();
+            }}
+          >
+            Coordinates
+          </button>
+        </div>
         <div className="header-actions">
           <button
             type="button"
@@ -371,7 +391,7 @@ function Studio({
         </div>
         <div className="studio-status">
           <span className="source-label">
-            {state.source.terrain ? 'Real terrain' : `Generated · ${state.design.seed}`}
+            {state.source.terrain ? 'Real terrain' : `Procedural · ${state.design.seed}`}
           </span>
           <span role="status" aria-live="polite">
             {state.workspace.activating ? 'Starting 3D…' : state.status}

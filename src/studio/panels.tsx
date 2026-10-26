@@ -73,23 +73,8 @@ export function TerrainPanel({ controller: c, state: s }: PanelProps): ReactNode
 
   return (
     <>
-      <Select
-        label="Terrain source"
-        value={source.selected}
-        options={[
-          { value: 'generated', label: 'Generated' },
-          { value: 'real', label: 'Real location' },
-        ]}
-        onChange={(value) => {
-          if (value === 'generated') {
-            c.useGenerated();
-          } else {
-            c.source({ selected: 'real' });
-          }
-        }}
-      />
       {source.selected === 'generated' ? (
-        <Group title="Generated landscape">
+        <Group title="Procedural landscape">
           <Hint>
             Seed <output id="seed-value">{s.design.seed}</output>
           </Hint>
