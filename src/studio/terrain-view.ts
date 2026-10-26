@@ -106,6 +106,10 @@ export function createStudioTerrainView(
       view.setRotating(scene.rotating);
     }
 
+    if (differs('camera')) {
+      view.setCamera(scene.camera);
+    }
+
     if (differs('lighting')) {
       view.setLighting(scene.lighting);
     }

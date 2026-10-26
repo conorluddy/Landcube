@@ -13,6 +13,7 @@ import {
   getSuggestedTerrainLightDirection,
   type TerrainLightingSettings,
 } from '../terrain-lighting';
+import { defaultTerrainCameraSettings, type TerrainCameraSettings } from '../terrain-camera';
 import { terrainMaterialPresets, type LandFinish, type WaterFinish } from '../terrain-materials';
 import {
   copyElevationGradient,
@@ -30,7 +31,8 @@ import type { WaterStyle } from '../terrain-3d';
 import type { FloorStyle } from '../terrain-floor-styles';
 
 export type StudioView = '2d' | '3d';
-export type InspectorSection = 'Terrain' | 'Contours' | 'Colour' | 'Scene' | 'Model';
+export type InspectorSection = 'Terrain' | 'Contours' | 'Colour' | 'Scene' | 'Camera' | 'Model';
+export const threeDOnlySections: readonly InspectorSection[] = ['Camera', 'Model'];
 export interface SceneSettings {
   contours: boolean;
   engraving: ContourEngravingSettings;
@@ -56,6 +58,7 @@ export interface SceneSettings {
   previewWaterLevel: number;
   lighting: TerrainLightingSettings;
   customLightDirection: boolean;
+  camera: TerrainCameraSettings;
   rotating: boolean;
 }
 export interface TerrainSourceState {
@@ -83,7 +86,7 @@ export interface StudioState {
     activating: boolean;
     collapsed: boolean;
     sections: Record<StudioView, InspectorSection>;
-    popover: 'Overlays' | 'Camera' | null;
+    popover: 'Overlays' | 'Orbit' | null;
     exporting: boolean;
   };
   seedLocked: boolean;
@@ -127,6 +130,8 @@ export interface StudioController {
   material: (key: string) => void;
   lighting: (patch: Partial<TerrainLightingSettings>) => void;
   resetLighting: () => void;
+  camera: (patch: Partial<TerrainCameraSettings>) => void;
+  resetCameraSettings: () => void;
   model: (patch: Partial<StudioState['model']>) => boolean;
   dimensions: (patch: Partial<TerrainModelSettings>) => boolean;
   metrics: (height: number, layerHeight?: number) => void;
@@ -189,6 +194,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       previewWaterLevel: 0.4,
       lighting: { ...defaultTerrainLighting },
       customLightDirection: false,
+      camera: { ...defaultTerrainCameraSettings },
       rotating: false,
     },
     model: {
@@ -314,7 +320,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       );
     },
     selectSection(section: InspectorSection) {
-      if (section === 'Model' && state.workspace.view === '2d') {
+      if (threeDOnlySections.includes(section) && state.workspace.view === '2d') {
         return;
       }
 
@@ -390,6 +396,12 @@ export function createStudioController(actions: DesignControlActions): StudioCon
         },
         customLightDirection: false,
       });
+    },
+    camera(patch: Partial<TerrainCameraSettings>) {
+      controller.scene({ camera: { ...state.scene.camera, ...patch } });
+    },
+    resetCameraSettings() {
+      controller.scene({ camera: { ...defaultTerrainCameraSettings } });
     },
     model(patch: Partial<StudioState['model']>) {
       const next = { ...state.model, ...patch };

@@ -21,6 +21,15 @@ import type { FloorStyle } from './terrain-floor-styles';
 import { getTerrainWaterColor } from './terrain-water';
 import { defaultTerrainLighting, type TerrainLightingSettings } from './terrain-lighting';
 import { createTerrainLineBuffers } from './terrain-3d-lines';
+import {
+  baseTerrainFovDegrees,
+  defaultTerrainCameraSettings,
+  getCompensatedDistance,
+  getDistanceForHalfHeight,
+  getOrthographicHalfHeight,
+  getVerticalFovDegrees,
+  type TerrainCameraSettings,
+} from './terrain-camera';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
@@ -79,6 +88,7 @@ export interface Terrain3d {
   setSurfaceColor(value: string | undefined): void;
   setRotating(value: boolean): void;
   setLighting(settings: Readonly<TerrainLightingSettings>): void;
+  setCamera(settings: Readonly<TerrainCameraSettings>): void;
   reset(): void;
 }
 
@@ -99,11 +109,21 @@ export function createTerrain3d(
 
   viewport.append(renderer.domElement);
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 100);
-  const controls = new OrbitControls(camera, renderer.domElement);
+  const perspectiveCamera = new THREE.PerspectiveCamera(
+    getVerticalFovDegrees(defaultTerrainCameraSettings.focalLengthMm),
+    1,
+    0.01,
+    200,
+  );
+  const orthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 200);
+  let camera: THREE.PerspectiveCamera | THREE.OrthographicCamera = perspectiveCamera;
+  let viewportAspect = 1;
+  let orthographicHalfHeight = 1;
+  const controls = new OrbitControls<THREE.PerspectiveCamera | THREE.OrthographicCamera>(
+    camera,
+    renderer.domElement,
+  );
 
-  controls.minDistance = 0.5;
-  controls.maxDistance = 12;
   controls.maxPolarAngle = Math.PI * 0.49;
   const lineLayers = {
     ordinary: new LineSegments2(
@@ -317,15 +337,77 @@ export function createTerrain3d(
     const height = Math.max(1, viewport.clientHeight);
 
     renderer.setSize(width, height);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
+    viewportAspect = width / height;
+    perspectiveCamera.aspect = viewportAspect;
+    perspectiveCamera.updateProjectionMatrix();
+    updateOrthographicFrustum();
+    draw();
+  };
+
+  const updateOrthographicFrustum = () => {
+    orthographicCamera.top = orthographicHalfHeight;
+    orthographicCamera.bottom = -orthographicHalfHeight;
+    orthographicCamera.left = -orthographicHalfHeight * viewportAspect;
+    orthographicCamera.right = orthographicHalfHeight * viewportAspect;
+    orthographicCamera.updateProjectionMatrix();
+  };
+
+  /** Perspective-equivalent distance, so framing survives lens and projection changes. */
+  const getViewDistance = () =>
+    camera === orthographicCamera
+      ? getDistanceForHalfHeight(orthographicHalfHeight, perspectiveCamera.fov) /
+        orthographicCamera.zoom
+      : perspectiveCamera.position.distanceTo(controls.target);
+
+  /** Places the active camera along `direction` from the orbit target at a framing distance. */
+  const placeCamera = (direction: THREE.Vector3, distance: number) => {
+    const scale = getCompensatedDistance(1, baseTerrainFovDegrees, perspectiveCamera.fov);
+    const minDistance = 0.5 * scale;
+    const maxDistance = 12 * scale;
+    const offset = direction.clone().normalize();
+
+    controls.minDistance = minDistance;
+    controls.maxDistance = maxDistance;
+
+    if (camera === orthographicCamera) {
+      // Orthographic depth does not affect framing; a fixed standoff keeps the model unclipped.
+      orthographicHalfHeight = getOrthographicHalfHeight(distance, perspectiveCamera.fov);
+      orthographicCamera.zoom = 1;
+      controls.minZoom = distance / maxDistance;
+      controls.maxZoom = distance / minDistance;
+      orthographicCamera.position.copy(controls.target).addScaledVector(offset, maxDistance);
+      updateOrthographicFrustum();
+    } else {
+      perspectiveCamera.position.copy(controls.target).addScaledVector(offset, distance);
+    }
+
+    controls.update();
+  };
+
+  const setCameraSettings = (settings: Readonly<TerrainCameraSettings>) => {
+    const direction = camera.position.clone().sub(controls.target);
+    const distance = getCompensatedDistance(
+      getViewDistance(),
+      perspectiveCamera.fov,
+      getVerticalFovDegrees(settings.focalLengthMm),
+    );
+
+    perspectiveCamera.fov = getVerticalFovDegrees(settings.focalLengthMm);
+    perspectiveCamera.updateProjectionMatrix();
+    camera = settings.projection === 'orthographic' ? orthographicCamera : perspectiveCamera;
+    controls.object = camera;
+    placeCamera(direction, distance);
     draw();
   };
 
   const reset = () => {
-    camera.position.set(0, 2.1, 2.5);
+    const home = new THREE.Vector3(0, 2.1, 2.5);
+
     controls.target.set(0, 0, 0);
-    controls.update();
+    placeCamera(
+      home,
+      getCompensatedDistance(home.length(), baseTerrainFovDegrees, perspectiveCamera.fov),
+    );
     draw();
   };
 
@@ -749,6 +831,7 @@ export function createTerrain3d(
       applyLighting(lighting);
       draw();
     },
+    setCamera: setCameraSettings,
     setRotating(value: boolean) {
       rotating = value;
       controls.autoRotate = value;
