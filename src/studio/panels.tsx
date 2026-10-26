@@ -17,9 +17,9 @@ import {
   summitMarkerSizes,
 } from '../constants/design';
 import {
-  realTerrainBounds,
   realTerrainPresetGroups,
   realTerrainPresets,
+  realTerrainSpanStopsKm,
 } from '../constants/real-terrain';
 import { designPalettePresets } from '../constants/palettes';
 import { createRandomPalette } from '../random-palette';
@@ -158,14 +158,16 @@ export function TerrainPanel({ controller: c, state: s }: PanelProps): ReactNode
               }}
             />
           </div>
-          <NumberField
+          <Range
             id="terrain-span"
-            label="Area span (km)"
-            value={source.spanKm}
-            min={realTerrainBounds.minimumSpanKm}
-            max={realTerrainBounds.maximumSpanKm}
-            onChange={(value) => {
-              c.source({ spanKm: value });
+            label="Area span"
+            value={getNearestSpanStopIndex(source.spanKm)}
+            min={0}
+            max={realTerrainSpanStopsKm.length - 1}
+            step={1}
+            displayValue={`${source.spanKm} km`}
+            onChange={(index) => {
+              c.source({ spanKm: realTerrainSpanStopsKm[index] });
             }}
           />
           <NumberField
@@ -866,5 +868,16 @@ export function OverlaysPanel({ controller: c, state: s }: PanelProps): ReactNod
         </Group>
       )}
     </>
+  );
+}
+
+/** Preset spans are stops; any other span shows on its nearest stop. */
+function getNearestSpanStopIndex(spanKm: number): number {
+  return realTerrainSpanStopsKm.reduce(
+    (nearest, stopKm, index) =>
+      Math.abs(stopKm - spanKm) < Math.abs(realTerrainSpanStopsKm[nearest] - spanKm)
+        ? index
+        : nearest,
+    0,
   );
 }

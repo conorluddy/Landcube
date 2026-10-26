@@ -5,6 +5,11 @@ import type { RealTerrain, TerrainTileLoader } from './real-terrain';
 import { decodeTerrariumElevation, loadRealTerrain } from './real-terrain';
 import { createOutputRenderer } from './export/image-export';
 import { engineConfiguration } from './constants/engine';
+import {
+  realTerrainBounds,
+  realTerrainPresets,
+  realTerrainSpanStopsKm,
+} from './constants/real-terrain';
 import { versionOneDesignDefaults } from './constants/design';
 import { createGridMarkup } from './svg-rendering';
 
@@ -177,4 +182,34 @@ void test('maximum depth clips bathymetry and combines with an above-sea elevati
 
   await assert.rejects(loadRealTerrain(0, 0, 2, loader, undefined, -1), /Maximum depth/);
   await assert.rejects(loadRealTerrain(0, 0, 2, loader, undefined, Infinity), /Maximum depth/);
+});
+
+void test('terrain presets have unique names, valid coordinates and slider spans', () => {
+  const names = realTerrainPresets.map(({ name }) => name.toLowerCase());
+  const spanStops: readonly number[] = realTerrainSpanStopsKm;
+
+  assert.equal(new Set(names).size, names.length, 'CLI lookup ignores case, so names must differ');
+
+  for (const preset of realTerrainPresets) {
+    assert.ok(
+      preset.latitude >= realTerrainBounds.minimumLatitude &&
+        preset.latitude <= realTerrainBounds.maximumLatitude,
+      `${preset.name} latitude ${preset.latitude}`,
+    );
+    assert.ok(
+      preset.longitude >= realTerrainBounds.minimumLongitude &&
+        preset.longitude <= realTerrainBounds.maximumLongitude,
+      `${preset.name} longitude ${preset.longitude}`,
+    );
+    assert.ok(spanStops.includes(preset.spanKm), `${preset.name} span ${preset.spanKm} km`);
+  }
+});
+
+void test('span slider stops ascend across the full allowed span range', () => {
+  assert.equal(realTerrainSpanStopsKm[0], realTerrainBounds.minimumSpanKm);
+  assert.equal(realTerrainSpanStopsKm.at(-1), realTerrainBounds.maximumSpanKm);
+
+  for (let index = 1; index < realTerrainSpanStopsKm.length; index++) {
+    assert.ok(realTerrainSpanStopsKm[index] > realTerrainSpanStopsKm[index - 1]);
+  }
 });
