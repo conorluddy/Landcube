@@ -5,6 +5,7 @@ import type { DesignSettings } from '../types/design';
 import type { HeightField } from '../types/terrain';
 import type { SeaLevelGeometry } from '../sea-level';
 import type { TerrainTerraceLevels } from '../terrain-terraces';
+import type { FloorPlace } from '../floor-geo';
 
 interface StudioTerrainView {
   isActive: () => boolean;
@@ -21,8 +22,7 @@ interface StudioTerrainView {
     field: HeightField,
     seaLevel?: SeaLevelGeometry,
     attribution?: string,
-    location?: { latitude: number; longitude: number },
-    groundSpanMeters?: number,
+    place?: FloorPlace,
     contourIntervalMeters?: number,
     terraceLevels?: TerrainTerraceLevels,
   ) => void;
@@ -35,7 +35,7 @@ export function createStudioTerrainView(
 ): StudioTerrainView {
   let view: Terrain3d | undefined;
   let active = false;
-  let span: number | undefined;
+  let floorPlace: FloorPlace | undefined;
   let interval: number | undefined;
 
   const syncScene = (previous?: SceneSettings) => {
@@ -110,7 +110,12 @@ export function createStudioTerrainView(
       view.setLighting(scene.lighting);
     }
 
-    view.setMapGrid(scene.mapGrid && span !== undefined, span, interval);
+    view.setMapGrid(
+      scene.mapGrid && floorPlace !== undefined,
+      floorPlace,
+      interval,
+      scene.floorStyle,
+    );
     view.setNorthArrow(scene.north && controller.getSnapshot().source.terrain !== undefined);
   };
 
@@ -163,20 +168,24 @@ export function createStudioTerrainView(
       field: HeightField,
       seaLevel?: SeaLevelGeometry,
       _attribution?: string,
-      location?: { latitude: number; longitude: number },
-      groundSpanMeters?: number,
+      place?: FloorPlace,
       contourIntervalMeters?: number,
       terraceLevels?: TerrainTerraceLevels,
     ) {
-      span = location ? groundSpanMeters : undefined;
+      floorPlace = place;
       interval = contourIntervalMeters;
 
       if (active && view) {
-        const snapshot = controller.getSnapshot();
+        const { scene } = controller.getSnapshot();
 
-        view.setLighting(snapshot.scene.lighting);
-        view.setMapGrid(snapshot.scene.mapGrid && span !== undefined, span, interval);
-        view.setNorthArrow(snapshot.scene.north && location !== undefined);
+        view.setLighting(scene.lighting);
+        view.setMapGrid(
+          scene.mapGrid && floorPlace !== undefined,
+          floorPlace,
+          interval,
+          scene.floorStyle,
+        );
+        view.setNorthArrow(scene.north && place !== undefined);
         view.update(contours, width, height, settings, field, seaLevel, terraceLevels);
       }
     },

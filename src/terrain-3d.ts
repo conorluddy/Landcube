@@ -16,6 +16,8 @@ import { createTerraceContours, type TerrainTerraceLevels } from './terrain-terr
 import { sampleHeightField } from './terrain-surface';
 import { createWaterVolume } from './terrain-water-volume';
 import { createTerrainStage, defaultTerrainGroundColor } from './terrain-stage';
+import type { FloorPlace } from './floor-geo';
+import type { FloorStyle } from './terrain-floor-styles';
 import { getTerrainWaterColor } from './terrain-water';
 import { defaultTerrainLighting, type TerrainLightingSettings } from './terrain-lighting';
 import { createTerrainLineBuffers } from './terrain-3d-lines';
@@ -65,7 +67,12 @@ export interface Terrain3d {
   setGround(value: boolean): void;
   setGroundColor(value: string | undefined): void;
   setNorthArrow(value: boolean): void;
-  setMapGrid(value: boolean, spanMeters: number | undefined, contourIntervalMeters?: number): void;
+  setMapGrid(
+    value: boolean,
+    place: FloorPlace | undefined,
+    contourIntervalMeters: number | undefined,
+    floorStyle: FloorStyle,
+  ): void;
   setWaterStyle(value: WaterStyle): void;
   setWaterColor(value: string | undefined): void;
   setContours(value: boolean): void;
@@ -724,8 +731,13 @@ export function createTerrain3d(
       updateStageVisibility();
       draw();
     },
-    setMapGrid(value: boolean, spanMeters: number | undefined, contourIntervalMeters?: number) {
-      stage.setMapGrid(value, spanMeters, contourIntervalMeters);
+    setMapGrid(
+      value: boolean,
+      place: FloorPlace | undefined,
+      contourIntervalMeters: number | undefined,
+      floorStyle: FloorStyle,
+    ) {
+      stage.setMapGrid(value, place, contourIntervalMeters, floorStyle);
       draw();
     },
     setNorthArrow(value: boolean) {

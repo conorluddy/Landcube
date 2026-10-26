@@ -177,6 +177,34 @@ test('real location controls share contour intervals and export model attributio
   expect(stl.bytes.readUInt32LE(80)).toBeGreaterThan(0);
 });
 
+test('cartographic floor styles repaint the floor without changing the STL', async ({ page }) => {
+  const errors: string[] = [];
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await loadLocation(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Export ↗' }).click();
+  const before = await download(page, 'Download STL');
+
+  await page.keyboard.press('Escape');
+
+  for (const style of ['survey', 'plinth', 'rose', 'graticule', 'crop', 'grid']) {
+    await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+    await page.getByLabel('Floor style', { exact: true }).selectOption(style);
+    await page.keyboard.press('Escape');
+  }
+
+  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await page.getByLabel('Floor style', { exact: true }).selectOption('rose');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Export ↗' }).click();
+  const after = await download(page, 'Download STL');
+
+  expect(after.bytes.equals(before.bytes)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('portrait mobile model and gradient editors fit the studio sheet', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${appUrl}?v=1&seed=123`);

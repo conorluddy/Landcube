@@ -1,4 +1,6 @@
 import { createTerrainMapGrid, getMapGridInk } from './terrain-map-grid';
+import type { FloorPlace } from './floor-geo';
+import type { FloorStyle } from './terrain-floor-styles';
 import * as THREE from 'three';
 
 export const defaultTerrainGroundColor = '#b4b4b4';
@@ -11,7 +13,12 @@ export function createTerrainStage(): {
   setColor(value: string): void;
   setCastShadows(value: boolean): void;
   setNorthArrow(value: boolean): void;
-  setMapGrid(value: boolean, spanMeters: number | undefined, contourIntervalMeters?: number): void;
+  setMapGrid(
+    value: boolean,
+    place: FloorPlace | undefined,
+    contourIntervalMeters: number | undefined,
+    floorStyle: FloorStyle,
+  ): void;
 } {
   const group = new THREE.Group();
   const shadowEnabled = { value: 1 };
@@ -139,8 +146,10 @@ export function createTerrainStage(): {
 
   group.add(mapGrid.mesh);
   let gridEnabled = false;
-  let groundSpan: number | undefined;
+  let northEnabled = false;
+  let floorPlace: FloorPlace | undefined;
   let contourInterval: number | undefined;
+  let style: FloorStyle = 'grid';
   let stageSize = { width: 2, length: 2, circular: false, background: defaultTerrainGroundColor };
 
   const updateGrid = () => {
@@ -148,14 +157,17 @@ export function createTerrainStage(): {
 
     arrowMaterial.color.set(ink);
     letterMaterial.color.set(ink);
-    mapGrid.mesh.visible = gridEnabled && groundSpan !== undefined;
+    mapGrid.mesh.visible = gridEnabled && floorPlace !== undefined;
+    // Every cartographic floor style paints its own north marker.
+    north.visible = northEnabled && !(mapGrid.mesh.visible && style !== 'grid');
     mapGrid.update(
       stageSize.width,
       stageSize.length,
       stageSize.circular,
       stageSize.background,
-      groundSpan,
+      floorPlace,
       contourInterval,
+      style,
     );
   };
 
@@ -191,14 +203,16 @@ export function createTerrainStage(): {
     setVisible(value) {
       group.visible = value;
     },
-    setMapGrid(value, spanMeters, contourIntervalMeters) {
+    setMapGrid(value, place, contourIntervalMeters, floorStyle) {
       contourInterval = contourIntervalMeters;
       gridEnabled = value;
-      groundSpan = spanMeters;
+      floorPlace = place;
+      style = floorStyle;
       updateGrid();
     },
     setNorthArrow(value) {
-      north.visible = value;
+      northEnabled = value;
+      updateGrid();
     },
   };
 }

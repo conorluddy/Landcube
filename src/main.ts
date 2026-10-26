@@ -7,6 +7,7 @@ import { createCropPreview } from './studio/crop-preview';
 import { mountStudio } from './studio/app';
 import { downloadBlob } from './studio/export-panel';
 import type { RealTerrain } from './real-terrain';
+import { createFloorPlace } from './floor-geo';
 import { findTerrainSummits } from './summit-markers';
 import { getRequiredElement } from './dom-elements';
 import './landscape-studio.css';
@@ -343,11 +344,7 @@ function updateTerrain3d(): void {
     modelCrop.field,
     croppedSea,
     realTerrain?.attribution,
-    realTerrain?.location,
-    realTerrain?.spanKm === undefined
-      ? undefined
-      : (realTerrain.spanKm * 1000 * Math.max(modelCrop.width, modelCrop.height)) /
-          Math.max(modelSourceFrame.width, modelSourceFrame.height),
+    createFloorPlace(realTerrain, modelCrop, modelSourceFrame),
     getRealContourInterval(realTerrain),
     getTerrainTerraceLevels(settings, engineConfiguration, realTerrain),
   );
