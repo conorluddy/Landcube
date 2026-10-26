@@ -25,6 +25,8 @@ import { terrainMaterialPresets, type LandFinish, type WaterFinish } from '../te
 import {
   copyElevationGradient,
   elevationGradientPresets,
+  getLandscapeGradientKey,
+  landscapeGradientPresets,
   validateElevationGradient,
   type ElevationGradientSettings,
 } from '../terrain-elevation-gradient';
@@ -52,6 +54,8 @@ export interface SceneSettings {
   surfaceColor: string;
   gradient: ElevationGradientSettings;
   gradientPreset: string;
+  /** 'location' follows the loaded place's landscape; any manual gradient choice sticks as 'user'. */
+  gradientSource: 'location' | 'user';
   ground: boolean;
   groundMatch: boolean;
   groundColor: string;
@@ -199,6 +203,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
         stops: elevationGradientPresets.paper.stops,
       }),
       gradientPreset: 'paper',
+      gradientSource: 'location',
       ground: true,
       groundMatch: false,
       groundColor: '#b4b4b4',
@@ -272,6 +277,10 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       previousLocation?.longitude !== nextLocation?.longitude;
 
     state = { ...state, source: { ...state.source, terrain } };
+
+    if (locationChanged && state.scene.gradientSource === 'location') {
+      state = { ...state, scene: applyLocationGradient(state.scene, nextLocation) };
+    }
 
     if (locationChanged && !state.scene.customLightDirection) {
       state = {
@@ -367,7 +376,11 @@ export function createStudioController(actions: DesignControlActions): StudioCon
     },
     scene(patch: Partial<SceneSettings>, custom = false) {
       const previous = state.scene;
-      const next = { ...previous, ...patch, ...(custom ? { materialPreset: 'custom' } : {}) };
+      const merged = { ...previous, ...patch, ...(custom ? { materialPreset: 'custom' } : {}) };
+      const next =
+        patch.gradientSource === 'location'
+          ? applyLocationGradient(merged, state.source.terrain?.location)
+          : merged;
 
       try {
         validateElevationGradient(next.gradient);
@@ -628,4 +641,29 @@ function getSourceFieldsKey(source: TerrainSourceState): string {
     source.elevationFloor,
     source.maxDepth,
   ]);
+}
+
+/** Unknown places (typed coordinates, generated terrain) keep the current gradient. */
+function applyLocationGradient(
+  scene: SceneSettings,
+  location: { latitude: number; longitude: number } | undefined,
+): SceneSettings {
+  const preset = realTerrainPresets.find(
+    (place) => place.latitude === location?.latitude && place.longitude === location.longitude,
+  );
+
+  if (!preset) {
+    return scene;
+  }
+
+  const key = getLandscapeGradientKey(preset.landscape);
+
+  return {
+    ...scene,
+    gradient: copyElevationGradient({
+      ...scene.gradient,
+      stops: landscapeGradientPresets[key].stops,
+    }),
+    gradientPreset: key,
+  };
 }
