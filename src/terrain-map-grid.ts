@@ -1,4 +1,10 @@
 import * as THREE from 'three';
+import type { FloorPlace } from './floor-geo';
+import {
+  paintFloorStyleLabels,
+  paintFloorStyleLines,
+  type FloorStyle,
+} from './terrain-floor-styles';
 
 /** Shared floor ink keeps the grid, scale, and north marker in the same palette. */
 export function getMapGridInk(background: string): { color: string; rgb: string } {
@@ -32,8 +38,9 @@ export function createTerrainMapGrid(): {
     length: number,
     circular: boolean,
     background: string,
-    spanMeters: number | undefined,
-    contourIntervalMeters?: number,
+    place: FloorPlace | undefined,
+    contourIntervalMeters: number | undefined,
+    floorStyle: FloorStyle,
   ): void;
 } {
   const canvas = document.createElement('canvas');
@@ -63,14 +70,15 @@ export function createTerrainMapGrid(): {
 
   return {
     mesh,
-    update(width, length, circular, background, spanMeters, contourIntervalMeters) {
+    update(width, length, circular, background, place, contourIntervalMeters, floorStyle) {
       const key = JSON.stringify([
         width,
         length,
         circular,
         background,
-        spanMeters,
+        place,
         contourIntervalMeters,
+        floorStyle,
       ]);
 
       if (key === previousKey) {
@@ -80,11 +88,13 @@ export function createTerrainMapGrid(): {
       previousKey = key;
       context.clearRect(0, 0, 2048, 2048);
 
-      if (spanMeters === undefined || !Number.isFinite(spanMeters) || spanMeters <= 0) {
+      if (place === undefined) {
         texture.needsUpdate = true;
 
         return;
       }
+
+      const spanMeters = Math.max(place.widthKm, place.lengthKm) * 1000;
 
       const extent = Math.max(width, length);
       const planeSize = extent * 2.8;
@@ -97,22 +107,32 @@ export function createTerrainMapGrid(): {
       const halfWidth = (width * pixelsPerUnit) / 2;
       const halfLength = (length * pixelsPerUnit) / 2;
       const gap = extent * pixelsPerUnit * 0.035;
+      const frame = {
+        context,
+        extentPx: extent * pixelsPerUnit,
+        halfWidthPx: halfWidth,
+        halfLengthPx: halfLength,
+        ink,
+      };
 
       context.save();
       context.translate(1024, 1024);
 
-      for (let index = -Math.ceil(1024 / spacing); index <= Math.ceil(1024 / spacing); index++) {
-        const offset = index * spacing;
-
-        context.strokeStyle = `rgba(${ink}, ${index % 5 === 0 ? 0.22 : 0.11})`;
-        context.lineWidth = index % 5 === 0 ? 1.5 : 1;
-        context.beginPath();
-        context.moveTo(offset, -1024);
-        context.lineTo(offset, 1024);
-        context.moveTo(-1024, offset);
-        context.lineTo(1024, offset);
-        context.stroke();
+      if (floorStyle === 'grid') {
+        paintGridLines(context, ink, spacing, { x: 0, y: 0 }, (index) =>
+          index % 5 === 0 ? { alpha: 0.22, width: 1.5 } : { alpha: 0.11, width: 1 },
+        );
       }
+
+      // Survey sheets use a finer, uniform grid whose cells start at the model's north-west corner.
+      if (floorStyle === 'survey') {
+        paintGridLines(context, ink, spacing / 2, { x: -halfWidth, y: -halfLength }, () => ({
+          alpha: 0.16,
+          width: 1,
+        }));
+      }
+
+      paintFloorStyleLines(floorStyle, frame, place);
 
       // Erase the whole footprint, including water and a small breathing margin.
       context.globalCompositeOperation = 'destination-out';
@@ -139,6 +159,15 @@ export function createTerrainMapGrid(): {
       context.fillStyle = fade;
       context.fillRect(-1024, -1024, 2048, 2048);
       context.globalCompositeOperation = 'source-over';
+
+      if (floorStyle !== 'grid') {
+        paintFloorStyleLabels(floorStyle, frame, place, contourIntervalMeters);
+        context.restore();
+        texture.needsUpdate = true;
+
+        return;
+      }
+
       // One small scale bar and its end ticks keep the labels sparse.
       const barY = 0;
       const barX = halfWidth + gap + spacing / 2 + 24;
@@ -169,4 +198,28 @@ export function createTerrainMapGrid(): {
       texture.needsUpdate = true;
     },
   };
+}
+
+/** Square grid lines through `origin`, covering the whole floor canvas. */
+function paintGridLines(
+  context: CanvasRenderingContext2D,
+  ink: string,
+  spacing: number,
+  origin: { x: number; y: number },
+  getLineStyle: (index: number) => { alpha: number; width: number },
+): void {
+  const reach = Math.ceil(2048 / spacing);
+
+  for (let index = -reach; index <= reach; index++) {
+    const { alpha, width } = getLineStyle(index);
+
+    context.strokeStyle = `rgba(${ink}, ${alpha})`;
+    context.lineWidth = width;
+    context.beginPath();
+    context.moveTo(origin.x + index * spacing, -1024);
+    context.lineTo(origin.x + index * spacing, 1024);
+    context.moveTo(-1024, origin.y + index * spacing);
+    context.lineTo(1024, origin.y + index * spacing);
+    context.stroke();
+  }
 }

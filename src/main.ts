@@ -7,6 +7,7 @@ import { createCropPreview } from './studio/crop-preview';
 import { mountStudio } from './studio/app';
 import { downloadBlob } from './studio/export-panel';
 import type { RealTerrain } from './real-terrain';
+import { createFloorPlace, type FloorPlace } from './floor-geo';
 import { findTerrainSummits } from './summit-markers';
 import { getRequiredElement } from './dom-elements';
 import './landscape-studio.css';
@@ -343,13 +344,30 @@ function updateTerrain3d(): void {
     modelCrop.field,
     croppedSea,
     realTerrain?.attribution,
-    realTerrain?.location,
-    realTerrain?.spanKm === undefined
-      ? undefined
-      : (realTerrain.spanKm * 1000 * Math.max(modelCrop.width, modelCrop.height)) /
-          Math.max(modelSourceFrame.width, modelSourceFrame.height),
+    getFloorPlace(realTerrain, modelCrop, modelSourceFrame),
     getRealContourInterval(realTerrain),
     getTerrainTerraceLevels(settings, engineConfiguration, realTerrain),
+  );
+}
+
+/** Locates the cropped model on Earth so the 3D floor can print its name, bounds and scale. */
+function getFloorPlace(
+  terrain: RealTerrain | undefined,
+  crop: { x: number; y: number; width: number; height: number },
+  frame: { width: number; height: number },
+): FloorPlace | undefined {
+  if (terrain?.location === undefined || terrain.spanKm === undefined) {
+    return undefined;
+  }
+
+  const kilometersPerUnit = terrain.spanKm / Math.max(frame.width, frame.height);
+
+  return createFloorPlace(
+    terrain.location,
+    (crop.x + crop.width / 2 - frame.width / 2) * kilometersPerUnit,
+    (crop.y + crop.height / 2 - frame.height / 2) * kilometersPerUnit,
+    crop.width * kilometersPerUnit,
+    crop.height * kilometersPerUnit,
   );
 }
 

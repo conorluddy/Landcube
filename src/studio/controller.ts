@@ -27,6 +27,7 @@ import type { RealTerrain } from '../real-terrain';
 import type { DesignSettings, ValidatedDesignSettings } from '../types/design';
 import type { Result } from '../types/operations';
 import type { WaterStyle } from '../terrain-3d';
+import type { FloorStyle } from '../terrain-floor-styles';
 
 export type StudioView = '2d' | '3d';
 export type InspectorSection = 'Terrain' | 'Contours' | 'Colour' | 'Scene' | 'Model';
@@ -45,6 +46,7 @@ export interface SceneSettings {
   groundMatch: boolean;
   groundColor: string;
   mapGrid: boolean;
+  floorStyle: FloorStyle;
   north: boolean;
   waterStyle: WaterStyle;
   waterFinish: WaterFinish;
@@ -176,6 +178,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       groundMatch: false,
       groundColor: '#b4b4b4',
       mapGrid: true,
+      floorStyle: 'grid',
       north: true,
       waterStyle: 'solid',
       waterFinish: natural.waterFinish,
