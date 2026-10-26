@@ -206,6 +206,7 @@ export function createStudioTerrainView(
         const { scene } = controller.getSnapshot();
 
         view.setLighting(scene.lighting);
+        view.setHeight(controller.getSnapshot().model.exaggeration, false);
         view.setMapGrid(
           scene.mapGrid && floorPlace !== undefined,
           floorPlace,

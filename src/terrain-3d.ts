@@ -78,7 +78,8 @@ export interface Terrain3d {
     terraceLevels?: TerrainTerraceLevels,
   ): void;
   setVisible(value: boolean): void;
-  setHeight(value: number): void;
+  /** Pass false when a terrain update follows, so the new height morphs with it. */
+  setHeight(value: number, shouldRebuild?: boolean): void;
   setModelSettings(value: TerrainModelSettings): void;
   getStl(): ArrayBuffer;
   setLandFinish(value: LandFinish): void;
@@ -839,19 +840,20 @@ export function createTerrain3d(
     ) {
       lastUpdate = [contours, width, height, settings, field, seaLevel, terraceLevels];
       // Terrace levels follow the contour interval but only shape terraced models.
-      const key = JSON.stringify([
+      const morphKey = JSON.stringify([
         width,
         height,
         modelSettings,
-        exaggeration,
         modelSettings.terrainShape === 'terraced' ? terraceLevels : undefined,
       ]);
+      const key = `${morphKey}|${exaggeration}`;
 
       if (field !== previousField || key !== modelKey) {
         // Terraced layers do not share a vertex layout between terrains, so they always cut.
+        // Height may change with the location, so it never blocks a morph.
         const shouldMorph =
           isTransitionArmed &&
-          key === modelKey &&
+          modelKey.startsWith(`${morphKey}|`) &&
           previousField !== undefined &&
           modelSettings.terrainShape !== 'terraced';
         const [previousSurface, previousBase] = [surface.geometry, base.geometry];
@@ -1131,9 +1133,12 @@ export function createTerrain3d(
       updateLoop();
       draw();
     },
-    setHeight(value: number) {
+    setHeight(value: number, shouldRebuild = true) {
       exaggeration = value;
-      rebuild();
+
+      if (shouldRebuild) {
+        rebuild();
+      }
     },
     setModelSettings(value: TerrainModelSettings) {
       modelSettings = { ...value };
