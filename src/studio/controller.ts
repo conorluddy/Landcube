@@ -211,7 +211,8 @@ export function createStudioController(actions: DesignControlActions): StudioCon
   let effects: StudioEffects | undefined;
   let requestVersion = 0;
   // Procedural mode parks the last real terrain so switching back is instant.
-  let parkedTerrain: RealTerrain | undefined;
+  let parked: { terrain: RealTerrain; fieldsKey: string } | undefined;
+  let loadedFieldsKey = '';
   const listeners = new Set<() => void>();
 
   const publish = () => {
@@ -431,7 +432,11 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       }
 
       requestVersion++;
-      parkedTerrain = state.source.terrain ?? parkedTerrain;
+
+      if (state.source.terrain) {
+        parked = { terrain: state.source.terrain, fieldsKey: loadedFieldsKey };
+      }
+
       controller.source({
         selected: 'generated',
         loading: false,
@@ -442,19 +447,22 @@ export function createStudioController(actions: DesignControlActions): StudioCon
     async useCoordinates() {
       controller.selectSection('Terrain');
 
-      if (state.source.selected === 'real') {
+      // Coordinates with nothing loaded (a failed first load) retries rather than doing nothing.
+      if (state.source.selected === 'real' && (state.source.terrain || state.source.loading)) {
         return;
       }
 
-      if (!parkedTerrain) {
+      // Location fields edited since the parked load ask for a fresh load, not a stale restore.
+      if (parked?.fieldsKey !== getSourceFieldsKey(state.source)) {
         controller.source({ selected: 'real' });
         await controller.loadTerrain();
 
         return;
       }
 
+      loadedFieldsKey = parked.fieldsKey;
       applySource({
-        ...parkedTerrain,
+        ...parked.terrain,
         contourInterval: state.source.interval,
         seaLevelHatching: state.source.hatching,
       });
@@ -479,6 +487,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
           return;
         }
 
+        loadedFieldsKey = getSourceFieldsKey(source);
         applySource({
           ...terrain,
           contourInterval: state.source.interval,
@@ -538,4 +547,15 @@ export function createStudioController(actions: DesignControlActions): StudioCon
   };
 
   return controller;
+}
+
+/** Identifies the location fields a real-terrain load used. */
+function getSourceFieldsKey(source: TerrainSourceState): string {
+  return JSON.stringify([
+    source.latitude,
+    source.longitude,
+    source.spanKm,
+    source.elevationFloor,
+    source.maxDepth,
+  ]);
 }

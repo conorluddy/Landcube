@@ -250,6 +250,29 @@ test('real terrain switches back instantly and revisited places load from the ti
   expect(tileRequests).toBe(0);
 });
 
+test('coordinates edited before switching away load fresh terrain instead of restoring', async ({
+  page,
+}) => {
+  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
+  await loadLocation(page);
+  await page.getByLabel('Latitude', { exact: true }).fill('10');
+  await page.getByLabel('Latitude', { exact: true }).press('Tab');
+  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
+  await page.getByRole('button', { name: 'Coordinates', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible();
+});
+
+test('coordinates retries after a failed first load', async ({ page }) => {
+  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
+  await page.route('https://s3.amazonaws.com/elevation-tiles-prod/terrarium/**', (route) =>
+    route.abort(),
+  );
+  await page.getByRole('button', { name: 'Coordinates', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'download failed' })).toBeVisible();
+  await page.unroute('https://s3.amazonaws.com/elevation-tiles-prod/terrarium/**');
+  await loadLocation(page);
+});
+
 test('failed preview decoding retains the last image and obsolete previews cannot replace newer output', async ({
   page,
 }) => {
