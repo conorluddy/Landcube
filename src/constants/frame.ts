@@ -13,7 +13,8 @@ export const minimumFrameWallMm = 1.2;
 /** Steepest overhang that prints without supports, measured from vertical. */
 export const maximumFrameOverhangDegrees = 45;
 export const maximumFrameDimensionMm = 1000;
-export const coveProfileSegments = 8;
+/** Segments per quarter-circle in cove, round and ogee edges. */
+export const frameEdgeArcSegments = 8;
 
 /** The rim stands this far above the model's base. */
 export const trayWallAboveBaseMm = 4;

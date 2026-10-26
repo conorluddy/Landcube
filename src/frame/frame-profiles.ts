@@ -1,14 +1,18 @@
-import { coveProfileSegments, maximumFrameOverhangDegrees } from '../constants/frame';
+import { frameEdgeArcSegments, maximumFrameOverhangDegrees } from '../constants/frame';
 import { operationErrorCodes } from '../constants/operations';
-import type { FrameProfile, FrameProfilePoint, FrameProfilePreset } from '../types/frame';
+import type { FrameEdge, FrameProfile, FrameProfilePoint } from '../types/frame';
 import type { Result } from '../types/operations';
 
-/** Offsets are measured from the footprint edge; heights from the bed. */
-export interface TrayProfileDimensions {
-  innerOffsetMm: number;
-  outerOffsetMm: number;
-  floorHeightMm: number;
-  topHeightMm: number;
+/** A top corner of a profile block: its vertical face meets its top face here. */
+export interface FrameCorner {
+  offsetMm: number;
+  heightMm: number;
+}
+
+/** In edge space, `inwardMm` runs from the vertical face and `downMm` from the top face. */
+interface EdgePoint {
+  inwardMm: number;
+  downMm: number;
 }
 
 const overhangToleranceDegrees = 1e-9;
@@ -18,60 +22,20 @@ const bedToleranceMm = 1e-9;
 // === PUBLIC API ===
 
 /**
- * Builds the tray cross-section from the outer foot, up and over the rim, down to the floor
- * top. Every preset faces up or out, so all print upright without supports. Feature size
- * scales with the wall so presets stay proportional.
+ * Cuts `edge` into an outer top corner, from the outer face up to the top face. Every shape
+ * faces up or out, so none adds an overhang when printed upright.
  */
-export function createTrayProfile(
-  preset: FrameProfilePreset,
-  dimensions: TrayProfileDimensions,
-): FrameProfile {
-  const {
-    innerOffsetMm: inner,
-    outerOffsetMm: outer,
-    floorHeightMm,
-    topHeightMm: top,
-  } = dimensions;
-  const featureMm = Math.min(outer - inner, top - floorHeightMm) / 2;
-  const rimToFloor = [point(inner, top), point(inner, floorHeightMm)];
+export function createOuterEdgePoints(edge: FrameEdge, corner: FrameCorner): FrameProfilePoint[] {
+  return createEdgeShape(edge).map(({ inwardMm, downMm }) =>
+    point(corner.offsetMm - inwardMm, corner.heightMm - downMm),
+  );
+}
 
-  switch (preset) {
-    case 'square':
-      return upright([point(outer, 0), point(outer, top), ...rimToFloor]);
-    case 'chamfer':
-      return upright([
-        point(outer, 0),
-        point(outer, top - featureMm),
-        point(outer - featureMm, top),
-        ...rimToFloor,
-      ]);
-    case 'cove':
-      return upright([
-        point(outer, 0),
-        point(outer, top - featureMm),
-        ...createCovePoints(outer, top, featureMm),
-        point(outer - featureMm, top),
-        ...rimToFloor,
-      ]);
-    case 'stepped':
-      return upright([
-        point(outer, 0),
-        point(outer, top - featureMm),
-        point(outer - featureMm / 2, top - featureMm),
-        point(outer - featureMm / 2, top - featureMm / 2),
-        point(outer - featureMm, top - featureMm / 2),
-        point(outer - featureMm, top),
-        ...rimToFloor,
-      ]);
-    case 'floating':
-      // A 45° undercut toe casts a shadow line and sits exactly on the overhang limit.
-      return upright([
-        point(outer - featureMm, 0),
-        point(outer, featureMm),
-        point(outer, top),
-        ...rimToFloor,
-      ]);
-  }
+/** Cuts `edge` into an inner top corner, from the top face down to the inner face. */
+export function createInnerEdgePoints(edge: FrameEdge, corner: FrameCorner): FrameProfilePoint[] {
+  return createEdgeShape(edge)
+    .map(({ inwardMm, downMm }) => point(corner.offsetMm + inwardMm, corner.heightMm - downMm))
+    .reverse();
 }
 
 /**
@@ -161,24 +125,60 @@ function point(offsetMm: number, heightMm: number): FrameProfilePoint {
   return { offsetMm, heightMm };
 }
 
-function upright(points: FrameProfilePoint[]): FrameProfile {
-  return { points, printOrientation: 'upright' };
+/** Edge points from the vertical face (`downMm` = size) to the top face (`inwardMm` = size). */
+function createEdgeShape(edge: FrameEdge): EdgePoint[] {
+  if (edge.shape === 'square') {
+    return [edgePoint(0, 0)];
+  }
+
+  const size = edge.sizeMm;
+  const half = size / 2;
+
+  switch (edge.shape) {
+    case 'chamfer':
+      return [edgePoint(0, size), edgePoint(size, 0)];
+    case 'cove':
+      // Concave quarter-round centred on the corner.
+      return createArc((sin, cos) => edgePoint(sin * size, cos * size));
+    case 'round':
+      // Convex quarter-round centred one size in from both faces.
+      return createArc((sin, cos) => edgePoint(size - cos * size, size - sin * size));
+    case 'ogee':
+      // A half-size cove below a half-size round: an S-curve with no downward face.
+      return [
+        ...createArc((sin, cos) => edgePoint(sin * half, half + cos * half)),
+        ...createArc((sin, cos) => edgePoint(size - cos * half, half - sin * half)).slice(1),
+      ];
+    case 'step':
+      return [
+        edgePoint(0, size),
+        edgePoint(half, size),
+        edgePoint(half, half),
+        edgePoint(size, half),
+        edgePoint(size, 0),
+      ];
+  }
 }
 
-/** A concave quarter-round centred on the outer top corner, excluding both end points. */
-function createCovePoints(
-  outerOffsetMm: number,
-  topHeightMm: number,
-  radiusMm: number,
-): FrameProfilePoint[] {
-  return Array.from({ length: coveProfileSegments - 1 }, (_, index) => {
-    const angle = ((index + 1) / coveProfileSegments) * (Math.PI / 2);
+/** Samples a quarter-turn, both ends included and exact so edges meet their faces flush. */
+function createArc(sample: (sin: number, cos: number) => EdgePoint): EdgePoint[] {
+  return Array.from({ length: frameEdgeArcSegments + 1 }, (_, index) => {
+    if (index === 0) {
+      return sample(0, 1);
+    }
 
-    return point(
-      outerOffsetMm - Math.sin(angle) * radiusMm,
-      topHeightMm - Math.cos(angle) * radiusMm,
-    );
+    if (index === frameEdgeArcSegments) {
+      return sample(1, 0);
+    }
+
+    const angle = (index / frameEdgeArcSegments) * (Math.PI / 2);
+
+    return sample(Math.sin(angle), Math.cos(angle));
   });
+}
+
+function edgePoint(inwardMm: number, downMm: number): EdgePoint {
+  return { inwardMm, downMm };
 }
 
 /** The outermost offset at `heightMm` among segments spanning the whole band. */
