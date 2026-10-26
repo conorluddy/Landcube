@@ -27,6 +27,7 @@ import { resetDesignStyle } from '../design-settings';
 import { getRealContourInterval } from '../real-terrain-contours';
 import { landFinishes, terrainMaterialPresets, waterFinishes } from '../terrain-materials';
 import { terrainLightingControls } from '../terrain-lighting';
+import { floorStyles } from '../terrain-floor-styles';
 import {
   elevationGradientPresets,
   getElevationGradientCss,
@@ -827,6 +828,22 @@ export function OverlaysPanel({ controller: c, state: s }: PanelProps): ReactNod
               c.scene({ mapGrid: value });
             }}
           />
+          <Select
+            id="floorStyle"
+            label="Floor style"
+            value={s.scene.floorStyle}
+            options={namedOptions(floorStyles)}
+            disabled={
+              !s.source.terrain ||
+              !s.scene.ground ||
+              !s.scene.base ||
+              !s.scene.surface ||
+              !s.scene.mapGrid
+            }
+            onChange={(value) => {
+              c.scene({ floorStyle: value as typeof s.scene.floorStyle });
+            }}
+          />
           <Toggle
             label="North arrow"
             value={s.scene.north}
@@ -836,8 +853,8 @@ export function OverlaysPanel({ controller: c, state: s }: PanelProps): ReactNod
             }}
           />
           <Hint>
-            Ground-distance grid and north arrow require a real location, studio floor and solid
-            base. Omitted from STL.
+            Map grid, floor styles and north arrow require a real location, studio floor and solid
+            base. Floor styles other than Grid draw their own north marker. Omitted from STL.
           </Hint>
         </Group>
       )}

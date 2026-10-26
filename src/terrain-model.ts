@@ -69,13 +69,15 @@ export function cropTerrainModelField(
   height: number,
   settings: TerrainModelSettings,
   crop: TerrainCropSettings = defaultTerrainCrop,
-): { field: HeightField; width: number; height: number } {
+): { field: HeightField; x: number; y: number; width: number; height: number } {
   validateTerrainModelSettings(settings);
   const ratio = settings.cropShape === 'circle' ? 1 : settings.widthMm / settings.lengthMm;
   const bounds = getTerrainCropBounds(width, height, ratio, crop);
 
   return {
     field: { ...field, originX: field.originX - bounds.x, originY: field.originY - bounds.y },
+    x: bounds.x,
+    y: bounds.y,
     width: bounds.width,
     height: bounds.height,
   };
