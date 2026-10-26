@@ -97,6 +97,27 @@ export function TerrainPanel({ controller: c, state: s }: PanelProps): ReactNode
             }}
           />
         )}
+        <Toggle
+          label="Cycle daylight"
+          value={s.scene.daylightCycle.enabled}
+          onChange={(value) => {
+            c.daylightCycle({ enabled: value });
+          }}
+        />
+        {s.scene.daylightCycle.enabled && (
+          <Range
+            id="daylight-day-length"
+            label="Day length"
+            value={s.scene.daylightCycle.daySeconds}
+            min={30}
+            max={180}
+            step={5}
+            suffix=" s"
+            onChange={(value) => {
+              c.daylightCycle({ daySeconds: value });
+            }}
+          />
+        )}
       </Group>
       {source.selected === 'generated' ? (
         <Group title="Procedural landscape">

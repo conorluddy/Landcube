@@ -184,6 +184,22 @@ void test('autoplay tours preset locations after each delay until switched off',
   assert.equal(c.getSnapshot().source.place, secondPlace);
 });
 
+void test('daylight cycle sweeps the sun until a manual lighting edit pauses it', (t) => {
+  const { controller: c } = setup();
+
+  t.mock.timers.enable({ apis: ['setInterval', 'Date'] });
+  c.daylightCycle({ enabled: true, daySeconds: 60 });
+  const startHour = c.getSnapshot().scene.lighting.timeOfDay;
+
+  t.mock.timers.tick(5000);
+  assert.ok(c.getSnapshot().scene.lighting.timeOfDay > startHour);
+
+  c.lighting({ timeOfDay: 12 });
+  t.mock.timers.tick(5000);
+  assert.equal(c.getSnapshot().scene.daylightCycle.enabled, false);
+  assert.equal(c.getSnapshot().scene.lighting.timeOfDay, 12);
+});
+
 /** Serves flat Terrarium tiles through the browser decoding path without a network or canvas. */
 function stubBrowserTileDecoding(t: TestContext): void {
   const tileSizePixels = 256;
