@@ -13,3 +13,8 @@ Browser and CLI share settings validation, terrain generation, contour extractio
 Preserve reproducibility: existing version-one links depend on stable defaults and terrain semantics. Browser design links omit real-terrain locations; CLI configurations preserve terrain settings. Static exports use settled terrain without cursor deformation. Real-terrain output includes source attribution.
 
 Keep browser and CLI behavior aligned through the shared pipeline.
+
+## Guides
+
+- [docs/CODESTYLE.md](docs/CODESTYLE.md): code style, determinism rules, error handling, testing.
+- [docs/SPECS.md](docs/SPECS.md): how to write issues, specs and acceptance criteria.
