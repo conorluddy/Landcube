@@ -891,3 +891,126 @@ test('terraced shape exports real shelves and risers, retains contour treatment 
   expect((await download()).equals(smooth)).toBe(true);
   expect(errors).toEqual([]);
 });
+
+test('elevation gradients edit and retain stops, render hard and soft bands, and preserve STL', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      errors.push(message.text());
+    }
+  });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).check();
+  await page.getByRole('switch', { name: 'Contour lines', exact: true }).uncheck();
+
+  const download = async () => {
+    const pending = page.waitForEvent('download');
+
+    await page.getByRole('button', { name: 'Download STL', exact: true }).click();
+    const path = await (await pending).path();
+
+    if (!path) {
+      throw new Error('Missing STL download.');
+    }
+
+    return readFile(path);
+  };
+
+  const original = await download();
+
+  await expect(
+    page.getByRole('switch', { name: 'Color by elevation', exact: true }),
+  ).not.toBeChecked();
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const baseline = await page.screenshot();
+
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('switch', { name: 'Color by elevation', exact: true }).check();
+  await expect(page.getByLabel('Surface tint', { exact: true })).toBeHidden();
+
+  for (const preset of ['paper', 'sandstone', 'ember', 'copper', 'coastal']) {
+    await page.getByRole('combobox', { name: 'Gradient preset', exact: true }).selectOption(preset);
+    await expect(page.locator('[data-gradient-preview]')).toHaveAttribute(
+      'style',
+      /linear-gradient/,
+    );
+  }
+
+  await page.getByRole('combobox', { name: 'Gradient preset', exact: true }).selectOption('paper');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const soft = await page.screenshot({ path: test.info().outputPath('gradient-smooth-soft.png') });
+
+  expect(soft.equals(baseline)).toBe(false);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('combobox', { name: 'Transitions', exact: true }).selectOption('hard');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  expect(
+    (await page.screenshot({ path: test.info().outputPath('gradient-smooth-hard.png') })).equals(
+      soft,
+    ),
+  ).toBe(false);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('switch', { name: 'Color by elevation', exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  expect((await page.screenshot()).equals(baseline)).toBe(true);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('switch', { name: 'Color by elevation', exact: true }).check();
+  await page.getByRole('combobox', { name: 'Transitions', exact: true }).selectOption('soft');
+  await page.getByLabel('Stop 2 color', { exact: true }).fill('#c46b35');
+  await expect(page.getByRole('combobox', { name: 'Gradient preset', exact: true })).toHaveValue(
+    'custom',
+  );
+  await page.getByRole('spinbutton', { name: 'Stop 2 position', exact: true }).fill('35');
+  await page.getByRole('spinbutton', { name: 'Stop 2 position', exact: true }).press('Tab');
+  await expect(page.getByRole('spinbutton', { name: 'Stop 2 position', exact: true })).toHaveValue(
+    '35',
+  );
+  await page.getByRole('button', { name: 'Add color stop', exact: true }).click();
+  await page.getByRole('button', { name: 'Add color stop', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Add color stop', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Remove stop 2', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Add color stop', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Reverse', exact: true }).click();
+  await expect(page.getByLabel('Stop 1 color', { exact: true })).toHaveValue('#f5f3ec');
+  expect((await download()).equals(original)).toBe(true);
+  await page.getByRole('combobox', { name: 'Terrain shape', exact: true }).selectOption('terraced');
+  await page
+    .getByRole('combobox', { name: 'Gradient preset', exact: true })
+    .selectOption('sandstone');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  await page.screenshot({ path: test.info().outputPath('gradient-terraced-sandstone.png') });
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page
+    .getByRole('combobox', { name: 'Material preset', exact: true })
+    .selectOption('porcelain');
+  await page.getByRole('combobox', { name: 'Gradient preset', exact: true }).selectOption('ember');
+  await page.getByRole('combobox', { name: 'Crop shape', exact: true }).selectOption('circle');
+  await page.getByRole('combobox', { name: 'Treatment', exact: true }).selectOption('engraved');
+  await page.getByRole('switch', { name: 'Contour lines', exact: true }).check();
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  await page.screenshot({ path: test.info().outputPath('gradient-terraced-ember.png') });
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).uncheck();
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).check();
+  await expect(page.getByRole('switch', { name: 'Color by elevation', exact: true })).toBeChecked();
+  await expect(page.getByRole('combobox', { name: 'Gradient preset', exact: true })).toHaveValue(
+    'ember',
+  );
+  await expect(page.getByRole('combobox', { name: 'Transitions', exact: true })).toHaveValue(
+    'soft',
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByLabel('Stop 1 color', { exact: true }).scrollIntoViewIfNeeded();
+  expect(
+    await page
+      .locator('[data-gradient-stops]')
+      .evaluate((element) => element.scrollWidth <= element.clientWidth),
+  ).toBe(true);
+  await page.screenshot({ path: test.info().outputPath('gradient-controls-mobile.png') });
+  expect(errors).toEqual([]);
+});

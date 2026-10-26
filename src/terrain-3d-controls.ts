@@ -1,3 +1,4 @@
+import { mountElevationGradientControls } from './terrain-elevation-controls';
 import {
   terrainMaterialPresets,
   landFinishes,
@@ -108,6 +109,7 @@ export function mountTerrain3dControls(
         <p class="export-hint" data-contour-interval hidden></p>
         <p class="export-hint">Pair land and water colors and finishes, then adjust either below.</p>
       </fieldset>
+      <div data-elevation-gradient-slot></div>
       <fieldset><legend>Surface</legend>
         <label class="toggle-row">Show land surface<input type="checkbox" role="switch" data-surface checked></label>
         <div data-surface-options>
@@ -117,8 +119,8 @@ export function mountTerrain3dControls(
             .map(([key, finish]) => `<option value="${key}">${finish.label}</option>`)
             .join('')}</select></label>
           <label class="toggle-row">Solid base<input type="checkbox" role="switch" data-solid-base checked></label>
-          <label class="toggle-row"><span data-surface-match-label>Match background</span><input type="checkbox" role="switch" data-surface-match checked></label>
-          <div class="colour-row"><label><span data-surface-color-label>Surface color</span><input type="color" data-surface-color value="#202326" disabled></label></div>
+          <div data-land-color-controls><label class="toggle-row"><span data-surface-match-label>Match background</span><input type="checkbox" role="switch" data-surface-match checked></label>
+          <div class="colour-row"><label><span data-surface-color-label>Surface color</span><input type="color" data-surface-color value="#202326" disabled></label></div></div>
         </div>
         <p class="export-hint">Natural blends moss, soil and rock with layered cut edges. Use the natural palette or choose a surface tint; white preserves the original colors. Turn off the surface for floating contours.</p>
       </fieldset>
@@ -169,6 +171,14 @@ export function mountTerrain3dControls(
   const toggle = getRequiredElement(section, '[data-view]', HTMLInputElement);
   const options = getRequiredElement(section, '[data-options]', HTMLElement);
   let view: ReturnType<typeof createTerrain3d> | undefined;
+  const gradientControls = mountElevationGradientControls(
+    getRequiredElement(section, '[data-elevation-gradient-slot]', HTMLElement),
+    (gradient) => {
+      getRequiredElement(section, '[data-land-color-controls]', HTMLElement).hidden =
+        gradient.enabled;
+      view?.setElevationGradient(gradient);
+    },
+  );
   let active = false;
   let modelSettings: TerrainModelSettings = { ...defaultTerrainModelSettings };
   let attributionText = '';
@@ -494,6 +504,7 @@ export function mountTerrain3dControls(
             `${Number(heightMm.toFixed(2))} mm`;
         });
         applyContourEngraving();
+        view.setElevationGradient(gradientControls.getSettings());
         view.setLandFinish(
           getRequiredElement(section, '[data-land-finish]', HTMLSelectElement).value as LandFinish,
         );

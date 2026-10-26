@@ -1,3 +1,5 @@
+import { createTerrainElevationMaterial } from './terrain-elevation-material';
+import type { ElevationGradientSettings } from './terrain-elevation-gradient';
 import {
   landFinishes,
   waterFinishes,
@@ -54,6 +56,7 @@ export interface Terrain3d {
   setModelSettings(value: TerrainModelSettings): void;
   getStl(): ArrayBuffer;
   setLandFinish(value: LandFinish): void;
+  setElevationGradient(value: ElevationGradientSettings): void;
   setWaterFinish(value: WaterFinish): void;
   setWaterOpacity(value: number): void;
   setPreviewWaterLevel(value: number | undefined): void;
@@ -134,6 +137,16 @@ export function createTerrain3d(
   const naturalBaseMaterial = createNaturalTerrainMaterial(true);
 
   engraving.applyTo(naturalSurfaceMaterial);
+  const elevationGradient = createTerrainElevationMaterial();
+
+  for (const material of [
+    surfaceMaterial,
+    baseMaterial,
+    naturalSurfaceMaterial,
+    naturalBaseMaterial,
+  ]) {
+    elevationGradient.applyTo(material);
+  }
 
   const updateLandColor = () => {
     surfaceMaterial.color.set(customSurfaceColor ?? backgroundColor);
@@ -372,6 +385,8 @@ export function createTerrain3d(
                 terraceLevels,
               )
             : undefined;
+        const gradientOffsetMm = model.elevationOffsetMm;
+        const gradientScaleMm = model.elevationScaleMm;
         const previewScale =
           2 /
           (modelSettings.cropShape === 'circle'
@@ -417,6 +432,24 @@ export function createTerrain3d(
             rendered.setAttribute('contourElevation', new THREE.BufferAttribute(elevations, 1));
           }
 
+          const gradientPositions = rendered.getAttribute('position').array;
+          const sourceScale = 2 / Math.max(width, height);
+          const gradientHeights = Float32Array.from(
+            { length: gradientPositions.length / 3 },
+            (_, i) =>
+              exaggeration > 0
+                ? (gradientPositions[i * 3 + 1] / previewScale - gradientOffsetMm) /
+                  gradientScaleMm /
+                  terrain3dElevationScale
+                : sampleHeightField(
+                    field,
+                    gradientPositions[i * 3] / sourceScale + width / 2,
+                    gradientPositions[i * 3 + 2] / sourceScale + height / 2,
+                  ),
+          );
+
+          rendered.setAttribute('gradientElevation', new THREE.BufferAttribute(gradientHeights, 1));
+
           rendered.computeVertexNormals();
           rendered.setAttribute(
             'terrainDepth',
@@ -440,6 +473,15 @@ export function createTerrain3d(
           mesh.geometry = rendered;
         }
 
+        let gradientMinimum = Infinity;
+        let gradientMaximum = -Infinity;
+
+        for (const elevation of field.values) {
+          gradientMinimum = Math.min(gradientMinimum, elevation);
+          gradientMaximum = Math.max(gradientMaximum, elevation);
+        }
+
+        elevationGradient.setRange(gradientMinimum, gradientMaximum);
         previousField = field;
         modelKey = key;
         onModel(model.overallHeightMm, model.layerHeightMm);
@@ -594,6 +636,10 @@ export function createTerrain3d(
       contourTreatment = value.treatment;
       engraving.setSize(value.widthMm, value.depthMm);
       syncContourTreatment();
+      draw();
+    },
+    setElevationGradient(value: ElevationGradientSettings) {
+      elevationGradient.setSettings(value);
       draw();
     },
     setLandFinish(value: LandFinish) {
