@@ -11,29 +11,42 @@ export function createTerrainStage(): {
   setColor(value: string): void;
   setCastShadows(value: boolean): void;
   setNorthArrow(value: boolean): void;
-  setMapGrid(value: boolean, spanMeters: number | undefined): void;
+  setMapGrid(value: boolean, spanMeters: number | undefined, contourIntervalMeters?: number): void;
 } {
   const group = new THREE.Group();
-  const groundMaterial = new THREE.MeshBasicMaterial({
+  const shadowEnabled = { value: 1 };
+  const groundMaterial = new THREE.ShadowMaterial({
     color: defaultTerrainGroundColor,
     side: THREE.BackSide,
     toneMapped: false,
+    transparent: false,
+    opacity: 0.65,
   });
+
+  // Color and cast shadow share one depth surface, avoiding a nearly coplanar overlay.
+  groundMaterial.onBeforeCompile = (shader) => {
+    shader.uniforms.floorShadowEnabled = shadowEnabled;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('uniform float opacity;', 'uniform float opacity; uniform float floorShadowEnabled;')
+      .replace(
+        'gl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) );',
+        'gl_FragColor = vec4( color, 1.0 );',
+      )
+      .replace(
+        '#include <colorspace_fragment>',
+        `#include <colorspace_fragment>
+        gl_FragColor.rgb *= 1.0 - opacity * floorShadowEnabled * (1.0 - getShadowMask());`,
+      );
+  };
+
+  groundMaterial.customProgramCacheKey = () => 'topogra-shadowed-studio-v1';
+
   // An enclosing studio box keeps the floor, walls, and ceiling the same color.
   const ground = new THREE.Mesh(new THREE.BoxGeometry(400, 200, 400), groundMaterial);
 
   ground.position.y = 100 - 0.01;
+  ground.receiveShadow = true;
   group.add(ground);
-
-  const castShadow = new THREE.Mesh(
-    new THREE.PlaneGeometry(400, 400),
-    new THREE.ShadowMaterial({ opacity: 0.65, depthWrite: false }),
-  );
-
-  castShadow.rotation.x = -Math.PI / 2;
-  castShadow.position.y = -0.005;
-  castShadow.receiveShadow = true;
-  group.add(castShadow);
 
   // A restrained contact shadow supplements the directional shadow at the base.
   const canvas = document.createElement('canvas');
@@ -127,6 +140,7 @@ export function createTerrainStage(): {
   group.add(mapGrid.mesh);
   let gridEnabled = false;
   let groundSpan: number | undefined;
+  let contourInterval: number | undefined;
   let stageSize = { width: 2, length: 2, circular: false, background: defaultTerrainGroundColor };
 
   const updateGrid = () => {
@@ -141,6 +155,7 @@ export function createTerrainStage(): {
       stageSize.circular,
       stageSize.background,
       groundSpan,
+      contourInterval,
     );
   };
 
@@ -166,7 +181,7 @@ export function createTerrainStage(): {
       north.position.set(-width / 2 - 0.2, 0, length / 2 - 0.05);
     },
     setCastShadows(value) {
-      castShadow.visible = value;
+      shadowEnabled.value = value ? 1 : 0;
     },
     setColor(value) {
       groundMaterial.color.set(value);
@@ -176,7 +191,8 @@ export function createTerrainStage(): {
     setVisible(value) {
       group.visible = value;
     },
-    setMapGrid(value, spanMeters) {
+    setMapGrid(value, spanMeters, contourIntervalMeters) {
+      contourInterval = contourIntervalMeters;
       gridEnabled = value;
       groundSpan = spanMeters;
       updateGrid();

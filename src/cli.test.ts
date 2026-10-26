@@ -480,3 +480,121 @@ void test('terrain presets use suggested spans while explicit spans override the
     assert.equal(saved.terrain.spanKm, expected);
   }
 });
+
+void test('physical contour intervals round-trip through CLI configs and old configs retain density', async (context) => {
+  const { runCli } = await import('./cli');
+  const { PNG } = await import('pngjs');
+  const directory = await mkdtemp(join(tmpdir(), 'topogra-interval-'));
+  const tile = new PNG({ width: 256, height: 256 });
+
+  for (let i = 0; i < tile.data.length; i += 4) {
+    const encoded = 32768 + ((i / 4) % 256) * 2;
+
+    tile.data[i] = Math.floor(encoded / 256);
+    tile.data[i + 1] = encoded % 256;
+    tile.data[i + 3] = 255;
+  }
+
+  context.mock.method(globalThis, 'fetch', () =>
+    Promise.resolve(new Response(new Uint8Array(PNG.sync.write(tile)))),
+  );
+  let diagnostics = '';
+  const io = {
+    stdout: { write: () => true },
+    stderr: {
+      write: (text: string) => {
+        diagnostics += text;
+
+        return true;
+      },
+    },
+  } as unknown as Parameters<typeof runCli>[1];
+  const output = join(directory, 'fixed.svg');
+  const config = join(directory, 'fixed.json');
+
+  assert.equal(
+    await runCli(
+      [
+        'generate',
+        '--terrain-preset',
+        'Wicklow Mountains',
+        '--seed',
+        '123',
+        '--width',
+        '100',
+        '--height',
+        '100',
+        '--contour-interval',
+        '25',
+        '--output',
+        output,
+        '--save-config',
+        config,
+      ],
+      io,
+    ),
+    0,
+    diagnostics,
+  );
+  const saved = JSON.parse(await readFile(config, 'utf8')) as {
+    terrain: { contourInterval?: number | string };
+  };
+  const svg = await readFile(output, 'utf8');
+
+  assert.equal(saved.terrain.contourInterval, 25);
+  assert.match(svg, /data-contour-interval-m="25"/);
+  assert.equal(
+    await runCli(['generate', '--config', config, '--output', join(directory, 'restored.svg')], io),
+    0,
+    diagnostics,
+  );
+  assert.equal(await readFile(join(directory, 'restored.svg'), 'utf8'), svg);
+  assert.equal(
+    await runCli(
+      [
+        'generate',
+        '--config',
+        config,
+        '--contour-interval',
+        'auto',
+        '--output',
+        join(directory, 'auto.svg'),
+      ],
+      io,
+    ),
+    0,
+    diagnostics,
+  );
+  assert.match(await readFile(join(directory, 'auto.svg'), 'utf8'), /data-contour-interval-m="20"/);
+  delete saved.terrain.contourInterval;
+  await writeFile(config, JSON.stringify(saved));
+  assert.equal(
+    await runCli(['generate', '--config', config, '--output', join(directory, 'legacy.svg')], io),
+    0,
+    diagnostics,
+  );
+  assert.doesNotMatch(
+    await readFile(join(directory, 'legacy.svg'), 'utf8'),
+    /data-contour-interval-m/,
+  );
+
+  for (const value of ['0', '-1', 'NaN', 'Infinity', '5001', 'fixed']) {
+    assert.equal(
+      await runCli(
+        [
+          'generate',
+          '--config',
+          config,
+          '--contour-interval',
+          value,
+          '--output',
+          join(directory, 'invalid.svg'),
+        ],
+        io,
+      ),
+      2,
+    );
+  }
+
+  assert.equal(await runCli(['generate', '--contour-interval', '25'], io), 2);
+});

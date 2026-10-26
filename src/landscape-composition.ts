@@ -2,7 +2,12 @@ import { createSeaLevelGeometry, type SeaLevelGeometry } from './sea-level';
 import type { RealTerrain } from './real-terrain';
 import { findTerrainSummits } from './summit-markers';
 import type { ContourPoint } from './types/contours';
-import { extractContours } from './contour-extraction';
+import type { TerrainTerraceLevels } from './terrain-terraces';
+import {
+  getRealContourInterval,
+  extractLandscapeContours,
+  getRealContourElevations,
+} from './real-terrain-contours';
 import { deriveTerrainConfiguration } from './design-settings';
 import { createTerrainSampler, sampleTerrain } from './terrain-generation';
 import type { Contour } from './types/contours';
@@ -13,7 +18,14 @@ import type { EngineConfiguration } from './types/terrain';
 export function calculateContourElevations(
   settings: Readonly<DesignSettings>,
   engineConfiguration: Readonly<EngineConfiguration>,
+  realTerrain?: RealTerrain,
 ): number[] {
+  const realLevels = getRealContourElevations(realTerrain);
+
+  if (realLevels) {
+    return realLevels;
+  }
+
   return Array.from(
     { length: settings.contourCount },
     (_, index) =>
@@ -48,8 +60,33 @@ export function generateLandscapeGeometry(
   );
 
   return {
-    contours: extractContours(field, calculateContourElevations(settings, engineConfiguration)),
+    contours: extractLandscapeContours(
+      field,
+      calculateContourElevations(settings, engineConfiguration, realTerrain),
+      realTerrain,
+    ),
     summits: findTerrainSummits(field),
     seaLevel: createSeaLevelGeometry(field, settings.width, settings.height, realTerrain),
+  };
+}
+
+/** Keeps terraces anchored to exactly the same physical or decorative contour levels. */
+export function getTerrainTerraceLevels(
+  settings: Readonly<DesignSettings>,
+  engine: Readonly<EngineConfiguration>,
+  terrain?: RealTerrain,
+): TerrainTerraceLevels {
+  const interval = getRealContourInterval(terrain);
+
+  if (interval !== undefined && terrain?.elevations) {
+    return {
+      origin: -terrain.elevations.originMeters / terrain.elevations.metersPerUnit,
+      interval: interval / terrain.elevations.metersPerUnit,
+    };
+  }
+
+  return {
+    origin: 0,
+    interval: (engine.elevationMax - engine.elevationMin) / (settings.contourCount - 1),
   };
 }

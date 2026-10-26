@@ -2,6 +2,7 @@
 export const landFinishes = {
   matte: { label: 'Matte', roughness: 1, clearcoat: 0 },
   satin: { label: 'Satin', roughness: 0.55, clearcoat: 0.15 },
+  natural: { label: 'Natural', roughness: 0.96, clearcoat: 0 },
 };
 
 export const waterFinishes = {
@@ -15,6 +16,13 @@ export type LandFinish = keyof typeof landFinishes;
 export type WaterFinish = keyof typeof waterFinishes;
 
 export const terrainMaterialPresets = {
+  natural: {
+    label: 'Natural landscape',
+    land: '#ffffff',
+    water: '#36666b',
+    landFinish: 'natural',
+    waterFinish: 'satin',
+  },
   porcelain: {
     label: 'Porcelain',
     land: '#e9e2d3',

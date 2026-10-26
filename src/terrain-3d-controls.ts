@@ -5,6 +5,11 @@ import {
   type LandFinish,
   type WaterFinish,
 } from './terrain-materials';
+import {
+  defaultContourEngraving,
+  type ContourEngravingSettings,
+} from './terrain-contour-engraving';
+import type { TerrainTerraceLevels } from './terrain-terraces';
 import { mountTerrainCropControls } from './terrain-crop-controls';
 import type { TerrainCropSettings } from './terrain-crop';
 import { getTerrainWaterColor } from './terrain-water';
@@ -40,6 +45,7 @@ export function mountTerrain3dControls(
     width: number,
     height: number,
     settings: DesignSettings,
+    contourLevels?: readonly number[],
   ): void;
   update(
     contours: Contour[],
@@ -51,6 +57,8 @@ export function mountTerrain3dControls(
     attribution?: string,
     location?: { latitude: number; longitude: number },
     groundSpanMeters?: number,
+    contourIntervalMeters?: number,
+    terraceLevels?: TerrainTerraceLevels,
   ): void;
 } {
   const section = document.createElement('section');
@@ -64,6 +72,14 @@ export function mountTerrain3dControls(
     <p class="export-hint">Explore the current landscape in 3D. Palette controls are in Settings; real terrain is in Location.</p>
     <div data-options hidden>
       <label class="toggle-row">Contour lines<input type="checkbox" role="switch" data-show-contours checked></label>
+      <fieldset><legend>Contour treatment</legend>
+        <label class="select-row">Treatment<select data-contour-treatment><option value="drawn">Drawn</option><option value="engraved">Engraved</option></select></label>
+        <div data-engraving-options hidden>
+          <label class="range-control" for="terrain-groove-width"><span>Groove width</span><output data-groove-width-value>${defaultContourEngraving.widthMm} mm</output><input id="terrain-groove-width" data-groove-width type="range" min="0.1" max="3" step="0.1" value="${defaultContourEngraving.widthMm}"></label>
+          <label class="range-control" for="terrain-groove-depth"><span>Groove depth</span><output data-groove-depth-value>${defaultContourEngraving.depthMm} mm</output><input id="terrain-groove-depth" data-groove-depth type="range" min="0" max="1" step="0.02" value="${defaultContourEngraving.depthMm}"></label>
+          <p class="export-hint">Shallow V-shaped grooves catch the light; index contours have a wider cut. Cuts are continuous. Grooves are a visual preview and do not change STL geometry. Hide the land surface to see drawn contours.</p>
+        </div>
+      </fieldset>
       <div data-crop-slot></div>
       <fieldset><legend>Model dimensions</legend>
         <div class="control-grid">
@@ -79,6 +95,8 @@ export function mountTerrain3dControls(
         <button type="button" class="text-button" data-model-attribution hidden>Download attribution</button>
       </fieldset>
       <fieldset><legend>Shape</legend>
+        <label class="select-row">Terrain shape<select data-terrain-shape><option value="smooth">Smooth</option><option value="terraced">Terraced</option></select></label>
+        <p class="export-hint" data-terrace-hint hidden>Flat shelves and vertical risers follow the contour interval. STL exports include the steps. Layer height: <output data-layer-height>—</output>.</p>
         <label class="range-control" for="terrain-3d-height"><span>Height exaggeration</span><output data-height-value>0.3×</output><input id="terrain-3d-height" data-height type="range" min="0" max="1" step="0.05" value="0.3"></label>
       </fieldset>
       <fieldset><legend>Materials</legend>
@@ -87,6 +105,7 @@ export function mountTerrain3dControls(
         )
           .map(([key, preset]) => `<option value="${key}">${preset.label}</option>`)
           .join('')}</select></label>
+        <p class="export-hint" data-contour-interval hidden></p>
         <p class="export-hint">Pair land and water colors and finishes, then adjust either below.</p>
       </fieldset>
       <fieldset><legend>Surface</legend>
@@ -98,10 +117,10 @@ export function mountTerrain3dControls(
             .map(([key, finish]) => `<option value="${key}">${finish.label}</option>`)
             .join('')}</select></label>
           <label class="toggle-row">Solid base<input type="checkbox" role="switch" data-solid-base checked></label>
-          <label class="toggle-row">Match background<input type="checkbox" role="switch" data-surface-match checked></label>
-          <div class="colour-row"><label>Surface color<input type="color" data-surface-color value="#202326" disabled></label></div>
+          <label class="toggle-row"><span data-surface-match-label>Match background</span><input type="checkbox" role="switch" data-surface-match checked></label>
+          <div class="colour-row"><label><span data-surface-color-label>Surface color</span><input type="color" data-surface-color value="#202326" disabled></label></div>
         </div>
-        <p class="export-hint">Turn off the surface for floating contours.</p>
+        <p class="export-hint">Natural blends moss, soil and rock with layered cut edges. Use the natural palette or choose a surface tint; white preserves the original colors. Turn off the surface for floating contours.</p>
       </fieldset>
       <fieldset><legend>Ground</legend>
         <label class="toggle-row">Studio floor<input type="checkbox" role="switch" data-ground checked></label>
@@ -154,7 +173,9 @@ export function mountTerrain3dControls(
   let modelSettings: TerrainModelSettings = { ...defaultTerrainModelSettings };
   let attributionText = '';
   let seed = 0;
+  let currentBackground = '#202326';
   let currentGroundSpan: number | undefined;
+  let currentContourInterval: number | undefined;
 
   const updateModelLabels = () => {
     const circular = modelSettings.cropShape === 'circle';
@@ -205,10 +226,29 @@ export function mountTerrain3dControls(
     getRequiredElement(section, selector, HTMLElement).addEventListener('change', markCustom);
   }
 
+  const syncLandFinishLabels = () => {
+    const natural =
+      getRequiredElement(section, '[data-land-finish]', HTMLSelectElement).value === 'natural';
+
+    getRequiredElement(section, '[data-surface-match-label]', HTMLElement).textContent = natural
+      ? 'Use natural palette'
+      : 'Match background';
+    getRequiredElement(section, '[data-surface-color-label]', HTMLElement).textContent = natural
+      ? 'Surface tint'
+      : 'Surface color';
+
+    if (getRequiredElement(section, '[data-surface-match]', HTMLInputElement).checked) {
+      getRequiredElement(section, '[data-surface-color]', HTMLInputElement).value = natural
+        ? '#ffffff'
+        : currentBackground;
+    }
+  };
+
   getRequiredElement(section, '[data-land-finish]', HTMLSelectElement).addEventListener(
     'change',
     (event) => {
       view?.setLandFinish((event.target as HTMLSelectElement).value as LandFinish);
+      syncLandFinishLabels();
     },
   );
   getRequiredElement(section, '[data-water-finish]', HTMLSelectElement).addEventListener(
@@ -221,48 +261,53 @@ export function mountTerrain3dControls(
         finish !== 'translucent';
     },
   );
-  getRequiredElement(section, '[data-material-preset]', HTMLSelectElement).addEventListener(
-    'change',
-    (event) => {
-      const key = (event.target as HTMLSelectElement).value as keyof typeof terrainMaterialPresets;
-      const preset = (
-        terrainMaterialPresets as Partial<
-          Record<string, (typeof terrainMaterialPresets)[keyof typeof terrainMaterialPresets]>
-        >
-      )[key];
 
-      if (!preset) {
-        return;
-      }
+  const applyMaterialPreset = (key: string) => {
+    const preset = (
+      terrainMaterialPresets as Partial<
+        Record<string, (typeof terrainMaterialPresets)[keyof typeof terrainMaterialPresets]>
+      >
+    )[key];
 
-      for (const [target, color] of [
-        ['surface', preset.land],
-        ['water', preset.water],
-      ]) {
-        getRequiredElement(section, `[data-${target}-match]`, HTMLInputElement).checked = false;
-        const picker = getRequiredElement(section, `[data-${target}-color]`, HTMLInputElement);
+    if (!preset) {
+      return;
+    }
 
-        picker.disabled = false;
-        picker.value = color;
-      }
+    for (const [target, color] of [
+      ['surface', preset.land],
+      ['water', preset.water],
+    ]) {
+      getRequiredElement(section, `[data-${target}-match]`, HTMLInputElement).checked = false;
+      const picker = getRequiredElement(section, `[data-${target}-color]`, HTMLInputElement);
 
-      getRequiredElement(section, '[data-surface]', HTMLInputElement).checked = true;
-      getRequiredElement(section, '[data-surface-options]', HTMLElement).hidden = false;
-      getRequiredElement(section, '[data-water-style]', HTMLSelectElement).value = 'solid';
-      getRequiredElement(section, '[data-water-color-row]', HTMLElement).hidden = false;
-      getRequiredElement(section, '[data-land-finish]', HTMLSelectElement).value =
-        preset.landFinish;
-      getRequiredElement(section, '[data-water-finish]', HTMLSelectElement).value =
-        preset.waterFinish;
-      getRequiredElement(section, '[data-water-opacity-row]', HTMLElement).hidden = true;
-      view?.setSurface(true);
-      view?.setSurfaceColor(preset.land);
-      view?.setWaterColor(preset.water);
-      view?.setLandFinish(preset.landFinish);
-      view?.setWaterFinish(preset.waterFinish);
-      view?.setWaterStyle('solid');
-    },
-  );
+      picker.disabled = false;
+      picker.value = color;
+    }
+
+    getRequiredElement(section, '[data-surface]', HTMLInputElement).checked = true;
+    getRequiredElement(section, '[data-surface-options]', HTMLElement).hidden = false;
+    getRequiredElement(section, '[data-water-style]', HTMLSelectElement).value = 'solid';
+    getRequiredElement(section, '[data-water-color-row]', HTMLElement).hidden = false;
+    getRequiredElement(section, '[data-land-finish]', HTMLSelectElement).value = preset.landFinish;
+    getRequiredElement(section, '[data-water-finish]', HTMLSelectElement).value =
+      preset.waterFinish;
+    getRequiredElement(section, '[data-water-opacity-row]', HTMLElement).hidden = true;
+    view?.setSurface(true);
+    view?.setSurfaceColor(preset.land);
+    view?.setWaterColor(preset.water);
+    view?.setLandFinish(preset.landFinish);
+    syncLandFinishLabels();
+    view?.setWaterFinish(preset.waterFinish);
+    view?.setWaterStyle('solid');
+  };
+
+  const materialPreset = getRequiredElement(section, '[data-material-preset]', HTMLSelectElement);
+
+  materialPreset.addEventListener('change', () => {
+    applyMaterialPreset(materialPreset.value);
+  });
+  materialPreset.value = 'natural';
+  applyMaterialPreset(materialPreset.value);
 
   getRequiredElement(section, '[data-water-opacity]', HTMLInputElement).addEventListener(
     'input',
@@ -309,6 +354,34 @@ export function mountTerrain3dControls(
       URL.revokeObjectURL(url);
     }, 1000);
   };
+
+  getRequiredElement(section, '[data-terrain-shape]', HTMLSelectElement).addEventListener(
+    'change',
+    (event) => {
+      const select = event.target as HTMLSelectElement;
+      const previous = modelSettings;
+
+      try {
+        modelSettings = {
+          ...modelSettings,
+          terrainShape: select.value as TerrainModelSettings['terrainShape'],
+        };
+        validateTerrainModelSettings(modelSettings);
+        view?.setModelSettings(modelSettings);
+        getRequiredElement(section, '[data-terrace-hint]', HTMLElement).hidden =
+          select.value !== 'terraced';
+        changed();
+      } catch (error) {
+        modelSettings = previous;
+        select.value = previous.terrainShape ?? 'smooth';
+        view?.setModelSettings(modelSettings);
+        getRequiredElement(section, '[data-terrace-hint]', HTMLElement).hidden =
+          select.value !== 'terraced';
+        changed();
+        notify(error instanceof Error ? error.message : 'Terrain shape could not be changed.');
+      }
+    },
+  );
 
   for (const input of section.querySelectorAll<HTMLInputElement>('[data-model]')) {
     input.addEventListener('change', () => {
@@ -368,6 +441,41 @@ export function mountTerrain3dControls(
     }
   };
 
+  const applyContourEngraving = () => {
+    const treatment = getRequiredElement(section, '[data-contour-treatment]', HTMLSelectElement)
+      .value as ContourEngravingSettings['treatment'];
+    const widthMm = getRequiredElement(
+      section,
+      '[data-groove-width]',
+      HTMLInputElement,
+    ).valueAsNumber;
+    const depthMm = getRequiredElement(
+      section,
+      '[data-groove-depth]',
+      HTMLInputElement,
+    ).valueAsNumber;
+
+    getRequiredElement(section, '[data-engraving-options]', HTMLElement).hidden =
+      treatment !== 'engraved';
+    getRequiredElement(section, '[data-groove-width-value]', HTMLOutputElement).value =
+      `${widthMm} mm`;
+    getRequiredElement(section, '[data-groove-depth-value]', HTMLOutputElement).value =
+      `${depthMm} mm`;
+    view?.setContourEngraving({ treatment, widthMm, depthMm });
+  };
+
+  getRequiredElement(section, '[data-contour-treatment]', HTMLSelectElement).addEventListener(
+    'change',
+    applyContourEngraving,
+  );
+
+  for (const selector of ['[data-groove-width]', '[data-groove-depth]']) {
+    getRequiredElement(section, selector, HTMLInputElement).addEventListener(
+      'input',
+      applyContourEngraving,
+    );
+  }
+
   toggle.addEventListener('change', () => {
     void activate();
   });
@@ -379,10 +487,13 @@ export function mountTerrain3dControls(
       if (toggle.checked && !view) {
         const module = await import('./terrain-3d');
 
-        view = module.createTerrain3d((heightMm) => {
+        view = module.createTerrain3d((heightMm, layerHeightMm) => {
+          getRequiredElement(section, '[data-layer-height]', HTMLOutputElement).value =
+            layerHeightMm === undefined ? '—' : `${Number(layerHeightMm.toFixed(3))} mm`;
           getRequiredElement(section, '[data-model-height]', HTMLOutputElement).value =
             `${Number(heightMm.toFixed(2))} mm`;
         });
+        applyContourEngraving();
         view.setLandFinish(
           getRequiredElement(section, '[data-land-finish]', HTMLSelectElement).value as LandFinish,
         );
@@ -515,7 +626,11 @@ export function mountTerrain3dControls(
   getRequiredElement(section, '[data-map-grid]', HTMLInputElement).addEventListener(
     'change',
     (event) => {
-      view?.setMapGrid((event.target as HTMLInputElement).checked, currentGroundSpan);
+      view?.setMapGrid(
+        (event.target as HTMLInputElement).checked,
+        currentGroundSpan,
+        currentContourInterval,
+      );
     },
   );
   getRequiredElement(section, '[data-north]', HTMLInputElement).addEventListener(
@@ -611,8 +726,8 @@ export function mountTerrain3dControls(
     isActive: () => active,
     getModelSettings: () => ({ ...modelSettings }),
     getCropSettings: () => cropControls.getCrop(),
-    updateCropPreview: (field, width, height, settings) => {
-      cropControls.update(field, width, height, settings);
+    updateCropPreview: (field, width, height, settings, contourLevels) => {
+      cropControls.update(field, width, height, settings, contourLevels);
     },
     update: (
       contours: Contour[],
@@ -624,12 +739,24 @@ export function mountTerrain3dControls(
       attribution?: string,
       location?: { latitude: number; longitude: number },
       groundSpanMeters?: number,
+      contourIntervalMeters?: number,
+      terraceLevels?: TerrainTerraceLevels,
     ) => {
+      currentContourInterval = contourIntervalMeters;
+      const intervalLabel = getRequiredElement(section, '[data-contour-interval]', HTMLElement);
+
+      intervalLabel.hidden = contourIntervalMeters === undefined;
+      intervalLabel.textContent =
+        contourIntervalMeters === undefined ? '' : `Contours: ${contourIntervalMeters} m`;
       currentGroundSpan = location ? groundSpanMeters : undefined;
       const gridToggle = getRequiredElement(section, '[data-map-grid]', HTMLInputElement);
 
       gridToggle.disabled = currentGroundSpan === undefined;
-      view?.setMapGrid(gridToggle.checked && !gridToggle.disabled, currentGroundSpan);
+      view?.setMapGrid(
+        gridToggle.checked && !gridToggle.disabled,
+        currentGroundSpan,
+        currentContourInterval,
+      );
       locationLatitude = location?.latitude;
       const locationKey = location ? `${location.latitude},${location.longitude}` : '';
 
@@ -644,6 +771,7 @@ export function mountTerrain3dControls(
       }
 
       seed = settings.seed;
+      currentBackground = settings.background;
       attributionText = attribution ?? '';
       const north = getRequiredElement(section, '[data-north]', HTMLInputElement);
 
@@ -657,8 +785,7 @@ export function mountTerrain3dControls(
         !attributionText;
 
       if (getRequiredElement(section, '[data-surface-match]', HTMLInputElement).checked) {
-        getRequiredElement(section, '[data-surface-color]', HTMLInputElement).value =
-          settings.background;
+        syncLandFinishLabels();
       }
 
       syncWaterColor();
@@ -669,7 +796,7 @@ export function mountTerrain3dControls(
       }
 
       if (active) {
-        view?.update(contours, width, height, settings, field, seaLevel);
+        view?.update(contours, width, height, settings, field, seaLevel, terraceLevels);
       }
     },
   };

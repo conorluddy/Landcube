@@ -6,13 +6,13 @@ export interface TerrainLightingSettings {
   fill: number;
 }
 
-/** Session-only lighting starts with warm, low sunlight from the upper left. */
+/** Session-only lighting starts with warm sunlight and soft fill to reveal the natural materials. */
 export const defaultTerrainLighting: Readonly<TerrainLightingSettings> = Object.freeze({
   mode: 'sun',
   direction: 315,
-  elevation: 10,
+  elevation: 35,
   intensity: 2.5,
-  fill: 0.1,
+  fill: 0.7,
 });
 
 export const terrainLightingControls = [

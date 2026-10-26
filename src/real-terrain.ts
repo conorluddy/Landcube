@@ -1,3 +1,4 @@
+import type { RealContourInterval } from './real-terrain-contours';
 import { realTerrainBounds } from './constants/real-terrain';
 
 export interface RealTerrain {
@@ -7,6 +8,13 @@ export interface RealTerrain {
   location?: { latitude: number; longitude: number };
   seaLevel?: number;
   seaLevelHatching?: boolean;
+  contourInterval?: RealContourInterval;
+  elevations?: {
+    minimumMeters: number;
+    maximumMeters: number;
+    originMeters: number;
+    metersPerUnit: number;
+  };
 }
 
 /** Raw decoded RGBA pixels and source metadata for one 256px Terrarium tile. */
@@ -106,10 +114,32 @@ export async function loadRealTerrain(
   }
 
   const elevationRange = Math.max(1, maximum - minimum);
+  let visibleMinimum = Infinity;
+  let visibleMaximum = -Infinity;
+  const left = Math.max(0, Math.floor((centerX - startX - spanTiles / 2) * tileSizePixels));
+  const right = Math.min(
+    columns - 1,
+    Math.ceil((centerX - startX + spanTiles / 2) * tileSizePixels),
+  );
+  const top = Math.max(0, Math.floor((centerY - startY - spanTiles / 2) * tileSizePixels));
+  const bottom = Math.min(rows - 1, Math.ceil((centerY - startY + spanTiles / 2) * tileSizePixels));
+
+  for (let y = top; y <= bottom; y++) {
+    for (let x = left; x <= right; x++) {
+      visibleMinimum = Math.min(visibleMinimum, elevations[y * columns + x]);
+      visibleMaximum = Math.max(visibleMaximum, elevations[y * columns + x]);
+    }
+  }
 
   return {
     location: { latitude, longitude },
     spanKm,
+    elevations: {
+      minimumMeters: visibleMinimum,
+      maximumMeters: visibleMaximum,
+      originMeters: minimum + elevationRange / 2,
+      metersPerUnit: elevationRange / 1.6,
+    },
     attribution: [...credits].join(' · '),
     seaLevel: ((0 - minimum) / elevationRange - 0.5) * 1.6,
     sample(x, y, width, height) {

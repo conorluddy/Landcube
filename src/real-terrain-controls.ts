@@ -1,6 +1,8 @@
+import { getRequiredElement } from './dom-elements';
 import { realTerrainPresets, realTerrainPresetGroups } from './constants/real-terrain';
 import { loadBrowserRealTerrain } from './browser-real-terrain';
 import { realTerrainBounds } from './constants/real-terrain';
+import { getRealContourInterval, validateRealContourInterval } from './real-terrain-contours';
 import type { RealTerrain } from './real-terrain';
 
 /** Mounts explicit network loading controls; failed requests retain the current landscape. */
@@ -27,6 +29,12 @@ export function mountRealTerrainControls(
     <label>Area span (km)<input id="terrain-span" type="number" min="${realTerrainBounds.minimumSpanKm}" max="${realTerrainBounds.maximumSpanKm}" value="${realTerrainPresets[0].spanKm}"></label>
     <label>Maximum depth below sea level (m)<input id="terrain-max-depth" type="number" min="0" max="11000" step="any" value="20"></label>
     <label>Elevation floor (m, optional)<input id="terrain-elevation-floor" type="number" min="-11000" max="8900" step="any" placeholder="Include all elevations"></label>
+    <fieldset><legend>Contour interval</legend>
+      <div class="select-row"><label for="terrain-contour-mode">Interval mode</label><select id="terrain-contour-mode"><option value="auto">Auto</option><option value="fixed">Fixed interval</option></select></div>
+      <label data-fixed-interval hidden>Interval (m)<input id="terrain-contour-interval" type="number" min="1" max="5000" step="any" value="25"></label>
+      <p data-contour-summary role="status">Load a location to choose contours in meters.</p>
+      <p>Levels are anchored to 0 m. Every N levels uses the index style in Settings. Interval stays fixed while orbiting or cropping; Auto recalculates when a new location is loaded.</p>
+    </fieldset>
     <label class="toggle-row">Sea-level hatching<input type="checkbox" role="switch" data-sea-level checked></label>
     <p>Hatches terrain at or below 0 m. This is an elevation indicator, not a water map. Included in exports; session-only.</p>
     <p>Omit low elevations to reduce coastal source artifacts. This does not trace the shoreline.</p>
@@ -52,17 +60,60 @@ export function mountRealTerrainControls(
   let loadedTerrain: RealTerrain | undefined;
   const hatching = section.querySelector<HTMLInputElement>('[data-sea-level]');
 
-  hatching?.addEventListener('change', () => {
-    if (loadedTerrain) {
-      applyTerrain({ ...loadedTerrain, seaLevelHatching: hatching.checked });
-    }
-  });
-
   if (!latitude || !longitude || !span || !maxDepth || !elevationFloor || !loadButton || !status) {
     throw new Error('Real terrain controls are incomplete.');
   }
 
-  section.querySelector('select')?.addEventListener('change', (event) => {
+  const mode = getRequiredElement(section, '#terrain-contour-mode', HTMLSelectElement);
+  const intervalInput = getRequiredElement(section, '#terrain-contour-interval', HTMLInputElement);
+  const summary = getRequiredElement(section, '[data-contour-summary]', HTMLElement);
+  let activeInterval: 'auto' | number = 'auto';
+
+  const applyLoadedTerrain = (terrain: RealTerrain) => {
+    const candidate = {
+      ...terrain,
+      contourInterval: activeInterval,
+      seaLevelHatching: hatching?.checked ?? true,
+    };
+    const interval = getRealContourInterval(candidate);
+
+    applyTerrain(candidate);
+    summary.textContent = `Contours: ${interval} m${activeInterval === 'auto' ? ' (Auto)' : ' (Fixed)'}`;
+  };
+
+  const updateInterval = () => {
+    const previous = activeInterval;
+
+    try {
+      const value = mode.value === 'auto' ? 'auto' : intervalInput.valueAsNumber;
+
+      validateRealContourInterval(value);
+      activeInterval = value;
+
+      if (loadedTerrain) {
+        applyLoadedTerrain(loadedTerrain);
+      }
+
+      getRequiredElement(section, '[data-fixed-interval]', HTMLElement).hidden =
+        mode.value !== 'fixed';
+      intervalInput.setCustomValidity('');
+    } catch (error) {
+      activeInterval = previous;
+      intervalInput.setCustomValidity(error instanceof Error ? error.message : 'Invalid interval.');
+      intervalInput.reportValidity();
+      summary.textContent = error instanceof Error ? error.message : 'Invalid interval.';
+    }
+  };
+
+  mode.addEventListener('change', updateInterval);
+  intervalInput.addEventListener('change', updateInterval);
+  hatching?.addEventListener('change', () => {
+    if (loadedTerrain) {
+      applyLoadedTerrain(loadedTerrain);
+    }
+  });
+
+  section.querySelector('#terrain-place')?.addEventListener('change', (event) => {
     if (event.target instanceof HTMLSelectElement) {
       const selected = event.target.value;
       const coordinates = selected.split(',');
@@ -82,6 +133,7 @@ export function mountRealTerrainControls(
     requestVersion++;
     loadButton.disabled = false;
     loadedTerrain = undefined;
+    summary.textContent = 'Load a location to choose contours in meters.';
     applyTerrain(undefined);
     status.textContent = 'Using generated terrain.';
   });
@@ -102,8 +154,8 @@ export function mountRealTerrainControls(
           return;
         }
 
+        applyLoadedTerrain(terrain);
         loadedTerrain = terrain;
-        applyTerrain({ ...terrain, seaLevelHatching: hatching?.checked ?? true });
         const credit = section.querySelector('[data-credit]');
 
         if (credit) {

@@ -18,7 +18,13 @@ export function mountTerrainCropControls(
   changed: (shape: TerrainCropShape) => void,
 ): {
   getCrop(): TerrainCropSettings;
-  update(field: HeightField, width: number, height: number, settings: DesignSettings): void;
+  update(
+    field: HeightField,
+    width: number,
+    height: number,
+    settings: DesignSettings,
+    contourLevels?: readonly number[],
+  ): void;
 } {
   container.innerHTML = `<fieldset><legend>Crop</legend>
     <div class="select-row"><label for="terrain-crop-shape">Crop shape</label><select id="terrain-crop-shape" data-crop-shape><option value="rectangle">Rectangle</option><option value="circle">Circle</option></select></div>
@@ -253,13 +259,19 @@ export function mountTerrainCropControls(
 
   return {
     getCrop: () => ({ ...crop }),
-    update(field, sourceWidth, sourceHeight, settings) {
+    update(field, sourceWidth, sourceHeight, settings, contourLevels) {
       width = sourceWidth;
       height = sourceHeight;
       shape = getModel().cropShape ?? 'rectangle';
       select.value = shape;
       svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-      const key = `${sourceWidth},${sourceHeight},${settings.background},${settings.lineColor}`;
+      const key = JSON.stringify([
+        sourceWidth,
+        sourceHeight,
+        settings.background,
+        settings.lineColor,
+        contourLevels,
+      ]);
 
       if (field !== previousField || key !== imageKey) {
         const canvas = document.createElement('canvas');
@@ -308,10 +320,12 @@ export function mountTerrainCropControls(
         }
 
         context.putImageData(pixels, 0, 0);
-        const levels = Array.from(
-          { length: 12 },
-          (_, index) => minimum + ((maximum - minimum) * (index + 1)) / 13,
-        );
+        const levels =
+          contourLevels ??
+          Array.from(
+            { length: 12 },
+            (_, index) => minimum + ((maximum - minimum) * (index + 1)) / 13,
+          );
 
         context.strokeStyle = settings.lineColor;
         context.globalAlpha = 0.5;

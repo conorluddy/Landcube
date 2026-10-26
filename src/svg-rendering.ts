@@ -60,13 +60,25 @@ function getContourMarkup(contours: Contour[], settings: Readonly<DesignSettings
       ? (['ordinary', 'solid', 'dashed'] as const)
       : (['ordinary', settings.indexStyle === 'dashed' ? 'dashed' : 'solid'] as const);
 
+  const intervalAttribute =
+    contours[0]?.intervalMeters === undefined
+      ? ''
+      : ` data-contour-interval-m="${contours[0].intervalMeters}"`;
+
   return styles
     .map((style) => {
       const isIndex = style !== 'ordinary';
       const dashAttribute =
         style === 'dashed' ? ` stroke-dasharray="${settings.dashLength} ${settings.dashGap}"` : '';
       const pathData = contours
-        .filter((contour) => getContourStyle(contour.elevation, interval, settings) === style)
+        .filter(
+          (contour) =>
+            getContourStyle(
+              contour.elevationMeters ?? contour.elevation,
+              contour.intervalMeters ?? interval,
+              settings,
+            ) === style,
+        )
         .flatMap((contour) =>
           contour.paths.map(
             ({ points, closed }) =>
@@ -80,7 +92,7 @@ function getContourMarkup(contours: Contour[], settings: Readonly<DesignSettings
         )
         .join('');
 
-      return `<path fill="none" stroke="${settings.lineColor}" stroke-width="${isIndex ? settings.indexStrokeWidth : settings.strokeWidth}" stroke-opacity="${settings.strokeOpacity}" stroke-linejoin="round" stroke-linecap="round"${dashAttribute} d="${pathData}"/>`;
+      return `<path${intervalAttribute} fill="none" stroke="${settings.lineColor}" stroke-width="${isIndex ? settings.indexStrokeWidth : settings.strokeWidth}" stroke-opacity="${settings.strokeOpacity}" stroke-linejoin="round" stroke-linecap="round"${dashAttribute} d="${pathData}"/>`;
     })
     .join('');
 }

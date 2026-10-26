@@ -27,7 +27,14 @@ export function createTerrainLineBuffers(
   const scale = 2 / Math.max(width, height);
 
   for (const contour of contours) {
-    const group = groups[getContourStyle(contour.elevation, interval, settings)];
+    const group =
+      groups[
+        getContourStyle(
+          contour.elevationMeters ?? contour.elevation,
+          contour.intervalMeters ?? interval,
+          settings,
+        )
+      ];
 
     for (const path of contour.paths) {
       let distance = 0;
