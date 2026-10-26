@@ -10,5 +10,7 @@ export interface ContourPath {
 
 export interface Contour {
   elevation: number;
+  elevationMeters?: number;
+  intervalMeters?: number;
   paths: ContourPath[];
 }

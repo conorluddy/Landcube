@@ -5,7 +5,12 @@ import {
   type TerrainCropSettings,
   type TerrainCropShape,
 } from './terrain-crop';
-import { createTerrainSurfaceBuffers } from './terrain-surface';
+import {
+  createTerracedTerrainBuffers,
+  type TerracedTerrainBuffers,
+  type TerrainTerraceLevels,
+} from './terrain-terraces';
+import { createTerrainSurfaceBuffers, terrain3dElevationScale } from './terrain-surface';
 import type { TerrainSurfaceBuffers } from './terrain-surface';
 import type { HeightField } from './types/terrain';
 
@@ -14,6 +19,7 @@ export interface TerrainModelSettings {
   lengthMm: number;
   baseThicknessMm: number;
   cropShape?: TerrainCropShape;
+  terrainShape?: 'smooth' | 'terraced';
 }
 
 export const defaultTerrainModelSettings: Readonly<TerrainModelSettings> = Object.freeze({
@@ -29,9 +35,18 @@ export interface TerrainModel {
   overallHeightMm: number;
   elevationOffsetMm: number;
   elevationScaleMm: number;
+  layerHeightMm?: number;
+  contourEdges?: TerracedTerrainBuffers['contourEdges'];
 }
 
 export function validateTerrainModelSettings(settings: TerrainModelSettings): void {
+  if (
+    settings.terrainShape !== undefined &&
+    !['smooth', 'terraced'].includes(settings.terrainShape)
+  ) {
+    throw new Error('Terrain shape must be Smooth or Terraced.');
+  }
+
   for (const value of [settings.widthMm, settings.lengthMm]) {
     if (!Number.isFinite(value) || value < 1 || value > 1000) {
       throw new Error('Model width and length must be between 1 and 1000 mm.');
@@ -73,6 +88,7 @@ export function createTerrainModel(
   height: number,
   settings: TerrainModelSettings,
   exaggeration: number,
+  terraceLevels?: TerrainTerraceLevels,
 ): TerrainModel {
   validateTerrainModelSettings(settings);
 
@@ -89,6 +105,25 @@ export function createTerrainModel(
       ? settings.widthMm
       : Math.max(settings.widthMm, settings.lengthMm)) / 2;
   const elevationScaleMm = mmPerUnit * exaggeration;
+
+  if (settings.terrainShape === 'terraced' && exaggeration > 0) {
+    if (!terraceLevels) {
+      throw new Error('Terraced terrain needs a contour interval.');
+    }
+
+    return {
+      ...createTerracedTerrainBuffers(
+        sampled,
+        mmPerUnit,
+        elevationScaleMm,
+        settings.baseThicknessMm,
+        terraceLevels.origin * terrain3dElevationScale,
+        terraceLevels.interval * terrain3dElevationScale,
+      ),
+      elevationScaleMm,
+    };
+  }
+
   let minimum = Infinity;
   let maximum = -Infinity;
 
@@ -163,5 +198,6 @@ export function createTerrainModel(
     overallHeightMm: settings.baseThicknessMm + (maximum - minimum) * elevationScaleMm,
     elevationOffsetMm,
     elevationScaleMm,
+    ...(settings.terrainShape === 'terraced' ? { layerHeightMm: 0 } : {}),
   };
 }

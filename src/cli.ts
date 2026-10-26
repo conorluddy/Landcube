@@ -16,6 +16,11 @@ import { createNodeExportFile } from './export/node-image-export';
 import { loadNodeRealTerrain } from './node-real-terrain';
 import { createRandomPalette } from './random-palette';
 import type { DesignSettings, ValidatedDesignSettings } from './types/design';
+import {
+  getRealContourInterval,
+  validateRealContourInterval,
+  type RealContourInterval,
+} from './real-terrain-contours';
 import type { RealTerrain } from './real-terrain';
 
 const cliConfigVersion = 1;
@@ -45,7 +50,7 @@ const designSettingDescriptions: Record<keyof DesignSettings, string> = {
   strokeOpacity:
     'The opacity applied to ordinary and index contours, as well as summit markers. It is composited over the chosen background in opaque output.',
   contourCount:
-    'The odd number of evenly spaced elevation levels to extract. More levels create denser line work without changing the underlying sampled terrain.',
+    'The odd number of evenly spaced elevation levels to extract. More levels create denser line work without changing the underlying sampled terrain. Real terrain uses --contour-interval instead; density applies only in legacy/density mode.',
   featureScale:
     'The characteristic size of generated landforms in output pixels. Larger values produce broader terrain features; this setting is ignored by real terrain.',
   detail:
@@ -97,6 +102,7 @@ type TerrainConfig =
       spanKm: number;
       elevationFloor?: number;
       maxDepth?: number;
+      contourInterval?: RealContourInterval;
     };
 interface CliConfig {
   version: number;
@@ -171,6 +177,7 @@ function parseOptions(argumentsList: string[]) {
     'span-km': { type: 'string' },
     'elevation-floor': { type: 'string' },
     'max-depth': { type: 'string' },
+    'contour-interval': { type: 'string' },
     json: { type: 'string' },
     force: { type: 'string' },
     'save-config': { type: 'string' },
@@ -190,6 +197,7 @@ function parseOptions(argumentsList: string[]) {
     'span-km',
     'elevation-floor',
     'max-depth',
+    'contour-interval',
     ...Object.keys(designNumberConstraints).map(toKebab),
   ]);
   const normalized: string[] = [];
@@ -268,6 +276,18 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
     terrain = { ...terrain, maxDepth: Number(options['max-depth']) };
   }
 
+  if (options['contour-interval'] !== undefined) {
+    if (terrain.mode !== 'real') {
+      throw new Error('--contour-interval requires real terrain.');
+    }
+
+    const raw = options['contour-interval'];
+    const interval = raw === 'auto' || raw === 'density' ? raw : Number(raw);
+
+    validateRealContourInterval(interval);
+    terrain = { ...terrain, contourInterval: interval };
+  }
+
   validateTerrainConfig(terrain);
 
   source.seed ??= randomBytes(4).readUInt32BE();
@@ -314,6 +334,10 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
           terrain.maxDepth,
         )
       : undefined;
+
+  if (loadedTerrain && terrain.mode === 'real') {
+    loadedTerrain.contourInterval = terrain.contourInterval;
+  }
 
   validateAttributionOptions(options, loadedTerrain);
 
@@ -526,6 +550,7 @@ function readTerrain(
     return {
       mode: 'real',
       maxDepth: 0,
+      contourInterval: 'auto',
       latitude: place.latitude,
       longitude: place.longitude,
       spanKm: Number(options['span-km'] ?? place.spanKm),
@@ -541,7 +566,7 @@ function readTerrain(
       throw new Error('Real terrain requires --latitude and --longitude.');
     }
 
-    return { mode: 'real', latitude, longitude, spanKm, maxDepth: 0 };
+    return { mode: 'real', latitude, longitude, spanKm, maxDepth: 0, contourInterval: 'auto' };
   }
 
   return mode === 'generated' ? { mode } : current;
@@ -552,6 +577,8 @@ function validateTerrainConfig(terrain: TerrainConfig): void {
   if (terrain.mode === 'generated') {
     return;
   }
+
+  validateRealContourInterval(terrain.contourInterval);
 
   if (
     terrain.maxDepth !== undefined &&
@@ -612,6 +639,7 @@ function metadata(
     settings,
     terrain,
     attribution: loadedTerrain?.attribution,
+    contourIntervalMeters: getRealContourInterval(loadedTerrain),
     browserLink: getDesignUrl(browserBaseUrl, settings),
     browserLinkRestoresTerrain: terrain.mode === 'generated',
   };
@@ -732,7 +760,7 @@ function write(stream: NodeJS.WriteStream, value: string) {
 function printHelp(stdout: NodeJS.WriteStream, isVerbose = false) {
   return write(
     stdout,
-    `Topogra CLI\n\nUsage: topogra generate [options]\n       topogra presets [--json true]\n       topogra validate --config design.json\n\nSources apply as defaults → config or URL → palette/size → explicit flags. --output - writes image bytes; --json true is incompatible with it. Existing files require --force true.\n\nGenerator options:\n  --config FILE | --url URL    Versioned CLI config or v=1 browser URL (mutually exclusive)\n  --palette NAME               ${[...Object.keys(designPalettePresets), 'random'].join(', ')}\n  --size WIDTHxHEIGHT          A listed output size; use presets --json true to discover values\n  --terrain generated|real     Real mode requires coordinates or --terrain-preset NAME\n  --latitude NUMBER --longitude NUMBER --span-km NUMBER\n  --max-depth NUMBER            Maximum depth below sea level in meters (new real designs: 0; 0–11000)\n  --elevation-floor NUMBER      Omit real terrain below this height in meters (optional; −11000–8900)\n  --format svg|png --output FILE|- --save-config FILE\n  --attribution embedded       Keep real-terrain credit visibly embedded (the default)\n  --attribution-file FILE      Write the resolved real-terrain credit alongside the image\n  --json true|false --force true|false\n\nDesign flags (default; range where applicable):\n${getDesignFlagReference(isVerbose)}\n${isVerbose ? '' : '\nUse --help --verbose for a full description of every design flag.\n'}`,
+    `Topogra CLI\n\nUsage: topogra generate [options]\n       topogra presets [--json true]\n       topogra validate --config design.json\n\nSources apply as defaults → config or URL → palette/size → explicit flags. --output - writes image bytes; --json true is incompatible with it. Existing files require --force true.\n\nGenerator options:\n  --config FILE | --url URL    Versioned CLI config or v=1 browser URL (mutually exclusive)\n  --palette NAME               ${[...Object.keys(designPalettePresets), 'random'].join(', ')}\n  --size WIDTHxHEIGHT          A listed output size; use presets --json true to discover values\n  --terrain generated|real     Real mode requires coordinates or --terrain-preset NAME\n  --latitude NUMBER --longitude NUMBER --span-km NUMBER\n  --contour-interval auto|density|METERS  New real designs use Auto; density keeps decorative levels\n  --max-depth NUMBER            Maximum depth below sea level in meters (new real designs: 0; 0–11000)\n  --elevation-floor NUMBER      Omit real terrain below this height in meters (optional; −11000–8900)\n  --format svg|png --output FILE|- --save-config FILE\n  --attribution embedded       Keep real-terrain credit visibly embedded (the default)\n  --attribution-file FILE      Write the resolved real-terrain credit alongside the image\n  --json true|false --force true|false\n\nDesign flags (default; range where applicable):\n${getDesignFlagReference(isVerbose)}\n${isVerbose ? '' : '\nUse --help --verbose for a full description of every design flag.\n'}`,
   );
 }
 

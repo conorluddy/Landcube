@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { PNG } from 'pngjs';
@@ -40,13 +40,27 @@ test('3D controls retain surface, contour and lighting choices across tab and vi
   await expect(page.getByRole('switch', { name: 'North arrow', exact: true })).toBeDisabled();
   await expect(page.getByRole('switch', { name: 'Map grid', exact: true })).toBeDisabled();
   await expect(page.getByLabel('Water style')).toHaveValue('solid');
-  await expect(page.getByRole('switch', { name: 'Match terrain', exact: true })).toBeChecked();
-  await expect(page.getByLabel('Water color', { exact: true })).toHaveValue('#1c1f21');
-  await expect(page.getByLabel('Water color', { exact: true })).toBeDisabled();
+  await expect(page.getByRole('combobox', { name: 'Material preset', exact: true })).toHaveValue(
+    'natural',
+  );
+  await expect(page.getByRole('combobox', { name: 'Land finish', exact: true })).toHaveValue(
+    'natural',
+  );
+  await expect(page.getByRole('combobox', { name: 'Water finish', exact: true })).toHaveValue(
+    'satin',
+  );
+  await expect(page.getByRole('switch', { name: 'Match terrain', exact: true })).not.toBeChecked();
+  await expect(page.getByLabel('Water color', { exact: true })).toHaveValue('#36666b');
+  await expect(page.getByLabel('Surface tint', { exact: true })).toHaveValue('#ffffff');
+  await expect(page.locator('#terrain-light-fill')).toHaveValue('0.7');
   await expect(page.getByLabel('Light source')).toHaveValue('sun');
-  await expect(page.locator('#terrain-light-elevation')).toHaveValue('10');
+  await expect(page.locator('#terrain-light-elevation')).toHaveValue('35');
   await expect(height).toHaveValue('0.3');
   await expect(height).toHaveAttribute('max', '1');
+  // User choices replace the defaults and survive toggling the preview.
+  await page.getByRole('combobox', { name: 'Land finish', exact: true }).selectOption('matte');
+  await page.getByRole('switch', { name: 'Match background', exact: true }).check();
+  await page.getByRole('switch', { name: 'Match terrain', exact: true }).check();
   await expect(page.getByLabel('Surface color')).toHaveValue('#202326');
   await expect(page.getByLabel('Surface color')).toBeDisabled();
   await page.getByRole('switch', { name: 'Contour lines', exact: true }).uncheck();
@@ -104,6 +118,7 @@ test('3D controls retain surface, contour and lighting choices across tab and vi
   await expect(page.getByLabel('Water color', { exact: true })).toHaveValue('#123456');
   await expect(page.getByLabel('Floor color', { exact: true })).toHaveValue('#8899aa');
   await expect(height).toHaveValue('0.5');
+  await expect(page.getByLabel('Land finish')).toHaveValue('matte');
   await expect(page.getByLabel('Surface color')).toHaveValue('#667788');
   await expect(page.getByRole('switch', { name: 'Contour lines', exact: true })).not.toBeChecked();
   await page.getByRole('switch', { name: 'Show land surface' }).uncheck();
@@ -307,8 +322,8 @@ test('loaded location models export STL and companion attribution', async ({ pag
   await expect(page.locator('[data-status]')).toContainText('Real terrain loaded');
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await expect(page.locator('#terrain-light-direction')).toHaveValue('120');
-  await expect(page.locator('#terrain-light-elevation')).toHaveValue('10');
-  await expect(page.locator('#terrain-light-fill')).toHaveValue('0.1');
+  await expect(page.locator('#terrain-light-elevation')).toHaveValue('35');
+  await expect(page.locator('#terrain-light-fill')).toHaveValue('0.7');
   await expect(page.locator('[data-model-credit]')).toContainText('Copernicus');
   await expect(page.locator('[data-model-height]')).toHaveText('3 mm');
   expect(originalHeight).not.toBe('3 mm');
@@ -573,4 +588,466 @@ test('studio color surrounds the model and directional lighting casts a real flo
   }
 
   expect(shadowPixels).toBeGreaterThan(1000);
+});
+
+test('natural materials render both crop shapes and leave printable geometry unchanged', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      errors.push(message.text());
+    }
+  });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('switch', { name: 'Show raised contours' }).check();
+
+  const download = async () => {
+    const pending = page.waitForEvent('download');
+
+    await page.getByRole('button', { name: 'Download STL', exact: true }).click();
+    const file = await (await pending).path();
+
+    if (!file) {
+      throw new Error('Missing STL download.');
+    }
+
+    return readFile(file);
+  };
+
+  const original = await download();
+
+  await page
+    .getByRole('combobox', { name: 'Material preset', exact: true })
+    .selectOption('natural');
+  await expect(page.getByRole('combobox', { name: 'Land finish', exact: true })).toHaveValue(
+    'natural',
+  );
+  await expect(
+    page.getByRole('switch', { name: 'Use natural palette', exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const natural = await page.screenshot({ path: test.info().outputPath('natural-landscape.png') });
+
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  expect((await download()).equals(original)).toBe(true);
+  await page.getByRole('combobox', { name: 'Land finish', exact: true }).selectOption('matte');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  expect((await page.screenshot()).equals(natural)).toBe(false);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('combobox', { name: 'Land finish', exact: true }).selectOption('natural');
+  await page.getByLabel('Crop shape', { exact: true }).selectOption('circle');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  await page.screenshot({ path: test.info().outputPath('natural-circle.png') });
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('switch', { name: 'Show raised contours' }).uncheck();
+  await page.getByRole('switch', { name: 'Show raised contours' }).check();
+  await expect(page.getByRole('combobox', { name: 'Land finish', exact: true })).toHaveValue(
+    'natural',
+  );
+  expect(errors).toEqual([]);
+});
+
+test('real locations use meter intervals through hatching, cropping, height and view changes', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  const tile = new PNG({ width: 256, height: 256 });
+
+  for (let i = 0; i < tile.data.length; i += 4) {
+    const encoded = 32768 + ((i / 4) % 256) * 2;
+
+    tile.data[i] = Math.floor(encoded / 256);
+    tile.data[i + 1] = encoded % 256;
+    tile.data[i + 3] = 255;
+  }
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.route('https://s3.amazonaws.com/elevation-tiles-prod/**', (route) =>
+    route.fulfill({
+      body: PNG.sync.write(tile),
+      contentType: 'image/png',
+      headers: {
+        'access-control-allow-origin': '*',
+        'x-amz-meta-x-imagery-sources': 'eudem/test.tif',
+      },
+    }),
+  );
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: 'Location', exact: true }).click();
+  await page.getByRole('button', { name: 'Load terrain', exact: true }).click();
+  await expect(page.locator('[data-status]')).toContainText('Real terrain loaded');
+  await expect(page.locator('[data-contour-summary]')).toHaveText('Contours: 20 m (Auto)');
+  await page.getByRole('combobox', { name: 'Interval mode', exact: true }).selectOption('fixed');
+  await expect(page.getByLabel('Interval (m)', { exact: true })).toBeVisible();
+  await expect(page.locator('[data-contour-summary]')).toHaveText('Contours: 25 m (Fixed)');
+  const paths = page.locator('#terrain [data-contour-interval-m]');
+
+  await expect(paths.first()).toHaveAttribute('data-contour-interval-m', '25');
+  const original = await paths.evaluateAll((elements) =>
+    elements.map((element) => element.getAttribute('d')),
+  );
+
+  await page.getByLabel('Interval (m)', { exact: true }).fill('0');
+  await page.getByLabel('Interval (m)', { exact: true }).press('Tab');
+  await expect(page.locator('[data-contour-summary]')).toContainText('1 to 5000');
+  expect(
+    await paths.evaluateAll((elements) => elements.map((element) => element.getAttribute('d'))),
+  ).toEqual(original);
+  await page.getByLabel('Interval (m)', { exact: true }).fill('25');
+  await page.getByLabel('Interval (m)', { exact: true }).press('Tab');
+  await page.getByRole('switch', { name: 'Sea-level hatching', exact: true }).uncheck();
+  await expect(page.locator('[data-contour-summary]')).toHaveText('Contours: 25 m (Fixed)');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByRole('slider', { name: 'Density', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).check();
+  await expect(page.locator('[data-contour-interval]')).toHaveText('Contours: 25 m');
+  await page.getByRole('combobox', { name: 'Terrain shape', exact: true }).selectOption('terraced');
+  await expect(page.locator('[data-layer-height]')).toHaveText('1.147 mm');
+  await page.getByRole('slider', { name: 'Height exaggeration' }).fill('0.8');
+  await expect(page.locator('[data-layer-height]')).toHaveText('3.059 mm');
+  await page.getByRole('combobox', { name: 'Crop shape', exact: true }).selectOption('circle');
+  await page.getByRole('slider', { name: 'Crop size', exact: true }).fill('60');
+  await expect(page.locator('[data-contour-interval]')).toHaveText('Contours: 25 m');
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).uncheck();
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).check();
+  await expect(page.locator('[data-contour-interval]')).toHaveText('Contours: 25 m');
+  await page.getByRole('button', { name: 'Location', exact: true }).click();
+  await page.getByRole('button', { name: 'Use generated', exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByRole('slider', { name: 'Density', exact: true })).toBeEnabled();
+  expect(errors).toEqual([]);
+});
+
+test('engraved contours react to light on natural and satin surfaces without changing STL', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      errors.push(message.text());
+    }
+  });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).check();
+
+  const download = async () => {
+    const pending = page.waitForEvent('download');
+
+    await page.getByRole('button', { name: 'Download STL', exact: true }).click();
+    const file = await (await pending).path();
+
+    if (!file) {
+      throw new Error('Missing STL download.');
+    }
+
+    return readFile(file);
+  };
+
+  const original = await download();
+
+  await page.getByRole('combobox', { name: 'Treatment', exact: true }).selectOption('engraved');
+  await page.getByRole('slider', { name: 'Groove width', exact: true }).fill('1');
+  await page.getByRole('slider', { name: 'Groove depth', exact: true }).fill('0.3');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  await page.screenshot({ path: test.info().outputPath('engraved-natural.png') });
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page
+    .getByRole('combobox', { name: 'Material preset', exact: true })
+    .selectOption('porcelain');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const engraved = PNG.sync.read(
+    await page.screenshot({ path: test.info().outputPath('engraved-porcelain.png') }),
+  );
+
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('slider', { name: 'Groove depth', exact: true }).fill('0');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const plain = PNG.sync.read(await page.screenshot());
+  let changed = 0;
+
+  for (let i = 0; i < plain.data.length; i += 4) {
+    if (Math.abs(plain.data[i] - engraved.data[i]) > 8) {
+      changed++;
+    }
+  }
+
+  expect(changed).toBeGreaterThan(1000);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('slider', { name: 'Groove depth', exact: true }).fill('0.3');
+  expect((await download()).equals(original)).toBe(true);
+  await page.getByRole('switch', { name: 'Contour lines', exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  expect(PNG.sync.read(await page.screenshot()).data.equals(plain.data)).toBe(true);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('switch', { name: 'Contour lines', exact: true }).check();
+  await page.getByRole('slider', { name: 'Height exaggeration' }).fill('0');
+  await page.getByRole('combobox', { name: 'Crop shape', exact: true }).selectOption('circle');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  await page.screenshot({ path: test.info().outputPath('engraved-flat-circle.png') });
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).uncheck();
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).check();
+  await expect(page.getByRole('combobox', { name: 'Treatment', exact: true })).toHaveValue(
+    'engraved',
+  );
+  await expect(page.getByRole('slider', { name: 'Groove depth', exact: true })).toHaveValue('0.3');
+  expect(errors).toEqual([]);
+});
+
+test('terraced shape exports real shelves and risers, retains contour treatment and restores Smooth', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      errors.push(message.text());
+    }
+  });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).check();
+
+  const download = async () => {
+    const pending = page.waitForEvent('download');
+
+    await page.getByRole('button', { name: 'Download STL', exact: true }).click();
+    const path = await (await pending).path();
+
+    if (!path) {
+      throw new Error('Missing STL download.');
+    }
+
+    return readFile(path);
+  };
+
+  const smooth = await download();
+
+  await page.getByRole('combobox', { name: 'Terrain shape', exact: true }).selectOption('terraced');
+  await expect(page.locator('[data-layer-height]')).toContainText('mm');
+  await page.getByRole('switch', { name: 'Contour lines', exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  await page.screenshot({ path: test.info().outputPath('terraced-natural.png') });
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  const terraced = await download();
+
+  expect(terraced.equals(smooth)).toBe(false);
+  let shelves = 0;
+  let risers = 0;
+  let sloped = 0;
+  const triangles = terraced.readUInt32LE(80);
+
+  for (let i = 0; i < triangles; i++) {
+    const nz = Math.abs(terraced.readFloatLE(84 + i * 50 + 8));
+
+    if (!(nz < 1e-5 || Math.abs(nz - 1) < 1e-5)) {
+      sloped++;
+    }
+
+    if (nz > 0.99) {
+      shelves++;
+    } else {
+      risers++;
+    }
+  }
+
+  expect(sloped).toBe(0);
+  expect(shelves).toBeGreaterThan(100);
+  expect(risers).toBeGreaterThan(100);
+  await page.getByRole('combobox', { name: 'Treatment', exact: true }).selectOption('engraved');
+  expect((await download()).equals(terraced)).toBe(true);
+  await page.getByRole('switch', { name: 'Contour lines', exact: true }).check();
+  await page
+    .getByRole('combobox', { name: 'Material preset', exact: true })
+    .selectOption('porcelain');
+  await page.getByRole('combobox', { name: 'Crop shape', exact: true }).selectOption('circle');
+  await page.getByRole('switch', { name: 'Preview water level', exact: true }).check();
+  await page
+    .getByRole('combobox', { name: 'Water finish', exact: true })
+    .selectOption('translucent');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  await page.screenshot({ path: test.info().outputPath('terraced-circle-water.png') });
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  expect((await download()).readUInt32LE(80)).toBeGreaterThan(100);
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).uncheck();
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).check();
+  await expect(page.getByRole('combobox', { name: 'Terrain shape', exact: true })).toHaveValue(
+    'terraced',
+  );
+  await expect(page.getByRole('combobox', { name: 'Treatment', exact: true })).toHaveValue(
+    'engraved',
+  );
+  await page.getByRole('combobox', { name: 'Terrain shape', exact: true }).selectOption('smooth');
+  await page.getByRole('combobox', { name: 'Crop shape', exact: true }).selectOption('rectangle');
+  expect((await download()).equals(smooth)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+async function openElevationGradient(page: Page, enabled = true): Promise<string[]> {
+  const errors: string[] = [];
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      errors.push(message.text());
+    }
+  });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).check();
+  await page.getByRole('switch', { name: 'Contour lines', exact: true }).uncheck();
+
+  if (enabled) {
+    await page.getByRole('switch', { name: 'Color by elevation', exact: true }).check();
+  }
+
+  return errors;
+}
+
+async function downloadGradientModel(page: Page): Promise<Buffer> {
+  const pending = page.waitForEvent('download');
+
+  await page.getByRole('button', { name: 'Download STL', exact: true }).click();
+  const path = await (await pending).path();
+
+  if (!path) {
+    throw new Error('Missing STL download.');
+  }
+
+  return readFile(path);
+}
+
+test('elevation gradient presets render hard and soft bands and restore material colors', async ({
+  page,
+}) => {
+  const errors = await openElevationGradient(page, false);
+
+  await expect(
+    page.getByRole('switch', { name: 'Color by elevation', exact: true }),
+  ).not.toBeChecked();
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const baseline = await page.screenshot();
+
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('switch', { name: 'Color by elevation', exact: true }).check();
+  await expect(page.getByLabel('Surface tint', { exact: true })).toBeHidden();
+
+  for (const preset of ['paper', 'sandstone', 'ember', 'copper', 'coastal']) {
+    await page.getByRole('combobox', { name: 'Gradient preset', exact: true }).selectOption(preset);
+    await expect(page.locator('[data-gradient-preview]')).toHaveAttribute(
+      'style',
+      /linear-gradient/,
+    );
+  }
+
+  await page.getByRole('combobox', { name: 'Gradient preset', exact: true }).selectOption('paper');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  const soft = await page.screenshot({ path: test.info().outputPath('gradient-smooth-soft.png') });
+
+  expect(soft.equals(baseline)).toBe(false);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('combobox', { name: 'Transitions', exact: true }).selectOption('hard');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  expect(
+    (await page.screenshot({ path: test.info().outputPath('gradient-smooth-hard.png') })).equals(
+      soft,
+    ),
+  ).toBe(false);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('switch', { name: 'Color by elevation', exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  expect((await page.screenshot()).equals(baseline)).toBe(true);
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  expect(errors).toEqual([]);
+});
+
+test('elevation gradient stop editing preserves STL and retains custom choices', async ({
+  page,
+}) => {
+  const errors = await openElevationGradient(page);
+  const original = await downloadGradientModel(page);
+
+  await page.getByRole('combobox', { name: 'Transitions', exact: true }).selectOption('soft');
+  await page.getByLabel('Stop 2 color', { exact: true }).fill('#c46b35');
+  await expect(page.getByRole('combobox', { name: 'Gradient preset', exact: true })).toHaveValue(
+    'custom',
+  );
+  await page.getByRole('spinbutton', { name: 'Stop 2 position', exact: true }).fill('35');
+  await page.getByRole('spinbutton', { name: 'Stop 2 position', exact: true }).press('Tab');
+  await expect(page.getByRole('spinbutton', { name: 'Stop 2 position', exact: true })).toHaveValue(
+    '35',
+  );
+  await page.getByRole('button', { name: 'Add color stop', exact: true }).click();
+  await page.getByRole('button', { name: 'Add color stop', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Add color stop', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Remove stop 2', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Add color stop', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Reverse', exact: true }).click();
+  await expect(page.getByLabel('Stop 1 color', { exact: true })).toHaveValue('#f5f3ec');
+  expect((await downloadGradientModel(page)).equals(original)).toBe(true);
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).uncheck();
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).check();
+  await expect(page.getByRole('combobox', { name: 'Gradient preset', exact: true })).toHaveValue(
+    'custom',
+  );
+  await expect(page.getByLabel('Stop 1 color', { exact: true })).toHaveValue('#f5f3ec');
+  expect(errors).toEqual([]);
+});
+
+test('elevation gradients compose with terraced circular crops, finishes and engraved contours', async ({
+  page,
+}) => {
+  const errors = await openElevationGradient(page);
+
+  await page.getByRole('combobox', { name: 'Terrain shape', exact: true }).selectOption('terraced');
+  await page
+    .getByRole('combobox', { name: 'Gradient preset', exact: true })
+    .selectOption('sandstone');
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  await page.screenshot({ path: test.info().outputPath('gradient-terraced-sandstone.png') });
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page
+    .getByRole('combobox', { name: 'Material preset', exact: true })
+    .selectOption('porcelain');
+  await page.getByRole('combobox', { name: 'Gradient preset', exact: true }).selectOption('ember');
+  await page.getByRole('combobox', { name: 'Crop shape', exact: true }).selectOption('circle');
+  await page.getByRole('combobox', { name: 'Treatment', exact: true }).selectOption('engraved');
+  await page.getByRole('switch', { name: 'Contour lines', exact: true }).check();
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  await page.screenshot({ path: test.info().outputPath('gradient-terraced-ember.png') });
+  await page.getByRole('button', { name: 'Expand controls' }).click();
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).uncheck();
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).check();
+  await expect(page.getByRole('switch', { name: 'Color by elevation', exact: true })).toBeChecked();
+  await expect(page.getByRole('combobox', { name: 'Gradient preset', exact: true })).toHaveValue(
+    'ember',
+  );
+  await expect(page.getByRole('combobox', { name: 'Transitions', exact: true })).toHaveValue(
+    'soft',
+  );
+  expect(errors).toEqual([]);
+});
+
+test('elevation gradient controls fit a portrait mobile viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const errors = await openElevationGradient(page);
+
+  await page.getByRole('combobox', { name: 'Gradient preset', exact: true }).selectOption('ember');
+  await page.getByLabel('Stop 1 color', { exact: true }).scrollIntoViewIfNeeded();
+  expect(
+    await page
+      .locator('[data-gradient-stops]')
+      .evaluate((element) => element.scrollWidth <= element.clientWidth),
+  ).toBe(true);
+  await page.screenshot({ path: test.info().outputPath('gradient-controls-mobile.png') });
+  expect(errors).toEqual([]);
 });

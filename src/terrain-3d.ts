@@ -1,9 +1,19 @@
+import { createTerrainElevationMaterial } from './terrain-elevation-material';
+import type { ElevationGradientSettings } from './terrain-elevation-gradient';
 import {
   landFinishes,
   waterFinishes,
   type LandFinish,
   type WaterFinish,
 } from './terrain-materials';
+import { createNaturalTerrainMaterial, createTerrainDepths } from './terrain-natural-material';
+import {
+  createContourEngraving,
+  defaultContourEngraving,
+  type ContourEngravingSettings,
+} from './terrain-contour-engraving';
+import { createTerraceContours, type TerrainTerraceLevels } from './terrain-terraces';
+import { sampleHeightField } from './terrain-surface';
 import { createWaterVolume } from './terrain-water-volume';
 import { createTerrainStage, defaultTerrainGroundColor } from './terrain-stage';
 import { getTerrainWaterColor } from './terrain-water';
@@ -39,12 +49,14 @@ export interface Terrain3d {
     settings: DesignSettings,
     field: HeightField,
     seaLevel?: SeaLevelGeometry,
+    terraceLevels?: TerrainTerraceLevels,
   ): void;
   setVisible(value: boolean): void;
   setHeight(value: number): void;
   setModelSettings(value: TerrainModelSettings): void;
   getStl(): ArrayBuffer;
   setLandFinish(value: LandFinish): void;
+  setElevationGradient(value: ElevationGradientSettings): void;
   setWaterFinish(value: WaterFinish): void;
   setWaterOpacity(value: number): void;
   setPreviewWaterLevel(value: number | undefined): void;
@@ -53,17 +65,20 @@ export interface Terrain3d {
   setGround(value: boolean): void;
   setGroundColor(value: string | undefined): void;
   setNorthArrow(value: boolean): void;
-  setMapGrid(value: boolean, spanMeters: number | undefined): void;
+  setMapGrid(value: boolean, spanMeters: number | undefined, contourIntervalMeters?: number): void;
   setWaterStyle(value: WaterStyle): void;
   setWaterColor(value: string | undefined): void;
   setContours(value: boolean): void;
+  setContourEngraving(value: ContourEngravingSettings): void;
   setSurfaceColor(value: string | undefined): void;
   setRotating(value: boolean): void;
   setLighting(settings: Readonly<TerrainLightingSettings>): void;
   reset(): void;
 }
 
-export function createTerrain3d(onModel: (heightMm: number) => void = () => undefined): Terrain3d {
+export function createTerrain3d(
+  onModel: (heightMm: number, layerHeightMm?: number) => void = () => undefined,
+): Terrain3d {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
 
   renderer.shadowMap.enabled = true;
@@ -112,8 +127,41 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
     polygonOffsetFactor: 2,
     polygonOffsetUnits: 2,
   });
+  const baseMaterial = surfaceMaterial.clone();
+  const engraving = createContourEngraving();
+  let contourTreatment = defaultContourEngraving.treatment;
+  let showContours = true;
+
+  engraving.applyTo(surfaceMaterial);
+  const naturalSurfaceMaterial = createNaturalTerrainMaterial(false);
+  const naturalBaseMaterial = createNaturalTerrainMaterial(true);
+
+  engraving.applyTo(naturalSurfaceMaterial);
+  const elevationGradient = createTerrainElevationMaterial();
+
+  for (const material of [
+    surfaceMaterial,
+    baseMaterial,
+    naturalSurfaceMaterial,
+    naturalBaseMaterial,
+  ]) {
+    elevationGradient.applyTo(material);
+  }
+
+  const updateLandColor = () => {
+    surfaceMaterial.color.set(customSurfaceColor ?? backgroundColor);
+    baseMaterial.color.copy(surfaceMaterial.color);
+    naturalSurfaceMaterial.color.set(customSurfaceColor ?? '#ffffff');
+    naturalBaseMaterial.color.set(customSurfaceColor ?? '#ffffff');
+  };
+
   const surface = new THREE.Mesh(new THREE.BufferGeometry(), surfaceMaterial);
-  const base = new THREE.Mesh(new THREE.BufferGeometry(), surfaceMaterial);
+  const base = new THREE.Mesh(new THREE.BufferGeometry(), baseMaterial);
+
+  const syncContourTreatment = () => {
+    contourLayer.visible = showContours && (contourTreatment === 'drawn' || !surface.visible);
+    engraving.setEnabled(showContours && contourTreatment === 'engraved' && surface.visible);
+  };
 
   surface.castShadow = surface.receiveShadow = true;
   base.castShadow = base.receiveShadow = true;
@@ -169,6 +217,8 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
   let exaggeration = 0.3;
   let model: TerrainModel | undefined;
   let modelKey = '';
+  let terracedContours: Contour[] | undefined;
+  let waterSurfacePositions: Float32Array = new Float32Array();
   let lastUpdate: Parameters<Terrain3d['update']> | undefined;
 
   const rebuild = () => {
@@ -307,12 +357,36 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
       settings: DesignSettings,
       field: HeightField,
       seaLevel?: SeaLevelGeometry,
+      terraceLevels?: TerrainTerraceLevels,
     ) {
-      lastUpdate = [contours, width, height, settings, field, seaLevel];
-      const key = JSON.stringify([width, height, modelSettings, exaggeration]);
+      lastUpdate = [contours, width, height, settings, field, seaLevel, terraceLevels];
+      const key = JSON.stringify([width, height, modelSettings, exaggeration, terraceLevels]);
 
       if (field !== previousField || key !== modelKey) {
-        model = createTerrainModel(field, width, height, modelSettings, exaggeration);
+        model = createTerrainModel(
+          field,
+          width,
+          height,
+          modelSettings,
+          exaggeration,
+          terraceLevels,
+        );
+        terracedContours =
+          model.contourEdges && terraceLevels
+            ? createTerraceContours(
+                model.contourEdges,
+                contours,
+                width,
+                height,
+                (modelSettings.cropShape === 'circle'
+                  ? modelSettings.widthMm
+                  : Math.max(modelSettings.widthMm, modelSettings.lengthMm)) / 2,
+                terrain3dElevationScale,
+                terraceLevels,
+              )
+            : undefined;
+        const gradientOffsetMm = model.elevationOffsetMm;
+        const gradientScaleMm = model.elevationScaleMm;
         const previewScale =
           2 /
           (modelSettings.cropShape === 'circle'
@@ -333,10 +407,63 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
             ),
           );
           geometry.setIndex(new THREE.BufferAttribute(buffers.indices, 1));
+
           // Independent face vertices keep the base edges crisp.
-          const rendered = mesh === base ? geometry.toNonIndexed() : geometry;
+          if (mesh === surface) {
+            waterSurfacePositions = geometry.getAttribute('position').array as Float32Array;
+          }
+
+          const rendered =
+            mesh === base || modelSettings.terrainShape === 'terraced'
+              ? geometry.toNonIndexed()
+              : geometry;
+
+          if (mesh === surface) {
+            const positions = rendered.getAttribute('position').array;
+            const sourceScale = 2 / Math.max(width, height);
+            const elevations = Float32Array.from({ length: positions.length / 3 }, (_, i) =>
+              sampleHeightField(
+                field,
+                positions[i * 3] / sourceScale + width / 2,
+                positions[i * 3 + 2] / sourceScale + height / 2,
+              ),
+            );
+
+            rendered.setAttribute('contourElevation', new THREE.BufferAttribute(elevations, 1));
+          }
+
+          const gradientPositions = rendered.getAttribute('position').array;
+          const sourceScale = 2 / Math.max(width, height);
+          const gradientHeights = Float32Array.from(
+            { length: gradientPositions.length / 3 },
+            (_, i) =>
+              exaggeration > 0
+                ? (gradientPositions[i * 3 + 1] / previewScale - gradientOffsetMm) /
+                  gradientScaleMm /
+                  terrain3dElevationScale
+                : sampleHeightField(
+                    field,
+                    gradientPositions[i * 3] / sourceScale + width / 2,
+                    gradientPositions[i * 3 + 2] / sourceScale + height / 2,
+                  ),
+          );
+
+          rendered.setAttribute('gradientElevation', new THREE.BufferAttribute(gradientHeights, 1));
 
           rendered.computeVertexNormals();
+          rendered.setAttribute(
+            'terrainDepth',
+            new THREE.BufferAttribute(
+              createTerrainDepths(
+                mesh === surface
+                  ? rendered.getAttribute('position').array
+                  : surface.geometry.getAttribute('position').array,
+                rendered.getAttribute('position').array,
+                mesh === base && model.contourEdges ? (height) => height * 2 : undefined,
+              ),
+              1,
+            ),
+          );
 
           if (rendered !== geometry) {
             geometry.dispose();
@@ -346,9 +473,18 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
           mesh.geometry = rendered;
         }
 
+        let gradientMinimum = Infinity;
+        let gradientMaximum = -Infinity;
+
+        for (const elevation of field.values) {
+          gradientMinimum = Math.min(gradientMinimum, elevation);
+          gradientMaximum = Math.max(gradientMaximum, elevation);
+        }
+
+        elevationGradient.setRange(gradientMinimum, gradientMaximum);
         previousField = field;
         modelKey = key;
-        onModel(model.overallHeightMm);
+        onModel(model.overallHeightMm, model.layerHeightMm);
       }
 
       const previewScale =
@@ -361,11 +497,12 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
         throw new Error('Terrain model is unavailable.');
       }
 
+      engraving.update(contours, settings, previewScale);
       const elevationOffset = model.elevationOffsetMm * previewScale;
 
       const scale = 2 / Math.max(width, height);
       const lineBuffers = createTerrainLineBuffers(
-        contours,
+        terracedContours ?? contours,
         width,
         height,
         settings,
@@ -425,7 +562,7 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
         level === undefined
           ? { top: [], sides: [] }
           : createWaterVolume(
-              surface.geometry.getAttribute('position').array,
+              waterSurfacePositions,
               model.surface.indices,
               level * terrain3dElevationScale * exaggeration + elevationOffset + 0.00005,
             );
@@ -456,7 +593,7 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
       syncWaterSides();
       seaInk.set(settings.lineColor);
       backgroundColor = settings.background;
-      surfaceMaterial.color.set(customSurfaceColor ?? backgroundColor);
+      updateLandColor();
       updateWaterColor();
       updateStageVisibility();
       stage.update(
@@ -491,12 +628,27 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
       return createBinaryStl(model.solid);
     },
     setContours(value: boolean) {
-      contourLayer.visible = value;
+      showContours = value;
+      syncContourTreatment();
+      draw();
+    },
+    setContourEngraving(value: ContourEngravingSettings) {
+      contourTreatment = value.treatment;
+      engraving.setSize(value.widthMm, value.depthMm);
+      syncContourTreatment();
+      draw();
+    },
+    setElevationGradient(value: ElevationGradientSettings) {
+      elevationGradient.setSettings(value);
       draw();
     },
     setLandFinish(value: LandFinish) {
+      surface.material = value === 'natural' ? naturalSurfaceMaterial : surfaceMaterial;
+      base.material = value === 'natural' ? naturalBaseMaterial : baseMaterial;
       surfaceMaterial.roughness = landFinishes[value].roughness;
       surfaceMaterial.clearcoat = landFinishes[value].clearcoat;
+      baseMaterial.roughness = surfaceMaterial.roughness;
+      baseMaterial.clearcoat = surfaceMaterial.clearcoat;
       draw();
     },
     setWaterFinish(value: WaterFinish) {
@@ -517,6 +669,7 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
     },
     setSurface(value: boolean) {
       surface.visible = value;
+      syncContourTreatment();
       base.visible = value && solidBase;
       updateStageVisibility();
       draw();
@@ -566,8 +719,8 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
       updateStageVisibility();
       draw();
     },
-    setMapGrid(value: boolean, spanMeters: number | undefined) {
-      stage.setMapGrid(value, spanMeters);
+    setMapGrid(value: boolean, spanMeters: number | undefined, contourIntervalMeters?: number) {
+      stage.setMapGrid(value, spanMeters, contourIntervalMeters);
       draw();
     },
     setNorthArrow(value: boolean) {
@@ -576,7 +729,7 @@ export function createTerrain3d(onModel: (heightMm: number) => void = () => unde
     },
     setSurfaceColor(value: string | undefined) {
       customSurfaceColor = value;
-      surfaceMaterial.color.set(value ?? backgroundColor);
+      updateLandColor();
       updateWaterColor();
       draw();
     },

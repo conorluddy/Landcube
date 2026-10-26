@@ -11,7 +11,10 @@ import { designChangePriority, versionOneDesignDefaults } from './constants/desi
 import { engineConfiguration } from './constants/engine';
 import { operationErrorCodes } from './constants/operations';
 import { designUrlDebounceMs } from './constants/sharing';
-import { extractContours } from './contour-extraction';
+import {
+  extractLandscapeContours as extractContours,
+  getRealContourInterval,
+} from './real-terrain-contours';
 import { applyCursorElevation } from './cursor-interaction';
 import { mountDesignControls } from './design-controls';
 import {
@@ -29,7 +32,7 @@ import {
 } from './design-sharing';
 import { mountExportControls } from './export/export-controls';
 import { createOutputRenderer } from './export/image-export';
-import { calculateContourElevations } from './landscape-composition';
+import { calculateContourElevations, getTerrainTerraceLevels } from './landscape-composition';
 import { logOperationError } from './operation-logging';
 import { renderContoursIntoSvg } from './svg-rendering';
 import { createTerrainSampler, sampleTerrain } from './terrain-generation';
@@ -86,7 +89,7 @@ const targetCursorInfluence: CursorInfluence = { ...cursor };
 let width = innerWidth;
 let height = innerHeight;
 let baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
-let contourElevations = calculateContourElevations(settings, engineConfiguration);
+let contourElevations = calculateContourElevations(settings, engineConfiguration, realTerrain);
 let summits: ReturnType<typeof findTerrainSummits> = [];
 let contours: ReturnType<typeof extractContours> = [];
 let seaLevel: SeaLevelGeometry | undefined;
@@ -130,6 +133,14 @@ const refreshExportControls = mountExportControls(
 
 mountRealTerrainControls(controls.panel, (loadedTerrain) => {
   realTerrain = loadedTerrain;
+  contourElevations = calculateContourElevations(settings, engineConfiguration, realTerrain);
+  const density = document.querySelector<HTMLInputElement>('#contourCount');
+
+  if (density) {
+    density.disabled = realTerrain !== undefined;
+    density.title = realTerrain ? 'Set contour interval in Location.' : '';
+  }
+
   terrain = realTerrain
     ? (x, y) => sampleLoadedTerrain(x, y)
     : createTerrainSampler(settings.seed, terrainSettings);
@@ -216,7 +227,7 @@ function updateSettings(nextDesignSettings: DesignSettings): boolean {
     }
 
     if (change === 'terrain' || change === 'contours') {
-      contourElevations = calculateContourElevations(settings, engineConfiguration);
+      contourElevations = calculateContourElevations(settings, engineConfiguration, realTerrain);
     }
 
     if (change === 'appearance') {
@@ -260,7 +271,7 @@ function renderCurrentLandscape(): void {
       ? baseHeightField
       : applyCursorElevation(baseHeightField, cursor, settings);
 
-  contours = extractContours(field, contourElevations);
+  contours = extractContours(field, contourElevations, realTerrain);
   summits = findTerrainSummits(field);
   seaLevel = createSeaLevelGeometry(field, width, height, realTerrain);
   updateTerrain3d();
@@ -298,6 +309,7 @@ function updateTerrain3d(): void {
     modelSourceFrame.width,
     modelSourceFrame.height,
     settings,
+    realTerrain ? contourElevations : undefined,
   );
   const dimensions = terrain3d.getModelSettings();
   const crop = terrain3d.getCropSettings();
@@ -314,7 +326,7 @@ function updateTerrain3d(): void {
     modelCropKey = key;
   }
 
-  const croppedContours = extractContours(modelCrop.field, contourElevations);
+  const croppedContours = extractContours(modelCrop.field, contourElevations, realTerrain);
   const croppedSea = createSeaLevelGeometry(
     modelCrop.field,
     modelCrop.width,
@@ -335,6 +347,8 @@ function updateTerrain3d(): void {
       ? undefined
       : (realTerrain.spanKm * 1000 * Math.max(modelCrop.width, modelCrop.height)) /
           Math.max(modelSourceFrame.width, modelSourceFrame.height),
+    getRealContourInterval(realTerrain),
+    getTerrainTerraceLevels(settings, engineConfiguration, realTerrain),
   );
 }
 

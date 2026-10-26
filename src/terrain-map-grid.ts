@@ -33,6 +33,7 @@ export function createTerrainMapGrid(): {
     circular: boolean,
     background: string,
     spanMeters: number | undefined,
+    contourIntervalMeters?: number,
   ): void;
 } {
   const canvas = document.createElement('canvas');
@@ -62,8 +63,15 @@ export function createTerrainMapGrid(): {
 
   return {
     mesh,
-    update(width, length, circular, background, spanMeters) {
-      const key = JSON.stringify([width, length, circular, background, spanMeters]);
+    update(width, length, circular, background, spanMeters, contourIntervalMeters) {
+      const key = JSON.stringify([
+        width,
+        length,
+        circular,
+        background,
+        spanMeters,
+        contourIntervalMeters,
+      ]);
 
       if (key === previousKey) {
         return;
@@ -151,6 +159,12 @@ export function createTerrainMapGrid(): {
       context.fillStyle = `rgba(${ink}, 0.55)`;
       context.textAlign = 'center';
       context.fillText(formatMapDistance(spacingMeters), barX, barY + 28);
+
+      if (contourIntervalMeters !== undefined) {
+        context.font = '16px monospace';
+        context.fillText(`Contours: ${contourIntervalMeters} m`, barX, barY + 52);
+      }
+
       context.restore();
       texture.needsUpdate = true;
     },
