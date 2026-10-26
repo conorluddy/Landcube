@@ -149,7 +149,7 @@ export function createTerrainStage(): {
   let northEnabled = false;
   let floorPlace: FloorPlace | undefined;
   let contourInterval: number | undefined;
-  let style: FloorStyle = 'grid';
+  let style: FloorStyle = 'survey';
   let stageSize = { width: 2, length: 2, circular: false, background: defaultTerrainGroundColor };
 
   const updateGrid = () => {
@@ -159,7 +159,7 @@ export function createTerrainStage(): {
     letterMaterial.color.set(ink);
     mapGrid.mesh.visible = gridEnabled && floorPlace !== undefined;
     // Every cartographic floor style paints its own north marker.
-    north.visible = northEnabled && !(mapGrid.mesh.visible && style !== 'grid');
+    north.visible = northEnabled && !mapGrid.mesh.visible;
     mapGrid.update(
       stageSize.width,
       stageSize.length,

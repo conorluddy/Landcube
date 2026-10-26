@@ -854,7 +854,7 @@ export function OverlaysPanel({ controller: c, state: s }: PanelProps): ReactNod
           />
           <Hint>
             Map grid, floor styles and north arrow require a real location, studio floor and solid
-            base. Floor styles other than Grid draw their own north marker. Omitted from STL.
+            base. Each floor style draws its own north marker. Omitted from STL.
           </Hint>
         </Group>
       )}

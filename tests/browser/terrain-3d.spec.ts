@@ -189,7 +189,7 @@ test('cartographic floor styles repaint the floor without changing the STL', asy
 
   await page.keyboard.press('Escape');
 
-  for (const style of ['survey', 'plinth', 'rose', 'graticule', 'crop', 'grid']) {
+  for (const style of ['survey', 'plinth', 'rose', 'graticule', 'crop']) {
     await page.getByRole('button', { name: 'Overlays', exact: true }).click();
     await page.getByLabel('Floor style', { exact: true }).selectOption(style);
     await page.keyboard.press('Escape');

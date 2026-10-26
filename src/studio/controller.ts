@@ -180,7 +180,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       groundMatch: false,
       groundColor: '#b4b4b4',
       mapGrid: true,
-      floorStyle: 'grid',
+      floorStyle: 'survey',
       north: true,
       waterStyle: 'solid',
       waterFinish: natural.waterFinish,

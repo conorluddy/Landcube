@@ -12,10 +12,9 @@ import {
   paintRoseRhumbLines,
 } from './terrain-floor-mark-painters';
 
-export type FloorStyle = 'grid' | 'survey' | 'plinth' | 'rose' | 'graticule' | 'crop';
+export type FloorStyle = 'survey' | 'plinth' | 'rose' | 'graticule' | 'crop';
 
 export const floorStyles: Record<FloorStyle, { label: string }> = {
-  grid: { label: 'Grid' },
   survey: { label: 'Survey sheet' },
   plinth: { label: 'Plinth label' },
   rose: { label: 'Compass rose' },
@@ -44,7 +43,7 @@ export function paintFloorStyleLines(
 
 /** Frames and labels sit on top of the fade, outside the model footprint. */
 export function paintFloorStyleLabels(
-  style: Exclude<FloorStyle, 'grid'>,
+  style: FloorStyle,
   frame: FloorFrame,
   place: FloorPlace,
   contourIntervalMeters: number | undefined,
@@ -60,7 +59,7 @@ type FloorLabelPainter = (
   contourIntervalMeters: number | undefined,
 ) => void;
 
-const floorLabelPainters: Record<Exclude<FloorStyle, 'grid'>, FloorLabelPainter> = {
+const floorLabelPainters: Record<FloorStyle, FloorLabelPainter> = {
   survey: paintSurveyLabels,
   plinth: paintPlinthLabels,
   rose: paintRoseLabels,
