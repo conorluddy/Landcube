@@ -80,6 +80,8 @@ const morning = {
   tint: '#ffffff',
 };
 
+export const maximumSunElevation = 45;
+
 /** An artistic day, not a solar model; hours ascend and wrap at 24. */
 export const timeOfDayKeyframes: readonly (TerrainAtmosphere & { hour: number })[] = [
   { hour: 0, ...night },
@@ -90,7 +92,8 @@ export const timeOfDayKeyframes: readonly (TerrainAtmosphere & { hour: number })
   {
     hour: 13,
     label: 'Midday',
-    sunElevation: 65,
+    // Capped below overhead so relief keeps readable shadows at noon.
+    sunElevation: maximumSunElevation,
     sunColor: '#fff4df',
     sunScale: 1.1,
     fillScale: 1.1,
