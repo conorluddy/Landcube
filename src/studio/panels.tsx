@@ -31,7 +31,9 @@ import { floorStyles } from '../terrain-floor-styles';
 import {
   elevationGradientPresets,
   getElevationGradientCss,
+  landscapeGradientPresets,
   maximumElevationColorStops,
+  type ElevationColorStop,
 } from '../terrain-elevation-gradient';
 import { getTerrainWaterColor } from '../terrain-water';
 import type { DesignSettings } from '../types/design';
@@ -356,16 +358,15 @@ function Gradient({ controller: c, state: s }: PanelProps): ReactNode {
             value={s.scene.gradientPreset}
             options={[
               { value: 'custom', label: 'Custom' },
-              ...namedOptions(elevationGradientPresets),
+              { group: 'Studio', options: namedOptions(elevationGradientPresets) },
+              { group: 'Landscapes', options: namedOptions(landscapeGradientPresets) },
             ]}
             onChange={(key) => {
               const preset = (
-                elevationGradientPresets as Partial<
-                  Record<
-                    string,
-                    (typeof elevationGradientPresets)[keyof typeof elevationGradientPresets]
-                  >
-                >
+                {
+                  ...elevationGradientPresets,
+                  ...landscapeGradientPresets,
+                } as Partial<Record<string, { stops: readonly ElevationColorStop[] }>>
               )[key];
 
               if (preset) {

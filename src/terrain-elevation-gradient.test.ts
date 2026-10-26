@@ -4,13 +4,28 @@ import {
   copyElevationGradient,
   elevationGradientPresets,
   getElevationGradientCss,
+  getLandscapeGradientKey,
+  landscapeGradientPresets,
   mixElevationColors,
   validateElevationGradient,
   type ElevationGradientSettings,
 } from './terrain-elevation-gradient';
+import { realTerrainPresets } from './constants/real-terrain';
+
+void test('every real-terrain location references an existing landscape gradient', () => {
+  for (const location of realTerrainPresets) {
+    assert.ok(
+      getLandscapeGradientKey(location.landscape) in landscapeGradientPresets,
+      `${location.name} has unknown landscape ${location.landscape}`,
+    );
+  }
+});
 
 void test('all elevation presets have valid editable stops and are copied independently', () => {
-  for (const preset of Object.values(elevationGradientPresets)) {
+  for (const preset of [
+    ...Object.values(elevationGradientPresets),
+    ...Object.values(landscapeGradientPresets),
+  ]) {
     const settings: ElevationGradientSettings = {
       enabled: true,
       transition: 'soft',
