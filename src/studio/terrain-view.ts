@@ -1,0 +1,184 @@
+import type { StudioController, SceneSettings, StudioView } from './controller';
+import type { Terrain3d } from '../terrain-3d';
+import type { Contour } from '../types/contours';
+import type { DesignSettings } from '../types/design';
+import type { HeightField } from '../types/terrain';
+import type { SeaLevelGeometry } from '../sea-level';
+import type { TerrainTerraceLevels } from '../terrain-terraces';
+
+interface StudioTerrainView {
+  isActive: () => boolean;
+  activate: (mode: StudioView) => Promise<void>;
+  sceneChanged: (previous: SceneSettings) => void;
+  modelChanged: () => void;
+  resetCamera: () => void;
+  getStl: () => ArrayBuffer;
+  update: (
+    contours: Contour[],
+    width: number,
+    height: number,
+    settings: DesignSettings,
+    field: HeightField,
+    seaLevel?: SeaLevelGeometry,
+    attribution?: string,
+    location?: { latitude: number; longitude: number },
+    groundSpanMeters?: number,
+    contourIntervalMeters?: number,
+    terraceLevels?: TerrainTerraceLevels,
+  ) => void;
+}
+
+/** Adapts studio snapshots to the lazy WebGL renderer; never reads form controls. */
+export function createStudioTerrainView(
+  controller: StudioController,
+  changed: () => void,
+): StudioTerrainView {
+  let view: Terrain3d | undefined;
+  let active = false;
+  let span: number | undefined;
+  let interval: number | undefined;
+
+  const syncScene = (previous?: SceneSettings) => {
+    if (!view) {
+      return;
+    }
+
+    const scene = controller.getSnapshot().scene;
+    const differs = (key: keyof SceneSettings) => scene[key] !== previous?.[key];
+
+    if (differs('engraving')) {
+      view.setContourEngraving(scene.engraving);
+    }
+
+    if (differs('gradient')) {
+      view.setElevationGradient(scene.gradient);
+    }
+
+    if (differs('landFinish')) {
+      view.setLandFinish(scene.landFinish);
+    }
+
+    if (differs('waterFinish')) {
+      view.setWaterFinish(scene.waterFinish);
+    }
+
+    if (differs('waterOpacity')) {
+      view.setWaterOpacity(scene.waterOpacity);
+    }
+
+    if (differs('previewWater') || differs('previewWaterLevel')) {
+      view.setPreviewWaterLevel(scene.previewWater ? scene.previewWaterLevel : undefined);
+    }
+
+    if (differs('surface')) {
+      view.setSurface(scene.surface);
+    }
+
+    if (differs('base')) {
+      view.setBase(scene.base);
+    }
+
+    if (differs('surfaceMatch') || differs('surfaceColor')) {
+      view.setSurfaceColor(scene.surfaceMatch ? undefined : scene.surfaceColor);
+    }
+
+    if (differs('ground')) {
+      view.setGround(scene.ground);
+    }
+
+    if (differs('groundMatch') || differs('groundColor')) {
+      view.setGroundColor(scene.groundMatch ? undefined : scene.groundColor);
+    }
+
+    if (differs('waterStyle')) {
+      view.setWaterStyle(scene.waterStyle);
+    }
+
+    if (differs('waterMatch') || differs('waterColor')) {
+      view.setWaterColor(scene.waterMatch ? undefined : scene.waterColor);
+    }
+
+    if (differs('contours')) {
+      view.setContours(scene.contours);
+    }
+
+    if (differs('rotating')) {
+      view.setRotating(scene.rotating);
+    }
+
+    if (differs('lighting')) {
+      view.setLighting(scene.lighting);
+    }
+
+    view.setMapGrid(scene.mapGrid && span !== undefined, span, interval);
+    view.setNorthArrow(scene.north && controller.getSnapshot().source.terrain !== undefined);
+  };
+
+  return {
+    isActive: () => active,
+    async activate(mode: StudioView) {
+      if (mode === '3d' && !view) {
+        const module = await import('../terrain-3d');
+
+        view = module.createTerrain3d((height, layerHeight) => {
+          controller.metrics(height, layerHeight);
+        });
+        syncScene();
+      }
+
+      active = mode === '3d';
+      document.querySelector('#terrain')?.toggleAttribute('hidden', active);
+      view?.setVisible(active);
+
+      if (view && active) {
+        const model = controller.getSnapshot().model;
+
+        view.setModelSettings(model.dimensions);
+        view.setHeight(model.exaggeration);
+      }
+
+      changed();
+    },
+    sceneChanged: syncScene,
+    modelChanged() {
+      const model = controller.getSnapshot().model;
+
+      view?.setModelSettings(model.dimensions);
+      view?.setHeight(model.exaggeration);
+      changed();
+    },
+    resetCamera: () => view?.reset(),
+    getStl() {
+      if (!view || !active) {
+        throw new Error('Select the 3D view before downloading STL.');
+      }
+
+      return view.getStl();
+    },
+    update(
+      contours: Contour[],
+      width: number,
+      height: number,
+      settings: DesignSettings,
+      field: HeightField,
+      seaLevel?: SeaLevelGeometry,
+      _attribution?: string,
+      location?: { latitude: number; longitude: number },
+      groundSpanMeters?: number,
+      contourIntervalMeters?: number,
+      terraceLevels?: TerrainTerraceLevels,
+    ) {
+      span = location ? groundSpanMeters : undefined;
+      interval = contourIntervalMeters;
+
+      if (active && view) {
+        const snapshot = controller.getSnapshot();
+
+        view.setLighting(snapshot.scene.lighting);
+        view.setMapGrid(snapshot.scene.mapGrid && span !== undefined, span, interval);
+        view.setNorthArrow(snapshot.scene.north && location !== undefined);
+        view.update(contours, width, height, settings, field, seaLevel, terraceLevels);
+      }
+    },
+  };
+}

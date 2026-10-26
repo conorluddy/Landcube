@@ -1,8 +1,11 @@
 import { cropTerrainModelField } from './terrain-model';
 import type { HeightField } from './types/terrain';
 import { createSeaLevelGeometry, type SeaLevelGeometry } from './sea-level';
-import { mountTerrain3dControls } from './terrain-3d-controls';
-import { mountRealTerrainControls } from './real-terrain-controls';
+import { createStudioTerrainView } from './studio/terrain-view';
+import { createStudioController } from './studio/controller';
+import { createCropPreview } from './studio/crop-preview';
+import { mountStudio } from './studio/app';
+import { downloadBlob } from './studio/export-panel';
 import type { RealTerrain } from './real-terrain';
 import { findTerrainSummits } from './summit-markers';
 import { getRequiredElement } from './dom-elements';
@@ -16,7 +19,6 @@ import {
   getRealContourInterval,
 } from './real-terrain-contours';
 import { applyCursorElevation } from './cursor-interaction';
-import { mountDesignControls } from './design-controls';
 import {
   classifyDesignSettingChange,
   deriveTerrainConfiguration,
@@ -30,7 +32,6 @@ import {
   replaceDesignUrl,
   saveLockedSeed,
 } from './design-sharing';
-import { mountExportControls } from './export/export-controls';
 import { createOutputRenderer } from './export/image-export';
 import { calculateContourElevations, getTerrainTerraceLevels } from './landscape-composition';
 import { logOperationError } from './operation-logging';
@@ -100,7 +101,7 @@ let designUrlDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingChange: DesignChangeKind | undefined;
 let settingsUpdateFrameIdentifier: number | undefined;
 
-const controls = mountDesignControls({
+const controls = createStudioController({
   getSettings: () => settings,
   updateSettings,
   newLandscape: () => updateSettings({ ...settings, seed: generateRandomSeed() }),
@@ -125,39 +126,39 @@ const controls = mountDesignControls({
   getShareUrl: synchronizeDesignUrl,
   copyLink: (url) => copyDesignLink(url, navigator.clipboard),
 });
-const refreshExportControls = mountExportControls(
-  controls.panel,
-  { getSettings: () => settings, updateSettings, notify: controls.notify },
-  createOutputRenderer(engineConfiguration, () => realTerrain),
-);
-
-mountRealTerrainControls(controls.panel, (loadedTerrain) => {
-  realTerrain = loadedTerrain;
-  contourElevations = calculateContourElevations(settings, engineConfiguration, realTerrain);
-  const density = document.querySelector<HTMLInputElement>('#contourCount');
-
-  if (density) {
-    density.disabled = realTerrain !== undefined;
-    density.title = realTerrain ? 'Set contour interval in Location.' : '';
-  }
-
-  terrain = realTerrain
-    ? (x, y) => sampleLoadedTerrain(x, y)
-    : createTerrainSampler(settings.seed, terrainSettings);
+const outputRenderer = createOutputRenderer(engineConfiguration, () => realTerrain);
+const cropPreview = createCropPreview(controls);
+const terrain3d = createStudioTerrainView(controls, () => {
   cursor.strength = targetCursorInfluence.strength = 0;
-  baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
   renderCurrentLandscape();
-  refreshExportControls();
 });
 
-const terrain3d = mountTerrain3dControls(
-  controls.panel,
-  () => {
+controls.connect({
+  activate: terrain3d.activate,
+  sceneChanged: terrain3d.sceneChanged,
+  modelChanged: terrain3d.modelChanged,
+  resetCamera: terrain3d.resetCamera,
+  downloadStl: () => {
+    const model = controls.getSnapshot().model.dimensions;
+
+    downloadBlob(
+      new Blob([terrain3d.getStl()], { type: 'model/stl' }),
+      model.cropShape === 'circle'
+        ? `topogra-${settings.seed}-circle-${model.widthMm}mm.stl`
+        : `topogra-${settings.seed}-${model.widthMm}x${model.lengthMm}mm.stl`,
+    );
+  },
+  applyTerrain: (loadedTerrain) => {
+    realTerrain = loadedTerrain;
+    contourElevations = calculateContourElevations(settings, engineConfiguration, realTerrain);
+    terrain = realTerrain
+      ? (x, y) => sampleLoadedTerrain(x, y)
+      : createTerrainSampler(settings.seed, terrainSettings);
     cursor.strength = targetCursorInfluence.strength = 0;
+    baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
     renderCurrentLandscape();
   },
-  controls.notify,
-);
+});
 
 if (!storedSeedResult.ok) {
   logOperationError(storedSeedResult.error);
@@ -245,7 +246,7 @@ function updateSettings(nextDesignSettings: DesignSettings): boolean {
       renderCurrentLandscape();
     }
 
-    refreshExportControls();
+    controls.sync();
   });
 
   return true;
@@ -304,15 +305,15 @@ function updateTerrain3d(): void {
     modelCrop = undefined;
   }
 
-  terrain3d.updateCropPreview(
+  cropPreview.update(
     modelSourceField,
     modelSourceFrame.width,
     modelSourceFrame.height,
     settings,
     realTerrain ? contourElevations : undefined,
   );
-  const dimensions = terrain3d.getModelSettings();
-  const crop = terrain3d.getCropSettings();
+  const dimensions = controls.getSnapshot().model.dimensions;
+  const crop = controls.getSnapshot().model.crop;
   const key = JSON.stringify([dimensions.widthMm, dimensions.lengthMm, dimensions.cropShape, crop]);
 
   if (!modelCrop || key !== modelCropKey) {
@@ -411,7 +412,7 @@ function moveCursor(event: PointerEvent): void {
     terrain3d.isActive() ||
     realTerrain !== undefined ||
     !settings.cursorEnabled ||
-    (event.target instanceof Element && event.target.closest('.control-panel'))
+    (event.target instanceof Element && event.target.closest('header, aside, footer, dialog'))
   ) {
     if (targetCursorInfluence.strength !== 0) {
       releaseCursor();
@@ -424,12 +425,16 @@ function moveCursor(event: PointerEvent): void {
     return;
   }
 
+  const bounds = terrainSvgElement.getBoundingClientRect();
+  const x = event.clientX - bounds.left;
+  const y = event.clientY - bounds.top;
+
   if (cursor.strength === 0) {
-    cursor.x = event.clientX;
-    cursor.y = event.clientY;
+    cursor.x = x;
+    cursor.y = y;
   }
 
-  Object.assign(targetCursorInfluence, { x: event.clientX, y: event.clientY, strength: 1 });
+  Object.assign(targetCursorInfluence, { x, y, strength: 1 });
   scheduleCursorAnimation();
 }
 
@@ -480,18 +485,27 @@ window.addEventListener('popstate', () => {
 });
 let viewportResizeDebounceTimer: ReturnType<typeof setTimeout>;
 
-window.addEventListener('resize', () => {
-  /** Updates framing immediately and defers expensive terrain resampling. */
-  terrainSvgElement.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`);
+mountStudio(controls, terrainSvgElement, outputRenderer, cropPreview);
+const viewport = getRequiredElement(document, '#studio-viewport', HTMLElement);
+
+const resizeViewport = () => {
+  const nextWidth = Math.max(1, viewport.clientWidth);
+  const nextHeight = Math.max(1, viewport.clientHeight);
+
+  terrainSvgElement.setAttribute('viewBox', `0 0 ${nextWidth} ${nextHeight}`);
   clearTimeout(viewportResizeDebounceTimer);
   viewportResizeDebounceTimer = setTimeout(() => {
-    /** Resamples after viewport resizing settles to avoid repeated geometry work. */
-    width = innerWidth;
-    height = innerHeight;
+    width = nextWidth;
+    height = nextHeight;
     baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
     renderCurrentLandscape();
   }, engineConfiguration.resizeDebounceMs);
-});
+};
+
+new ResizeObserver(resizeViewport).observe(viewport);
+width = Math.max(1, viewport.clientWidth);
+height = Math.max(1, viewport.clientHeight);
+baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
 applyPageStyle();
 synchronizeDesignUrl();
 renderCurrentLandscape();
