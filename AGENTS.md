@@ -13,3 +13,9 @@ Browser and CLI share settings validation, terrain generation, contour extractio
 Preserve reproducibility: existing version-one links depend on stable defaults and terrain semantics. Browser design links omit real-terrain locations; CLI configurations preserve terrain settings. Static exports use settled terrain without cursor deformation. Real-terrain output includes source attribution.
 
 Keep browser and CLI behavior aligned through the shared pipeline.
+
+## Git hygiene
+
+- Use the PR template for all PRs.
+- Default branch is protected - all updates via PR.
+- PR titles use four words and one emoji prefix e.g. "🧑🏼‍💻 This is a title".
