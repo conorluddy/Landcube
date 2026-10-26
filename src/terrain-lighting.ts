@@ -80,6 +80,8 @@ const morning = {
   tint: '#ffffff',
 };
 
+export const maximumSunElevation = 45;
+
 /** An artistic day, not a solar model; hours ascend and wrap at 24. */
 export const timeOfDayKeyframes: readonly (TerrainAtmosphere & { hour: number })[] = [
   { hour: 0, ...night },
@@ -90,7 +92,8 @@ export const timeOfDayKeyframes: readonly (TerrainAtmosphere & { hour: number })
   {
     hour: 13,
     label: 'Midday',
-    sunElevation: 65,
+    // Capped below overhead so relief keeps readable shadows at noon.
+    sunElevation: maximumSunElevation,
     sunColor: '#fff4df',
     sunScale: 1.1,
     fillScale: 1.1,
@@ -149,6 +152,38 @@ export function getSuggestedTerrainLightDirection(latitude?: number): number {
   }
 
   return latitude > 0 ? 120 : 60;
+}
+
+const daylightStartHour = 5;
+const daylightHours = 16;
+/** Share of each cycle spent between 05:00 and 21:00; night passes quickly. */
+const daylightShare = 0.85;
+
+/** Maps a 0–1 cycle phase to a time and a sun bearing that rises east and sets west. */
+export function getDaylightCycleLighting(
+  phase: number,
+  latitude?: number,
+): Pick<TerrainLightingSettings, 'timeOfDay' | 'direction'> {
+  const wrapped = ((phase % 1) + 1) % 1;
+  const timeOfDay =
+    wrapped < daylightShare
+      ? daylightStartHour + (daylightHours * wrapped) / daylightShare
+      : (daylightStartHour +
+          daylightHours +
+          ((24 - daylightHours) * (wrapped - daylightShare)) / (1 - daylightShare)) %
+        24;
+  // Fifteen degrees per hour from noon: through south in the north, through north in the south.
+  const hourAngle = (timeOfDay - 12) * 15;
+  const bearing = (latitude ?? 0) < 0 ? 360 - hourAngle : 180 + hourAngle;
+
+  return { timeOfDay, direction: ((bearing % 360) + 360) % 360 };
+}
+
+/** Starts a cycle where the current time already sits, so enabling it never jumps. */
+export function getDaylightCyclePhase(timeOfDay: number): number {
+  const daylightProgress = (timeOfDay - daylightStartHour) / daylightHours;
+
+  return daylightProgress >= 0 && daylightProgress < 1 ? daylightProgress * daylightShare : 0;
 }
 
 // === HELPERS ===

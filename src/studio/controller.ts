@@ -11,6 +11,8 @@ import {
 } from '../terrain-contour-engraving';
 import {
   defaultTerrainLighting,
+  getDaylightCycleLighting,
+  getDaylightCyclePhase,
   getSuggestedTerrainLightDirection,
   type TerrainLightingSettings,
 } from '../terrain-lighting';
@@ -71,6 +73,8 @@ export interface SceneSettings {
   previewWaterLevel: number;
   lighting: TerrainLightingSettings;
   customLightDirection: boolean;
+  /** Sweeps time of day and sun bearing; any manual lighting edit pauses it. */
+  daylightCycle: { enabled: boolean; daySeconds: number };
   camera: TerrainCameraSettings;
   rotating: boolean;
   rotationSeconds: number;
@@ -172,12 +176,16 @@ export interface StudioController {
   useCoordinates: () => Promise<void>;
   loadTerrain: () => Promise<void>;
   autoplay: (patch: Partial<TerrainSourceState['autoplay']>) => Promise<void>;
+  daylightCycle: (patch: Partial<SceneSettings['daylightCycle']>) => void;
   interval: (value: 'auto' | number) => boolean;
   hatching: (value: boolean) => void;
   resetCamera: () => void;
   downloadStl: () => void;
   downloadStill: (scale: TerrainStillScale) => Promise<void>;
 }
+
+/** Twenty updates a second keeps the sun smooth without flooding React with renders. */
+const daylightFrameMs = 50;
 
 /** Session state is independent of controls, rendering and version-one URL serialization. */
 export function createStudioController(actions: DesignControlActions): StudioController {
@@ -229,6 +237,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       previewWaterLevel: 0.4,
       lighting: { ...defaultTerrainLighting },
       customLightDirection: false,
+      daylightCycle: { enabled: false, daySeconds: 75 },
       camera: { ...defaultTerrainCameraSettings },
       rotating: false,
       rotationSeconds: defaultRotationSeconds,
@@ -257,6 +266,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
   let requestVersion = 0;
   // Procedural mode parks the last real terrain so switching back is instant.
   let autoplayTimer: ReturnType<typeof setTimeout> | undefined;
+  let daylightTimer: ReturnType<typeof setInterval> | undefined;
   let parked: { terrain: RealTerrain; fieldsKey: string } | undefined;
   let loadedFieldsKey = '';
   const listeners = new Set<() => void>();
@@ -442,6 +452,10 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       }
     },
     lighting(patch: Partial<TerrainLightingSettings>) {
+      if (patch.timeOfDay !== undefined || patch.direction !== undefined) {
+        controller.daylightCycle({ enabled: false });
+      }
+
       controller.scene({
         lighting: { ...state.scene.lighting, ...patch },
         customLightDirection:
@@ -566,6 +580,37 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       };
 
       scheduleNextPlace();
+    },
+    daylightCycle(patch) {
+      if (patch.enabled === true && isReducedMotionPreferred()) {
+        notify('Daylight cycling is off while your system prefers reduced motion.');
+
+        return;
+      }
+
+      controller.scene({ daylightCycle: { ...state.scene.daylightCycle, ...patch } });
+      clearInterval(daylightTimer);
+      daylightTimer = undefined;
+
+      if (!state.scene.daylightCycle.enabled) {
+        return;
+      }
+
+      let phase = getDaylightCyclePhase(state.scene.lighting.timeOfDay);
+      let previousMs = Date.now();
+
+      daylightTimer = setInterval(() => {
+        const nowMs = Date.now();
+
+        phase += (nowMs - previousMs) / 1000 / state.scene.daylightCycle.daySeconds;
+        previousMs = nowMs;
+        controller.scene({
+          lighting: {
+            ...state.scene.lighting,
+            ...getDaylightCycleLighting(phase, state.source.terrain?.location?.latitude),
+          },
+        });
+      }, daylightFrameMs);
     },
     source(patch: Partial<TerrainSourceState>) {
       state = { ...state, source: { ...state.source, ...patch } };
@@ -775,4 +820,9 @@ function applySuggestedExaggeration(
     ...model,
     exaggeration: getSuggestedExaggeration(elevations.metersPerUnit * 1.6, terrain.spanKm),
   };
+}
+
+/** Absent outside browsers, where tests run with motion allowed. */
+function isReducedMotionPreferred(): boolean {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }

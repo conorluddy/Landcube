@@ -3,9 +3,34 @@ import { test } from 'node:test';
 import {
   defaultTerrainLighting,
   formatTimeOfDay,
+  getDaylightCycleLighting,
+  getDaylightCyclePhase,
   getSuggestedTerrainLightDirection,
   getTerrainAtmosphere,
+  maximumSunElevation,
 } from './terrain-lighting';
+
+void test('the daylight cycle rises east, passes the equator side at noon and sets west', () => {
+  const noonPhase = getDaylightCyclePhase(12);
+
+  assert.equal(getDaylightCycleLighting(getDaylightCyclePhase(6)).direction, 90);
+  assert.equal(getDaylightCycleLighting(noonPhase, 53).direction, 180);
+  assert.equal(getDaylightCycleLighting(noonPhase, -33).direction, 0);
+  assert.equal(getDaylightCycleLighting(getDaylightCyclePhase(18), -33).direction, 270);
+});
+
+void test('the sun never climbs above the relief-preserving maximum', () => {
+  for (let hour = 0; hour < 24; hour += 0.25) {
+    assert.ok(getTerrainAtmosphere(hour).sunElevation <= maximumSunElevation);
+  }
+});
+
+void test('the daylight cycle spends most of its time in daylight and wraps through night', () => {
+  assert.equal(getDaylightCycleLighting(0).timeOfDay, 5);
+  assert.ok(Math.abs(getDaylightCycleLighting(0.85).timeOfDay - 21) < 1e-9);
+  assert.ok(getDaylightCycleLighting(0.95).timeOfDay < 5);
+  assert.equal(getDaylightCycleLighting(1).timeOfDay, 5);
+});
 
 void test('lighting defaults reveal natural materials and hemisphere suggestions use compass bearings', () => {
   assert.equal(defaultTerrainLighting.fill, 0.7);
