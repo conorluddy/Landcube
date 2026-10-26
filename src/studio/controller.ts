@@ -13,6 +13,14 @@ import {
   getSuggestedTerrainLightDirection,
   type TerrainLightingSettings,
 } from '../terrain-lighting';
+import {
+  defaultRotationSeconds,
+  defaultTerrainCameraSettings,
+  terrainViewPresets,
+  type TerrainCameraSettings,
+  type TerrainViewPreset,
+  type TurntableDirection,
+} from '../terrain-camera';
 import { terrainMaterialPresets, type LandFinish, type WaterFinish } from '../terrain-materials';
 import {
   copyElevationGradient,
@@ -28,9 +36,11 @@ import type { DesignSettings, ValidatedDesignSettings } from '../types/design';
 import type { Result } from '../types/operations';
 import type { WaterStyle } from '../terrain-3d';
 import type { FloorStyle } from '../terrain-floor-styles';
+import type { TerrainStillScale } from '../export/still-export';
 
 export type StudioView = '2d' | '3d';
-export type InspectorSection = 'Terrain' | 'Contours' | 'Colour' | 'Scene' | 'Model';
+export type InspectorSection = 'Terrain' | 'Contours' | 'Colour' | 'Scene' | 'Camera' | 'Model';
+export const threeDOnlySections: readonly InspectorSection[] = ['Camera', 'Model'];
 export interface SceneSettings {
   contours: boolean;
   engraving: ContourEngravingSettings;
@@ -56,7 +66,10 @@ export interface SceneSettings {
   previewWaterLevel: number;
   lighting: TerrainLightingSettings;
   customLightDirection: boolean;
+  camera: TerrainCameraSettings;
   rotating: boolean;
+  rotationSeconds: number;
+  rotationDirection: TurntableDirection;
 }
 export interface TerrainSourceState {
   selected: 'generated' | 'real';
@@ -83,7 +96,7 @@ export interface StudioState {
     activating: boolean;
     collapsed: boolean;
     sections: Record<StudioView, InspectorSection>;
-    popover: 'Overlays' | 'Camera' | null;
+    popover: 'Overlays' | 'Orbit' | null;
     exporting: boolean;
   };
   seedLocked: boolean;
@@ -98,6 +111,10 @@ export interface StudioEffects {
   sceneChanged(previous: SceneSettings): void;
   modelChanged(): void;
   resetCamera(): void;
+  applyViewPreset(preset: TerrainViewPreset): void;
+  pickFocus(): Promise<boolean>;
+  /** Resolves to the saved image's pixel size. */
+  downloadStill(scale: TerrainStillScale): Promise<{ width: number; height: number }>;
   downloadStl(): void;
 }
 
@@ -128,6 +145,11 @@ export interface StudioController {
   material: (key: string) => void;
   lighting: (patch: Partial<TerrainLightingSettings>) => void;
   resetLighting: () => void;
+  camera: (patch: Partial<TerrainCameraSettings>) => void;
+  resetCameraSettings: () => void;
+  applyViewPreset: (preset: TerrainViewPreset) => void;
+  /** Arms a one-off terrain click that sets the depth-of-field focus point. */
+  pickFocus: () => Promise<void>;
   model: (patch: Partial<StudioState['model']>) => boolean;
   dimensions: (patch: Partial<TerrainModelSettings>) => boolean;
   metrics: (height: number, layerHeight?: number) => void;
@@ -140,6 +162,7 @@ export interface StudioController {
   hatching: (value: boolean) => void;
   resetCamera: () => void;
   downloadStl: () => void;
+  downloadStill: (scale: TerrainStillScale) => Promise<void>;
 }
 
 /** Session state is independent of controls, rendering and version-one URL serialization. */
@@ -190,7 +213,10 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       previewWaterLevel: 0.4,
       lighting: { ...defaultTerrainLighting },
       customLightDirection: false,
+      camera: { ...defaultTerrainCameraSettings },
       rotating: false,
+      rotationSeconds: defaultRotationSeconds,
+      rotationDirection: 'counterclockwise',
     },
     model: {
       dimensions: { ...defaultTerrainModelSettings },
@@ -315,7 +341,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       );
     },
     selectSection(section: InspectorSection) {
-      if (section === 'Model' && state.workspace.view === '2d') {
+      if (threeDOnlySections.includes(section) && state.workspace.view === '2d') {
         return;
       }
 
@@ -391,6 +417,31 @@ export function createStudioController(actions: DesignControlActions): StudioCon
         },
         customLightDirection: false,
       });
+    },
+    camera(patch: Partial<TerrainCameraSettings>) {
+      controller.scene({ camera: { ...state.scene.camera, ...patch } });
+    },
+    resetCameraSettings() {
+      controller.scene({ camera: { ...defaultTerrainCameraSettings } });
+    },
+    applyViewPreset(preset: TerrainViewPreset) {
+      const { projection } = terrainViewPresets[preset];
+
+      if (projection) {
+        controller.camera({ projection });
+      }
+
+      effects?.applyViewPreset(preset);
+    },
+    async pickFocus() {
+      notify('Click the terrain to set focus. Press Escape to cancel.');
+      const picked = (await effects?.pickFocus()) ?? false;
+
+      if (picked) {
+        controller.camera({ focusFollowsTarget: false });
+      }
+
+      notify(picked ? 'Focus set.' : 'Focus unchanged.');
     },
     model(patch: Partial<StudioState['model']>) {
       const next = { ...state.model, ...patch };
@@ -550,6 +601,17 @@ export function createStudioController(actions: DesignControlActions): StudioCon
         effects?.downloadStl();
       } catch (error) {
         notify(error instanceof Error ? error.message : 'STL export failed.');
+      }
+    },
+    async downloadStill(scale: TerrainStillScale) {
+      try {
+        const size = await effects?.downloadStill(scale);
+
+        if (size) {
+          notify(`Saved a ${size.width} × ${size.height} px 3D still.`);
+        }
+      } catch (error) {
+        notify(error instanceof Error ? error.message : '3D still export failed.');
       }
     },
   };

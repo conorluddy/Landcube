@@ -19,8 +19,24 @@ import { createTerrainStage, defaultTerrainGroundColor } from './terrain-stage';
 import type { FloorPlace } from './floor-geo';
 import type { FloorStyle } from './terrain-floor-styles';
 import { getTerrainWaterColor } from './terrain-water';
-import { defaultTerrainLighting, type TerrainLightingSettings } from './terrain-lighting';
+import {
+  defaultTerrainLighting,
+  getTerrainAtmosphere,
+  type TerrainLightingSettings,
+} from './terrain-lighting';
 import { createTerrainLineBuffers } from './terrain-3d-lines';
+import {
+  baseTerrainFovDegrees,
+  defaultTerrainCameraSettings,
+  getBokehAperture,
+  getCompensatedDistance,
+  getDistanceForHalfHeight,
+  getOrthographicHalfHeight,
+  getVerticalFovDegrees,
+  terrainViewPresets,
+  type TerrainCameraSettings,
+  type TerrainViewPreset,
+} from './terrain-camera';
 import { createTerrainMeshMorph, type TerrainMeshMorph } from './terrain-3d-transition';
 import { evaluateTerrainTransition } from './terrain-transition';
 import { terrainTransitionDurationMs } from './constants/terrain-transition';
@@ -40,6 +56,7 @@ import { seaLevelHatchSpacing, seaLevelHatchOpacity } from './constants/sea-leve
 import type { SeaLevelGeometry } from './sea-level';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { createTerrainPostProcessing, type TerrainPostProcessing } from './terrain-post-processing';
 import type { Contour } from './types/contours';
 import type { DesignSettings } from './types/design';
 
@@ -81,7 +98,14 @@ export interface Terrain3d {
   setContourEngraving(value: ContourEngravingSettings): void;
   setSurfaceColor(value: string | undefined): void;
   setRotating(value: boolean): void;
+  setRotationSpeed(value: number): void;
+  applyViewPreset(preset: TerrainViewPreset): void;
+  /** Waits for a click on the terrain; resolves false if cancelled with Escape or a miss. */
+  pickFocus(): Promise<boolean>;
+  /** Renders the current view at `scale` × its on-screen CSS size into a new 2D canvas. */
+  captureStill(scale: number): HTMLCanvasElement;
   setLighting(settings: Readonly<TerrainLightingSettings>): void;
+  setCamera(settings: Readonly<TerrainCameraSettings>): void;
   /** Morphs the next rebuilt landscape from the current one instead of cutting to it. */
   requestTransition(): void;
   reset(): void;
@@ -117,11 +141,23 @@ export function createTerrain3d(
 
   viewport.append(renderer.domElement);
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 100);
-  const controls = new OrbitControls(camera, renderer.domElement);
+  const perspectiveCamera = new THREE.PerspectiveCamera(
+    getVerticalFovDegrees(defaultTerrainCameraSettings.focalLengthMm),
+    1,
+    0.01,
+    200,
+  );
+  const orthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 200);
+  let camera: THREE.PerspectiveCamera | THREE.OrthographicCamera = perspectiveCamera;
+  let viewportAspect = 1;
+  let viewportWidth = 1;
+  let viewportHeight = 1;
+  let orthographicHalfHeight = 1;
+  const controls = new OrbitControls<THREE.PerspectiveCamera | THREE.OrthographicCamera>(
+    camera,
+    renderer.domElement,
+  );
 
-  controls.minDistance = 0.5;
-  controls.maxDistance = 12;
   controls.maxPolarAngle = Math.PI * 0.49;
   const lineLayers = {
     ordinary: new LineSegments2(
@@ -207,13 +243,15 @@ export function createTerrain3d(
   let showGround = true;
   const stage = createTerrainStage();
 
+  const backdropTint = new THREE.Color(1, 1, 1);
+
   const updateStageVisibility = () => {
     const enabled = showGround && base.visible;
 
     stage.setVisible(enabled);
     scene.background = new THREE.Color(
       enabled ? (customGroundColor ?? backgroundColor) : backgroundColor,
-    );
+    ).multiply(backdropTint);
   };
 
   scene.add(stage.group);
@@ -231,10 +269,15 @@ export function createTerrain3d(
   sunlight.shadow.bias = -0.0001;
   sunlight.shadow.radius = 3;
 
-  /** Positions the sun independently of the camera and terrain height. */
-  const applyLighting = (lighting: Readonly<TerrainLightingSettings>) => {
+  let lighting: Readonly<TerrainLightingSettings> = defaultTerrainLighting;
+  let exposureScale = 1;
+  let landscapeRadius = 1;
+
+  /** Positions the sun independently of the camera; time of day sets height, colour and studio tint. */
+  const applyLighting = () => {
+    const atmosphere = getTerrainAtmosphere(lighting.timeOfDay);
     const direction = THREE.MathUtils.degToRad(lighting.direction);
-    const elevation = THREE.MathUtils.degToRad(lighting.elevation);
+    const elevation = THREE.MathUtils.degToRad(atmosphere.sunElevation);
     const radius = 10;
 
     sunlight.position.set(
@@ -242,13 +285,39 @@ export function createTerrain3d(
       radius * Math.sin(elevation),
       -radius * Math.cos(elevation) * Math.cos(direction),
     );
-    sunlight.color.set(lighting.mode === 'moon' ? 0xa9c7ff : 0xffd09a);
-    sunlight.intensity = lighting.mode === 'off' ? 0 : lighting.intensity;
-    stage.setCastShadows(lighting.mode !== 'off' && lighting.intensity > 0);
-    fillLight.intensity = lighting.fill;
+    sunlight.color.set(atmosphere.sunColor);
+    sunlight.intensity = lighting.flat
+      ? 0
+      : lighting.intensity * atmosphere.sunScale * exposureScale;
+    stage.setCastShadows(!lighting.flat && lighting.intensity > 0);
+    fillLight.color.set(atmosphere.skyColor);
+    fillLight.groundColor.set(atmosphere.groundColor);
+    fillLight.intensity = lighting.fill * atmosphere.fillScale * exposureScale;
+    backdropTint.set(atmosphere.tint);
+    stage.setTint(atmosphere.tint);
+    updateStageVisibility();
   };
 
-  applyLighting(defaultTerrainLighting);
+  /** Haze is relative to the model, so it reads the same at any lens or zoom. */
+  const updateFog = () => {
+    if (lighting.haze <= 0) {
+      scene.fog = null;
+
+      return;
+    }
+
+    const fog = scene.fog instanceof THREE.Fog ? scene.fog : new THREE.Fog(0xffffff);
+    const distance = camera.position.distanceTo(controls.target);
+    // The far edge of the model reaches 85% haze at full strength.
+    const backEdgeHaze = lighting.haze * 0.85;
+
+    scene.fog = fog;
+    fog.color.copy(scene.background instanceof THREE.Color ? scene.background : backdropTint);
+    fog.near = Math.max(0, distance - landscapeRadius);
+    fog.far = fog.near + (2 * landscapeRadius) / backEdgeHaze;
+  };
+
+  applyLighting();
   scene.add(fillLight, sunlight);
   let modelSettings: TerrainModelSettings = { ...defaultTerrainModelSettings };
   let exaggeration = 0.3;
@@ -339,10 +408,57 @@ export function createTerrain3d(
   let rotating = false;
   let previousTime = performance.now();
 
+  let cameraSettings: Readonly<TerrainCameraSettings> = defaultTerrainCameraSettings;
+  let postProcessing: TerrainPostProcessing | undefined;
+  let pickedFocusPoint: THREE.Vector3 | undefined;
+
+  /** Depth of field relies on perspective depth, so orthographic views skip it. */
+  const getActiveFocusEffect = () =>
+    cameraSettings.focusEffect === 'depth-of-field' && camera === orthographicCamera
+      ? 'off'
+      : cameraSettings.focusEffect;
+
+  const getFocusDistance = () => {
+    const point =
+      cameraSettings.focusFollowsTarget || !pickedFocusPoint ? controls.target : pickedFocusPoint;
+
+    camera.updateMatrixWorld();
+
+    return -point.clone().applyMatrix4(camera.matrixWorldInverse).z;
+  };
+
   const draw = () => {
-    if (visible && !document.hidden) {
+    if (!visible || document.hidden) {
+      return;
+    }
+
+    updateFog();
+
+    if (postProcessing && getActiveFocusEffect() !== 'off') {
+      postProcessing.setDepthOfField(
+        getFocusDistance(),
+        getBokehAperture(cameraSettings.apertureFStop),
+      );
+      postProcessing.render();
+    } else {
       renderer.render(scene, camera);
     }
+  };
+
+  const syncPostProcessing = () => {
+    if (cameraSettings.focusEffect === 'off' && !postProcessing) {
+      return;
+    }
+
+    postProcessing ??= createTerrainPostProcessing(renderer, scene, camera, [contourLayer]);
+    postProcessing.setSize(viewportWidth, viewportHeight, renderer.getPixelRatio());
+    postProcessing.setCamera(camera);
+    postProcessing.setEffect(getActiveFocusEffect());
+    postProcessing.setTiltShift({
+      bandPosition: cameraSettings.tiltShiftPosition,
+      bandWidth: cameraSettings.tiltShiftWidth,
+      blur: cameraSettings.tiltShiftBlur,
+    });
   };
 
   controls.addEventListener('change', draw);
@@ -352,15 +468,151 @@ export function createTerrain3d(
     const height = Math.max(1, viewport.clientHeight);
 
     renderer.setSize(width, height);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
+    viewportWidth = width;
+    viewportHeight = height;
+    postProcessing?.setSize(width, height, renderer.getPixelRatio());
+    viewportAspect = width / height;
+    perspectiveCamera.aspect = viewportAspect;
+    perspectiveCamera.updateProjectionMatrix();
+    updateOrthographicFrustum();
     draw();
   };
 
-  const reset = () => {
-    camera.position.set(0, 2.1, 2.5);
-    controls.target.set(0, 0, 0);
+  const updateOrthographicFrustum = () => {
+    orthographicCamera.top = orthographicHalfHeight;
+    orthographicCamera.bottom = -orthographicHalfHeight;
+    orthographicCamera.left = -orthographicHalfHeight * viewportAspect;
+    orthographicCamera.right = orthographicHalfHeight * viewportAspect;
+    orthographicCamera.updateProjectionMatrix();
+  };
+
+  /** Perspective-equivalent distance, so framing survives lens and projection changes. */
+  const getViewDistance = () =>
+    camera === orthographicCamera
+      ? getDistanceForHalfHeight(orthographicHalfHeight, perspectiveCamera.fov) /
+        orthographicCamera.zoom
+      : perspectiveCamera.position.distanceTo(controls.target);
+
+  /** Places the active camera along `direction` from the orbit target at a framing distance. */
+  const placeCamera = (direction: THREE.Vector3, distance: number) => {
+    const scale = getCompensatedDistance(1, baseTerrainFovDegrees, perspectiveCamera.fov);
+    const minDistance = 0.5 * scale;
+    const maxDistance = 12 * scale;
+    const offset = direction.clone().normalize();
+
+    controls.minDistance = minDistance;
+    controls.maxDistance = maxDistance;
+
+    if (camera === orthographicCamera) {
+      // Orthographic depth does not affect framing; a fixed standoff keeps the model unclipped.
+      orthographicHalfHeight = getOrthographicHalfHeight(distance, perspectiveCamera.fov);
+      orthographicCamera.zoom = 1;
+      controls.minZoom = distance / maxDistance;
+      controls.maxZoom = distance / minDistance;
+      orthographicCamera.position.copy(controls.target).addScaledVector(offset, maxDistance);
+      updateOrthographicFrustum();
+    } else {
+      perspectiveCamera.position.copy(controls.target).addScaledVector(offset, distance);
+    }
+
     controls.update();
+  };
+
+  const setCameraSettings = (settings: Readonly<TerrainCameraSettings>) => {
+    const direction = camera.position.clone().sub(controls.target);
+    const distance = getCompensatedDistance(
+      getViewDistance(),
+      perspectiveCamera.fov,
+      getVerticalFovDegrees(settings.focalLengthMm),
+    );
+
+    perspectiveCamera.fov = getVerticalFovDegrees(settings.focalLengthMm);
+    perspectiveCamera.updateProjectionMatrix();
+    exposureScale = 2 ** settings.exposureEv;
+    applyLighting();
+    camera = settings.projection === 'orthographic' ? orthographicCamera : perspectiveCamera;
+    controls.object = camera;
+    placeCamera(direction, distance);
+    cameraSettings = settings;
+    syncPostProcessing();
+    draw();
+  };
+
+  let viewAnimationFrame = 0;
+
+  /** Eases the camera to a new direction around the target, keeping the framing distance. */
+  const animateCameraDirection = (direction: THREE.Vector3) => {
+    cancelAnimationFrame(viewAnimationFrame);
+    const distance = getViewDistance();
+    const from = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+    const to = new THREE.Spherical().setFromVector3(direction);
+    const thetaChange =
+      THREE.MathUtils.euclideanModulo(to.theta - from.theta + Math.PI, Math.PI * 2) - Math.PI;
+    const durationMs = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 400;
+    const startedAt = performance.now();
+
+    const step = () => {
+      const progress =
+        durationMs === 0 ? 1 : Math.min(1, (performance.now() - startedAt) / durationMs);
+      const eased = 1 - (1 - progress) ** 3;
+      const current = new THREE.Spherical(
+        1,
+        THREE.MathUtils.lerp(from.phi, to.phi, eased),
+        from.theta + thetaChange * eased,
+      );
+
+      placeCamera(new THREE.Vector3().setFromSpherical(current), distance);
+      draw();
+
+      if (progress < 1) {
+        viewAnimationFrame = requestAnimationFrame(step);
+      }
+    };
+
+    step();
+  };
+
+  const raycaster = new THREE.Raycaster();
+
+  const getTerrainPointAt = (clientX: number, clientY: number) => {
+    const bounds = renderer.domElement.getBoundingClientRect();
+
+    raycaster.setFromCamera(
+      new THREE.Vector2(
+        ((clientX - bounds.left) / bounds.width) * 2 - 1,
+        -((clientY - bounds.top) / bounds.height) * 2 + 1,
+      ),
+      camera,
+    );
+
+    return raycaster.intersectObjects([surface, base], false).find((hit) => hit.object.visible)
+      ?.point;
+  };
+
+  /** Double-click re-centres the orbit on a terrain point without changing the viewing angle. */
+  renderer.domElement.addEventListener('dblclick', (event) => {
+    const point = getTerrainPointAt(event.clientX, event.clientY);
+
+    if (!point) {
+      return;
+    }
+
+    const offset = camera.position.clone().sub(controls.target);
+
+    controls.target.copy(point);
+    camera.position.copy(point).add(offset);
+    controls.update();
+    draw();
+  });
+
+  const reset = () => {
+    const home = new THREE.Vector3(0, 2.1, 2.5);
+
+    controls.target.set(0, 0, 0);
+    placeCamera(
+      home,
+      getCompensatedDistance(home.length(), baseTerrainFovDegrees, perspectiveCamera.fov),
+    );
     draw();
   };
 
@@ -804,6 +1056,8 @@ export function createTerrain3d(
       updateLandColor();
       updateWaterColor();
       updateStageVisibility();
+      landscapeRadius =
+        (Math.hypot(modelSettings.widthMm, modelSettings.lengthMm) * previewScale) / 2;
       stage.update(
         modelSettings.widthMm * previewScale,
         (modelSettings.cropShape === 'circle' ? modelSettings.widthMm : modelSettings.lengthMm) *
@@ -947,9 +1201,98 @@ export function createTerrain3d(
       updateWaterColor();
       draw();
     },
-    setLighting(lighting: Readonly<TerrainLightingSettings>) {
-      applyLighting(lighting);
+    setLighting(value: Readonly<TerrainLightingSettings>) {
+      lighting = value;
+      applyLighting();
       draw();
+    },
+    setCamera: setCameraSettings,
+    captureStill(scale: number) {
+      const maximumDimension = renderer.capabilities.maxTextureSize;
+      const pixelRatio = Math.min(
+        scale,
+        maximumDimension / Math.max(viewportWidth, viewportHeight),
+      );
+      const previousPixelRatio = renderer.getPixelRatio();
+      const frame = document.createElement('canvas');
+
+      const resizeTo = (ratio: number) => {
+        renderer.setPixelRatio(ratio);
+        renderer.setSize(viewportWidth, viewportHeight);
+        postProcessing?.setSize(viewportWidth, viewportHeight, ratio);
+      };
+
+      resizeTo(pixelRatio);
+      draw();
+      frame.width = renderer.domElement.width;
+      frame.height = renderer.domElement.height;
+      // Copied in the same task as the render, so no preserved drawing buffer is needed.
+      frame.getContext('2d')?.drawImage(renderer.domElement, 0, 0);
+      resizeTo(previousPixelRatio);
+      draw();
+
+      return frame;
+    },
+    pickFocus() {
+      const canvas = renderer.domElement;
+
+      canvas.style.cursor = 'crosshair';
+
+      return new Promise<boolean>((resolve) => {
+        let downAt: { x: number; y: number } | undefined;
+
+        const finish = (picked: boolean) => {
+          canvas.style.cursor = '';
+          canvas.removeEventListener('pointerdown', onDown);
+          canvas.removeEventListener('pointerup', onUp);
+          document.removeEventListener('keydown', onKey);
+          resolve(picked);
+        };
+
+        const onDown = (event: PointerEvent) => {
+          downAt = { x: event.clientX, y: event.clientY };
+        };
+
+        // A drag is still an orbit; only a near-stationary click picks focus.
+        const onUp = (event: PointerEvent) => {
+          if (!downAt || Math.hypot(event.clientX - downAt.x, event.clientY - downAt.y) > 4) {
+            return;
+          }
+
+          const point = getTerrainPointAt(event.clientX, event.clientY);
+
+          if (point) {
+            pickedFocusPoint = point;
+            draw();
+          }
+
+          finish(point !== undefined);
+        };
+
+        const onKey = (event: KeyboardEvent) => {
+          if (event.key === 'Escape') {
+            finish(false);
+          }
+        };
+
+        canvas.addEventListener('pointerdown', onDown);
+        canvas.addEventListener('pointerup', onUp);
+        document.addEventListener('keydown', onKey);
+      });
+    },
+    setRotationSpeed(value: number) {
+      controls.autoRotateSpeed = value;
+    },
+    applyViewPreset(preset: TerrainViewPreset) {
+      const { polarDegrees, azimuthDegrees } = terrainViewPresets[preset];
+
+      animateCameraDirection(
+        new THREE.Vector3().setFromSphericalCoords(
+          1,
+          THREE.MathUtils.degToRad(polarDegrees),
+          THREE.MathUtils.degToRad(azimuthDegrees),
+        ),
+      );
     },
     requestTransition() {
       isTransitionArmed = true;

@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import type { StudioController, InspectorSection } from './controller';
+import { threeDOnlySections, type StudioController, type InspectorSection } from './controller';
+import { CameraPanel, OrbitPanel } from './camera-panel';
 import {
   ColourPanel,
   ContoursPanel,
@@ -10,12 +11,12 @@ import {
   TerrainPanel,
   type PanelProps,
 } from './panels';
-import { Button, Group, Hint, NumberField, Range, Select, Toggle } from './fields';
+import { Button, Group, Hint, NumberField, Range, Select } from './fields';
 import { ExportPanel } from './export-panel';
 import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
 
-const sections: InspectorSection[] = ['Terrain', 'Contours', 'Colour', 'Scene', 'Model'];
+const sections: InspectorSection[] = ['Terrain', 'Contours', 'Colour', 'Scene', 'Camera', 'Model'];
 
 function Surface({
   title,
@@ -317,7 +318,9 @@ function Studio({
       >
         <nav className="inspector-sections" aria-label="Editing section">
           {sections
-            .filter((section) => section !== 'Model' || state.workspace.view === '3d')
+            .filter(
+              (section) => !threeDOnlySections.includes(section) || state.workspace.view === '3d',
+            )
             .map((section) => (
               <button
                 key={section}
@@ -338,13 +341,17 @@ function Studio({
               key={section}
               id={`inspector-${section.toLowerCase()}`}
               aria-label={`${section} settings`}
-              hidden={active !== section || (section === 'Model' && state.workspace.view !== '3d')}
+              hidden={
+                active !== section ||
+                (threeDOnlySections.includes(section) && state.workspace.view !== '3d')
+              }
             >
               <h2>{section}</h2>
               {section === 'Terrain' && <TerrainPanel {...props} />}
               {section === 'Contours' && <ContoursPanel {...props} />}
               {section === 'Colour' && <ColourPanel {...props} />}
               {section === 'Scene' && <ScenePanel {...props} />}
+              {section === 'Camera' && <CameraPanel {...props} />}
               {section === 'Model' && <ModelPanel {...props} cropPreview={cropPreview} />}
             </section>
           ))}
@@ -380,12 +387,12 @@ function Studio({
               type="button"
               data-popover-trigger
               aria-haspopup="dialog"
-              aria-expanded={state.workspace.popover === 'Camera'}
+              aria-expanded={state.workspace.popover === 'Orbit'}
               onClick={() => {
-                c.workspace({ popover: state.workspace.popover === 'Camera' ? null : 'Camera' });
+                c.workspace({ popover: state.workspace.popover === 'Orbit' ? null : 'Orbit' });
               }}
             >
-              Camera
+              Orbit
             </button>
           )}
         </div>
@@ -421,23 +428,7 @@ function Studio({
           {state.workspace.popover === 'Overlays' ? (
             <OverlaysPanel {...props} />
           ) : (
-            <Group title="Camera">
-              <Toggle
-                label="Auto-rotate"
-                value={state.scene.rotating}
-                onChange={(value) => {
-                  c.scene({ rotating: value });
-                }}
-              />
-              <Button
-                onClick={() => {
-                  c.resetCamera();
-                }}
-              >
-                Reset camera
-              </Button>
-              <Hint>Drag to orbit · scroll or pinch to zoom · right-drag to pan.</Hint>
-            </Group>
+            <OrbitPanel {...props} />
           )}
         </Surface>
       )}

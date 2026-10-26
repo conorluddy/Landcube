@@ -27,22 +27,54 @@ test('view selection activates 3D directly and restores independent inspector se
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await expect(page.locator('canvas.terrain-3d')).toBeVisible();
   await section(page, 'Scene');
-  await page.getByLabel('Light source').selectOption('moon');
+  await page.getByLabel('Time of day').fill('2');
+  await expect(page.locator('output[for="terrain-light-time"]')).toHaveText('02:00 · Night');
   await page.getByRole('switch', { name: 'Solid base', exact: true }).uncheck();
   await page.getByRole('button', { name: '2D', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Colour settings' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Model', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Scene settings' })).toBeVisible();
-  await expect(page.getByLabel('Light source')).toHaveValue('moon');
+  await expect(page.getByLabel('Time of day')).toHaveValue('2');
   await expect(page.getByRole('switch', { name: 'Solid base', exact: true })).not.toBeChecked();
   await page.getByRole('button', { name: 'Collapse controls' }).click();
-  await page.getByRole('button', { name: 'Camera', exact: true }).click();
+  await page.getByRole('button', { name: 'Orbit', exact: true }).click();
   await page.getByRole('switch', { name: 'Auto-rotate' }).check();
+  await page.getByRole('button', { name: 'Clockwise', exact: true }).click();
+  await page.getByLabel('Rotation speed').fill('60');
+  await expect(page.locator('output[for="orbit-rotation-seconds"]')).toHaveText('60 s per turn');
   await page.getByRole('switch', { name: 'Auto-rotate' }).uncheck();
+  await expect(page.getByLabel('Rotation speed')).toBeDisabled();
+  await page.getByRole('button', { name: 'Isometric', exact: true }).click();
   await page.getByRole('button', { name: 'Reset camera' }).click();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Camera', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Orbit', exact: true })).toBeFocused();
+  await section(page, 'Camera');
+  await expect(page.getByRole('button', { name: 'Orthographic', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.getByRole('button', { name: 'Perspective', exact: true }).click();
+  await page.getByLabel('Focal length').fill('5');
+  await expect(page.locator('output[for="camera-focal-length"]')).toHaveText('135 mm');
+  await page.getByRole('button', { name: 'Orthographic', exact: true }).click();
+  await expect(page.getByLabel('Focal length')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Depth of field', exact: true }).click();
+  await expect(page.getByText('Depth of field needs perspective projection.')).toBeVisible();
+  await page.getByRole('button', { name: 'Perspective', exact: true }).click();
+  await page.getByLabel('Aperture').fill('0');
+  await expect(page.locator('output[for="camera-aperture"]')).toHaveText('f/1.4');
+  await page.getByRole('button', { name: 'Tilt-shift', exact: true }).click();
+  await page.getByLabel('Band width').fill('40');
+  await expect(page.locator('output[for="camera-tiltShiftWidth"]')).toHaveText('40%');
+  await page.getByLabel('Exposure').fill('0.5');
+  await expect(page.locator('output[for="camera-exposure"]')).toHaveText('+0.5 EV');
+  await page.getByRole('button', { name: 'Reset camera settings' }).click();
+  await expect(page.locator('output[for="camera-focal-length"]')).toHaveText('35 mm');
+  await expect(page.getByRole('button', { name: 'Off', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await section(page, 'Model');
   await expect(page.getByLabel('Width (X, mm)')).toHaveValue('150');
   await page.screenshot({ path: test.info().outputPath('studio-desktop-model.png') });
@@ -174,6 +206,15 @@ test('real location controls share contour intervals and export model attributio
   const stl = await download(page, 'Download STL');
 
   expect(stl.bytes.readUInt32LE(80)).toBeGreaterThan(0);
+  const canvasWidth = await page
+    .locator('canvas.terrain-3d')
+    .evaluate((canvas) => canvas.clientWidth);
+  const still = await download(page, 'Download 3D still');
+
+  expect(still.filename).toContain('3d-2x.png');
+  // PNG IHDR stores the pixel width big-endian at byte 16.
+  expect(still.bytes.readUInt32BE(16)).toBe(canvasWidth * 2);
+  await expect(page.getByRole('status').filter({ hasText: '3D still' })).toBeVisible();
 });
 
 test('cartographic floor styles repaint the floor without changing the STL', async ({ page }) => {

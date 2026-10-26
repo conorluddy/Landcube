@@ -6,6 +6,7 @@ import type { HeightField } from '../types/terrain';
 import type { SeaLevelGeometry } from '../sea-level';
 import type { TerrainTerraceLevels } from '../terrain-terraces';
 import type { FloorPlace } from '../floor-geo';
+import { getAutoRotateSpeed, type TerrainViewPreset } from '../terrain-camera';
 
 interface StudioTerrainView {
   isActive: () => boolean;
@@ -13,6 +14,9 @@ interface StudioTerrainView {
   sceneChanged: (previous: SceneSettings) => void;
   modelChanged: () => void;
   resetCamera: () => void;
+  applyViewPreset: (preset: TerrainViewPreset) => void;
+  pickFocus: () => Promise<boolean>;
+  captureStill: (scale: number) => HTMLCanvasElement;
   /** Arms a morph for the next 3D rebuild; the 2D view and an inactive 3D view always cut. */
   requestTransition: () => void;
   getStl: () => ArrayBuffer;
@@ -104,8 +108,16 @@ export function createStudioTerrainView(
       view.setContours(scene.contours);
     }
 
+    if (differs('rotationSeconds') || differs('rotationDirection')) {
+      view.setRotationSpeed(getAutoRotateSpeed(scene.rotationSeconds, scene.rotationDirection));
+    }
+
     if (differs('rotating')) {
       view.setRotating(scene.rotating);
+    }
+
+    if (differs('camera')) {
+      view.setCamera(scene.camera);
     }
 
     if (differs('lighting')) {
@@ -154,6 +166,15 @@ export function createStudioTerrainView(
       changed();
     },
     resetCamera: () => view?.reset(),
+    applyViewPreset: (preset) => view?.applyViewPreset(preset),
+    pickFocus: () => view?.pickFocus() ?? Promise.resolve(false),
+    captureStill(scale) {
+      if (!view || !active) {
+        throw new Error('Select the 3D view before downloading a 3D still.');
+      }
+
+      return view.captureStill(scale);
+    },
     requestTransition() {
       if (active) {
         view?.requestTransition();
