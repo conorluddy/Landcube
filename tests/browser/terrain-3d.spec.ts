@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { PNG } from 'pngjs';
@@ -892,9 +892,7 @@ test('terraced shape exports real shelves and risers, retains contour treatment 
   expect(errors).toEqual([]);
 });
 
-test('elevation gradients edit and retain stops, render hard and soft bands, and preserve STL', async ({
-  page,
-}) => {
+async function openElevationGradient(page: Page, enabled = true): Promise<string[]> {
   const errors: string[] = [];
 
   page.on('pageerror', (error) => errors.push(error.message));
@@ -908,20 +906,30 @@ test('elevation gradients edit and retain stops, render hard and soft bands, and
   await page.getByRole('switch', { name: 'Show raised contours', exact: true }).check();
   await page.getByRole('switch', { name: 'Contour lines', exact: true }).uncheck();
 
-  const download = async () => {
-    const pending = page.waitForEvent('download');
+  if (enabled) {
+    await page.getByRole('switch', { name: 'Color by elevation', exact: true }).check();
+  }
 
-    await page.getByRole('button', { name: 'Download STL', exact: true }).click();
-    const path = await (await pending).path();
+  return errors;
+}
 
-    if (!path) {
-      throw new Error('Missing STL download.');
-    }
+async function downloadGradientModel(page: Page): Promise<Buffer> {
+  const pending = page.waitForEvent('download');
 
-    return readFile(path);
-  };
+  await page.getByRole('button', { name: 'Download STL', exact: true }).click();
+  const path = await (await pending).path();
 
-  const original = await download();
+  if (!path) {
+    throw new Error('Missing STL download.');
+  }
+
+  return readFile(path);
+}
+
+test('elevation gradient presets render hard and soft bands and restore material colors', async ({
+  page,
+}) => {
+  const errors = await openElevationGradient(page, false);
 
   await expect(
     page.getByRole('switch', { name: 'Color by elevation', exact: true }),
@@ -959,7 +967,15 @@ test('elevation gradients edit and retain stops, render hard and soft bands, and
   await page.getByRole('button', { name: 'Collapse controls' }).click();
   expect((await page.screenshot()).equals(baseline)).toBe(true);
   await page.getByRole('button', { name: 'Expand controls' }).click();
-  await page.getByRole('switch', { name: 'Color by elevation', exact: true }).check();
+  expect(errors).toEqual([]);
+});
+
+test('elevation gradient stop editing preserves STL and retains custom choices', async ({
+  page,
+}) => {
+  const errors = await openElevationGradient(page);
+  const original = await downloadGradientModel(page);
+
   await page.getByRole('combobox', { name: 'Transitions', exact: true }).selectOption('soft');
   await page.getByLabel('Stop 2 color', { exact: true }).fill('#c46b35');
   await expect(page.getByRole('combobox', { name: 'Gradient preset', exact: true })).toHaveValue(
@@ -977,7 +993,21 @@ test('elevation gradients edit and retain stops, render hard and soft bands, and
   await expect(page.getByRole('button', { name: 'Add color stop', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Reverse', exact: true }).click();
   await expect(page.getByLabel('Stop 1 color', { exact: true })).toHaveValue('#f5f3ec');
-  expect((await download()).equals(original)).toBe(true);
+  expect((await downloadGradientModel(page)).equals(original)).toBe(true);
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).uncheck();
+  await page.getByRole('switch', { name: 'Show raised contours', exact: true }).check();
+  await expect(page.getByRole('combobox', { name: 'Gradient preset', exact: true })).toHaveValue(
+    'custom',
+  );
+  await expect(page.getByLabel('Stop 1 color', { exact: true })).toHaveValue('#f5f3ec');
+  expect(errors).toEqual([]);
+});
+
+test('elevation gradients compose with terraced circular crops, finishes and engraved contours', async ({
+  page,
+}) => {
+  const errors = await openElevationGradient(page);
+
   await page.getByRole('combobox', { name: 'Terrain shape', exact: true }).selectOption('terraced');
   await page
     .getByRole('combobox', { name: 'Gradient preset', exact: true })
@@ -1004,7 +1034,14 @@ test('elevation gradients edit and retain stops, render hard and soft bands, and
   await expect(page.getByRole('combobox', { name: 'Transitions', exact: true })).toHaveValue(
     'soft',
   );
+  expect(errors).toEqual([]);
+});
+
+test('elevation gradient controls fit a portrait mobile viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  const errors = await openElevationGradient(page);
+
+  await page.getByRole('combobox', { name: 'Gradient preset', exact: true }).selectOption('ember');
   await page.getByLabel('Stop 1 color', { exact: true }).scrollIntoViewIfNeeded();
   expect(
     await page
