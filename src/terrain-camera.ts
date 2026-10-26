@@ -1,4 +1,7 @@
 export type TerrainProjection = 'perspective' | 'orthographic';
+export type TerrainViewPreset = 'plan' | 'isometric' | 'oblique' | 'hero';
+/** How the terrain appears to turn on screen, like a turntable seen from above. */
+export type TurntableDirection = 'counterclockwise' | 'clockwise';
 
 export interface TerrainCameraSettings {
   projection: TerrainProjection;
@@ -17,6 +20,37 @@ export const terrainProjections: readonly { value: TerrainProjection; label: str
 ];
 
 export const terrainFocalLengthStopsMm = [14, 24, 35, 50, 85, 135, 200, 300] as const;
+
+/** Polar angle from straight down, azimuth clockwise from the south-facing home view. */
+export const terrainViewPresets: Readonly<
+  Record<
+    TerrainViewPreset,
+    { label: string; polarDegrees: number; azimuthDegrees: number; projection?: TerrainProjection }
+  >
+> = {
+  plan: { label: 'Plan', polarDegrees: 0.05, azimuthDegrees: 0 },
+  // True isometric: equal foreshortening on all three axes.
+  isometric: {
+    label: 'Isometric',
+    polarDegrees: 54.74,
+    azimuthDegrees: 45,
+    projection: 'orthographic',
+  },
+  oblique: { label: 'Oblique', polarDegrees: 50, azimuthDegrees: 0 },
+  hero: { label: 'Hero', polarDegrees: 78, azimuthDegrees: 30 },
+};
+
+export const turntableDirections: readonly {
+  value: TurntableDirection;
+  label: string;
+  description: string;
+}[] = [
+  { value: 'counterclockwise', label: '↺', description: 'Counterclockwise' },
+  { value: 'clockwise', label: '↻', description: 'Clockwise' },
+];
+
+/** The original OrbitControls default: speed 2, one revolution every 30 seconds. */
+export const defaultRotationSeconds = 30;
 
 /** Orbit distances were tuned for the original fixed 40° vertical field of view. */
 export const baseTerrainFovDegrees = 40;
@@ -47,6 +81,16 @@ export function getOrthographicHalfHeight(distance: number, fovDegrees: number):
 /** Inverse of the orthographic half-height: the perspective distance with the same framing. */
 export function getDistanceForHalfHeight(halfHeight: number, fovDegrees: number): number {
   return halfHeight / getHalfFovTangent(fovDegrees);
+}
+
+/** OrbitControls auto-rotate speed; positive orbits the camera clockwise, turning the terrain counterclockwise. */
+export function getAutoRotateSpeed(
+  secondsPerRevolution: number,
+  direction: TurntableDirection,
+): number {
+  const speed = 60 / secondsPerRevolution;
+
+  return direction === 'counterclockwise' ? speed : -speed;
 }
 
 /** Values between stops show on their nearest stop. */

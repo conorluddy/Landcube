@@ -6,6 +6,7 @@ import type { HeightField } from '../types/terrain';
 import type { SeaLevelGeometry } from '../sea-level';
 import type { TerrainTerraceLevels } from '../terrain-terraces';
 import type { FloorPlace } from '../floor-geo';
+import { getAutoRotateSpeed, type TerrainViewPreset } from '../terrain-camera';
 
 interface StudioTerrainView {
   isActive: () => boolean;
@@ -13,6 +14,7 @@ interface StudioTerrainView {
   sceneChanged: (previous: SceneSettings) => void;
   modelChanged: () => void;
   resetCamera: () => void;
+  applyViewPreset: (preset: TerrainViewPreset) => void;
   getStl: () => ArrayBuffer;
   update: (
     contours: Contour[],
@@ -102,6 +104,10 @@ export function createStudioTerrainView(
       view.setContours(scene.contours);
     }
 
+    if (differs('rotationSeconds') || differs('rotationDirection')) {
+      view.setRotationSpeed(getAutoRotateSpeed(scene.rotationSeconds, scene.rotationDirection));
+    }
+
     if (differs('rotating')) {
       view.setRotating(scene.rotating);
     }
@@ -156,6 +162,7 @@ export function createStudioTerrainView(
       changed();
     },
     resetCamera: () => view?.reset(),
+    applyViewPreset: (preset) => view?.applyViewPreset(preset),
     getStl() {
       if (!view || !active) {
         throw new Error('Select the 3D view before downloading STL.');

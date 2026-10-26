@@ -91,7 +91,7 @@ export function Segmented<T extends string>({
 }: {
   label: string;
   value: T;
-  options: readonly { value: T; label: string }[];
+  options: readonly { value: T; label: string; description?: string }[];
   onChange: (value: T) => void;
 }): ReactNode {
   return (
@@ -103,6 +103,8 @@ export function Segmented<T extends string>({
             key={option.value}
             type="button"
             aria-pressed={option.value === value}
+            aria-label={option.description}
+            title={option.description}
             onClick={() => {
               onChange(option.value);
             }}

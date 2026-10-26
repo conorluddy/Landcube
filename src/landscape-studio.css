@@ -128,6 +128,10 @@ h2 {
   min-width: 40px;
   padding: 5px 10px;
 }
+.view-presets {
+  flex-wrap: wrap;
+  margin: 0 0 16px;
+}
 .segmented-row {
   display: grid;
   gap: 8px;

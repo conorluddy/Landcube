@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   baseTerrainFovDegrees,
+  defaultRotationSeconds,
   defaultTerrainCameraSettings,
+  getAutoRotateSpeed,
   getCompensatedDistance,
   getDistanceForHalfHeight,
   getNearestStopIndex,
@@ -48,4 +50,9 @@ void test('focal lengths between stops show on the nearest stop', () => {
   assert.equal(getNearestStopIndex(terrainFocalLengthStopsMm, 35), 2);
   assert.equal(getNearestStopIndex(terrainFocalLengthStopsMm, 60), 3);
   assert.equal(getNearestStopIndex(terrainFocalLengthStopsMm, 1000), 7);
+});
+
+void test('turntable speed matches the original auto-rotate at 30 seconds per revolution', () => {
+  assert.equal(getAutoRotateSpeed(defaultRotationSeconds, 'counterclockwise'), 2);
+  assert.equal(getAutoRotateSpeed(120, 'clockwise'), -0.5);
 });

@@ -13,7 +13,14 @@ import {
   getSuggestedTerrainLightDirection,
   type TerrainLightingSettings,
 } from '../terrain-lighting';
-import { defaultTerrainCameraSettings, type TerrainCameraSettings } from '../terrain-camera';
+import {
+  defaultRotationSeconds,
+  defaultTerrainCameraSettings,
+  terrainViewPresets,
+  type TerrainCameraSettings,
+  type TerrainViewPreset,
+  type TurntableDirection,
+} from '../terrain-camera';
 import { terrainMaterialPresets, type LandFinish, type WaterFinish } from '../terrain-materials';
 import {
   copyElevationGradient,
@@ -60,6 +67,8 @@ export interface SceneSettings {
   customLightDirection: boolean;
   camera: TerrainCameraSettings;
   rotating: boolean;
+  rotationSeconds: number;
+  rotationDirection: TurntableDirection;
 }
 export interface TerrainSourceState {
   selected: 'generated' | 'real';
@@ -100,6 +109,7 @@ export interface StudioEffects {
   sceneChanged(previous: SceneSettings): void;
   modelChanged(): void;
   resetCamera(): void;
+  applyViewPreset(preset: TerrainViewPreset): void;
   downloadStl(): void;
 }
 
@@ -132,6 +142,7 @@ export interface StudioController {
   resetLighting: () => void;
   camera: (patch: Partial<TerrainCameraSettings>) => void;
   resetCameraSettings: () => void;
+  applyViewPreset: (preset: TerrainViewPreset) => void;
   model: (patch: Partial<StudioState['model']>) => boolean;
   dimensions: (patch: Partial<TerrainModelSettings>) => boolean;
   metrics: (height: number, layerHeight?: number) => void;
@@ -196,6 +207,8 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       customLightDirection: false,
       camera: { ...defaultTerrainCameraSettings },
       rotating: false,
+      rotationSeconds: defaultRotationSeconds,
+      rotationDirection: 'counterclockwise',
     },
     model: {
       dimensions: { ...defaultTerrainModelSettings },
@@ -402,6 +415,15 @@ export function createStudioController(actions: DesignControlActions): StudioCon
     },
     resetCameraSettings() {
       controller.scene({ camera: { ...defaultTerrainCameraSettings } });
+    },
+    applyViewPreset(preset: TerrainViewPreset) {
+      const { projection } = terrainViewPresets[preset];
+
+      if (projection) {
+        controller.camera({ projection });
+      }
+
+      effects?.applyViewPreset(preset);
     },
     model(patch: Partial<StudioState['model']>) {
       const next = { ...state.model, ...patch };

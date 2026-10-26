@@ -39,11 +39,21 @@ test('view selection activates 3D directly and restores independent inspector se
   await page.getByRole('button', { name: 'Collapse controls' }).click();
   await page.getByRole('button', { name: 'Orbit', exact: true }).click();
   await page.getByRole('switch', { name: 'Auto-rotate' }).check();
+  await page.getByRole('button', { name: 'Clockwise', exact: true }).click();
+  await page.getByLabel('Rotation speed').fill('60');
+  await expect(page.locator('output[for="orbit-rotation-seconds"]')).toHaveText('60 s per turn');
   await page.getByRole('switch', { name: 'Auto-rotate' }).uncheck();
+  await expect(page.getByLabel('Rotation speed')).toBeDisabled();
+  await page.getByRole('button', { name: 'Isometric', exact: true }).click();
   await page.getByRole('button', { name: 'Reset camera' }).click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Orbit', exact: true })).toBeFocused();
   await section(page, 'Camera');
+  await expect(page.getByRole('button', { name: 'Orthographic', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.getByRole('button', { name: 'Perspective', exact: true }).click();
   await page.getByLabel('Focal length').fill('5');
   await expect(page.locator('output[for="camera-focal-length"]')).toHaveText('135 mm');
   await page.getByRole('button', { name: 'Orthographic', exact: true }).click();

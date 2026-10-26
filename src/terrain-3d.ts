@@ -28,7 +28,9 @@ import {
   getDistanceForHalfHeight,
   getOrthographicHalfHeight,
   getVerticalFovDegrees,
+  terrainViewPresets,
   type TerrainCameraSettings,
+  type TerrainViewPreset,
 } from './terrain-camera';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
@@ -87,6 +89,8 @@ export interface Terrain3d {
   setContourEngraving(value: ContourEngravingSettings): void;
   setSurfaceColor(value: string | undefined): void;
   setRotating(value: boolean): void;
+  setRotationSpeed(value: number): void;
+  applyViewPreset(preset: TerrainViewPreset): void;
   setLighting(settings: Readonly<TerrainLightingSettings>): void;
   setCamera(settings: Readonly<TerrainCameraSettings>): void;
   reset(): void;
@@ -399,6 +403,69 @@ export function createTerrain3d(
     placeCamera(direction, distance);
     draw();
   };
+
+  let viewAnimationFrame = 0;
+
+  /** Eases the camera to a new direction around the target, keeping the framing distance. */
+  const animateCameraDirection = (direction: THREE.Vector3) => {
+    cancelAnimationFrame(viewAnimationFrame);
+    const distance = getViewDistance();
+    const from = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+    const to = new THREE.Spherical().setFromVector3(direction);
+    const thetaChange =
+      THREE.MathUtils.euclideanModulo(to.theta - from.theta + Math.PI, Math.PI * 2) - Math.PI;
+    const durationMs = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 400;
+    const startedAt = performance.now();
+
+    const step = () => {
+      const progress =
+        durationMs === 0 ? 1 : Math.min(1, (performance.now() - startedAt) / durationMs);
+      const eased = 1 - (1 - progress) ** 3;
+      const current = new THREE.Spherical(
+        1,
+        THREE.MathUtils.lerp(from.phi, to.phi, eased),
+        from.theta + thetaChange * eased,
+      );
+
+      placeCamera(new THREE.Vector3().setFromSpherical(current), distance);
+      draw();
+
+      if (progress < 1) {
+        viewAnimationFrame = requestAnimationFrame(step);
+      }
+    };
+
+    step();
+  };
+
+  const raycaster = new THREE.Raycaster();
+
+  /** Double-click re-centres the orbit on a terrain point without changing the viewing angle. */
+  renderer.domElement.addEventListener('dblclick', (event) => {
+    const bounds = renderer.domElement.getBoundingClientRect();
+
+    raycaster.setFromCamera(
+      new THREE.Vector2(
+        ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+        -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
+      ),
+      camera,
+    );
+    const point = raycaster
+      .intersectObjects([surface, base], false)
+      .find((hit) => hit.object.visible)?.point;
+
+    if (!point) {
+      return;
+    }
+
+    const offset = camera.position.clone().sub(controls.target);
+
+    controls.target.copy(point);
+    camera.position.copy(point).add(offset);
+    controls.update();
+    draw();
+  });
 
   const reset = () => {
     const home = new THREE.Vector3(0, 2.1, 2.5);
@@ -832,6 +899,20 @@ export function createTerrain3d(
       draw();
     },
     setCamera: setCameraSettings,
+    setRotationSpeed(value: number) {
+      controls.autoRotateSpeed = value;
+    },
+    applyViewPreset(preset: TerrainViewPreset) {
+      const { polarDegrees, azimuthDegrees } = terrainViewPresets[preset];
+
+      animateCameraDirection(
+        new THREE.Vector3().setFromSphericalCoords(
+          1,
+          THREE.MathUtils.degToRad(polarDegrees),
+          THREE.MathUtils.degToRad(azimuthDegrees),
+        ),
+      );
+    },
     setRotating(value: boolean) {
       rotating = value;
       controls.autoRotate = value;

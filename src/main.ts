@@ -139,6 +139,7 @@ controls.connect({
   sceneChanged: terrain3d.sceneChanged,
   modelChanged: terrain3d.modelChanged,
   resetCamera: terrain3d.resetCamera,
+  applyViewPreset: terrain3d.applyViewPreset,
   downloadStl: () => {
     const model = controls.getSnapshot().model.dimensions;
 

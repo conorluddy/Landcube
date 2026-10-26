@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNod
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { threeDOnlySections, type StudioController, type InspectorSection } from './controller';
-import { CameraPanel } from './camera-panel';
+import { CameraPanel, OrbitPanel } from './camera-panel';
 import {
   ColourPanel,
   ContoursPanel,
@@ -11,7 +11,7 @@ import {
   TerrainPanel,
   type PanelProps,
 } from './panels';
-import { Button, Group, Hint, NumberField, Range, Select, Toggle } from './fields';
+import { Button, Group, Hint, NumberField, Range, Select } from './fields';
 import { ExportPanel } from './export-panel';
 import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
@@ -428,23 +428,7 @@ function Studio({
           {state.workspace.popover === 'Overlays' ? (
             <OverlaysPanel {...props} />
           ) : (
-            <Group title="Orbit">
-              <Toggle
-                label="Auto-rotate"
-                value={state.scene.rotating}
-                onChange={(value) => {
-                  c.scene({ rotating: value });
-                }}
-              />
-              <Button
-                onClick={() => {
-                  c.resetCamera();
-                }}
-              >
-                Reset camera
-              </Button>
-              <Hint>Drag to orbit · scroll or pinch to zoom · right-drag to pan.</Hint>
-            </Group>
+            <OrbitPanel {...props} />
           )}
         </Surface>
       )}

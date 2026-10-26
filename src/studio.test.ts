@@ -21,6 +21,7 @@ function setup() {
       modelChanges++;
     },
     resetCamera: () => undefined,
+    applyViewPreset: () => undefined,
     downloadStl: () => undefined,
   };
   const controller = createStudioController({
