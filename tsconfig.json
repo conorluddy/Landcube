@@ -10,7 +10,8 @@
     "skipLibCheck": true,
     "types": ["node"],
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    "jsx": "react-jsx"
   },
   "include": ["src", "tests", "playwright.config.ts", "vite.config.ts"]
 }

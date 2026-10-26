@@ -1,14 +1,4 @@
-import type { DesignSettings, ValidatedDesignSettings } from './design';
-import type { OperationError } from './operations';
-
-export type ExportState =
-  { phase: 'idle' } | { phase: 'generating' } | { phase: 'failed'; error: OperationError };
-
-export interface ExportActions {
-  getSettings: () => ValidatedDesignSettings;
-  updateSettings: (settings: DesignSettings) => boolean;
-  notify: (message: string) => void;
-}
+import type { ValidatedDesignSettings } from './design';
 
 export interface ExportFile {
   blob: Blob;

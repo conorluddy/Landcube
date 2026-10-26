@@ -89,7 +89,9 @@ export function createTerrain3d(
     'aria-label',
     'Interactive 3D terrain. Drag to orbit; scroll to zoom.',
   );
-  document.body.prepend(renderer.domElement);
+  const viewport = document.querySelector('#studio-viewport') ?? document.body;
+
+  viewport.append(renderer.domElement);
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 100);
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -305,8 +307,11 @@ export function createTerrain3d(
   controls.addEventListener('change', draw);
 
   const resize = () => {
-    renderer.setSize(innerWidth, innerHeight);
-    camera.aspect = innerWidth / innerHeight;
+    const width = Math.max(1, viewport.clientWidth);
+    const height = Math.max(1, viewport.clientHeight);
+
+    renderer.setSize(width, height);
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
     draw();
   };
@@ -345,7 +350,7 @@ export function createTerrain3d(
     updateLoop();
     draw();
   });
-  window.addEventListener('resize', resize);
+  new ResizeObserver(resize).observe(viewport);
   resize();
   reset();
 

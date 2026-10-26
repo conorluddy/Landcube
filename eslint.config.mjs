@@ -21,7 +21,7 @@ export default defineConfig(
     languageOptions: { globals: globals.node },
   },
   {
-    files: ['**/*.ts'],
+    files: ['**/*.{ts,tsx}'],
     extends: [
       javascript.configs.recommended,
       typescript.configs.strictTypeChecked,
@@ -70,7 +70,7 @@ export default defineConfig(
   },
   prettier,
   {
-    files: ['**/*.{ts,mjs}'],
+    files: ['**/*.{ts,tsx,mjs}'],
     plugins: { '@stylistic': stylistic },
     rules: {
       curly: ['error', 'all'],

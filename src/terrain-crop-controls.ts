@@ -16,8 +16,10 @@ export function mountTerrainCropControls(
   container: HTMLElement,
   getModel: () => TerrainModelSettings,
   changed: (shape: TerrainCropShape) => void,
+  getSelection: () => TerrainCropSettings = () => defaultTerrainCrop,
 ): {
   getCrop(): TerrainCropSettings;
+  dispose(): void;
   update(
     field: HeightField,
     width: number,
@@ -49,7 +51,7 @@ export function mountTerrainCropControls(
       4,
     );
   const handleElements = [...handlesGroup.querySelectorAll('circle')];
-  let crop: TerrainCropSettings = { ...defaultTerrainCrop };
+  let crop: TerrainCropSettings = { ...getSelection() };
   let shape: TerrainCropShape = 'rectangle';
   let width = 1;
   let height = 1;
@@ -255,14 +257,24 @@ export function mountTerrainCropControls(
     scheduleChange();
   });
 
-  new ResizeObserver(paintSelection).observe(svg);
+  const observer = new ResizeObserver(paintSelection);
+
+  observer.observe(svg);
 
   return {
     getCrop: () => ({ ...crop }),
+    dispose: () => {
+      observer.disconnect();
+
+      if (pendingFrame !== undefined) {
+        cancelAnimationFrame(pendingFrame);
+      }
+    },
     update(field, sourceWidth, sourceHeight, settings, contourLevels) {
       width = sourceWidth;
       height = sourceHeight;
       shape = getModel().cropShape ?? 'rectangle';
+      crop = { ...getSelection() };
       select.value = shape;
       svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
       const key = JSON.stringify([
