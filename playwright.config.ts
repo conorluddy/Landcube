@@ -7,7 +7,8 @@ export default defineConfig({
   workers: 1,
   timeout: 30_000,
   use: {
-    ...(process.env.CI === 'true' ? {} : { channel: 'chrome' }),
+    // GitHub's Ubuntu runners ship Chrome, so CI skips downloading a browser.
+    channel: 'chrome',
     headless: true,
     viewport: { width: 1280, height: 800 },
     trace: 'retain-on-failure',
