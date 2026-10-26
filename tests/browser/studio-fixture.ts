@@ -97,9 +97,7 @@ export async function loadLocation(page: Page): Promise<void> {
       headers: { 'access-control-allow-origin': '*' },
     }),
   );
-  await section(page, 'Terrain');
-  await page.getByLabel('Terrain source', { exact: true }).selectOption('real');
-  await page.getByRole('button', { name: 'Load terrain', exact: true }).click();
+  await page.getByRole('button', { name: 'Coordinates', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible();
 }
 

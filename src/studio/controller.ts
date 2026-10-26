@@ -131,6 +131,8 @@ export interface StudioController {
   metrics: (height: number, layerHeight?: number) => void;
   source: (patch: Partial<TerrainSourceState>) => void;
   useGenerated: () => void;
+  /** Switches to real terrain, opening its location controls and loading the selected place. */
+  useCoordinates: () => Promise<void>;
   loadTerrain: () => Promise<void>;
   interval: (value: 'auto' | number) => boolean;
   hatching: (value: boolean) => void;
@@ -208,6 +210,8 @@ export function createStudioController(actions: DesignControlActions): StudioCon
   };
   let effects: StudioEffects | undefined;
   let requestVersion = 0;
+  // Procedural mode parks the last real terrain so switching back is instant.
+  let parkedTerrain: RealTerrain | undefined;
   const listeners = new Set<() => void>();
 
   const publish = () => {
@@ -422,13 +426,39 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       publish();
     },
     useGenerated() {
+      if (state.source.selected === 'generated') {
+        return;
+      }
+
       requestVersion++;
+      parkedTerrain = state.source.terrain ?? parkedTerrain;
       controller.source({
         selected: 'generated',
         loading: false,
         status: 'Using generated terrain.',
       });
       applySource(undefined);
+    },
+    async useCoordinates() {
+      controller.selectSection('Terrain');
+
+      if (state.source.selected === 'real') {
+        return;
+      }
+
+      if (!parkedTerrain) {
+        controller.source({ selected: 'real' });
+        await controller.loadTerrain();
+
+        return;
+      }
+
+      applySource({
+        ...parkedTerrain,
+        contourInterval: state.source.interval,
+        seaLevelHatching: state.source.hatching,
+      });
+      controller.source({ selected: 'real', status: 'Real terrain restored.' });
     },
     async loadTerrain() {
       const version = ++requestVersion;

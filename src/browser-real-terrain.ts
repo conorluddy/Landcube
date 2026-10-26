@@ -3,6 +3,8 @@ import { loadRealTerrain as loadTerrainFromTiles } from './real-terrain';
 import type { DecodedTerrainTile, RealTerrain } from './real-terrain';
 
 const terrainTileSizePixels = 256;
+/** Terrarium tiles are immutable; bump the version only if the cached format changes. */
+const terrainTileCacheName = 'topogra-terrain-tiles-v1';
 
 /** Loads real terrain using browser image APIs while retaining shared sampling behaviour. */
 export async function loadBrowserRealTerrain(
@@ -24,7 +26,7 @@ export async function loadBrowserRealTerrain(
 
 /** Downloads and decodes a Terrarium tile through browser canvas APIs. */
 async function decodeBrowserTerrainTile(tileUrl: string): Promise<DecodedTerrainTile> {
-  const response = await downloadTerrainTile(tileUrl);
+  const response = await fetchCachedTerrainTile(tileUrl);
 
   const bitmap = await createImageBitmap(await response.blob());
 
@@ -48,5 +50,41 @@ async function decodeBrowserTerrainTile(tileUrl: string): Promise<DecodedTerrain
     };
   } finally {
     bitmap.close();
+  }
+}
+
+/** Serves tiles from Cache Storage when present, so revisited places load without the network. */
+async function fetchCachedTerrainTile(tileUrl: string): Promise<Response> {
+  const cache = await openTerrainTileCache();
+  const cached = await cache?.match(tileUrl);
+
+  if (cached) {
+    return cached;
+  }
+
+  const response = await downloadTerrainTile(tileUrl);
+
+  try {
+    await cache?.put(tileUrl, response.clone());
+  } catch (error) {
+    // A full cache only costs a re-download next time; the tile itself is fine.
+    console.warn(
+      JSON.stringify({ event: 'terrain_tile_cache_failed', tileUrl, error: String(error) }),
+    );
+  }
+
+  return response;
+}
+
+/** Undefined where Cache Storage is missing (insecure origins) or blocked (private browsing). */
+async function openTerrainTileCache(): Promise<Cache | undefined> {
+  if (!('caches' in globalThis)) {
+    return undefined;
+  }
+
+  try {
+    return await caches.open(terrainTileCacheName);
+  } catch {
+    return undefined;
   }
 }
