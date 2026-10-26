@@ -42,11 +42,8 @@ jobs:
       - name: Build static site
         run: npm run build
 
-      - name: Install Chromium for browser checks
-        run: npx playwright install --with-deps chromium
-
       - name: Verify browser journeys and GitHub Pages subpath
-        run: npx playwright test
+        run: npx playwright test --reporter=list
 
       - name: Package GitHub Pages site
         uses: actions/upload-pages-artifact@v4
