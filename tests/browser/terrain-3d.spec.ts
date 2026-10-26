@@ -67,9 +67,12 @@ test('view selection activates 3D directly and restores independent inspector se
   // A second pick supersedes the first instead of leaving its listeners behind.
   await page.getByRole('button', { name: 'Pick focus', exact: true }).click();
   await page.getByRole('button', { name: 'Pick focus', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Click the terrain' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('status').filter({ hasText: 'Focus unchanged.' })).toBeVisible();
   await expect(page.locator('canvas.terrain-3d')).toHaveCSS('cursor', 'auto');
+  // Escape cancels the pick only; the inspector stays open.
+  await expect(page.getByRole('region', { name: 'Camera settings' })).toBeVisible();
   await page.getByRole('button', { name: 'Tilt-shift', exact: true }).click();
   await page.getByLabel('Band width').fill('40');
   await expect(page.locator('output[for="camera-tiltShiftWidth"]')).toHaveText('40%');

@@ -62,7 +62,8 @@ import type { DesignSettings } from './types/design';
 
 export type WaterStyle = 'hatched' | 'solid' | 'off';
 
-// About 40 MP: 4× of a large desktop viewport stays within browser canvas memory limits.
+// Stills are capped at 40 MP to stay within browser canvas memory; on viewports above
+// 2.5 MP (e.g. 2560 × 1440) a 4× request renders smaller, and the saved toast reports the size.
 const maximumStillPixels = 40_000_000;
 
 /** An optional, session-only raised-contour preview of the shared landscape. */
@@ -1248,16 +1249,26 @@ export function createTerrain3d(
         postProcessing?.setSize(viewportWidth, viewportHeight, ratio);
       };
 
-      resizeTo(pixelRatio);
-      render();
-      frame.width = renderer.domElement.width;
-      frame.height = renderer.domElement.height;
-      // Copied in the same task as the render, so no preserved drawing buffer is needed.
-      context?.drawImage(renderer.domElement, 0, 0);
-      resizeTo(previousPixelRatio);
-      draw();
-
       if (!context) {
+        throw new Error('The browser could not allocate the 3D still. Try a smaller scale.');
+      }
+
+      try {
+        resizeTo(pixelRatio);
+        render();
+        frame.width = renderer.domElement.width;
+        frame.height = renderer.domElement.height;
+        // Copied in the same task as the render, so no preserved drawing buffer is needed.
+        context.drawImage(renderer.domElement, 0, 0);
+      } finally {
+        resizeTo(previousPixelRatio);
+        draw();
+      }
+
+      // The scene background is opaque, so a transparent centre means the copy silently failed.
+      const centre = context.getImageData(frame.width / 2, frame.height / 2, 1, 1).data;
+
+      if (centre[3] === 0) {
         throw new Error('The browser could not allocate the 3D still. Try a smaller scale.');
       }
 
