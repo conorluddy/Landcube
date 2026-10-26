@@ -199,6 +199,15 @@ void test('tray rejects mounts until they are supported', () => {
   assert.match(message, /mounts/);
 });
 
+void test('invalid model settings return an error instead of throwing', () => {
+  for (const widthMm of [Number.NaN, 0]) {
+    const model = { ...rectangleModel, widthMm };
+    const message = expectErrorMessage(createFrameAssembly(model, overallHeightMm, tray(model)));
+
+    assert.match(message, /width and length/);
+  }
+});
+
 void test('non-finite tray settings name the setting', () => {
   const message = expectErrorMessage(
     createFrameAssembly(

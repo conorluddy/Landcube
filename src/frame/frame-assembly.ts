@@ -8,6 +8,7 @@ import {
   trayWallAboveBaseMm,
 } from '../constants/frame';
 import { operationErrorCodes } from '../constants/operations';
+import { validateTerrainModelSettings } from '../terrain-model';
 import type { TerrainModelSettings } from '../terrain-model';
 import type {
   FrameAssembly,
@@ -35,6 +36,13 @@ export function createFrameAssembly(
   overallHeightMm: number,
   frame: FrameSettings,
 ): Result<FrameAssembly> {
+  // The model validator throws; the frame boundary reports the same rule as a Result.
+  try {
+    validateTerrainModelSettings(model);
+  } catch (error) {
+    return invalidSettings(error instanceof Error ? error.message : String(error));
+  }
+
   if (!Number.isFinite(overallHeightMm) || overallHeightMm <= 0) {
     return invalidSettings(
       `overallHeightMm must be a positive number of millimetres; got ${overallHeightMm}. Rebuild the model and retry.`,
