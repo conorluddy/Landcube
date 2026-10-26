@@ -27,14 +27,15 @@ test('view selection activates 3D directly and restores independent inspector se
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await expect(page.locator('canvas.terrain-3d')).toBeVisible();
   await section(page, 'Scene');
-  await page.getByLabel('Light source').selectOption('moon');
+  await page.getByLabel('Time of day').fill('2');
+  await expect(page.locator('output[for="terrain-light-time"]')).toHaveText('02:00 · Night');
   await page.getByRole('switch', { name: 'Solid base', exact: true }).uncheck();
   await page.getByRole('button', { name: '2D', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Colour settings' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Model', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Scene settings' })).toBeVisible();
-  await expect(page.getByLabel('Light source')).toHaveValue('moon');
+  await expect(page.getByLabel('Time of day')).toHaveValue('2');
   await expect(page.getByRole('switch', { name: 'Solid base', exact: true })).not.toBeChecked();
   await page.getByRole('button', { name: 'Collapse controls' }).click();
   await page.getByRole('button', { name: 'Orbit', exact: true }).click();
@@ -58,7 +59,9 @@ test('view selection activates 3D directly and restores independent inspector se
   await expect(page.locator('output[for="camera-focal-length"]')).toHaveText('135 mm');
   await page.getByRole('button', { name: 'Orthographic', exact: true }).click();
   await expect(page.getByLabel('Focal length')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Reset lens' }).click();
+  await page.getByLabel('Exposure').fill('0.5');
+  await expect(page.locator('output[for="camera-exposure"]')).toHaveText('+0.5 EV');
+  await page.getByRole('button', { name: 'Reset camera settings' }).click();
   await expect(page.locator('output[for="camera-focal-length"]')).toHaveText('35 mm');
   await section(page, 'Model');
   await expect(page.getByLabel('Width (X, mm)')).toHaveValue('150');

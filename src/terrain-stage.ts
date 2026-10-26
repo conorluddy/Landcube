@@ -11,6 +11,8 @@ export function createTerrainStage(): {
   update(width: number, length: number, background: string, circular: boolean): void;
   setVisible(value: boolean): void;
   setColor(value: string): void;
+  /** Multiplies floor and map colours, darkening the studio for night scenes. */
+  setTint(value: string): void;
   setCastShadows(value: boolean): void;
   setMapGrid(
     value: boolean,
@@ -21,6 +23,7 @@ export function createTerrainStage(): {
 } {
   const group = new THREE.Group();
   const shadowEnabled = { value: 1 };
+  const floorTint = { value: new THREE.Color(1, 1, 1) };
   const groundMaterial = new THREE.ShadowMaterial({
     color: defaultTerrainGroundColor,
     side: THREE.BackSide,
@@ -32,11 +35,15 @@ export function createTerrainStage(): {
   // Color and cast shadow share one depth surface, avoiding a nearly coplanar overlay.
   groundMaterial.onBeforeCompile = (shader) => {
     shader.uniforms.floorShadowEnabled = shadowEnabled;
+    shader.uniforms.floorTint = floorTint;
     shader.fragmentShader = shader.fragmentShader
-      .replace('uniform float opacity;', 'uniform float opacity; uniform float floorShadowEnabled;')
+      .replace(
+        'uniform float opacity;',
+        'uniform float opacity; uniform float floorShadowEnabled; uniform vec3 floorTint;',
+      )
       .replace(
         'gl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) );',
-        'gl_FragColor = vec4( color, 1.0 );',
+        'gl_FragColor = vec4( color * floorTint, 1.0 );',
       )
       .replace(
         '#include <colorspace_fragment>',
@@ -45,7 +52,7 @@ export function createTerrainStage(): {
       );
   };
 
-  groundMaterial.customProgramCacheKey = () => 'topogra-shadowed-studio-v1';
+  groundMaterial.customProgramCacheKey = () => 'topogra-shadowed-studio-v2';
 
   // An enclosing studio box keeps the floor, walls, and ceiling the same color.
   const ground = new THREE.Mesh(new THREE.BoxGeometry(400, 200, 400), groundMaterial);
@@ -143,6 +150,10 @@ export function createTerrainStage(): {
       groundMaterial.color.set(value);
       stageSize.background = value;
       updateGrid();
+    },
+    setTint(value) {
+      floorTint.value.set(value);
+      mapGrid.mesh.material.color.set(value);
     },
     setVisible(value) {
       group.visible = value;

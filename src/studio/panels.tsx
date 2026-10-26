@@ -26,7 +26,7 @@ import { createRandomPalette } from '../random-palette';
 import { resetDesignStyle } from '../design-settings';
 import { getRealContourInterval } from '../real-terrain-contours';
 import { landFinishes, terrainMaterialPresets, waterFinishes } from '../terrain-materials';
-import { terrainLightingControls } from '../terrain-lighting';
+import { formatTimeOfDay, terrainLightingControls } from '../terrain-lighting';
 import { floorStyles } from '../terrain-floor-styles';
 import {
   elevationGradientPresets,
@@ -741,12 +741,23 @@ export function ScenePanel({ controller: c, state: s }: PanelProps): ReactNode {
         </Hint>
       </Group>
       <Group title="Lighting">
-        <Select
-          label="Light source"
-          value={scene.lighting.mode}
-          options={['sun', 'moon', 'off']}
-          onChange={(value) => {
-            c.lighting({ mode: value });
+        <Range
+          id="terrain-light-time"
+          label="Time of day"
+          value={scene.lighting.timeOfDay}
+          min={0}
+          max={24}
+          step={0.25}
+          displayValue={formatTimeOfDay(scene.lighting.timeOfDay)}
+          onChange={(timeOfDay) => {
+            c.lighting({ timeOfDay });
+          }}
+        />
+        <Toggle
+          label="Flat light"
+          value={scene.lighting.flat}
+          onChange={(flat) => {
+            c.lighting({ flat });
           }}
         />
         {terrainLightingControls.map((control) => (
@@ -764,6 +775,18 @@ export function ScenePanel({ controller: c, state: s }: PanelProps): ReactNode {
             }}
           />
         ))}
+        <Range
+          id="terrain-light-haze"
+          label="Haze"
+          value={scene.lighting.haze * 100}
+          min={0}
+          max={100}
+          step={1}
+          suffix="%"
+          onChange={(value) => {
+            c.lighting({ haze: value / 100 });
+          }}
+        />
         <Button
           onClick={() => {
             c.resetLighting();
@@ -771,7 +794,10 @@ export function ScenePanel({ controller: c, state: s }: PanelProps): ReactNode {
         >
           Reset lighting
         </Button>
-        <Hint>Direction is clockwise from north. Locations suggest an artistic sunrise angle.</Hint>
+        <Hint>
+          Time of day sets sun height, colour and studio tint; night switches to moonlight.
+          Direction is clockwise from north. Locations suggest an artistic sunrise angle.
+        </Hint>
       </Group>
     </>
   );

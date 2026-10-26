@@ -19,7 +19,11 @@ import { createTerrainStage, defaultTerrainGroundColor } from './terrain-stage';
 import type { FloorPlace } from './floor-geo';
 import type { FloorStyle } from './terrain-floor-styles';
 import { getTerrainWaterColor } from './terrain-water';
-import { defaultTerrainLighting, type TerrainLightingSettings } from './terrain-lighting';
+import {
+  defaultTerrainLighting,
+  getTerrainAtmosphere,
+  type TerrainLightingSettings,
+} from './terrain-lighting';
 import { createTerrainLineBuffers } from './terrain-3d-lines';
 import {
   baseTerrainFovDegrees,
@@ -202,13 +206,15 @@ export function createTerrain3d(
   let showGround = true;
   const stage = createTerrainStage();
 
+  const backdropTint = new THREE.Color(1, 1, 1);
+
   const updateStageVisibility = () => {
     const enabled = showGround && base.visible;
 
     stage.setVisible(enabled);
     scene.background = new THREE.Color(
       enabled ? (customGroundColor ?? backgroundColor) : backgroundColor,
-    );
+    ).multiply(backdropTint);
   };
 
   scene.add(stage.group);
@@ -226,10 +232,15 @@ export function createTerrain3d(
   sunlight.shadow.bias = -0.0001;
   sunlight.shadow.radius = 3;
 
-  /** Positions the sun independently of the camera and terrain height. */
-  const applyLighting = (lighting: Readonly<TerrainLightingSettings>) => {
+  let lighting: Readonly<TerrainLightingSettings> = defaultTerrainLighting;
+  let exposureScale = 1;
+  let landscapeRadius = 1;
+
+  /** Positions the sun independently of the camera; time of day sets height, colour and studio tint. */
+  const applyLighting = () => {
+    const atmosphere = getTerrainAtmosphere(lighting.timeOfDay);
     const direction = THREE.MathUtils.degToRad(lighting.direction);
-    const elevation = THREE.MathUtils.degToRad(lighting.elevation);
+    const elevation = THREE.MathUtils.degToRad(atmosphere.sunElevation);
     const radius = 10;
 
     sunlight.position.set(
@@ -237,13 +248,39 @@ export function createTerrain3d(
       radius * Math.sin(elevation),
       -radius * Math.cos(elevation) * Math.cos(direction),
     );
-    sunlight.color.set(lighting.mode === 'moon' ? 0xa9c7ff : 0xffd09a);
-    sunlight.intensity = lighting.mode === 'off' ? 0 : lighting.intensity;
-    stage.setCastShadows(lighting.mode !== 'off' && lighting.intensity > 0);
-    fillLight.intensity = lighting.fill;
+    sunlight.color.set(atmosphere.sunColor);
+    sunlight.intensity = lighting.flat
+      ? 0
+      : lighting.intensity * atmosphere.sunScale * exposureScale;
+    stage.setCastShadows(!lighting.flat && lighting.intensity > 0);
+    fillLight.color.set(atmosphere.skyColor);
+    fillLight.groundColor.set(atmosphere.groundColor);
+    fillLight.intensity = lighting.fill * atmosphere.fillScale * exposureScale;
+    backdropTint.set(atmosphere.tint);
+    stage.setTint(atmosphere.tint);
+    updateStageVisibility();
   };
 
-  applyLighting(defaultTerrainLighting);
+  /** Haze is relative to the model, so it reads the same at any lens or zoom. */
+  const updateFog = () => {
+    if (lighting.haze <= 0) {
+      scene.fog = null;
+
+      return;
+    }
+
+    const fog = scene.fog instanceof THREE.Fog ? scene.fog : new THREE.Fog(0xffffff);
+    const distance = camera.position.distanceTo(controls.target);
+    // The far edge of the model reaches 85% haze at full strength.
+    const backEdgeHaze = lighting.haze * 0.85;
+
+    scene.fog = fog;
+    fog.color.copy(scene.background instanceof THREE.Color ? scene.background : backdropTint);
+    fog.near = Math.max(0, distance - landscapeRadius);
+    fog.far = fog.near + (2 * landscapeRadius) / backEdgeHaze;
+  };
+
+  applyLighting();
   scene.add(fillLight, sunlight);
   let modelSettings: TerrainModelSettings = { ...defaultTerrainModelSettings };
   let exaggeration = 0.3;
@@ -330,6 +367,7 @@ export function createTerrain3d(
 
   const draw = () => {
     if (visible && !document.hidden) {
+      updateFog();
       renderer.render(scene, camera);
     }
   };
@@ -398,6 +436,8 @@ export function createTerrain3d(
 
     perspectiveCamera.fov = getVerticalFovDegrees(settings.focalLengthMm);
     perspectiveCamera.updateProjectionMatrix();
+    exposureScale = 2 ** settings.exposureEv;
+    applyLighting();
     camera = settings.projection === 'orthographic' ? orthographicCamera : perspectiveCamera;
     controls.object = camera;
     placeCamera(direction, distance);
@@ -756,6 +796,8 @@ export function createTerrain3d(
       updateLandColor();
       updateWaterColor();
       updateStageVisibility();
+      landscapeRadius =
+        (Math.hypot(modelSettings.widthMm, modelSettings.lengthMm) * previewScale) / 2;
       stage.update(
         modelSettings.widthMm * previewScale,
         (modelSettings.cropShape === 'circle' ? modelSettings.widthMm : modelSettings.lengthMm) *
@@ -894,8 +936,9 @@ export function createTerrain3d(
       updateWaterColor();
       draw();
     },
-    setLighting(lighting: Readonly<TerrainLightingSettings>) {
-      applyLighting(lighting);
+    setLighting(value: Readonly<TerrainLightingSettings>) {
+      lighting = value;
+      applyLighting();
       draw();
     },
     setCamera: setCameraSettings,

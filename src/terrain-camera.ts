@@ -6,12 +6,15 @@ export type TurntableDirection = 'counterclockwise' | 'clockwise';
 export interface TerrainCameraSettings {
   projection: TerrainProjection;
   focalLengthMm: number;
+  /** Stops of light: each step doubles or halves the sun and fill. */
+  exposureEv: number;
 }
 
 /** Session-only lens settings; 35 mm on full frame sits closest to the original 40° view. */
 export const defaultTerrainCameraSettings: Readonly<TerrainCameraSettings> = Object.freeze({
   projection: 'perspective',
   focalLengthMm: 35,
+  exposureEv: 0,
 });
 
 export const terrainProjections: readonly { value: TerrainProjection; label: string }[] = [

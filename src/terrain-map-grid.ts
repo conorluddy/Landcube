@@ -26,7 +26,7 @@ export function getMapGridSpacing(spanMeters: number): number {
 
 /** Floor-only cartographic dressing, with a fully erased model footprint. */
 export function createTerrainMapGrid(): {
-  mesh: THREE.Mesh;
+  mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   update(
     width: number,
     length: number,

@@ -48,12 +48,26 @@ export function CameraPanel({ controller: c, state: s }: PanelProps): ReactNode 
           </>
         )}
       </Group>
+      <Group title="Exposure">
+        <Range
+          id="camera-exposure"
+          label="Exposure"
+          value={camera.exposureEv}
+          min={-2}
+          max={2}
+          step={0.1}
+          displayValue={`${camera.exposureEv > 0 ? '+' : ''}${camera.exposureEv.toFixed(1)} EV`}
+          onChange={(exposureEv) => {
+            c.camera({ exposureEv });
+          }}
+        />
+      </Group>
       <Button
         onClick={() => {
           c.resetCameraSettings();
         }}
       >
-        Reset lens
+        Reset camera settings
       </Button>
     </>
   );
