@@ -7,6 +7,13 @@ updates:
     groups:
       npm-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # typescript-eslint 8.72 peers on typescript <6.1; raise as its range grows.
+      - dependency-name: typescript
+        versions: ['>=6.1']
+      # Node types stay on a supported major so code can't use APIs newer than engines allow.
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
     labels: [type:chore, size:XS]
 
   - package-ecosystem: github-actions

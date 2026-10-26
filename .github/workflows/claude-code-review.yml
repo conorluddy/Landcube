@@ -10,7 +10,8 @@ concurrency:
 
 jobs:
   claude-review:
-    if: github.event.pull_request.draft == false
+    # Dependabot runs get no repository secrets, so the review would fail without a token.
+    if: github.event.pull_request.draft == false && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
