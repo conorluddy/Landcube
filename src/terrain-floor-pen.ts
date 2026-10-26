@@ -41,6 +41,8 @@ export const inkAlpha = { text: 0.85, line: 0.7, rule: 0.6, dashed: 0.45, rhumb:
 export function createFloorPen(frame: FloorFrame): FloorPen {
   const { context, extentPx, ink } = frame;
   const toCanvas = (mockPx: number) => (mockPx * extentPx) / mockModelSizePx;
+  // Older Safari and Firefox lack canvas tracking; without it the centering shift would misplace text.
+  const hasLetterSpacing = 'letterSpacing' in context;
   let trackingPx = 0;
 
   return {
@@ -56,9 +58,12 @@ export function createFloorPen(frame: FloorFrame): FloorPen {
       context.fillStyle = `rgba(${ink}, ${alpha})`;
     },
     font(sizeMockPx, family, weight = 400, trackingEm = 0) {
-      trackingPx = toCanvas(sizeMockPx) * trackingEm;
       context.font = `${weight} ${toCanvas(sizeMockPx)}px ${family}`;
-      context.letterSpacing = `${trackingPx}px`;
+
+      if (hasLetterSpacing) {
+        trackingPx = toCanvas(sizeMockPx) * trackingEm;
+        context.letterSpacing = `${trackingPx}px`;
+      }
     },
     line(x1, y1, x2, y2) {
       context.beginPath();
@@ -141,7 +146,10 @@ export function paintTextOnBottomArc(
   const widths = characters.map((character) => context.measureText(character).width);
   let angle = Math.PI / 2 + widths.reduce((total, width) => total + width, 0) / radius / 2;
 
-  context.letterSpacing = '0px';
+  if ('letterSpacing' in context) {
+    context.letterSpacing = '0px';
+  }
+
   context.textAlign = 'center';
   context.textBaseline = 'middle';
 

@@ -70,6 +70,8 @@ for (const [widthMm, lengthMm] of [
 void test('centered crops retain proportions and never accumulate', () => {
   const square = cropTerrainModelField(field, 30, 20, defaultTerrainModelSettings);
 
+  assert.equal(square.x, 5);
+  assert.equal(square.y, 0);
   assert.equal(square.width, 20);
   assert.equal(square.height, 20);
   assert.equal(square.field.originX, -10);
@@ -161,4 +163,17 @@ void test('moving a crop changes its terrain without stretching or accumulating 
     createTerrainModel(left.field, left.width, left.height, settings, 0.3).surface.positions,
     createTerrainModel(right.field, right.width, right.height, settings, 0.3).surface.positions,
   );
+});
+
+void test('an off-center rectangular crop reports where it sits in the source frame', () => {
+  const settings = { ...defaultTerrainModelSettings, widthMm: 200, lengthMm: 100 };
+  const crop = cropTerrainModelField(field, 30, 20, settings, {
+    centerX: 0.75,
+    centerY: 0.25,
+    size: 0.5,
+  });
+
+  assert.deepEqual([crop.x, crop.y, crop.width, crop.height], [15, 1.25, 15, 7.5]);
+  assert.equal(crop.field.originX, field.originX - crop.x);
+  assert.equal(crop.field.originY, field.originY - crop.y);
 });

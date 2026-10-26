@@ -1,4 +1,5 @@
 import { realTerrainPresets } from './constants/real-terrain';
+import type { RealTerrain } from './real-terrain';
 
 /** Geographic edges of the printed model, in decimal degrees. */
 export interface GeoBounds {
@@ -21,20 +22,35 @@ export interface FloorPlace {
 
 const kilometersPerDegreeLatitude = 111.32;
 
-/** Describes a model cropped from a square real-terrain source, offset in kilometers from its center. */
+/** Locates a crop of a square real-terrain source; undefined without a location or a usable span. */
 export function createFloorPlace(
-  source: { latitude: number; longitude: number },
-  offsetEastKm: number,
-  offsetSouthKm: number,
-  widthKm: number,
-  lengthKm: number,
-): FloorPlace {
-  const latitude = source.latitude - offsetSouthKm / kilometersPerDegreeLatitude;
-  const longitude = source.longitude + offsetEastKm / kilometersPerDegreeLongitude(latitude);
+  source: Pick<RealTerrain, 'location' | 'spanKm'> | undefined,
+  crop: { x: number; y: number; width: number; height: number },
+  frame: { width: number; height: number },
+): FloorPlace | undefined {
+  const location = source?.location;
+  const spanKm = source?.spanKm;
+
+  if (location === undefined || spanKm === undefined) {
+    return undefined;
+  }
+
+  // Zero or non-finite sizes would divide by zero in the bounds and scale-bar math.
+  if (![spanKm, crop.width, crop.height, frame.width, frame.height].every(isPositiveFinite)) {
+    return undefined;
+  }
+
+  const kilometersPerUnit = spanKm / Math.max(frame.width, frame.height);
+  const offsetEastKm = (crop.x + crop.width / 2 - frame.width / 2) * kilometersPerUnit;
+  const offsetSouthKm = (crop.y + crop.height / 2 - frame.height / 2) * kilometersPerUnit;
+  const widthKm = crop.width * kilometersPerUnit;
+  const lengthKm = crop.height * kilometersPerUnit;
+  const latitude = location.latitude - offsetSouthKm / kilometersPerDegreeLatitude;
+  const longitude = location.longitude + offsetEastKm / kilometersPerDegreeLongitude(latitude);
   const preset = realTerrainPresets.find(
     (candidate) =>
-      Math.abs(candidate.latitude - source.latitude) < 1e-4 &&
-      Math.abs(candidate.longitude - source.longitude) < 1e-4,
+      Math.abs(candidate.latitude - location.latitude) < 1e-4 &&
+      Math.abs(candidate.longitude - location.longitude) < 1e-4,
   );
 
   return {
@@ -134,6 +150,40 @@ export function pickScaleDistanceKm(targetKm: number, maxKm = Infinity): number 
   );
 }
 
+/** Graticule lines inside the model, at most five per axis. */
+export function getPlaceGraticule(place: FloorPlace): {
+  latitudes: number[];
+  longitudes: number[];
+} {
+  const { bounds } = place;
+  const step = pickGraticuleStep(
+    Math.max(bounds.north - bounds.south, bounds.east - bounds.west),
+    5,
+  );
+
+  return {
+    latitudes: graticuleValues(bounds.south, bounds.north, step),
+    longitudes: graticuleValues(bounds.west, bounds.east, step),
+  };
+}
+
+/** "32.8842°N 131.1040°E". */
+export function formatDecimalPair(place: FloorPlace): string {
+  return `${formatDecimal(place.latitude, 'lat')} ${formatDecimal(place.longitude, 'lon')}`;
+}
+
+/** "25 × 12.5 km". */
+export function formatModelSize(place: FloorPlace): string {
+  return `${formatKm(place.widthKm)} × ${formatKm(place.lengthKm)} km`;
+}
+
+/** Square and circular models print one distance: "25 KM". */
+export function formatModelSpan(place: FloorPlace): string {
+  return place.widthKm === place.lengthKm
+    ? `${formatKm(place.widthKm)} KM`
+    : formatModelSize(place).toUpperCase();
+}
+
 // === HELPERS ===
 
 /** Arc-minute steps that read well as labels, in degrees. */
@@ -155,4 +205,12 @@ function getHemisphere(value: number, axis: 'lat' | 'lon'): string {
   }
 
   return value >= 0 ? 'E' : 'W';
+}
+
+function formatKm(km: number): number {
+  return Number(km.toPrecision(3));
+}
+
+function isPositiveFinite(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
 }

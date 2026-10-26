@@ -208,9 +208,11 @@ function paintGridLines(
   origin: { x: number; y: number },
   getLineStyle: (index: number) => { alpha: number; width: number },
 ): void {
-  const reach = Math.ceil(2048 / spacing);
+  // Only indices whose lines land on the ±1024 canvas; an offset origin shifts the range, not its width.
+  const first = Math.floor((-1024 - Math.max(origin.x, origin.y)) / spacing);
+  const last = Math.ceil((1024 - Math.min(origin.x, origin.y)) / spacing);
 
-  for (let index = -reach; index <= reach; index++) {
+  for (let index = first; index <= last; index++) {
     const { alpha, width } = getLineStyle(index);
 
     context.strokeStyle = `rgba(${ink}, ${alpha})`;
