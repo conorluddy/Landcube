@@ -33,15 +33,30 @@ jobs:
           prompt: |
             Review PR #${{ github.event.pull_request.number }} in ${{ github.repository }}.
             Read AGENTS.md first; it defines the invariants that matter most here.
-            Check code against docs/CODESTYLE.md when it exists.
+            Check code against docs/CODESTYLE.md. Write every finding in the docs/SPECS.md style.
 
             Focus on, in order:
             - Bugs and regressions in the shared pipeline (settings, terrain, contours, composition, SVG, export)
             - Browser and CLI drift: behaviour changed on one side only
             - Reproducibility: version-one design links must render identically (defaults, terrain semantics, URL serialization)
             - Real-terrain output keeps source attribution; static exports use settled terrain
+            - Stack-specific issues (checklist below)
             - Missing tests for changed behaviour
             - PR hygiene: template filled in, title is one emoji plus four words, labels sensible
+            - Specs: when the PR adds or edits a spec, PRD or issue-style doc, audit it using "Auditing a spec" in docs/SPECS.md
+
+            Stack checklist. Name the API, hook or object involved; never give generic advice:
+            - TypeScript: no `any`, unchecked casts or non-null assertions that hide a real undefined; discriminated unions over boolean flags; expected failures return `Result`; exported types come before the implementation.
+            - React 19: studio state flows through the controller (`useSyncExternalStore` on `subscribe`/`getSnapshot`); components never read form controls or the DOM for state; effects clean up listeners, timers and object URLs; stale-closure and missing-dependency bugs; stable list keys; no state derived via effects that could be computed during render.
+            - Three.js: replaced geometries, materials and textures are disposed; no per-frame allocation in the animation loop; attribute edits set `needsUpdate` and refresh normals and bounds; the render loop stops when idle, hidden or 2D (`setAnimationLoop(null)`); draw-on-demand paths still call `draw()` after a change; shadows and pixel ratio stay bounded.
+            - UI: every control has an accessible name and role (E2E tests select by role); keyboard and focus order work, and focus returns after dialogs and popovers close; `prefers-reduced-motion` is respected; a 390 px wide viewport has no horizontal scroll; status and error text says what failed and how to fix it.
+
+            Review comment format, following docs/SPECS.md:
+            - Group findings under MUST (blocks merge), SHOULD (fix, or give a reason not to) and MAY (optional). Omit empty groups.
+            - Each finding is one statement of 25 words or fewer, with its `path:line`, then a `Rationale:` line.
+            - For bugs, add a Given/When/Then failure scenario with concrete inputs and the observable wrong result.
+            - Use no weak words from docs/SPECS.md: no "consider", "might want to" or "robust". Quantify where possible.
+            - Product decisions the PR leaves open are `OQ-n` questions for Conor, never findings. Mark guesses about engineering values `[ASSUMPTION — confirm]`.
 
             Be concise. Skip praise and nits a formatter or linter would catch.
             Post one review comment with `gh pr comment`. If nothing is worth raising, say so in one line.
