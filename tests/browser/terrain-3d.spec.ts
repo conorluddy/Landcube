@@ -64,6 +64,12 @@ test('view selection activates 3D directly and restores independent inspector se
   await page.getByRole('button', { name: 'Perspective', exact: true }).click();
   await page.getByLabel('Aperture').fill('0');
   await expect(page.locator('output[for="camera-aperture"]')).toHaveText('f/1.4');
+  // A second pick supersedes the first instead of leaving its listeners behind.
+  await page.getByRole('button', { name: 'Pick focus', exact: true }).click();
+  await page.getByRole('button', { name: 'Pick focus', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('status').filter({ hasText: 'Focus unchanged.' })).toBeVisible();
+  await expect(page.locator('canvas.terrain-3d')).toHaveCSS('cursor', 'auto');
   await page.getByRole('button', { name: 'Tilt-shift', exact: true }).click();
   await page.getByLabel('Band width').fill('40');
   await expect(page.locator('output[for="camera-tiltShiftWidth"]')).toHaveText('40%');
@@ -71,6 +77,10 @@ test('view selection activates 3D directly and restores independent inspector se
   await expect(page.locator('output[for="camera-exposure"]')).toHaveText('+0.5 EV');
   await page.getByRole('button', { name: 'Reset camera settings' }).click();
   await expect(page.locator('output[for="camera-focal-length"]')).toHaveText('35 mm');
+  await expect(page.getByRole('button', { name: 'Perspective', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await expect(page.getByRole('button', { name: 'Off', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',

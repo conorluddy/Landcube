@@ -12,7 +12,7 @@ import {
   type TerrainViewPreset,
 } from '../terrain-camera';
 
-/** 3D-only lens settings; orbit position stays with the viewport and the Camera popover. */
+/** 3D-only lens, focus and exposure; orbit position stays with the viewport and the Orbit popover. */
 export function CameraPanel({ controller: c, state: s }: PanelProps): ReactNode {
   const camera = s.scene.camera;
   const isOrthographic = camera.projection === 'orthographic';

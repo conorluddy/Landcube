@@ -62,6 +62,9 @@ import type { DesignSettings } from './types/design';
 
 export type WaterStyle = 'hatched' | 'solid' | 'off';
 
+// About 40 MP: 4× of a large desktop viewport stays within browser canvas memory limits.
+const maximumStillPixels = 40_000_000;
+
 /** An optional, session-only raised-contour preview of the shared landscape. */
 export interface Terrain3d {
   update(
@@ -411,6 +414,8 @@ export function createTerrain3d(
   let cameraSettings: Readonly<TerrainCameraSettings> = defaultTerrainCameraSettings;
   let postProcessing: TerrainPostProcessing | undefined;
   let pickedFocusPoint: THREE.Vector3 | undefined;
+  /** Resolves a pending focus pick as cancelled, removing its listeners. */
+  let cancelFocusPick: (() => void) | undefined;
 
   /** Depth of field relies on perspective depth, so orthographic views skip it. */
   const getActiveFocusEffect = () =>
@@ -428,10 +433,12 @@ export function createTerrain3d(
   };
 
   const draw = () => {
-    if (!visible || document.hidden) {
-      return;
+    if (visible && !document.hidden) {
+      render();
     }
+  };
 
+  const render = () => {
     updateFog();
 
     if (postProcessing && getActiveFocusEffect() !== 'off') {
@@ -539,10 +546,12 @@ export function createTerrain3d(
   };
 
   let viewAnimationFrame = 0;
+  /** Jumps a running preset animation to its destination; undefined when the camera is settled. */
+  let settleViewAnimation: (() => void) | undefined;
 
   /** Eases the camera to a new direction around the target, keeping the framing distance. */
   const animateCameraDirection = (direction: THREE.Vector3) => {
-    cancelAnimationFrame(viewAnimationFrame);
+    settleViewAnimation?.();
     const distance = getViewDistance();
     const from = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
     const to = new THREE.Spherical().setFromVector3(direction);
@@ -566,7 +575,15 @@ export function createTerrain3d(
 
       if (progress < 1) {
         viewAnimationFrame = requestAnimationFrame(step);
+      } else {
+        settleViewAnimation = undefined;
       }
+    };
+
+    settleViewAnimation = () => {
+      cancelAnimationFrame(viewAnimationFrame);
+      settleViewAnimation = undefined;
+      placeCamera(direction, distance);
     };
 
     step();
@@ -1072,6 +1089,7 @@ export function createTerrain3d(
 
       if (!value) {
         finishTransition();
+        cancelFocusPick?.();
       }
 
       renderer.domElement.hidden = !value;
@@ -1208,13 +1226,21 @@ export function createTerrain3d(
     },
     setCamera: setCameraSettings,
     captureStill(scale: number) {
-      const maximumDimension = renderer.capabilities.maxTextureSize;
+      if (!visible) {
+        throw new Error('Select the 3D view before downloading a 3D still.');
+      }
+
+      // Static exports use settled terrain and framing, never a frame mid-animation.
+      finishTransition();
+      settleViewAnimation?.();
       const pixelRatio = Math.min(
         scale,
-        maximumDimension / Math.max(viewportWidth, viewportHeight),
+        renderer.capabilities.maxTextureSize / Math.max(viewportWidth, viewportHeight),
+        Math.sqrt(maximumStillPixels / (viewportWidth * viewportHeight)),
       );
       const previousPixelRatio = renderer.getPixelRatio();
       const frame = document.createElement('canvas');
+      const context = frame.getContext('2d');
 
       const resizeTo = (ratio: number) => {
         renderer.setPixelRatio(ratio);
@@ -1223,29 +1249,35 @@ export function createTerrain3d(
       };
 
       resizeTo(pixelRatio);
-      draw();
+      render();
       frame.width = renderer.domElement.width;
       frame.height = renderer.domElement.height;
       // Copied in the same task as the render, so no preserved drawing buffer is needed.
-      frame.getContext('2d')?.drawImage(renderer.domElement, 0, 0);
+      context?.drawImage(renderer.domElement, 0, 0);
       resizeTo(previousPixelRatio);
       draw();
+
+      if (!context) {
+        throw new Error('The browser could not allocate the 3D still. Try a smaller scale.');
+      }
 
       return frame;
     },
     pickFocus() {
       const canvas = renderer.domElement;
 
+      cancelFocusPick?.();
       canvas.style.cursor = 'crosshair';
 
       return new Promise<boolean>((resolve) => {
         let downAt: { x: number; y: number } | undefined;
 
         const finish = (picked: boolean) => {
+          cancelFocusPick = undefined;
           canvas.style.cursor = '';
           canvas.removeEventListener('pointerdown', onDown);
           canvas.removeEventListener('pointerup', onUp);
-          document.removeEventListener('keydown', onKey);
+          document.removeEventListener('keydown', onKey, true);
           resolve(picked);
         };
 
@@ -1271,13 +1303,20 @@ export function createTerrain3d(
 
         const onKey = (event: KeyboardEvent) => {
           if (event.key === 'Escape') {
+            // Consumed so the studio's own Escape handling doesn't also collapse the inspector.
+            event.preventDefault();
             finish(false);
           }
         };
 
+        cancelFocusPick = () => {
+          finish(false);
+        };
+
         canvas.addEventListener('pointerdown', onDown);
         canvas.addEventListener('pointerup', onUp);
-        document.addEventListener('keydown', onKey);
+        // Capture phase runs ahead of the studio's bubbling Escape listener.
+        document.addEventListener('keydown', onKey, true);
       });
     },
     setRotationSpeed(value: number) {
