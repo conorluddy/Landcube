@@ -101,7 +101,10 @@ test('SVG and PNG exports preserve settled dimensions and transparency', async (
   await expect
     .poll(async () =>
       preview.evaluate(async (image) =>
-        fetch((image as HTMLImageElement).src).then((response) => response.text()),
+        // A replaced preview's blob URL is revoked mid-fetch; treat that as not-yet-settled.
+        fetch((image as HTMLImageElement).src)
+          .then((response) => response.text())
+          .catch(() => ''),
       ),
     )
     .toBe(transparent.bytes.toString());
@@ -274,7 +277,10 @@ test('failed preview decoding retains the last image and obsolete previews canno
   await expect
     .poll(async () =>
       preview.evaluate(async (image) =>
-        fetch((image as HTMLImageElement).src).then((response) => response.text()),
+        // A replaced preview's blob URL is revoked mid-fetch; treat that as not-yet-settled.
+        fetch((image as HTMLImageElement).src)
+          .then((response) => response.text())
+          .catch(() => ''),
       ),
     )
     .toContain('width="360"');
@@ -284,7 +290,10 @@ test('failed preview decoding retains the last image and obsolete previews canno
   await expect
     .poll(async () =>
       preview.evaluate(async (image) =>
-        fetch((image as HTMLImageElement).src).then((response) => response.text()),
+        // A replaced preview's blob URL is revoked mid-fetch; treat that as not-yet-settled.
+        fetch((image as HTMLImageElement).src)
+          .then((response) => response.text())
+          .catch(() => ''),
       ),
     )
     .toContain('width="360"');
