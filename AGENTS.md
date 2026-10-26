@@ -19,3 +19,8 @@ Keep browser and CLI behavior aligned through the shared pipeline.
 - Use the PR template for all PRs.
 - Default branch is protected - all updates via PR.
 - PR titles use four words and one emoji prefix e.g. "🧑🏼‍💻 This is a title".
+
+## Guides
+
+- [docs/CODESTYLE.md](docs/CODESTYLE.md): code style, determinism rules, error handling, testing.
+- [docs/SPECS.md](docs/SPECS.md): how to write issues, specs and acceptance criteria.
