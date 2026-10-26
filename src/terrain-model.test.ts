@@ -4,10 +4,20 @@ import {
   createTerrainModel,
   cropTerrainModelField,
   defaultTerrainModelSettings,
+  getSuggestedExaggeration,
   validateTerrainModelSettings,
 } from './terrain-model';
 import { createBinaryStl, validatePrintableSolid } from './export/stl-export';
 import type { HeightField } from './types/terrain';
+
+void test('suggested height lifts flat wide places and calms steep crops', () => {
+  const ibiza = getSuggestedExaggeration(525, 55);
+  const everest = getSuggestedExaggeration(4000, 25);
+
+  assert.ok(ibiza < everest);
+  assert.ok(ibiza >= 0.05 && everest <= 0.6);
+  assert.equal(getSuggestedExaggeration(0, 25), 0.3);
+});
 
 const field: HeightField = {
   columns: 5,

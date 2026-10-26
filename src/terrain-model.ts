@@ -83,6 +83,22 @@ export function cropTerrainModelField(
   };
 }
 
+/**
+ * Pulls each place partway toward a common look: steep crops calm down, flat wide ones lift.
+ * Relief ÷ span of 0.2 maps to 0.25; the 0.35 power keeps some of each place's character.
+ */
+export function getSuggestedExaggeration(reliefMeters: number, spanKm: number): number {
+  const reliefRatio = reliefMeters / (spanKm * 1000);
+
+  if (!Number.isFinite(reliefRatio) || reliefRatio <= 0) {
+    return 0.3;
+  }
+
+  const suggested = 0.25 * (reliefRatio / 0.2) ** 0.35;
+
+  return Math.round(Math.min(0.6, Math.max(0.05, suggested)) * 20) / 20;
+}
+
 /** Builds one indexed closed solid in millimeters, Y up, with a flat bottom at zero. */
 export function createTerrainModel(
   field: HeightField,

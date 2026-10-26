@@ -1,5 +1,6 @@
 import {
   defaultTerrainModelSettings,
+  getSuggestedExaggeration,
   validateTerrainModelSettings,
   type TerrainModelSettings,
 } from '../terrain-model';
@@ -96,7 +97,13 @@ export interface StudioState {
   design: ValidatedDesignSettings;
   source: TerrainSourceState;
   scene: SceneSettings;
-  model: { dimensions: TerrainModelSettings; crop: TerrainCropSettings; exaggeration: number };
+  model: {
+    dimensions: TerrainModelSettings;
+    crop: TerrainCropSettings;
+    exaggeration: number;
+    /** Real locations suggest a height until the user moves the slider. */
+    autoExaggeration: boolean;
+  };
   workspace: {
     view: StudioView;
     activating: boolean;
@@ -231,6 +238,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       dimensions: { ...defaultTerrainModelSettings },
       crop: { ...defaultTerrainCrop },
       exaggeration: 0.3,
+      autoExaggeration: true,
     },
     workspace: {
       view: '2d',
@@ -301,6 +309,10 @@ export function createStudioController(actions: DesignControlActions): StudioCon
           },
         },
       };
+    }
+
+    if (locationChanged && state.model.autoExaggeration) {
+      state = { ...state, model: applySuggestedExaggeration(state.model, terrain) };
     }
 
     effects?.applyTerrain(terrain, shouldTransition);
@@ -478,7 +490,11 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       notify(picked ? 'Focus set.' : 'Focus unchanged.');
     },
     model(patch: Partial<StudioState['model']>) {
-      const next = { ...state.model, ...patch };
+      const merged = { ...state.model, ...patch };
+      const next =
+        patch.autoExaggeration === true
+          ? applySuggestedExaggeration(merged, state.source.terrain)
+          : merged;
 
       try {
         validateTerrainModelSettings(next.dimensions);
@@ -741,4 +757,22 @@ function getNextAutoplayPlace(place: string): (typeof realTerrainPresets)[number
   );
 
   return places[(index + 1) % places.length];
+}
+
+/** Generated terrain has no real scale, so it keeps the current height. */
+function applySuggestedExaggeration(
+  model: StudioState['model'],
+  terrain: RealTerrain | undefined,
+): StudioState['model'] {
+  const elevations = terrain?.elevations;
+
+  if (!elevations || terrain.spanKm === undefined) {
+    return model;
+  }
+
+  // The model spans 1.6 units of metersPerUnit, so this is the relief the model shows.
+  return {
+    ...model,
+    exaggeration: getSuggestedExaggeration(elevations.metersPerUnit * 1.6, terrain.spanKm),
+  };
 }
