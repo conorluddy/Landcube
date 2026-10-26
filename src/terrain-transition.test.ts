@@ -47,13 +47,15 @@ void test('terrain holds still while decorations fade at either end', () => {
   assert.equal(at(terrainMorphStartFraction).terrainProgress, 0);
   assert.equal(at(terrainMorphEndFraction).terrainProgress, 1);
   assert.equal(at(0.5).terrainProgress, 0.5);
+  assert.ok(at(0.3).terrainProgress < 0.02, 'terrain lifts off gently');
+  assert.ok(at(0.7).terrainProgress > 0.98, 'terrain settles gently');
   assert.equal(at(terrainDecorationFadeFraction).outgoingOpacity, 0);
   assert.equal(at(1 - terrainDecorationFadeFraction).incomingOpacity, 0);
   assert.ok(at(1 - terrainDecorationFadeFraction / 2).incomingOpacity > 0);
 });
 
 void test('frames depend only on elapsed time, not evaluation order', () => {
-  const times = [1730, 12, 999, 1730, 0, 2000, 12];
+  const times = [1030, 12, 599, 1030, 0, duration, 12];
   const forward = times.map((time) => evaluateTerrainTransition(time, duration));
   const backward = [...times].reverse().map((time) => evaluateTerrainTransition(time, duration));
 

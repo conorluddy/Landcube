@@ -229,17 +229,24 @@ test('3D terrain morphs between landscapes and settles on the destination', asyn
   await page.getByRole('button', { name: '3D', exact: true }).click();
   const canvas = page.locator('canvas.terrain-3d');
   const transitions = await recordTerrainTransitions(page);
+  // Software WebGL can spend a whole morph inside one frame, so count recorded morphs, never poll for one.
+  const morphCount = async () =>
+    (await transitions()).filter((state) => state === 'morphing').length;
+  const settle = () =>
+    expect(canvas).toHaveAttribute('data-terrain-transition', 'settled', { timeout: 10_000 });
 
   await loadLocation(page);
   await page.screenshot({ path: test.info().outputPath('terrain-morph-mid.png') });
-  await expect(canvas).toHaveAttribute('data-terrain-transition', 'settled', { timeout: 5_000 });
+  await settle();
   await page.screenshot({ path: test.info().outputPath('terrain-morph-settled.png') });
-  expect(await transitions()).toContain('morphing');
+  expect(await morphCount()).toBe(1);
   await page.getByRole('button', { name: 'Procedural', exact: true }).click();
-  await expect(canvas).toHaveAttribute('data-terrain-transition', 'morphing');
+  await expect.poll(morphCount).toBe(2);
+  await settle();
   await page.getByRole('button', { name: 'New landscape', exact: true }).click();
   await page.getByRole('button', { name: 'New landscape', exact: true }).click();
-  await expect(canvas).toHaveAttribute('data-terrain-transition', 'settled', { timeout: 5_000 });
+  await expect.poll(morphCount).toBeGreaterThan(2);
+  await settle();
   expect(errors).toEqual([]);
 });
 

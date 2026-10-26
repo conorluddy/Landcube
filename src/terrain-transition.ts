@@ -33,7 +33,7 @@ export function evaluateTerrainTransition(
   );
 
   return {
-    terrainProgress: easeInOutCubic(morphTime),
+    terrainProgress: easeInOutQuint(morphTime),
     outgoingOpacity: 1 - clampUnit(time / terrainDecorationFadeFraction),
     incomingOpacity: clampUnit(
       (time - (1 - terrainDecorationFadeFraction)) / terrainDecorationFadeFraction,
@@ -66,6 +66,7 @@ function clampUnit(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-function easeInOutCubic(time: number): number {
-  return time < 0.5 ? 4 * time ** 3 : 1 - (2 - 2 * time) ** 3 / 2;
+/** A quintic curve makes the slow lift-off and long settle read clearly within a short morph. */
+function easeInOutQuint(time: number): number {
+  return time < 0.5 ? 16 * time ** 5 : 1 - (2 - 2 * time) ** 5 / 2;
 }
