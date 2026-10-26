@@ -17,6 +17,8 @@ interface StudioTerrainView {
   applyViewPreset: (preset: TerrainViewPreset) => void;
   pickFocus: () => Promise<boolean>;
   captureStill: (scale: number) => HTMLCanvasElement;
+  /** Arms a morph for the next 3D rebuild; the 2D view and an inactive 3D view always cut. */
+  requestTransition: () => void;
   getStl: () => ArrayBuffer;
   update: (
     contours: Contour[],
@@ -172,6 +174,11 @@ export function createStudioTerrainView(
       }
 
       return view.captureStill(scale);
+    },
+    requestTransition() {
+      if (active) {
+        view?.requestTransition();
+      }
     },
     getStl() {
       if (!view || !active) {

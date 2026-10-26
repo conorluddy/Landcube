@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 import { createStudioController, type StudioEffects } from './studio/controller';
 import {
   parseDesignParameters,
@@ -126,3 +126,42 @@ void test('gradient validation retains the previous palette and snapshots remain
   assert.equal(snapshot.scene.materialPreset, 'natural');
   assert.equal(c.getSnapshot().scene.materialPreset, 'porcelain');
 });
+
+void test('location loads and source switches morph terrain while interval and hatching edits cut', async (t) => {
+  const { controller: c, effects } = setup();
+  const transitions: boolean[] = [];
+
+  effects.applyTerrain = (_terrain, shouldTransition) => {
+    transitions.push(shouldTransition);
+  };
+
+  stubBrowserTileDecoding(t);
+  await c.loadTerrain();
+  assert.match(c.getSnapshot().source.status, /Real terrain loaded/);
+  c.interval(50);
+  c.hatching(false);
+  c.useGenerated();
+  await c.useCoordinates();
+  assert.match(c.getSnapshot().source.status, /restored/);
+  assert.deepEqual(transitions, [true, false, false, true, true]);
+});
+
+/** Serves flat Terrarium tiles through the browser decoding path without a network or canvas. */
+function stubBrowserTileDecoding(t: TestContext): void {
+  const tileSizePixels = 256;
+  const pixels = new Uint8ClampedArray(tileSizePixels * tileSizePixels * 4).fill(128);
+
+  t.mock.method(globalThis, 'fetch', () => Promise.resolve(new Response('tile')));
+  Object.assign(globalThis, {
+    createImageBitmap: () => Promise.resolve({ close: () => undefined }),
+    document: {
+      createElement: () => ({
+        getContext: () => ({ drawImage: () => undefined, getImageData: () => ({ data: pixels }) }),
+      }),
+    },
+  });
+  t.after(() => {
+    Reflect.deleteProperty(globalThis, 'createImageBitmap');
+    Reflect.deleteProperty(globalThis, 'document');
+  });
+}

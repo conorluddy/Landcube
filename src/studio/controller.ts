@@ -105,7 +105,8 @@ export interface StudioState {
   metrics: { height?: number; layerHeight?: number };
 }
 export interface StudioEffects {
-  applyTerrain(terrain: RealTerrain | undefined): void;
+  /** Location and source changes morph the 3D terrain; interval and hatching edits cut. */
+  applyTerrain(terrain: RealTerrain | undefined, shouldTransition: boolean): void;
   activate(view: StudioView): Promise<void>;
   sceneChanged(previous: SceneSettings): void;
   modelChanged(): void;
@@ -263,7 +264,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
     publish();
   };
 
-  const applySource = (terrain: RealTerrain | undefined) => {
+  const applySource = (terrain: RealTerrain | undefined, shouldTransition: boolean) => {
     const previousLocation = state.source.terrain?.location;
     const nextLocation = terrain?.location;
     const locationChanged =
@@ -285,7 +286,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       };
     }
 
-    effects?.applyTerrain(terrain);
+    effects?.applyTerrain(terrain, shouldTransition);
     publish();
   };
 
@@ -494,7 +495,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
         loading: false,
         status: 'Using generated terrain.',
       });
-      applySource(undefined);
+      applySource(undefined, true);
     },
     async useCoordinates() {
       controller.selectSection('Terrain');
@@ -513,11 +514,14 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       }
 
       loadedFieldsKey = parked.fieldsKey;
-      applySource({
-        ...parked.terrain,
-        contourInterval: state.source.interval,
-        seaLevelHatching: state.source.hatching,
-      });
+      applySource(
+        {
+          ...parked.terrain,
+          contourInterval: state.source.interval,
+          seaLevelHatching: state.source.hatching,
+        },
+        true,
+      );
       controller.source({ selected: 'real', status: 'Real terrain restored.' });
     },
     async loadTerrain() {
@@ -540,11 +544,14 @@ export function createStudioController(actions: DesignControlActions): StudioCon
         }
 
         loadedFieldsKey = getSourceFieldsKey(source);
-        applySource({
-          ...terrain,
-          contourInterval: state.source.interval,
-          seaLevelHatching: state.source.hatching,
-        });
+        applySource(
+          {
+            ...terrain,
+            contourInterval: state.source.interval,
+            seaLevelHatching: state.source.hatching,
+          },
+          true,
+        );
         controller.source({
           selected: 'real',
           status: 'Real terrain loaded. Location is session-only.',
@@ -574,7 +581,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       controller.source({ interval: value, ...(value === 'auto' ? {} : { fixedInterval: value }) });
 
       if (state.source.terrain) {
-        applySource({ ...state.source.terrain, contourInterval: value });
+        applySource({ ...state.source.terrain, contourInterval: value }, false);
       }
 
       return true;
@@ -583,7 +590,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       controller.source({ hatching: value });
 
       if (state.source.terrain) {
-        applySource({ ...state.source.terrain, seaLevelHatching: value });
+        applySource({ ...state.source.terrain, seaLevelHatching: value }, false);
       }
     },
     resetCamera() {

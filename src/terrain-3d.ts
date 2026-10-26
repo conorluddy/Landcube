@@ -37,6 +37,9 @@ import {
   type TerrainCameraSettings,
   type TerrainViewPreset,
 } from './terrain-camera';
+import { createTerrainMeshMorph, type TerrainMeshMorph } from './terrain-3d-transition';
+import { evaluateTerrainTransition } from './terrain-transition';
+import { terrainTransitionDurationMs } from './constants/terrain-transition';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
@@ -103,7 +106,21 @@ export interface Terrain3d {
   captureStill(scale: number): HTMLCanvasElement;
   setLighting(settings: Readonly<TerrainLightingSettings>): void;
   setCamera(settings: Readonly<TerrainCameraSettings>): void;
+  /** Morphs the next rebuilt landscape from the current one instead of cutting to it. */
+  requestTransition(): void;
   reset(): void;
+}
+
+type GradientRange = readonly [minimum: number, maximum: number];
+
+/** A landscape morph in progress; decorations that cannot follow the mesh fade or hide. */
+interface RunningTerrainTransition {
+  startedAtMs: number;
+  morph: TerrainMeshMorph;
+  outgoingContours: LineSegments2[];
+  outgoingStrokeOpacity: number;
+  previousGradientRange: GradientRange;
+  incomingOpacity: number;
 }
 
 export function createTerrain3d(
@@ -115,6 +132,7 @@ export function createTerrain3d(
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.domElement.className = 'terrain-3d';
+  renderer.domElement.dataset.terrainTransition = 'settled';
   renderer.domElement.setAttribute(
     'aria-label',
     'Interactive 3D terrain. Drag to orbit; scroll to zoom.',
@@ -158,6 +176,12 @@ export function createTerrain3d(
   const contourLayer = new THREE.Group();
 
   contourLayer.add(...Object.values(lineLayers));
+  let isTransitionArmed = false;
+  let transition: RunningTerrainTransition | undefined;
+  let pendingMapGrid: Parameters<Terrain3d['setMapGrid']> | undefined;
+  let strokeOpacity = 1;
+  // Engraving and water are built for the destination, so they wait for the incoming fade.
+  const shouldHideDecorations = () => transition?.incomingOpacity === 0;
   let customSurfaceColor: string | undefined;
   let backgroundColor = '#202326';
   let customGroundColor: string | undefined = defaultTerrainGroundColor;
@@ -204,7 +228,12 @@ export function createTerrain3d(
 
   const syncContourTreatment = () => {
     contourLayer.visible = showContours && (contourTreatment === 'drawn' || !surface.visible);
-    engraving.setEnabled(showContours && contourTreatment === 'engraved' && surface.visible);
+    engraving.setEnabled(
+      showContours &&
+        contourTreatment === 'engraved' &&
+        surface.visible &&
+        !shouldHideDecorations(),
+    );
   };
 
   surface.castShadow = surface.receiveShadow = true;
@@ -297,6 +326,7 @@ export function createTerrain3d(
   let terracedContours: Contour[] | undefined;
   let waterSurfacePositions: Float32Array = new Float32Array();
   let lastUpdate: Parameters<Terrain3d['update']> | undefined;
+  let gradientRange: GradientRange = [0, 1];
 
   const rebuild = () => {
     if (lastUpdate) {
@@ -361,7 +391,12 @@ export function createTerrain3d(
   );
   const waterSides = new THREE.Mesh(new THREE.BufferGeometry(), litWaterMaterial);
 
-  const syncWaterSides = () => {
+  const syncWater = () => {
+    sea.visible =
+      waterStyle !== 'off' &&
+      !shouldHideDecorations() &&
+      sea.geometry.hasAttribute('position') &&
+      sea.geometry.getAttribute('position').count > 0;
     waterSides.visible = sea.visible && waterFinish === 'translucent' && waterStyle === 'solid';
   };
 
@@ -583,16 +618,147 @@ export function createTerrain3d(
 
   const updateLoop = () => {
     renderer.setAnimationLoop(
-      visible && rotating && !document.hidden
+      visible && (rotating || transition !== undefined) && !document.hidden
         ? () => {
             const now = performance.now();
 
-            controls.update(Math.min((now - previousTime) / 1000, 0.05));
+            if (rotating) {
+              controls.update(Math.min((now - previousTime) / 1000, 0.05));
+            }
+
             previousTime = now;
+            advanceTransition(now);
             draw();
           }
         : null,
     );
+  };
+
+  const syncDecorations = () => {
+    const opacity = strokeOpacity * (transition?.incomingOpacity ?? 1);
+
+    for (const layer of Object.values(lineLayers)) {
+      layer.material.opacity = opacity;
+    }
+
+    syncContourTreatment();
+    syncWater();
+  };
+
+  const applyPendingMapGrid = () => {
+    if (pendingMapGrid) {
+      stage.setMapGrid(...pendingMapGrid);
+      pendingMapGrid = undefined;
+    }
+  };
+
+  /** Hands the previous meshes to a morph that ends on the freshly built destination geometry. */
+  const startTransition = (
+    previousSurface: THREE.BufferGeometry,
+    previousBase: THREE.BufferGeometry,
+    previousGradientRange: GradientRange,
+  ) => {
+    const morph = createTerrainMeshMorph([
+      { previous: previousSurface, next: surface.geometry },
+      { previous: previousBase, next: base.geometry },
+    ]);
+
+    previousSurface.dispose();
+    previousBase.dispose();
+
+    if (!morph) {
+      return;
+    }
+
+    const outgoingContours: LineSegments2[] = [];
+
+    for (const layer of Object.values(lineLayers)) {
+      if (layer.visible) {
+        const outgoing = new LineSegments2(layer.geometry, layer.material.clone());
+
+        layer.geometry = new LineSegmentsGeometry();
+        outgoingContours.push(outgoing);
+        contourLayer.add(outgoing);
+      }
+    }
+
+    transition = {
+      startedAtMs: performance.now(),
+      morph,
+      outgoingContours,
+      outgoingStrokeOpacity: strokeOpacity,
+      previousGradientRange,
+      incomingOpacity: 0,
+    };
+    // Bounds lag the morphing vertices, so culling could drop terrain or its shadow mid-blend.
+    surface.frustumCulled = base.frustumCulled = false;
+    advanceTransition(transition.startedAtMs);
+    renderer.domElement.dataset.terrainTransition = 'morphing';
+    updateLoop();
+  };
+
+  const advanceTransition = (nowMs: number) => {
+    if (!transition) {
+      return;
+    }
+
+    const frame = evaluateTerrainTransition(
+      nowMs - transition.startedAtMs,
+      terrainTransitionDurationMs,
+    );
+
+    if (frame.isComplete) {
+      finishTransition();
+
+      return;
+    }
+
+    const progress = frame.terrainProgress;
+    const [fromMinimum, fromMaximum] = transition.previousGradientRange;
+    const [toMinimum, toMaximum] = gradientRange;
+
+    transition.morph.apply(progress);
+    elevationGradient.setRange(
+      (1 - progress) * fromMinimum + progress * toMinimum,
+      (1 - progress) * fromMaximum + progress * toMaximum,
+    );
+
+    for (const line of transition.outgoingContours) {
+      line.material.opacity = transition.outgoingStrokeOpacity * frame.outgoingOpacity;
+    }
+
+    transition.incomingOpacity = frame.incomingOpacity;
+    syncDecorations();
+  };
+
+  /** Lands exactly on the destination; also used to cut short a morph a newer change supersedes. */
+  const finishTransition = () => {
+    if (!transition) {
+      return;
+    }
+
+    const { morph, outgoingContours } = transition;
+
+    transition = undefined;
+    morph.finish();
+    surface.frustumCulled = base.frustumCulled = true;
+
+    for (const line of outgoingContours) {
+      contourLayer.remove(line);
+      line.geometry.dispose();
+      line.material.dispose();
+    }
+
+    elevationGradient.setRange(...gradientRange);
+    syncDecorations();
+    renderer.domElement.dataset.terrainTransition = 'settled';
+
+    // A queued follow-up morph owns the floor label until it settles too.
+    if (!isTransitionArmed) {
+      applyPendingMapGrid();
+    }
+
+    updateLoop();
   };
 
   document.addEventListener('visibilitychange', () => {
@@ -623,9 +789,26 @@ export function createTerrain3d(
       terraceLevels?: TerrainTerraceLevels,
     ) {
       lastUpdate = [contours, width, height, settings, field, seaLevel, terraceLevels];
-      const key = JSON.stringify([width, height, modelSettings, exaggeration, terraceLevels]);
+      // Terrace levels follow the contour interval but only shape terraced models.
+      const key = JSON.stringify([
+        width,
+        height,
+        modelSettings,
+        exaggeration,
+        modelSettings.terrainShape === 'terraced' ? terraceLevels : undefined,
+      ]);
 
       if (field !== previousField || key !== modelKey) {
+        // Terraced layers do not share a vertex layout between terrains, so they always cut.
+        const shouldMorph =
+          isTransitionArmed &&
+          key === modelKey &&
+          previousField !== undefined &&
+          modelSettings.terrainShape !== 'terraced';
+        const [previousSurface, previousBase] = [surface.geometry, base.geometry];
+        const previousGradientRange = gradientRange;
+
+        finishTransition();
         model = createTerrainModel(
           field,
           width,
@@ -732,7 +915,10 @@ export function createTerrain3d(
             geometry.dispose();
           }
 
-          mesh.geometry.dispose();
+          if (!shouldMorph) {
+            mesh.geometry.dispose();
+          }
+
           mesh.geometry = rendered;
         }
 
@@ -744,10 +930,15 @@ export function createTerrain3d(
           gradientMaximum = Math.max(gradientMaximum, elevation);
         }
 
-        elevationGradient.setRange(gradientMinimum, gradientMaximum);
+        gradientRange = [gradientMinimum, gradientMaximum];
+        elevationGradient.setRange(...gradientRange);
         previousField = field;
         modelKey = key;
         onModel(model.overallHeightMm, model.layerHeightMm);
+
+        if (shouldMorph) {
+          startTransition(previousSurface, previousBase, previousGradientRange);
+        }
       }
 
       const previewScale =
@@ -764,6 +955,8 @@ export function createTerrain3d(
       const elevationOffset = model.elevationOffsetMm * previewScale;
 
       const scale = 2 / Math.max(width, height);
+
+      strokeOpacity = settings.strokeOpacity;
       const lineBuffers = createTerrainLineBuffers(
         terracedContours ?? contours,
         width,
@@ -800,7 +993,6 @@ export function createTerrain3d(
         layer.geometry = geometry;
         layer.visible = buffers.positions.length > 0;
         layer.material.color.set(settings.lineColor);
-        layer.material.opacity = settings.strokeOpacity;
         layer.material.linewidth =
           style === 'ordinary' ? settings.strokeWidth : settings.indexStrokeWidth;
         layer.material.dashSize = settings.dashLength;
@@ -852,8 +1044,13 @@ export function createTerrain3d(
         mesh.geometry = geometry;
       }
 
-      sea.visible = waterStyle !== 'off' && water.top.length > 0;
-      syncWaterSides();
+      syncDecorations();
+      isTransitionArmed = false;
+
+      if (!transition) {
+        applyPendingMapGrid();
+      }
+
       seaInk.set(settings.lineColor);
       backgroundColor = settings.background;
       updateLandColor();
@@ -872,6 +1069,11 @@ export function createTerrain3d(
     },
     setVisible(value: boolean) {
       visible = value;
+
+      if (!value) {
+        finishTransition();
+      }
+
       renderer.domElement.hidden = !value;
       controls.enabled = value;
       previousTime = performance.now();
@@ -924,7 +1126,7 @@ export function createTerrain3d(
       litWaterMaterial.needsUpdate = true;
       litWaterMaterial.roughness = waterFinishes[value].roughness;
       litWaterMaterial.clearcoat = waterFinishes[value].clearcoat;
-      syncWaterSides();
+      syncWater();
 
       if (waterStyle === 'solid') {
         sea.material = activeWaterMaterial();
@@ -942,11 +1144,7 @@ export function createTerrain3d(
     setWaterStyle(value: WaterStyle) {
       waterStyle = value;
       sea.material = value === 'solid' ? activeWaterMaterial() : seaMaterial;
-      sea.visible =
-        value !== 'off' &&
-        previousField !== undefined &&
-        sea.geometry.getAttribute('position').count > 0;
-      syncWaterSides();
+      syncWater();
       draw();
     },
     setWaterOpacity(value: number) {
@@ -990,8 +1188,12 @@ export function createTerrain3d(
       contourIntervalMeters: number | undefined,
       floorStyle: FloorStyle,
     ) {
-      stage.setMapGrid(value, place, contourIntervalMeters, floorStyle);
-      draw();
+      pendingMapGrid = [value, place, contourIntervalMeters, floorStyle];
+
+      if (!isTransitionArmed && !transition) {
+        applyPendingMapGrid();
+        draw();
+      }
     },
     setSurfaceColor(value: string | undefined) {
       customSurfaceColor = value;
@@ -1091,6 +1293,9 @@ export function createTerrain3d(
           THREE.MathUtils.degToRad(azimuthDegrees),
         ),
       );
+    },
+    requestTransition() {
+      isTransitionArmed = true;
     },
     setRotating(value: boolean) {
       rotating = value;
