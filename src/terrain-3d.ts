@@ -37,6 +37,7 @@ import {
   type TerrainCameraSettings,
   type TerrainViewPreset,
 } from './terrain-camera';
+import { getStillPixelRatio } from './export/still-export';
 import { createTerrainMeshMorph, type TerrainMeshMorph } from './terrain-3d-transition';
 import { evaluateTerrainTransition } from './terrain-transition';
 import { terrainTransitionDurationMs } from './constants/terrain-transition';
@@ -61,10 +62,6 @@ import type { Contour } from './types/contours';
 import type { DesignSettings } from './types/design';
 
 export type WaterStyle = 'hatched' | 'solid' | 'off';
-
-// Stills are capped at 40 MP to stay within browser canvas memory; on viewports above
-// 2.5 MP (e.g. 2560 × 1440) a 4× request renders smaller, and the saved toast reports the size.
-const maximumStillPixels = 40_000_000;
 
 /** An optional, session-only raised-contour preview of the shared landscape. */
 export interface Terrain3d {
@@ -552,7 +549,8 @@ export function createTerrain3d(
 
   /** Eases the camera to a new direction around the target, keeping the framing distance. */
   const animateCameraDirection = (direction: THREE.Vector3) => {
-    settleViewAnimation?.();
+    // A new preset eases on from wherever the previous one had reached.
+    cancelAnimationFrame(viewAnimationFrame);
     const distance = getViewDistance();
     const from = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
     const to = new THREE.Spherical().setFromVector3(direction);
@@ -1234,10 +1232,11 @@ export function createTerrain3d(
       // Static exports use settled terrain and framing, never a frame mid-animation.
       finishTransition();
       settleViewAnimation?.();
-      const pixelRatio = Math.min(
+      const pixelRatio = getStillPixelRatio(
         scale,
-        renderer.capabilities.maxTextureSize / Math.max(viewportWidth, viewportHeight),
-        Math.sqrt(maximumStillPixels / (viewportWidth * viewportHeight)),
+        viewportWidth,
+        viewportHeight,
+        renderer.capabilities.maxTextureSize,
       );
       const previousPixelRatio = renderer.getPixelRatio();
       const frame = document.createElement('canvas');
@@ -1265,10 +1264,12 @@ export function createTerrain3d(
         draw();
       }
 
-      // The scene background is opaque, so a transparent centre means the copy silently failed.
-      const centre = context.getImageData(frame.width / 2, frame.height / 2, 1, 1).data;
-
-      if (centre[3] === 0) {
+      // The scene background is opaque, so an empty or transparent copy means allocation failed.
+      if (
+        frame.width === 0 ||
+        frame.height === 0 ||
+        context.getImageData(frame.width / 2, frame.height / 2, 1, 1).data[3] === 0
+      ) {
         throw new Error('The browser could not allocate the 3D still. Try a smaller scale.');
       }
 
@@ -1314,8 +1315,9 @@ export function createTerrain3d(
 
         const onKey = (event: KeyboardEvent) => {
           if (event.key === 'Escape') {
-            // Consumed so the studio's own Escape handling doesn't also collapse the inspector.
+            // Consumed so the studio's Escape handling doesn't also collapse the inspector or close a popover.
             event.preventDefault();
+            event.stopPropagation();
             finish(false);
           }
         };

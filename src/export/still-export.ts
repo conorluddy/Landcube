@@ -1,6 +1,24 @@
 export const terrainStillScales = [1, 2, 4] as const;
 export type TerrainStillScale = (typeof terrainStillScales)[number];
 
+// Stills are capped at 40 MP to stay within desktop browser canvas memory; on viewports above
+// 2.5 MP (e.g. 2560 × 1440) a 4× request renders smaller, and the saved toast reports the size.
+export const maximumStillPixels = 40_000_000;
+
+/** Pixel ratio for a still at `scale` × the viewport, limited by GPU texture size and the pixel cap. */
+export function getStillPixelRatio(
+  scale: number,
+  viewportWidth: number,
+  viewportHeight: number,
+  maximumTextureSize: number,
+): number {
+  return Math.min(
+    scale,
+    maximumTextureSize / Math.max(viewportWidth, viewportHeight),
+    Math.sqrt(maximumStillPixels / (viewportWidth * viewportHeight)),
+  );
+}
+
 /** Encodes a captured 3D frame as PNG, stamping real-terrain attribution bottom-left like SVG exports. */
 export async function encodeTerrainStill(
   frame: HTMLCanvasElement,
