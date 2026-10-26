@@ -127,7 +127,7 @@ jobs:
       # Trusted publishing (OIDC) needs npm 11.5.1 or later
       - name: Update npm
         if: steps.release.outputs.should-publish == 'true'
-        run: npm install --global npm@latest
+        run: npm install --global npm@^11.5.1
 
       - name: Install dependencies
         if: steps.release.outputs.should-publish == 'true'
