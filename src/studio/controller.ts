@@ -270,6 +270,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
   };
 
   const applySource = (terrain: RealTerrain | undefined, shouldTransition: boolean) => {
+    const previousScene = state.scene;
     const previousLocation = state.source.terrain?.location;
     const nextLocation = terrain?.location;
     const locationChanged =
@@ -296,6 +297,12 @@ export function createStudioController(actions: DesignControlActions): StudioCon
     }
 
     effects?.applyTerrain(terrain, shouldTransition);
+
+    // After applyTerrain, so the renderer can blend the new gradient into the terrain morph.
+    if (state.scene !== previousScene) {
+      effects?.sceneChanged(previousScene);
+    }
+
     publish();
   };
 
