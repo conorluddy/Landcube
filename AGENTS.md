@@ -14,6 +14,12 @@ Preserve reproducibility: existing version-one links depend on stable defaults a
 
 Keep browser and CLI behavior aligned through the shared pipeline.
 
+## Git hygiene
+
+- Use the PR template for all PRs.
+- Default branch is protected - all updates via PR.
+- PR titles use four words and one emoji prefix e.g. "🧑🏼‍💻 This is a title".
+
 ## Guides
 
 - [docs/CODESTYLE.md](docs/CODESTYLE.md): code style, determinism rules, error handling, testing.
