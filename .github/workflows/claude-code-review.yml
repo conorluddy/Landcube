@@ -1,0 +1,47 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  claude-review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Review PR #${{ github.event.pull_request.number }} in ${{ github.repository }}.
+            Read AGENTS.md first; it defines the invariants that matter most here.
+            Check code against docs/CODESTYLE.md when it exists.
+
+            Focus on, in order:
+            - Bugs and regressions in the shared pipeline (settings, terrain, contours, composition, SVG, export)
+            - Browser and CLI drift: behaviour changed on one side only
+            - Reproducibility: version-one design links must render identically (defaults, terrain semantics, URL serialization)
+            - Real-terrain output keeps source attribution; static exports use settled terrain
+            - Missing tests for changed behaviour
+            - PR hygiene: template filled in, title is one emoji plus four words, labels sensible
+
+            Be concise. Skip praise and nits a formatter or linter would catch.
+            Post one review comment with `gh pr comment`. If nothing is worth raising, say so in one line.
+          claude_args: '--allowed-tools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*)"'
