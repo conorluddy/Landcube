@@ -179,6 +179,8 @@ export const realTerrainPresets = [
     longitude: 46.83,
     spanKm: 16,
   },
+  // Machynlleth, Corris, Cross Foxes, Bwlch Oerddrws, Dinas Mawddwy and Cadair Idris.
+  { name: 'Mach Loop', country: 'United Kingdom', latitude: 52.67, longitude: -3.79, spanKm: 22 },
 ] as const;
 
 /** Native select groups; keep the flat preset list and its initial selection stable. */
