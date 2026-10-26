@@ -552,7 +552,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
   return controller;
 }
 
-/** Identifies the location fields a real-terrain load used. */
+/** Identifies the location fields a real-terrain load used; must list every input `loadTerrain` passes on. */
 function getSourceFieldsKey(source: TerrainSourceState): string {
   return JSON.stringify([
     source.latitude,

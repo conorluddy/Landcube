@@ -64,14 +64,13 @@ async function fetchCachedTerrainTile(tileUrl: string): Promise<Response> {
 
   const response = await downloadTerrainTile(tileUrl);
 
-  try {
-    await cache?.put(tileUrl, response.clone());
-  } catch (error) {
-    // A full cache only costs a re-download next time; the tile itself is fine.
+  // Writing in the background keeps decoding off the cache's critical path.
+  // A failed write only costs a re-download next time; the tile itself is fine.
+  cache?.put(tileUrl, response.clone()).catch((error: unknown) => {
     console.warn(
       JSON.stringify({ event: 'terrain_tile_cache_failed', tileUrl, error: String(error) }),
     );
-  }
+  });
 
   return response;
 }
