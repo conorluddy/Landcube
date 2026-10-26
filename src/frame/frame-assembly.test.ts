@@ -219,3 +219,96 @@ void test('non-finite tray settings name the setting', () => {
 
   assert.match(message, /floorThicknessMm/);
 });
+
+void test('a 1.2 mm wall is accepted whatever the clearance rounding', () => {
+  expectAssembly(
+    createFrameAssembly(
+      rectangleModel,
+      overallHeightMm,
+      tray(rectangleModel, { borderWidthMm: 1.2, clearanceMm: -3.98 }),
+    ),
+  );
+});
+
+void test('a press-fit clearance builds a printable tray', () => {
+  const assembly = expectAssembly(
+    createFrameAssembly(
+      rectangleModel,
+      overallHeightMm,
+      tray(rectangleModel, { clearanceMm: -0.1 }),
+    ),
+  );
+
+  validatePrintableSolid(assembly.parts[0].solid);
+});
+
+void test('a long thin model collapses on its short axis first', () => {
+  const model = { widthMm: 120, lengthMm: 20, baseThicknessMm: 3 };
+  const message = expectErrorMessage(
+    createFrameAssembly(model, overallHeightMm, tray(model, { clearanceMm: -12 })),
+  );
+
+  assert.match(message, /clearanceMm/);
+});
+
+void test('round tray opening is the model radius plus clearance', () => {
+  const assembly = expectAssembly(
+    createFrameAssembly(circleModel, overallHeightMm, tray(circleModel, { clearanceMm: 0.3 })),
+  );
+  const { positions } = assembly.parts[0].solid;
+  let openingVertexCount = 0;
+
+  for (let offset = 0; offset < positions.length; offset += 3) {
+    const radiusMm = Math.hypot(positions[offset], positions[offset + 2]);
+
+    if (radiusMm > 1 && radiusMm < 76) {
+      openingVertexCount++;
+      // Float32 positions resolve about 4e-6 mm at this radius.
+      assert.ok(Math.abs(radiusMm - 75.3) < 1e-5, `opening radius ${radiusMm}`);
+    }
+  }
+
+  assert.equal(openingVertexCount, 512 * 2);
+});
+
+void test('circle outline matches a circular model', () => {
+  expectAssembly(
+    createFrameAssembly(circleModel, overallHeightMm, tray(circleModel, { outline: 'circle' })),
+  );
+});
+
+void test('tray rejects a float until it is supported', () => {
+  const message = expectErrorMessage(
+    createFrameAssembly(
+      rectangleModel,
+      overallHeightMm,
+      tray(rectangleModel, { float: { insetMm: 10, liftMm: 5 } }),
+    ),
+  );
+
+  assert.match(message, /float/);
+});
+
+void test('an unknown profile lists the presets', () => {
+  const message = expectErrorMessage(
+    createFrameAssembly(
+      rectangleModel,
+      overallHeightMm,
+      tray(rectangleModel, { profile: 'ogee' as TrayFrameSettings['profile'] }),
+    ),
+  );
+
+  assert.match(message, /square, chamfer, cove, stepped, floating/);
+});
+
+void test('a floor thinner than 1.2 mm is rejected', () => {
+  const message = expectErrorMessage(
+    createFrameAssembly(
+      rectangleModel,
+      overallHeightMm,
+      tray(rectangleModel, { floorThicknessMm: 0.4 }),
+    ),
+  );
+
+  assert.match(message, /floorThicknessMm 0\.4/);
+});

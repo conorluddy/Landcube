@@ -1,5 +1,5 @@
-import { operationErrorCodes } from '../constants/operations';
 import { coveProfileSegments, maximumFrameOverhangDegrees } from '../constants/frame';
+import { operationErrorCodes } from '../constants/operations';
 import type { FrameProfile, FrameProfilePoint, FrameProfilePreset } from '../types/frame';
 import type { Result } from '../types/operations';
 
@@ -117,20 +117,38 @@ export function validateProfileOverhang(profile: FrameProfile): Result<FrameProf
   return { ok: true, data: profile };
 }
 
-/** The narrowest horizontal span from the inner wall to the outer face, floor top to rim. */
+/**
+ * The narrowest horizontal span from the inner wall to the outer face, floor top to rim.
+ * Each band between neighbouring vertex heights is measured with only the segments that
+ * span it, so a notch bounded by horizontal faces is not hidden by those faces. In a
+ * non-self-intersecting profile the outer face is one linear segment per band, so its
+ * narrowest point is at a band edge.
+ */
 export function measureNarrowestWallMm(
   points: readonly FrameProfilePoint[],
   innerOffsetMm: number,
   floorHeightMm: number,
 ): number {
-  const wallHeights = [
-    floorHeightMm,
-    ...points.map(({ heightMm }) => heightMm).filter((heightMm) => heightMm >= floorHeightMm),
-  ];
+  const bandEdges = [
+    ...new Set([
+      floorHeightMm,
+      ...points.map(({ heightMm }) => heightMm).filter((heightMm) => heightMm >= floorHeightMm),
+    ]),
+  ].sort((a, b) => a - b);
+  let narrowestMm = Infinity;
 
-  return Math.min(
-    ...wallHeights.map((heightMm) => getOuterOffsetAtMm(points, heightMm) - innerOffsetMm),
-  );
+  for (let index = 0; index < bandEdges.length - 1; index++) {
+    const lowerMm = bandEdges[index];
+    const upperMm = bandEdges[index + 1];
+
+    for (const heightMm of [lowerMm, upperMm]) {
+      const outerOffsetMm = getBandOuterOffsetMm(points, lowerMm, upperMm, heightMm);
+
+      narrowestMm = Math.min(narrowestMm, outerOffsetMm - innerOffsetMm);
+    }
+  }
+
+  return narrowestMm;
 }
 
 // === HELPERS ===
@@ -159,27 +177,31 @@ function createCovePoints(
   });
 }
 
-function getOuterOffsetAtMm(points: readonly FrameProfilePoint[], heightMm: number): number {
+/** The outermost offset at `heightMm` among segments spanning the whole band. */
+function getBandOuterOffsetMm(
+  points: readonly FrameProfilePoint[],
+  lowerMm: number,
+  upperMm: number,
+  heightMm: number,
+): number {
   let outerOffsetMm = -Infinity;
 
   for (let index = 0; index < points.length - 1; index++) {
     const start = points[index];
     const end = points[index + 1];
 
-    if (heightMm < Math.min(start.heightMm, end.heightMm)) {
+    if (Math.min(start.heightMm, end.heightMm) > lowerMm) {
       continue;
     }
 
-    if (heightMm > Math.max(start.heightMm, end.heightMm)) {
+    if (Math.max(start.heightMm, end.heightMm) < upperMm) {
       continue;
     }
 
     const offsetMm =
-      start.heightMm === end.heightMm
-        ? Math.max(start.offsetMm, end.offsetMm)
-        : start.offsetMm +
-          ((end.offsetMm - start.offsetMm) * (heightMm - start.heightMm)) /
-            (end.heightMm - start.heightMm);
+      start.offsetMm +
+      ((end.offsetMm - start.offsetMm) * (heightMm - start.heightMm)) /
+        (end.heightMm - start.heightMm);
 
     outerOffsetMm = Math.max(outerOffsetMm, offsetMm);
   }

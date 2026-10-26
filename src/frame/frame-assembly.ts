@@ -25,11 +25,14 @@ import {
 } from './frame-profiles';
 import { sweepFrameProfile } from './frame-sweep';
 
+const wallToleranceMm = 1e-9;
+
 // === PUBLIC API ===
 
 /**
  * Builds printable frame parts that fit the model's footprint. Pure and deterministic:
- * the same inputs always give the same buffers.
+ * the same inputs always give the same buffers. `overallHeightMm` sets shadow-box depth
+ * (#36); the tray only validates it.
  */
 export function createFrameAssembly(
   model: TerrainModelSettings,
@@ -94,7 +97,8 @@ function createTrayAssembly(
     tray.floorThicknessMm,
   );
 
-  if (narrowestWallMm < minimumFrameWallMm) {
+  // Tolerance absorbs rounding in (clearance + border) - clearance at exactly the minimum.
+  if (narrowestWallMm < minimumFrameWallMm - wallToleranceMm) {
     return invalidSettings(
       `The ${tray.profile} tray wall is ${narrowestWallMm.toFixed(2)} mm at its narrowest; the minimum is ${minimumFrameWallMm} mm. Increase borderWidthMm.`,
     );
@@ -164,6 +168,10 @@ function findTraySettingsError(
     if (!Number.isFinite(value) || value <= 0 || value > maximumFrameDimensionMm) {
       return `${name} must be above 0 and at most ${maximumFrameDimensionMm} mm; got ${value}.`;
     }
+  }
+
+  if (tray.floorThicknessMm < minimumFrameWallMm - wallToleranceMm) {
+    return `floorThicknessMm ${tray.floorThicknessMm} is too thin to print; the minimum is ${minimumFrameWallMm} mm.`;
   }
 
   // Every tray ring lies between the opening (clearance) and the outer edge (clearance + border).

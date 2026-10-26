@@ -100,3 +100,39 @@ void test('narrowest wall is the rim land for a chamfer and the full border for 
     assert.ok(Math.abs(wallMm - expectedMm) < 1e-9, `${preset}: ${wallMm}`);
   }
 });
+
+void test('a notch between horizontal faces counts as the narrowest wall', () => {
+  const notchedProfile = [
+    { offsetMm: 10, heightMm: 0 },
+    { offsetMm: 10, heightMm: 4 },
+    { offsetMm: 2, heightMm: 4 },
+    { offsetMm: 2, heightMm: 6 },
+    { offsetMm: 10, heightMm: 6 },
+    { offsetMm: 10, heightMm: 9 },
+    { offsetMm: 0.3, heightMm: 9 },
+    { offsetMm: 0.3, heightMm: 2 },
+  ];
+
+  assert.ok(Math.abs(measureNarrowestWallMm(notchedProfile, 0.3, 2) - 1.7) < 1e-9);
+});
+
+void test('a low wall shrinks preset features to half its height', () => {
+  const { points } = createTrayProfile('chamfer', { ...dimensions, topHeightMm: 4 });
+
+  assert.ok(Math.abs(measureNarrowestWallMm(points, 0.3, 2) - 9) < 1e-9);
+});
+
+void test('a lid passes face-down but needs supports upright', () => {
+  const lid = [
+    { offsetMm: 0.3, heightMm: 6 },
+    { offsetMm: 0.3, heightMm: 0 },
+    { offsetMm: 10, heightMm: 0 },
+    { offsetMm: 10, heightMm: 8 },
+  ];
+
+  assert.ok(validateProfileOverhang({ points: lid, printOrientation: 'face-down' }).ok);
+  assert.match(
+    expectRejection({ points: lid, printOrientation: 'upright' }),
+    /^The start cap at height 6 mm overhangs 90\.0°/,
+  );
+});
