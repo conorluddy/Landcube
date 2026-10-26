@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import {
   appUrl,
   download,
@@ -220,3 +220,71 @@ test('portrait mobile model and gradient editors fit the studio sheet', async ({
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   await page.screenshot({ path: test.info().outputPath('studio-mobile-gradient.png') });
 });
+
+test('3D terrain morphs between landscapes and settles on the destination', async ({ page }) => {
+  const errors: string[] = [];
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  const canvas = page.locator('canvas.terrain-3d');
+  const transitions = await recordTerrainTransitions(page);
+  // Software WebGL can spend a whole morph inside one frame, so count recorded morphs, never poll for one.
+  const morphCount = async () =>
+    (await transitions()).filter((state) => state === 'morphing').length;
+  const settle = () =>
+    expect(canvas).toHaveAttribute('data-terrain-transition', 'settled', { timeout: 10_000 });
+
+  await loadLocation(page);
+  await page.screenshot({ path: test.info().outputPath('terrain-morph-mid.png') });
+  await settle();
+  await page.screenshot({ path: test.info().outputPath('terrain-morph-settled.png') });
+  expect(await morphCount()).toBe(1);
+  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
+  await expect.poll(morphCount).toBe(2);
+  await settle();
+  await page.getByRole('button', { name: 'New landscape', exact: true }).click();
+  await page.getByRole('button', { name: 'New landscape', exact: true }).click();
+  await expect.poll(morphCount).toBeGreaterThan(2);
+  await settle();
+  expect(errors).toEqual([]);
+});
+
+test('reduced motion swaps 3D terrain without morphing', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  const transitions = await recordTerrainTransitions(page);
+
+  await loadLocation(page);
+  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
+  await page.getByRole('button', { name: 'New landscape', exact: true }).click();
+  // The new seed renders on the next frame; a frame queued after it runs once it has.
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+  expect(await transitions()).not.toContain('morphing');
+  await expect(page.locator('canvas.terrain-3d')).toHaveAttribute(
+    'data-terrain-transition',
+    'settled',
+  );
+});
+
+/** Records every state the 3D canvas reports, so a fast morph cannot slip between polls. */
+async function recordTerrainTransitions(page: Page): Promise<() => Promise<string[]>> {
+  await expect(page.locator('canvas.terrain-3d')).toBeVisible();
+  await page.evaluate(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>('canvas.terrain-3d');
+    const states: string[] = [];
+
+    if (!canvas) {
+      throw new Error('3D canvas is missing.');
+    }
+
+    Object.assign(window, { terrainTransitions: states });
+    new MutationObserver(() => {
+      states.push(canvas.dataset.terrainTransition ?? '');
+    }).observe(canvas, { attributeFilter: ['data-terrain-transition'] });
+  });
+
+  return () =>
+    page.evaluate(() => (window as unknown as { terrainTransitions: string[] }).terrainTransitions);
+}
