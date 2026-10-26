@@ -32,6 +32,7 @@ jobs:
           prompt: |
             Review PR #${{ github.event.pull_request.number }} in ${{ github.repository }}.
             Read AGENTS.md first; it defines the invariants that matter most here.
+            Check code against docs/CODESTYLE.md when it exists.
 
             Focus on, in order:
             - Bugs and regressions in the shared pipeline (settings, terrain, contours, composition, SVG, export)
