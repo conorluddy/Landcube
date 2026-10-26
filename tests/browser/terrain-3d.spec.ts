@@ -206,6 +206,15 @@ test('real location controls share contour intervals and export model attributio
   const stl = await download(page, 'Download STL');
 
   expect(stl.bytes.readUInt32LE(80)).toBeGreaterThan(0);
+  const canvasWidth = await page
+    .locator('canvas.terrain-3d')
+    .evaluate((canvas) => canvas.clientWidth);
+  const still = await download(page, 'Download 3D still');
+
+  expect(still.filename).toContain('3d-2x.png');
+  // PNG IHDR stores the pixel width big-endian at byte 16.
+  expect(still.bytes.readUInt32BE(16)).toBe(canvasWidth * 2);
+  await expect(page.getByRole('status').filter({ hasText: '3D still' })).toBeVisible();
 });
 
 test('cartographic floor styles repaint the floor without changing the STL', async ({ page }) => {

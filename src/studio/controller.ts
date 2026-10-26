@@ -36,6 +36,7 @@ import type { DesignSettings, ValidatedDesignSettings } from '../types/design';
 import type { Result } from '../types/operations';
 import type { WaterStyle } from '../terrain-3d';
 import type { FloorStyle } from '../terrain-floor-styles';
+import type { TerrainStillScale } from '../export/still-export';
 
 export type StudioView = '2d' | '3d';
 export type InspectorSection = 'Terrain' | 'Contours' | 'Colour' | 'Scene' | 'Camera' | 'Model';
@@ -111,6 +112,8 @@ export interface StudioEffects {
   resetCamera(): void;
   applyViewPreset(preset: TerrainViewPreset): void;
   pickFocus(): Promise<boolean>;
+  /** Resolves to the saved image's pixel size. */
+  downloadStill(scale: TerrainStillScale): Promise<{ width: number; height: number }>;
   downloadStl(): void;
 }
 
@@ -158,6 +161,7 @@ export interface StudioController {
   hatching: (value: boolean) => void;
   resetCamera: () => void;
   downloadStl: () => void;
+  downloadStill: (scale: TerrainStillScale) => Promise<void>;
 }
 
 /** Session state is independent of controls, rendering and version-one URL serialization. */
@@ -590,6 +594,17 @@ export function createStudioController(actions: DesignControlActions): StudioCon
         effects?.downloadStl();
       } catch (error) {
         notify(error instanceof Error ? error.message : 'STL export failed.');
+      }
+    },
+    async downloadStill(scale: TerrainStillScale) {
+      try {
+        const size = await effects?.downloadStill(scale);
+
+        if (size) {
+          notify(`Saved a ${size.width} × ${size.height} px 3D still.`);
+        }
+      } catch (error) {
+        notify(error instanceof Error ? error.message : '3D still export failed.');
       }
     },
   };

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Button, Group, Hint, NumberField, Select, Toggle } from './fields';
+import { Button, Group, Hint, NumberField, Segmented, Select, Toggle } from './fields';
+import { terrainStillScales, type TerrainStillScale } from '../export/still-export';
 import type { PanelProps } from './panels';
 import type { OutputRenderer } from '../types/export';
 import {
@@ -38,6 +39,8 @@ export function ExportPanel({
   const [busy, setBusy] = useState(false);
   const [size, setSize] = useState('custom');
   const [invalid, setInvalid] = useState(false);
+  const [stillScale, setStillScale] = useState<TerrainStillScale>(2);
+  const [stillBusy, setStillBusy] = useState(false);
   const fields = useRef<HTMLDivElement>(null);
   const settings = s.design;
   const limit = settings.allowExtraLargeExports
@@ -302,6 +305,38 @@ export function ExportPanel({
           {busy ? 'Generating…' : `Download ${settings.format.toUpperCase()}`}
         </Button>
       </Group>
+      {s.workspace.view === '3d' && (
+        <Group title="3D still">
+          <Segmented
+            label="Scale"
+            value={String(stillScale)}
+            options={terrainStillScales.map((scale) => ({
+              value: String(scale),
+              label: `${scale}×`,
+            }))}
+            onChange={(value) => {
+              setStillScale(Number(value) as TerrainStillScale);
+            }}
+          />
+          <Hint>
+            The current 3D view, with its lens, focus and lighting, at {stillScale}× its on-screen
+            size.
+            {s.source.terrain ? ' Includes terrain attribution.' : ''}
+          </Hint>
+          <Button
+            primary
+            disabled={stillBusy}
+            onClick={() => {
+              setStillBusy(true);
+              void c.downloadStill(stillScale).finally(() => {
+                setStillBusy(false);
+              });
+            }}
+          >
+            {stillBusy ? 'Rendering…' : 'Download 3D still'}
+          </Button>
+        </Group>
+      )}
       {s.workspace.view === '3d' && (
         <Group title="STL model">
           <Hint>

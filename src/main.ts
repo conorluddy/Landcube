@@ -6,6 +6,7 @@ import { createStudioController } from './studio/controller';
 import { createCropPreview } from './studio/crop-preview';
 import { mountStudio } from './studio/app';
 import { downloadBlob } from './studio/export-panel';
+import { encodeTerrainStill } from './export/still-export';
 import type { RealTerrain } from './real-terrain';
 import { createFloorPlace } from './floor-geo';
 import { findTerrainSummits } from './summit-markers';
@@ -141,6 +142,16 @@ controls.connect({
   resetCamera: terrain3d.resetCamera,
   applyViewPreset: terrain3d.applyViewPreset,
   pickFocus: terrain3d.pickFocus,
+  async downloadStill(scale) {
+    const frame = terrain3d.captureStill(scale);
+
+    downloadBlob(
+      await encodeTerrainStill(frame, realTerrain?.attribution),
+      `topogra-${settings.seed}-3d-${scale}x.png`,
+    );
+
+    return { width: frame.width, height: frame.height };
+  },
   downloadStl: () => {
     const model = controls.getSnapshot().model.dimensions;
 

@@ -99,6 +99,8 @@ export interface Terrain3d {
   applyViewPreset(preset: TerrainViewPreset): void;
   /** Waits for a click on the terrain; resolves false if cancelled with Escape or a miss. */
   pickFocus(): Promise<boolean>;
+  /** Renders the current view at `scale` × its on-screen CSS size into a new 2D canvas. */
+  captureStill(scale: number): HTMLCanvasElement;
   setLighting(settings: Readonly<TerrainLightingSettings>): void;
   setCamera(settings: Readonly<TerrainCameraSettings>): void;
   reset(): void;
@@ -1003,6 +1005,32 @@ export function createTerrain3d(
       draw();
     },
     setCamera: setCameraSettings,
+    captureStill(scale: number) {
+      const maximumDimension = renderer.capabilities.maxTextureSize;
+      const pixelRatio = Math.min(
+        scale,
+        maximumDimension / Math.max(viewportWidth, viewportHeight),
+      );
+      const previousPixelRatio = renderer.getPixelRatio();
+      const frame = document.createElement('canvas');
+
+      const resizeTo = (ratio: number) => {
+        renderer.setPixelRatio(ratio);
+        renderer.setSize(viewportWidth, viewportHeight);
+        postProcessing?.setSize(viewportWidth, viewportHeight, ratio);
+      };
+
+      resizeTo(pixelRatio);
+      draw();
+      frame.width = renderer.domElement.width;
+      frame.height = renderer.domElement.height;
+      // Copied in the same task as the render, so no preserved drawing buffer is needed.
+      frame.getContext('2d')?.drawImage(renderer.domElement, 0, 0);
+      resizeTo(previousPixelRatio);
+      draw();
+
+      return frame;
+    },
     pickFocus() {
       const canvas = renderer.domElement;
 
