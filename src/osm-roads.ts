@@ -8,6 +8,7 @@ import {
   roadSpanLimitsKm,
 } from './constants/roads';
 import { operationErrorCodes } from './constants/operations';
+import { createRequestSignal, readLimitedText } from './bounded-request';
 import type { GeoBounds } from './floor-geo';
 import type { Result } from './types/operations';
 import type { MappedRoad, RoadClass, RoadDetail, RoadNetwork } from './types/roads';
@@ -152,39 +153,6 @@ async function requestMappedRoads(
   }
 }
 
-/**
- * Aborts on the caller's signal or after `timeoutMs`, whichever comes first.
- * Combined by hand because `AbortSignal.any` needs Safari 17.4 and Chrome 116.
- */
-function createRequestSignal(
-  timeoutMs: number,
-  signal: AbortSignal | undefined,
-): { signal: AbortSignal; release: () => void } {
-  const controller = new AbortController();
-
-  const forwardAbort = () => {
-    controller.abort(signal?.reason);
-  };
-
-  const timer = setTimeout(() => {
-    controller.abort(new DOMException('The road download timed out.', 'TimeoutError'));
-  }, timeoutMs);
-
-  if (signal?.aborted === true) {
-    forwardAbort();
-  } else {
-    signal?.addEventListener('abort', forwardAbort, { once: true });
-  }
-
-  return {
-    signal: controller.signal,
-    release() {
-      clearTimeout(timer);
-      signal?.removeEventListener('abort', forwardAbort);
-    },
-  };
-}
-
 /** West-to-east longitude ranges inside ±180° that together cover `west`…`east`. */
 function splitAtAntimeridian(west: number, east: number): [number, number][] {
   if (east - west >= 360) {
@@ -204,48 +172,6 @@ function splitAtAntimeridian(west: number, east: number): [number, number][] {
 
 function wrapLongitude(longitude: number): number {
   return ((((longitude + 180) % 360) + 360) % 360) - 180;
-}
-
-/** Undefined once the body passes `maximumBytes`, without buffering the rest of it. */
-async function readLimitedText(
-  response: Response,
-  maximumBytes: number,
-): Promise<string | undefined> {
-  if (Number(response.headers.get('content-length') ?? 0) > maximumBytes) {
-    await response.body?.cancel();
-
-    return undefined;
-  }
-
-  if (!response.body) {
-    return response.text();
-  }
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-
-  for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
-    totalBytes += chunk.value.byteLength;
-
-    if (totalBytes > maximumBytes) {
-      await reader.cancel();
-
-      return undefined;
-    }
-
-    chunks.push(chunk.value);
-  }
-
-  const bytes = new Uint8Array(totalBytes);
-  let offset = 0;
-
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-
-  return new TextDecoder().decode(bytes);
 }
 
 type ParsedRoadElement =
