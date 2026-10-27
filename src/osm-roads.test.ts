@@ -81,6 +81,31 @@ void test('unknown classes, nodes and ways with invalid points are skipped rathe
   assert.equal(result.data.roads.length, 0);
 });
 
+void test('a partial response flagged with an Overpass remark fails instead of caching', () => {
+  const result = parseOverpassRoads(
+    {
+      remark: 'runtime error: Query timed out in "query" at line 2 after 31 seconds.',
+      elements: [way(1, { highway: 'primary' })],
+    },
+    'all',
+    '',
+  );
+
+  assert.ok(!result.ok);
+  assert.equal(result.error.retryable, true);
+  assert.match(result.error.message, /could not finish/);
+});
+
+void test('responses without a readable stream are still parsed', async () => {
+  const response = Response.json({ elements: [way(1, { highway: 'primary' })] });
+
+  Object.defineProperty(response, 'body', { value: null });
+  const result = await loadMappedRoads(bounds, 'all', () => Promise.resolve(response));
+
+  assert.ok(result.ok);
+  assert.equal(result.data.roads.length, 1);
+});
+
 void test('a malformed response fails with a retryable map-data error', () => {
   const result = parseOverpassRoads({ remark: 'runtime error' }, 'all', '');
 

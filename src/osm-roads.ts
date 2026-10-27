@@ -65,6 +65,15 @@ export function parseOverpassRoads(
     return failure('The road response had no elements. Retry later.', true);
   }
 
+  // Overpass reports timeouts and memory limits as 200 with partial elements and a remark;
+  // accepting it would cache an incomplete network for the session.
+  if (typeof response.remark === 'string' && response.remark !== '') {
+    return failure(
+      'The road service could not finish this area. Retry, or choose a smaller area span.',
+      true,
+    );
+  }
+
   const roads: MappedRoad[] = [];
   const omitted = { tunnels: 0, bridges: 0 };
 
