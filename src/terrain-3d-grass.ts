@@ -24,6 +24,8 @@ export interface TerrainGrassLayer {
   setStyle(style: Readonly<GrassStyle>): void;
   /** Morphs and terraced models cannot carry grass, so they hide it. */
   setSuppressed(value: boolean): void;
+  /** Settled grass stands still and upright, for stills and whenever wind is not animating. */
+  setSettled(value: boolean): void;
   /** True while wind needs a continuous render loop. */
   isAnimated(): boolean;
   tick(timeMs: number): void;
@@ -59,6 +61,7 @@ export function createTerrainGrassLayer(): TerrainGrassLayer {
   let coverage: GrassCoverageMap | undefined;
   let texture: THREE.DataTexture | undefined;
   let suppressed = false;
+  let settled = false;
   let groundKey: readonly unknown[] = [];
   let coverageKey: readonly unknown[] = [];
 
@@ -166,8 +169,12 @@ export function createTerrainGrassLayer(): TerrainGrassLayer {
       uniforms.grassVariation.value = value.colorVariation;
       uniforms.grassDryness.value = value.dryness;
       uniforms.grassLengthVariation.value = value.lengthVariation;
-      uniforms.grassWind.value = value.wind;
+      uniforms.grassWind.value = settled ? 0 : value.wind;
       rebuild();
+    },
+    setSettled(value) {
+      settled = value;
+      uniforms.grassWind.value = value ? 0 : style.wind;
     },
     setSuppressed(value) {
       suppressed = value;

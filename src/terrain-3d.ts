@@ -732,6 +732,8 @@ export function createTerrain3d(
   };
 
   const updateLoop = () => {
+    // Without a running wind, blades stand upright rather than keeping the last gust's lean.
+    grass.setSettled(!grass.isAnimated());
     renderer.setAnimationLoop(
       visible && (rotating || transition !== undefined || grass.isAnimated()) && !document.hidden
         ? () => {
@@ -1419,6 +1421,7 @@ export function createTerrain3d(
       // Static exports use settled terrain and framing, never a frame mid-animation.
       finishTransition();
       settleViewAnimation?.();
+      grass.setSettled(true);
       const pixelRatio = getStillPixelRatio(
         scale,
         viewportWidth,
@@ -1448,6 +1451,7 @@ export function createTerrain3d(
         context.drawImage(renderer.domElement, 0, 0);
       } finally {
         resizeTo(previousPixelRatio);
+        grass.setSettled(!grass.isAnimated());
         draw();
       }
 

@@ -457,9 +457,13 @@ test('grass restyles without errors and never changes the printable STL', async 
   await loadLocation(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
   const before = await modelDownload(page);
+  const canvas = page.locator('canvas.terrain-3d');
+  const bare = await canvas.screenshot();
 
   await section(page, 'Scene');
   await page.getByRole('switch', { name: 'Grass', exact: true }).check();
+  // The carpet must actually draw, not just restyle without errors.
+  await expect.poll(async () => (await canvas.screenshot()).equals(bare)).toBe(false);
   await page.getByLabel('Look', { exact: true }).selectOption('autumn');
   await page.getByLabel('Blade length', { exact: true }).fill('2');
   await expect(page.getByLabel('Look', { exact: true })).toHaveValue('custom');

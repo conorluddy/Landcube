@@ -136,3 +136,14 @@ void test('roads regrow the mask; wind animates only visible grass while motion 
   });
   assert.equal(layer.isAnimated(), false);
 });
+
+void test('settled grass keeps its wind setting for when motion resumes', () => {
+  const layer = createTerrainGrassLayer();
+
+  layer.update(inputs);
+  layer.setSettled(true);
+  layer.setStyle({ ...enabled, wind: 0.8 });
+  assert.equal(layer.isAnimated(), true);
+  layer.setSettled(false);
+  assert.equal(layer.isAnimated(), true);
+});
