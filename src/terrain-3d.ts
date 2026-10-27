@@ -1421,7 +1421,6 @@ export function createTerrain3d(
       // Static exports use settled terrain and framing, never a frame mid-animation.
       finishTransition();
       settleViewAnimation?.();
-      grass.setSettled(true);
       const pixelRatio = getStillPixelRatio(
         scale,
         viewportWidth,
@@ -1443,6 +1442,8 @@ export function createTerrain3d(
       }
 
       try {
+        // Inside the try, so a failed still never leaves the preview's wind switched off.
+        grass.setSettled(true);
         resizeTo(pixelRatio);
         render();
         frame.width = renderer.domElement.width;
