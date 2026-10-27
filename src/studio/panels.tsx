@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import type { StudioController, StudioState } from './controller';
 import {
   Button,
@@ -37,6 +37,14 @@ import {
 } from '../terrain-elevation-gradient';
 import { getTerrainWaterColor } from '../terrain-water';
 import type { DesignSettings } from '../types/design';
+import type { RoadDetail } from '../types/roads';
+import {
+  roadAttribution,
+  roadAttributionUrl,
+  roadWidthMmLimits,
+  roadWidthMmPerModelKm,
+} from '../constants/roads';
+import { describeRoadNetwork } from './controller';
 
 export interface PanelProps {
   controller: StudioController;
@@ -935,6 +943,7 @@ export function OverlaysPanel({ controller: c, state: s }: PanelProps): ReactNod
           </Hint>
         </Group>
       )}
+      {s.workspace.view === '3d' && <RoadsGroup controller={c} state={s} />}
       {s.source.terrain && (
         <Group title="Sea level">
           <Toggle
@@ -951,6 +960,123 @@ export function OverlaysPanel({ controller: c, state: s }: PanelProps): ReactNod
         </Group>
       )}
     </>
+  );
+}
+
+const roadDetailOptions: readonly { value: RoadDetail; label: string }[] = [
+  { value: 'major', label: 'Major roads' },
+  { value: 'all', label: 'All roads' },
+  { value: 'tracks', label: 'Roads and tracks' },
+];
+
+/** Mapped OSM roads draped over real terrain; fetched once per location when first enabled. */
+function RoadsGroup({ controller: c, state: s }: PanelProps): ReactNode {
+  const statusRef = useRef<HTMLParagraphElement>(null);
+  const style = s.scene.roads;
+  const isTerraced = s.model.dimensions.terrainShape === 'terraced';
+  const network = s.roads.network;
+  let status = s.roads.status;
+
+  if (!s.source.terrain) {
+    status = 'Roads need a real location.';
+  } else if (isTerraced) {
+    status = 'Roads are hidden on terraced models.';
+  } else if (style.enabled && network && !s.roads.loading && status === '') {
+    status = describeRoadNetwork(network, style);
+  }
+
+  return (
+    <Group title="Roads">
+      <Toggle
+        label="Mapped roads"
+        value={style.enabled}
+        disabled={!s.source.terrain}
+        onChange={(value) => {
+          c.roads({ enabled: value });
+        }}
+      />
+      <Select
+        id="roadDetail"
+        label="Detail"
+        value={network?.detail === 'major' ? 'major' : style.detail}
+        options={
+          network?.detail === 'major'
+            ? roadDetailOptions.filter((option) => option.value === 'major')
+            : roadDetailOptions
+        }
+        disabled={!style.enabled}
+        onChange={(value) => {
+          c.roads({ detail: value });
+        }}
+      />
+      <Color
+        label="Road color"
+        value={style.color}
+        disabled={!style.enabled}
+        onChange={(value) => {
+          c.roads({ color: value });
+        }}
+      />
+      <Range
+        label="Road width"
+        value={style.widthMm}
+        min={roadWidthMmLimits.minimum}
+        max={roadWidthMmLimits.maximum}
+        step={roadWidthMmLimits.step}
+        suffix=" mm"
+        disabled={!style.enabled}
+        onChange={(value) => {
+          c.roads({ widthMm: value, autoWidth: false });
+        }}
+      />
+      <Toggle
+        label="Auto width for area"
+        value={style.autoWidth}
+        disabled={!style.enabled}
+        onChange={(value) => {
+          c.roads({ autoWidth: value });
+        }}
+      />
+      <Range
+        label="Road texture"
+        value={style.texture * 100}
+        min={0}
+        max={100}
+        step={1}
+        suffix="%"
+        disabled={!style.enabled}
+        onChange={(value) => {
+          c.roads({ texture: value / 100 });
+        }}
+      />
+      {/* Always mounted, so screen readers announce download progress and failures. */}
+      <p ref={statusRef} role="status" className="export-hint" tabIndex={-1}>
+        {status}
+      </p>
+      {style.enabled && s.roads.canRetry && (
+        <Button
+          onClick={() => {
+            // Retrying unmounts this button, so keyboard focus moves to the status it updates.
+            statusRef.current?.focus();
+            c.retryRoads();
+          }}
+        >
+          Retry download
+        </Button>
+      )}
+      <Hint>
+        Experimental. Width is on the printed model; auto width is {roadWidthMmPerModelKm} mm per km
+        of model area. Tunnels and bridges are hidden. Session-only and omitted from STL.
+      </Hint>
+      <a
+        href={roadAttributionUrl}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`${roadAttribution} (opens in a new tab)`}
+      >
+        {roadAttribution} ↗
+      </a>
+    </Group>
   );
 }
 

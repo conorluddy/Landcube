@@ -5,4 +5,5 @@ export const operationErrorCodes = {
   urlFailed: 'URL_FAILED',
   clipboardFailed: 'CLIPBOARD_FAILED',
   exportFailed: 'EXPORT_FAILED',
+  mapDataFailed: 'MAP_DATA_FAILED',
 } as const;

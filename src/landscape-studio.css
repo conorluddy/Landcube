@@ -252,6 +252,9 @@ h2 {
 .attribution {
   max-width: 220px;
 }
+a.attribution {
+  color: inherit;
+}
 .studio-group,
 .inspector-body fieldset {
   border: 0;

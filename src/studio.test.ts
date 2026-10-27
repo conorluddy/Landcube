@@ -1,13 +1,19 @@
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
-import { createStudioController, type StudioEffects } from './studio/controller';
+import {
+  createStudioController,
+  describeRoadNetwork,
+  getSceneCredits,
+  type StudioEffects,
+} from './studio/controller';
+import { defaultRoadStyle } from './constants/roads';
 import {
   parseDesignParameters,
   serializeDesignParameters,
   validateDesignSettings,
 } from './design-settings';
 
-function setup() {
+function setup(fetchRoads?: typeof fetch) {
   const initial = parseDesignParameters(new URLSearchParams('v=1&seed=123&width=480&height=320'));
 
   assert.ok(initial.ok);
@@ -25,33 +31,37 @@ function setup() {
     pickFocus: () => Promise.resolve(false),
     downloadStill: () => Promise.resolve({ width: 1, height: 1 }),
     downloadStl: () => undefined,
+    roadsChanged: () => undefined,
     frameChanged: () => undefined,
     downloadFrameStl: () => undefined,
   };
-  const controller = createStudioController({
-    getSettings: () => design,
-    updateSettings: (candidate) => {
-      const result = validateDesignSettings(candidate);
+  const controller = createStudioController(
+    {
+      getSettings: () => design,
+      updateSettings: (candidate) => {
+        const result = validateDesignSettings(candidate);
 
-      if (!result.ok) {
-        return false;
-      }
+        if (!result.ok) {
+          return false;
+        }
 
-      design = result.data;
+        design = result.data;
 
-      return true;
+        return true;
+      },
+      newLandscape: () => {
+        const result = validateDesignSettings({ ...design, seed: design.seed + 1 });
+
+        assert.ok(result.ok);
+        design = result.data;
+      },
+      isSeedLocked: false,
+      lockSeed: () => undefined,
+      getShareUrl: () => `https://topogra.test/?${serializeDesignParameters(design).toString()}`,
+      copyLink: () => Promise.resolve({ ok: true, data: undefined }),
     },
-    newLandscape: () => {
-      const result = validateDesignSettings({ ...design, seed: design.seed + 1 });
-
-      assert.ok(result.ok);
-      design = result.data;
-    },
-    isSeedLocked: false,
-    lockSeed: () => undefined,
-    getShareUrl: () => `https://topogra.test/?${serializeDesignParameters(design).toString()}`,
-    copyLink: () => Promise.resolve({ ok: true, data: undefined }),
-  });
+    fetchRoads,
+  );
 
   controller.connect(effects);
 
@@ -107,6 +117,7 @@ void test('scene and model edits cannot leak into version-one style links', asyn
   c.material('porcelain');
   c.dimensions({ widthMm: 220, cropShape: 'circle' });
   c.lighting({ direction: 75 });
+  c.roads({ enabled: true, detail: 'tracks', color: '#ff0000', widthMm: 2, texture: 1 });
   await c.selectView('3d');
   assert.equal(serializeDesignParameters(c.getSnapshot().design).toString(), before);
   c.lockSeed(true);
@@ -251,6 +262,161 @@ void test('daylight cycle sweeps the sun until a manual lighting edit pauses it'
   assert.equal(c.getSnapshot().scene.daylightCycle.enabled, false);
   assert.equal(c.getSnapshot().scene.lighting.timeOfDay, 12);
 });
+
+void test('road edits restyle without refetching and a superseded download never reaches the new place', async (t) => {
+  const requests: ((elements: unknown[]) => void)[] = [];
+  const { controller: c, effects } = setup(
+    () =>
+      new Promise((resolve) => {
+        // Ignores abort signals, so a superseded response still arrives late.
+        requests.push((elements) => {
+          resolve(Response.json({ elements }));
+        });
+      }),
+  );
+  let roadUpdates = 0;
+
+  effects.roadsChanged = () => {
+    roadUpdates++;
+  };
+
+  stubBrowserTileDecoding(t);
+  await c.loadTerrain();
+  c.roads({ enabled: true });
+  assert.equal(requests.length, 1);
+  assert.equal(c.getSnapshot().roads.loading, true);
+
+  c.source({ latitude: 53.2707, longitude: -9.0568 });
+  await c.loadTerrain();
+  assert.equal(requests.length, 2);
+  requests[1]([roadElement(2)]);
+  await new Promise(setImmediate);
+  requests[0]([roadElement(1)]);
+  await new Promise(setImmediate);
+  assert.deepEqual(
+    c.getSnapshot().roads.network?.roads.map((road) => road.id),
+    [2],
+  );
+
+  c.roads({ color: '#ff0000', widthMm: 1.2, detail: 'major' });
+  c.roads({ enabled: false });
+  c.roads({ enabled: true });
+  assert.equal(requests.length, 2);
+  assert.equal(roadUpdates, 1);
+  assert.equal(c.getSnapshot().scene.roads.color, '#ff0000');
+});
+
+void test('a failed road download keeps the terrain and explains how to recover', async (t) => {
+  const { controller: c } = setup(() => Promise.resolve(new Response('', { status: 504 })));
+
+  stubBrowserTileDecoding(t);
+  await c.loadTerrain();
+  const terrain = c.getSnapshot().source.terrain;
+
+  c.roads({ enabled: true });
+  await new Promise(setImmediate);
+  assert.equal(c.getSnapshot().source.terrain, terrain);
+  assert.equal(c.getSnapshot().roads.loading, false);
+  assert.match(c.getSnapshot().roads.status, /busy/);
+  assert.equal(c.getSnapshot().roads.canRetry, true);
+});
+
+void test('style edits after a failed road download never refetch; Retry does', async (t) => {
+  let downloads = 0;
+  const { controller: c } = setup(() => {
+    downloads++;
+
+    return Promise.resolve(new Response('', { status: 502 }));
+  });
+
+  stubBrowserTileDecoding(t);
+  await c.loadTerrain();
+  c.roads({ enabled: true });
+  await new Promise(setImmediate);
+
+  for (let index = 0; index < 30; index++) {
+    c.roads({ widthMm: 0.5 + index / 100, autoWidth: false });
+  }
+
+  await new Promise(setImmediate);
+  assert.equal(downloads, 1);
+  c.retryRoads();
+  await new Promise(setImmediate);
+  assert.equal(downloads, 2);
+});
+
+void test('auto road width follows the model area until the width is edited', () => {
+  const { controller: c } = setup();
+
+  c.modelSpan(5.09);
+  assert.equal(c.getSnapshot().scene.roads.widthMm, 0.6, 'hidden roads keep their width');
+  c.roads({ enabled: true });
+  assert.equal(c.getSnapshot().scene.roads.widthMm, 0.5);
+  c.modelSpan(20);
+  assert.equal(c.getSnapshot().scene.roads.widthMm, 2);
+
+  c.roads({ widthMm: 0.8, autoWidth: false });
+  c.modelSpan(5.09);
+  assert.equal(c.getSnapshot().scene.roads.widthMm, 0.8);
+
+  c.roads({ autoWidth: true });
+  assert.equal(c.getSnapshot().scene.roads.widthMm, 0.5);
+});
+
+void test('stills credit OpenStreetMap only while roads are drawn', async (t) => {
+  const { controller: c } = setup(() =>
+    Promise.resolve(Response.json({ elements: [roadElement(1)] })),
+  );
+  const credits = () => getSceneCredits(c.getSnapshot(), 'EU-DEM');
+
+  stubBrowserTileDecoding(t);
+  await c.loadTerrain();
+  await c.selectView('3d');
+  assert.deepEqual(credits(), ['EU-DEM'], 'roads off');
+
+  c.roads({ enabled: true });
+  assert.deepEqual(credits(), ['EU-DEM'], 'roads enabled before the network arrives');
+  await new Promise(setImmediate);
+  assert.equal(credits().length, 2);
+  assert.match(credits()[1], /OpenStreetMap/);
+
+  c.dimensions({ terrainShape: 'terraced' });
+  assert.deepEqual(credits(), ['EU-DEM'], 'terraced models hide roads');
+  c.dimensions({ terrainShape: 'smooth' });
+  await c.selectView('2d');
+  assert.deepEqual(credits(), ['EU-DEM'], 'the 2D view draws no roads');
+});
+
+void test('road status counts only the tunnels and bridges within the drawn detail', () => {
+  const network = {
+    roads: [{ id: 1, roadClass: 'primary' as const, points: [] }],
+    omitted: [{ roadClass: 'track' as const, kind: 'bridge' as const }],
+    detail: 'tracks' as const,
+    fetchedAt: '',
+    attribution: '',
+  };
+
+  assert.equal(
+    describeRoadNetwork(network, { ...defaultRoadStyle, detail: 'major' }),
+    '1 mapped road.',
+  );
+  assert.equal(
+    describeRoadNetwork(network, { ...defaultRoadStyle, detail: 'tracks' }),
+    '1 mapped road · 1 bridge and 0 tunnels hidden.',
+  );
+});
+
+function roadElement(id: number) {
+  return {
+    type: 'way',
+    id,
+    tags: { highway: 'primary' },
+    geometry: [
+      { lat: 53, lon: -6 },
+      { lat: 53.01, lon: -6 },
+    ],
+  };
+}
 
 const pngHeaders = { headers: { 'content-type': 'image/png' } };
 

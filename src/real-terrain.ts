@@ -1,5 +1,6 @@
 import type { RealContourInterval } from './real-terrain-contours';
 import { realTerrainBounds } from './constants/real-terrain';
+import { getMercatorSpanFraction, getMercatorX, getMercatorY } from './real-terrain-projection';
 
 export interface RealTerrain {
   sample: (x: number, y: number, width: number, height: number) => number;
@@ -26,7 +27,6 @@ export interface DecodedTerrainTile {
 /** Keeps fetching and image decoding platform-specific while sharing terrain sampling. */
 export type TerrainTileLoader = (tileUrl: string) => Promise<DecodedTerrainTile>;
 
-const earthCircumferenceMeters = 40075016.686;
 const tileSizePixels = 256;
 
 /** Decodes the public Terrarium RGB elevation format into meters. */
@@ -73,12 +73,12 @@ export async function loadRealTerrain(
   const effectiveFloor =
     maxDepth === undefined ? elevationFloor : Math.max(elevationFloor ?? -Infinity, -maxDepth);
 
-  const latitudeRadians = (latitude * Math.PI) / 180;
-  const spanFraction = (spanKm * 1000) / (earthCircumferenceMeters * Math.cos(latitudeRadians));
+  // Shared with feature projection, so overlays land where terrain is sampled.
+  const spanFraction = getMercatorSpanFraction(latitude, spanKm);
   const zoom = Math.max(0, Math.min(14, Math.floor(Math.log2(2 / spanFraction))));
   const tileCount = 2 ** zoom;
-  const centerX = ((longitude + 180) / 360) * tileCount;
-  const centerY = ((1 - Math.asinh(Math.tan(latitudeRadians)) / Math.PI) / 2) * tileCount;
+  const centerX = getMercatorX(longitude) * tileCount;
+  const centerY = getMercatorY(latitude) * tileCount;
   const spanTiles = spanFraction * tileCount;
   const startX = Math.floor(centerX - spanTiles / 2);
   const startY = Math.floor(centerY - spanTiles / 2);

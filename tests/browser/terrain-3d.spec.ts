@@ -373,3 +373,77 @@ async function recordTerrainTransitions(page: Page): Promise<() => Promise<strin
   return () =>
     page.evaluate(() => (window as unknown as { terrainTransitions: string[] }).terrainTransitions);
 }
+
+test('mapped roads retry after a busy service, restyle without refetching and credit OpenStreetMap', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  const queries: string[] = [];
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.route('https://overpass-api.de/api/interpreter', async (route) => {
+    queries.push(new URLSearchParams(route.request().postData() ?? '').get('data') ?? '');
+    const headers = { 'access-control-allow-origin': '*' };
+
+    // The public instance answers 502 under load; the first request plays that part.
+    if (queries.length === 1) {
+      await route.fulfill({ status: 502, headers });
+
+      return;
+    }
+
+    // Synthetic ways near the default preset; real responses carry the same shape.
+    await route.fulfill({
+      json: {
+        elements: [
+          syntheticWay(1, 'primary', {}),
+          syntheticWay(2, 'track', {}),
+          syntheticWay(3, 'secondary', { bridge: 'yes' }),
+        ],
+      },
+      headers,
+    });
+  });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await loadLocation(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await page.getByRole('switch', { name: 'Mapped roads', exact: true }).check();
+  await expect(page.getByRole('status').filter({ hasText: 'busy' })).toBeVisible();
+  await page.getByLabel('Road width').fill('1.5');
+  expect(queries).toHaveLength(1);
+  await page.getByRole('button', { name: 'Retry download', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('status').filter({ hasText: /mapped road/ })).toBeFocused();
+  await expect(page.getByText('1 mapped road · 1 bridge and 0 tunnels hidden.')).toBeVisible();
+  await page.getByLabel('Detail').selectOption('tracks');
+  await expect(page.getByText('2 mapped roads · 1 bridge and 0 tunnels hidden.')).toBeVisible();
+  await page.getByLabel('Road width').fill('2');
+  await page.getByRole('switch', { name: 'Mapped roads', exact: true }).uncheck();
+  await page.getByRole('switch', { name: 'Mapped roads', exact: true }).check();
+  await expect(
+    page.locator('footer a.attribution').filter({ hasText: 'OpenStreetMap' }),
+  ).toHaveAttribute('href', 'https://www.openstreetmap.org/copyright');
+  expect(queries).toHaveLength(2);
+  expect(queries[1]).toContain('way["highway"');
+
+  await page.keyboard.press('Escape');
+  await section(page, 'Model');
+  await page.getByLabel('Terrain shape', { exact: true }).selectOption('terraced');
+  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await expect(page.getByText('Roads are hidden on terraced models.')).toBeVisible();
+  await expect(page.locator('footer a.attribution')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+function syntheticWay(id: number, highway: string, tags: Record<string, string>) {
+  return {
+    type: 'way',
+    id,
+    tags: { highway, ...tags },
+    geometry: Array.from({ length: 12 }, (_, index) => ({
+      lat: 55.01 + index * 0.0015 * id,
+      lon: -8.15 + index * 0.006,
+    })),
+  };
+}

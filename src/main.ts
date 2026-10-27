@@ -2,7 +2,7 @@ import { cropTerrainModelField } from './terrain-model';
 import type { HeightField } from './types/terrain';
 import { createSeaLevelGeometry, type SeaLevelGeometry } from './sea-level';
 import { createStudioTerrainView } from './studio/terrain-view';
-import { createStudioController } from './studio/controller';
+import { createStudioController, getSceneCredits } from './studio/controller';
 import { createCropPreview } from './studio/crop-preview';
 import { mountStudio } from './studio/app';
 import { downloadBlob } from './studio/export-panel';
@@ -10,6 +10,8 @@ import { encodeTerrainStill } from './export/still-export';
 import { createBinaryStl } from './export/stl-export';
 import type { RealTerrain } from './real-terrain';
 import { createFloorPlace } from './floor-geo';
+import { clipRoadsToCrop, noRoadPaths } from './road-ribbons';
+import type { RoadPath } from './types/roads';
 import { findTerrainSummits } from './summit-markers';
 import { getRequiredElement } from './dom-elements';
 import './landscape-studio.css';
@@ -155,7 +157,7 @@ controls.connect({
     const frame = terrain3d.captureStill(scale);
 
     downloadBlob(
-      await encodeTerrainStill(frame, realTerrain?.attribution),
+      await encodeTerrainStill(frame, getStillAttribution()),
       `topogra-${settings.seed}-3d-${scale}x.png`,
     );
 
@@ -179,6 +181,7 @@ controls.connect({
         : `topogra-${settings.seed}-${model.widthMm}x${model.lengthMm}mm.stl`,
     );
   },
+  roadsChanged: updateTerrain3d,
   applyTerrain: (loadedTerrain, shouldTransition) => {
     if (shouldTransition) {
       requestTerrainTransition();
@@ -327,6 +330,7 @@ let modelSourceSampler: typeof terrain | undefined;
 let modelSourceField: HeightField | undefined;
 let modelCropKey = '';
 let modelCrop: ReturnType<typeof cropTerrainModelField> | undefined;
+let roadPaths: { key: unknown[]; paths: RoadPath[] } = { key: [], paths: [] };
 
 function updateTerrain3d(): void {
   if (!terrain3d.isActive()) {
@@ -377,6 +381,11 @@ function updateTerrain3d(): void {
     realTerrain,
   );
 
+  const place = createFloorPlace(realTerrain, modelCrop, modelSourceFrame);
+
+  // Before the update, so the update builds roads at the new auto width. A width change also
+  // rebuilds once on the previous terrain; that costs one ribbon pass per place load.
+  controls.modelSpan(place ? Math.max(place.widthKm, place.lengthKm) : undefined);
   terrain3d.update(
     croppedContours,
     modelCrop.width,
@@ -385,10 +394,43 @@ function updateTerrain3d(): void {
     modelCrop.field,
     croppedSea,
     realTerrain?.attribution,
-    createFloorPlace(realTerrain, modelCrop, modelSourceFrame),
+    place,
     getRealContourInterval(realTerrain),
     getTerrainTerraceLevels(settings, engineConfiguration, realTerrain),
+    getCroppedRoadPaths(modelSourceFrame, modelCrop, dimensions.cropShape ?? 'rectangle'),
   );
+}
+
+/** Projects the current road network into the model crop, reusing the last result when unchanged. */
+function getCroppedRoadPaths(
+  frame: { width: number; height: number },
+  crop: NonNullable<typeof modelCrop>,
+  shape: 'rectangle' | 'circle',
+): readonly RoadPath[] {
+  const { roads } = controls.getSnapshot();
+  const location = realTerrain?.location;
+  const spanKm = realTerrain?.spanKm;
+
+  // Disabled roads still project, so switching them back on needs no terrain update.
+  if (!roads.network || !location || spanKm === undefined) {
+    return noRoadPaths;
+  }
+
+  const key = [roads.network, location, spanKm, frame, crop, shape];
+
+  if (key.some((value, index) => value !== roadPaths.key[index])) {
+    roadPaths = {
+      key,
+      paths: clipRoadsToCrop(roads.network.roads, { location, spanKm }, frame, crop, shape),
+    };
+  }
+
+  return roadPaths.paths;
+}
+
+/** Credits every external source visible in the 3D view. */
+function getStillAttribution(): string[] {
+  return getSceneCredits(controls.getSnapshot(), realTerrain?.attribution);
 }
 
 /** Eases cursor deformation with capped frame pacing until settled. */

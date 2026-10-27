@@ -1,7 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { threeDOnlySections, type StudioController, type InspectorSection } from './controller';
+import { roadAttributionUrl } from '../constants/roads';
+import {
+  areRoadsDrawn,
+  threeDOnlySections,
+  type StudioController,
+  type InspectorSection,
+} from './controller';
 import { CameraPanel, OrbitPanel } from './camera-panel';
 import {
   ColourPanel,
@@ -433,6 +439,17 @@ function Studio({
             <span title={state.source.terrain.attribution} className="attribution">
               {state.source.terrain.attribution}
             </span>
+          )}
+          {areRoadsDrawn(state) && (
+            <a
+              className="attribution"
+              href={roadAttributionUrl}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`${state.roads.network?.attribution ?? ''} (opens in a new tab)`}
+            >
+              {state.roads.network?.attribution}
+            </a>
           )}
         </div>
         <a
