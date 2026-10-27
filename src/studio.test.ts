@@ -8,6 +8,7 @@ import {
 } from './studio/controller';
 import { defaultRoadStyle } from './constants/roads';
 import { grassPresets } from './constants/grass';
+import { rockPresets } from './constants/rocks';
 import {
   parseDesignParameters,
   serializeDesignParameters,
@@ -542,4 +543,21 @@ void test('grass presets apply their look until a look value is set by hand', ()
   assert.equal(c.getSnapshot().scene.grass.preset, 'custom');
   assert.equal(c.getSnapshot().scene.grass.lengthMm, 2);
   assert.equal(c.getSnapshot().scene.grass.baseColor, grassPresets.alpine.baseColor);
+});
+
+void test('rock presets apply their look until a look value is set by hand; sizes never invert', () => {
+  const { controller: c } = setup();
+
+  c.rocks({ preset: 'slate' });
+  assert.equal(c.getSnapshot().scene.rocks.preset, 'slate');
+  assert.equal(c.getSnapshot().scene.rocks.angularity, rockPresets.slate.angularity);
+
+  c.rocks({ rocksPerSquareCm: 12, clustering: 0.2 });
+  assert.equal(c.getSnapshot().scene.rocks.preset, 'slate');
+
+  c.rocks({ flattening: 0.1 });
+  assert.equal(c.getSnapshot().scene.rocks.preset, 'custom');
+
+  c.rocks({ minimumSizeMm: 5, maximumSizeMm: 2 });
+  assert.equal(c.getSnapshot().scene.rocks.maximumSizeMm, 5);
 });

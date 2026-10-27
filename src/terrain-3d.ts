@@ -32,13 +32,10 @@ import {
 } from './terrain-lighting';
 import { createTerrainLineBuffers } from './terrain-3d-lines';
 import { createTerrainRoadLayer } from './terrain-3d-roads';
-import { createTerrainGrassLayer } from './terrain-3d-grass';
-import {
-  getDecorationRoads,
-  type DecorationGeography,
-  type DecorationSite,
-} from './decoration-field';
+import { createTerrainDecorations, type DecorationTerrain } from './terrain-3d-decorations';
+import type { DecorationGeography } from './decoration-field';
 import type { GrassStyle } from './types/grass';
+import type { RockStyle } from './types/rocks';
 import { defaultRoadStyle } from './constants/roads';
 import { noRoadPaths } from './road-ribbons';
 import {
@@ -64,7 +61,6 @@ import { terrain3dElevationScale } from './terrain-surface';
 import {
   createTerrainModel,
   defaultTerrainModelSettings,
-  getFrameUnitsPerMm,
   type TerrainModelSettings,
   type TerrainModel,
 } from './terrain-model';
@@ -121,6 +117,7 @@ export interface Terrain3d {
   setContours(value: boolean): void;
   setRoadStyle(value: Readonly<RoadStyle>): void;
   setGrassStyle(value: Readonly<GrassStyle>): void;
+  setRockStyle(value: Readonly<RockStyle>): void;
   setContourEngraving(value: ContourEngravingSettings): void;
   setSurfaceColor(value: string | undefined): void;
   setRotating(value: boolean): void;
@@ -443,66 +440,18 @@ export function createTerrain3d(
   const landscape = new THREE.Group();
 
   const roads = createTerrainRoadLayer();
-  const grass = createTerrainGrassLayer();
+  const decorations = createTerrainDecorations();
+  const { grass, rocks } = decorations;
   let roadStyle: Readonly<RoadStyle> = defaultRoadStyle;
-  let grassTerrain:
-    | {
-        field: HeightField;
-        width: number;
-        height: number;
-        seaLevel: number | undefined;
-        roadPaths: readonly RoadPath[];
-        geography: DecorationGeography;
-      }
-    | undefined;
-  let grassRoads: { key: readonly unknown[]; roads: DecorationSite['roads'] } = {
-    key: [],
-    roads: [],
-  };
+  let decorationTerrain: DecorationTerrain | undefined;
 
-  /** Regrows grass from the last terrain update and the current road style. */
-  const updateGrass = () => {
-    if (!grassTerrain) {
-      grass.update(undefined);
-
-      return;
-    }
-
-    const { field, width, height, seaLevel, roadPaths, geography } = grassTerrain;
-    const frameUnitsPerMm = getFrameUnitsPerMm(width, height, modelSettings);
-    const roadKey = [
-      roadPaths,
-      roadStyle.enabled,
-      roadStyle.detail,
-      roadStyle.widthMm,
-      frameUnitsPerMm,
-    ];
-
-    // A stable road list keeps grass from resurveying the ground on unrelated updates.
-    if (roadKey.some((value, index) => value !== grassRoads.key[index])) {
-      grassRoads = {
-        key: roadKey,
-        roads: getDecorationRoads(roadPaths, roadStyle, frameUnitsPerMm),
-      };
-    }
-
-    grass.update({
-      site: {
-        field,
-        width,
-        height,
-        shape: modelSettings.cropShape ?? 'rectangle',
-        frameUnitsPerMm,
-        seaLevel,
-        roads: grassRoads.roads,
-        ...geography,
-      },
-      surface: surface.geometry,
-    });
+  /** Re-places rocks and regrows grass from the last terrain update and the current road style. */
+  const updateDecorations = () => {
+    decorations.update(decorationTerrain, modelSettings, roadStyle, surface.geometry);
     updateLoop();
   };
 
-  landscape.add(surface, base, contourLayer, roads.mesh, grass.mesh, sea, waterSides);
+  landscape.add(surface, base, contourLayer, roads.mesh, grass.mesh, rocks.group, sea, waterSides);
   scene.add(landscape);
   const framePreview = createTerrainFramePreview(renderer);
 
@@ -774,6 +723,7 @@ export function createTerrain3d(
     roads.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
     const wasAnimated = grass.isAnimated();
 
+    rocks.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
     grass.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
 
     // Wind keeps the loop running, so showing or hiding grass starts or stops it.
@@ -1125,15 +1075,17 @@ export function createTerrain3d(
         exaggeration,
         elevationOffset,
       });
-      grassTerrain = decorationGeography && {
+      decorationTerrain = decorationGeography && {
         field,
         width,
         height,
         seaLevel: seaLevel?.elevation,
         roadPaths,
         geography: decorationGeography,
+        exaggeration,
+        elevationOffset,
       };
-      updateGrass();
+      updateDecorations();
 
       const scale = 2 / Math.max(width, height);
 
@@ -1293,15 +1245,15 @@ export function createTerrain3d(
       draw();
     },
     setRoadStyle(value: Readonly<RoadStyle>) {
-      const wasVisible = roads.mesh.visible || grass.mesh.visible;
+      const wasVisible = roads.mesh.visible || grass.mesh.visible || rocks.group.visible;
 
       roadStyle = value;
       roads.setStyle(value);
-      // Grass keeps clear of drawn roads, so road edits can regrow it.
-      updateGrass();
+      // Grass and rocks keep clear of drawn roads, so road edits can re-place them.
+      updateDecorations();
 
       // Hidden roads change nothing on screen; skipping the frame keeps terrain loads quick.
-      if (wasVisible || roads.mesh.visible || grass.mesh.visible) {
+      if (wasVisible || roads.mesh.visible || grass.mesh.visible || rocks.group.visible) {
         draw();
       }
     },
@@ -1312,6 +1264,17 @@ export function createTerrain3d(
       updateLoop();
 
       if (wasVisible || grass.mesh.visible) {
+        draw();
+      }
+    },
+    setRockStyle(value: Readonly<RockStyle>) {
+      const wasVisible = rocks.group.visible;
+
+      rocks.setStyle(value);
+      // Grass leaves bare ground under rocks, so rock edits can regrow it.
+      updateDecorations();
+
+      if (wasVisible || rocks.group.visible) {
         draw();
       }
     },

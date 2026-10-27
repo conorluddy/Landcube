@@ -135,6 +135,10 @@ export function createStudioTerrainView(
       view.setGrassStyle(scene.grass);
     }
 
+    if (differs('rocks')) {
+      view.setRockStyle(scene.rocks);
+    }
+
     if (differs('rotationSeconds') || differs('rotationDirection')) {
       view.setRotationSpeed(getAutoRotateSpeed(scene.rotationSeconds, scene.rotationDirection));
     }
