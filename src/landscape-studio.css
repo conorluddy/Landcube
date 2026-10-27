@@ -455,6 +455,9 @@ input[type='range']::-moz-range-thumb {
   margin-bottom: 14px;
 }
 .frame-choices button {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
   font-size: 9px;
   line-height: 1.2;
   min-width: 0;
