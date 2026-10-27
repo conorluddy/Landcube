@@ -209,7 +209,7 @@ function ModelPanel({
             {s.metrics.layerHeight?.toFixed(3) ?? '—'} mm.
           </Hint>
         )}
-        <Hint>Download the prepared model from Export → STL model.</Hint>
+        <Hint>Download the prepared model from Export → STL.</Hint>
       </Group>
     </>
   );

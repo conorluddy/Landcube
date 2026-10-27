@@ -16,7 +16,9 @@ The default appearance is a charcoal background with subtle, lighter contour lin
 - A new random seed on every page load.
 - Smooth procedural terrain and mathematically derived contour lines.
 - Crisp rendering at different viewport sizes and pixel densities.
-- No accounts, backend, or runtime network dependencies. The one external service is Google Analytics page-view tracking, which receives the site origin and path, not design-link query strings, plus the standard browser details Google collects (IP address, user agent, referrer, screen size).
+- No accounts, backend, or runtime network dependencies beyond public elevation tiles and hosted-site analytics.
+- The hosted site MUST NOT send design-link query strings to Google Analytics. Google also collects standard browser details (IP address, user agent, referrer, screen size).
+- Where the origin is not `conorluddy.github.io`, the editor MUST NOT request `googletagmanager.com`.
 
 Controls, export buttons, animation, real geographic data, 3D previews, and website-content previews are outside this version.
 

@@ -435,7 +435,7 @@ export function createTerrain3d(
 
   landscape.add(surface, base, contourLayer, roads.mesh, sea, waterSides);
   scene.add(landscape);
-  const framePreview = createTerrainFramePreview();
+  const framePreview = createTerrainFramePreview(renderer);
 
   /** Scene units per millimetre: the model's longest side spans two units. */
   const getPreviewScale = () =>

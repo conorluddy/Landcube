@@ -423,6 +423,11 @@ input[type='range']::-moz-range-thumb {
 .primary-button:hover {
   background: #e3ebd9;
 }
+.button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .text-button {
   color: #cbd4c1;
 }
@@ -455,12 +460,16 @@ input[type='range']::-moz-range-thumb {
   margin-bottom: 14px;
 }
 .frame-choices button {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
   font-size: 9px;
   line-height: 1.2;
   min-width: 0;
   padding: 6px 3px;
 }
-.edge-choices {
+.edge-choices,
+.finish-choices {
   grid-template-columns: repeat(6, 1fr);
 }
 .frame-thumbnail {
