@@ -916,7 +916,11 @@ export function createTerrain3d(
     draw();
   });
   // Grass wind pauses as soon as reduced motion is turned on, not at the next scene edit.
-  matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', updateLoop);
+  matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => {
+    updateLoop();
+    // A stopped loop draws no more frames, so redraw once to show the settled blades.
+    draw();
+  });
   new ResizeObserver(resize).observe(viewport);
   resize();
   reset();
