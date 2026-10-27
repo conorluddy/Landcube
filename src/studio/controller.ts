@@ -920,7 +920,8 @@ export function createStudioController(
           ...state.scene.grass,
           ...look,
           ...patch,
-          ...(editsLook && preset === undefined ? { preset: 'custom' as const } : {}),
+          // Hand-set look values override any preset in the same patch.
+          ...(editsLook ? { preset: 'custom' as const } : {}),
         },
       });
     },

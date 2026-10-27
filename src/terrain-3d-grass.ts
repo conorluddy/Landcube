@@ -1,5 +1,11 @@
 import * as THREE from 'three';
-import { createGrassCoverage, type GrassCoverageMap, type GrassSite } from './grass-coverage';
+import {
+  createGrassCoverage,
+  surveyGrassGround,
+  type GrassCoverageMap,
+  type GrassGround,
+  type GrassSite,
+} from './grass-coverage';
 import { defaultGrassStyle } from './constants/grass';
 import type { GrassStyle } from './types/grass';
 
@@ -13,7 +19,8 @@ export interface TerrainGrassInputs {
 /** A shell-textured grass carpet; colour, length, density and wind never rebuild its mask. */
 export interface TerrainGrassLayer {
   mesh: THREE.InstancedMesh;
-  update(inputs: TerrainGrassInputs): void;
+  /** Undefined when the terrain has no grass site, which hides the carpet. */
+  update(inputs: TerrainGrassInputs | undefined): void;
   setStyle(style: Readonly<GrassStyle>): void;
   /** Morphs and terraced models cannot carry grass, so they hide it. */
   setSuppressed(value: boolean): void;
@@ -48,9 +55,11 @@ export function createTerrainGrassLayer(): TerrainGrassLayer {
   const mesh = new THREE.InstancedMesh(placeholder, createGrassMaterial(uniforms), grassShellCount);
   let style: Readonly<GrassStyle> = { ...defaultGrassStyle };
   let inputs: TerrainGrassInputs | undefined;
+  let ground: GrassGround | undefined;
   let coverage: GrassCoverageMap | undefined;
   let texture: THREE.DataTexture | undefined;
   let suppressed = false;
+  let groundKey: readonly unknown[] = [];
   let coverageKey: readonly unknown[] = [];
 
   mesh.visible = false;
@@ -59,7 +68,7 @@ export function createTerrainGrassLayer(): TerrainGrassLayer {
   mesh.frustumCulled = false;
 
   const syncVisibility = () => {
-    mesh.visible = style.enabled && !suppressed && texture !== undefined;
+    mesh.visible = style.enabled && !suppressed && inputs !== undefined && texture !== undefined;
   };
 
   /** Uniforms that follow the crop and style without touching the mask. */
@@ -79,6 +88,11 @@ export function createTerrainGrassLayer(): TerrainGrassLayer {
   };
 
   const rebuild = () => {
+    if (!inputs) {
+      // Never keep drawing a surface the terrain may already have disposed.
+      mesh.geometry = placeholder;
+    }
+
     if (!inputs || !style.enabled) {
       syncVisibility();
 
@@ -86,7 +100,7 @@ export function createTerrainGrassLayer(): TerrainGrassLayer {
     }
 
     const { site, surface } = inputs;
-    const key: unknown[] = [
+    const nextGroundKey: unknown[] = [
       site.field,
       site.width,
       site.height,
@@ -97,21 +111,38 @@ export function createTerrainGrassLayer(): TerrainGrassLayer {
       site.metersPerFrameUnit,
       site.seaLevel,
       site.roads,
+    ];
+
+    if (!ground || !sameKey(nextGroundKey, groundKey)) {
+      ground = surveyGrassGround(site);
+      groundKey = nextGroundKey;
+      coverageKey = [];
+    }
+
+    // Sliders only redo thresholds over the surveyed ground, which stays well inside a frame.
+    const nextCoverageKey = [
+      ground,
       style.coverage,
       style.clumping,
       style.slopeLimitDegrees,
       style.altitudeLimit,
     ];
 
-    if (!texture || key.some((value, index) => value !== coverageKey[index])) {
-      coverage = createGrassCoverage(site, style);
-      texture?.dispose();
-      texture = new THREE.DataTexture(coverage.data, coverage.columns, coverage.rows);
-      texture.magFilter = THREE.LinearFilter;
-      texture.minFilter = THREE.LinearFilter;
+    if (!texture || !sameKey(nextCoverageKey, coverageKey)) {
+      coverage = createGrassCoverage(ground, style);
+
+      if (texture?.image.width === coverage.columns && texture.image.height === coverage.rows) {
+        texture.image.data = coverage.data;
+      } else {
+        texture?.dispose();
+        texture = new THREE.DataTexture(coverage.data, coverage.columns, coverage.rows);
+        texture.magFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearFilter;
+        uniforms.grassMap.value = texture;
+      }
+
       texture.needsUpdate = true;
-      uniforms.grassMap.value = texture;
-      coverageKey = key;
+      coverageKey = nextCoverageKey;
     }
 
     // The terrain owns the surface geometry; the shells only borrow it.
@@ -263,6 +294,10 @@ function createGrassMaterial(uniforms: Record<string, THREE.IUniform>): THREE.Me
   };
 
   return material;
+}
+
+function sameKey(a: readonly unknown[], b: readonly unknown[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
 /** Absent outside browsers, where tests run with motion allowed. */

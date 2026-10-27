@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createGrassCoverage, type GrassCoverageMap, type GrassSite } from './grass-coverage';
+import {
+  createGrassCoverage,
+  surveyGrassGround,
+  type GrassCoverageMap,
+  type GrassSite,
+} from './grass-coverage';
 import { defaultGrassStyle } from './constants/grass';
+import type { GrassStyle } from './types/grass';
 import type { HeightField } from './types/terrain';
 
 /** A gentle tilt, 2 m per frame unit horizontally at 10 m per frame unit: about 11° everywhere. */
@@ -39,6 +45,10 @@ const style = { ...defaultGrassStyle, coverage: 1, altitudeLimit: 1 };
 // 5 frame units a texel keeps crop offsets on texel centres, so cropped maps line up exactly.
 const resolution = 100;
 
+function grow(site: GrassSite, coverageStyle: GrassStyle, resolution: number): GrassCoverageMap {
+  return createGrassCoverage(surveyGrassGround(site, resolution), coverageStyle);
+}
+
 /** Growth (0..255) at a crop point, read from the texel containing it. */
 function growthAt(map: GrassCoverageMap, site: GrassSite, x: number, y: number): number {
   const column = Math.min(map.columns - 1, Math.floor((x / site.width) * map.columns));
@@ -58,8 +68,8 @@ function totalGrowth(map: GrassCoverageMap): number {
 }
 
 void test('the same site and style always grow the same coverage', () => {
-  const first = createGrassCoverage(createSite(), style, resolution);
-  const second = createGrassCoverage(createSite(), style, resolution);
+  const first = grow(createSite(), style, resolution);
+  const second = grow(createSite(), style, resolution);
 
   assert.equal(first.columns, 100);
   assert.equal(first.rows, 100);
@@ -70,8 +80,8 @@ void test('the same site and style always grow the same coverage', () => {
 void test('patches are anchored to the source, so cropping never reshapes them', () => {
   const site = createSite({ field: createField(0.002, 201, 201), width: 1000, height: 1000 });
   const partial = { ...style, coverage: 0.5 };
-  const whole = createGrassCoverage(site, partial, 200);
-  const cropped = createGrassCoverage(
+  const whole = grow(site, partial, 200);
+  const cropped = grow(
     { ...site, width: 500, height: 500, originX: 250, originY: 125 },
     partial,
     100,
@@ -97,14 +107,14 @@ void test('grass keeps off roads and out of the sea', () => {
     halfWidth: 8,
   };
   const site = createSite({ roads: [road] });
-  const withRoad = createGrassCoverage(site, style, resolution);
+  const withRoad = grow(site, style, resolution);
 
   assert.equal(growthAt(withRoad, site, 100, 250), 0, 'grass grows on the road');
   assert.ok(growthAt(withRoad, site, 100, 100) > 0);
 
   // The field rises 0.002 a unit from 0 in the west, so a sea level of 0.25 floods x < 125.
   const coastal = createSite({ seaLevel: 0.25 });
-  const coast = createGrassCoverage(coastal, style, resolution);
+  const coast = grow(coastal, style, resolution);
 
   assert.equal(growthAt(coast, coastal, 60, 300), 0, 'grass grows in the sea');
   assert.ok(growthAt(coast, coastal, 300, 300) > 0);
@@ -112,8 +122,8 @@ void test('grass keeps off roads and out of the sea', () => {
 
 void test('slope limits use the real slope, so steep ground stays bare', () => {
   // 0.02 field units per frame unit is 20 m rise per 10 m run: about 63°.
-  const cliff = createGrassCoverage(createSite({ field: createField(0.02) }), style, resolution);
-  const gentle = createGrassCoverage(createSite(), style, resolution);
+  const cliff = grow(createSite({ field: createField(0.02) }), style, resolution);
+  const gentle = grow(createSite(), style, resolution);
 
   assert.equal(totalGrowth(cliff), 0);
   assert.ok(totalGrowth(gentle) > 0);
@@ -121,12 +131,12 @@ void test('slope limits use the real slope, so steep ground stays bare', () => {
 
 void test('raising coverage only adds grass, never removes it', () => {
   const site = createSite();
-  let previous = createGrassCoverage(site, { ...style, coverage: 0 }, resolution);
+  let previous = grow(site, { ...style, coverage: 0 }, resolution);
 
   assert.equal(totalGrowth(previous), 0);
 
   for (const coverage of [0.25, 0.5, 0.75, 1]) {
-    const next = createGrassCoverage(site, { ...style, coverage }, resolution);
+    const next = grow(site, { ...style, coverage }, resolution);
 
     for (let offset = 0; offset < next.data.length; offset += 4) {
       assert.ok(next.data[offset] >= previous.data[offset], `coverage ${coverage} lost grass`);
@@ -138,8 +148,19 @@ void test('raising coverage only adds grass, never removes it', () => {
 
 void test('circular crops grow nothing outside the circle', () => {
   const site = createSite({ shape: 'circle' });
-  const map = createGrassCoverage(site, style, resolution);
+  const map = grow(site, style, resolution);
 
   assert.equal(growthAt(map, site, 2, 2), 0);
   assert.ok(growthAt(map, site, 250, 250) > 0);
+});
+
+void test('one ground survey serves every style, including clumping changes', () => {
+  const site = createSite();
+  const ground = surveyGrassGround(site, resolution);
+
+  for (const clumping of [0.5, 0, 1, 0.5]) {
+    const patchy = { ...style, coverage: 0.6, clumping };
+
+    assert.deepEqual(createGrassCoverage(ground, patchy).data, grow(site, patchy, resolution).data);
+  }
 });

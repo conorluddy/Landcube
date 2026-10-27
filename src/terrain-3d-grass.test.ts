@@ -90,3 +90,16 @@ void test('suppressed or disabled grass hides without discarding its mask', () =
   assert.equal(layer.mesh.visible, false);
   assert.equal(layer.getCoverage(), coverage);
 });
+
+void test('a terrain without a grass site hides the carpet and lets go of the surface', () => {
+  const layer = createTerrainGrassLayer();
+
+  layer.update(inputs);
+  layer.setStyle(enabled);
+  layer.update(undefined);
+
+  assert.equal(layer.mesh.visible, false);
+  assert.notEqual(layer.mesh.geometry, inputs.surface);
+  layer.update(inputs);
+  assert.equal(layer.mesh.visible, true);
+});

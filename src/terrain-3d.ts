@@ -455,6 +455,8 @@ export function createTerrain3d(
   /** Regrows grass from the last terrain update and the current road style. */
   const updateGrass = () => {
     if (!grassTerrain) {
+      grass.update(undefined);
+
       return;
     }
 

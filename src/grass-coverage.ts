@@ -44,42 +44,63 @@ type GrassCoverageStyle = Pick<
   'coverage' | 'clumping' | 'slopeLimitDegrees' | 'altitudeLimit'
 >;
 
+/**
+ * Per-texel facts that change only with the terrain, crop or roads, so style sliders reuse them
+ * and only redo cheap thresholds.
+ */
+export interface GrassGround {
+  columns: number;
+  rows: number;
+  /** Real slope in degrees; NaN where grass can never grow (outside the crop, roads, sea). */
+  slope: Float32Array;
+  /** Elevation as a share of the field's relief, 0 to 1. */
+  altitude: Float32Array;
+  /** Source-frame centre of each texel, where patch noise is anchored. */
+  sourceX: Float32Array;
+  sourceY: Float32Array;
+  /** Dry patch noise, 0 to 255. */
+  dryness: Uint8Array;
+}
+
 /** Texels along the crop's longer side: about 0.3 mm on a 150 mm model, finer than any road. */
 export const grassCoverageResolution = 512;
 
 const grassSeed = 0x6a55;
+// Patch noise is the slowest part of a style rebuild and depends only on clumping.
+const patchNoiseCache = new WeakMap<GrassGround, { clumping: number; values: Float32Array }>();
 
-/**
- * Where grass grows and how long it gets. Patch noise is sampled in source-frame coordinates, so
- * moving the crop reveals or hides patches without reshaping them, and raising coverage only grows
- * grass where there was none.
- */
-export function createGrassCoverage(
+/** Measures the crop once per terrain, crop or road change. */
+export function surveyGrassGround(
   site: GrassSite,
-  style: GrassCoverageStyle,
   resolution = grassCoverageResolution,
-): GrassCoverageMap {
+): GrassGround {
   const texelUnits = Math.max(site.width, site.height) / resolution;
   const columns = Math.max(1, Math.round(site.width / texelUnits));
   const rows = Math.max(1, Math.round(site.height / texelUnits));
-  const data = new Uint8Array(columns * rows * 4);
+  const count = columns * rows;
+  const ground: GrassGround = {
+    columns,
+    rows,
+    slope: new Float32Array(count).fill(Number.NaN),
+    altitude: new Float32Array(count),
+    sourceX: new Float32Array(count),
+    sourceY: new Float32Array(count),
+    dryness: new Uint8Array(count),
+  };
   const [minimum, maximum] = getFieldRange(site.field);
   const roads = createRoadIndex(site.roads);
-  const patchScale = 0.004 + (1 - style.clumping) * 0.01;
-  const patchSoftness = 0.04 + (1 - style.clumping) * 0.3;
-  // Noise spans 0..1, so the soft edge sits wholly above it at no coverage and below it at full.
-  const patchEdge = 1 + patchSoftness - style.coverage * (1 + 2 * patchSoftness);
 
   for (let row = 0; row < rows; row++) {
     for (let column = 0; column < columns; column++) {
       const x = ((column + 0.5) / columns) * site.width;
       const y = ((row + 0.5) / rows) * site.height;
+      const index = row * columns + column;
       const sourceX = x + site.originX;
       const sourceY = y + site.originY;
-      const offset = (row * columns + column) * 4;
 
-      data[offset + 1] = Math.round(fractalNoise(sourceX * 0.012, sourceY * 0.012, 23) * 255);
-      data[offset + 3] = 255;
+      ground.sourceX[index] = sourceX;
+      ground.sourceY[index] = sourceY;
+      ground.dryness[index] = Math.round(fractalNoise(sourceX * 0.012, sourceY * 0.012, 23) * 255);
 
       if (!isInsideFootprint(x, y, site) || roads.covers(x, y)) {
         continue;
@@ -91,14 +112,47 @@ export function createGrassCoverage(
         continue;
       }
 
-      const patch = fractalNoise(sourceX * patchScale, sourceY * patchScale, 11);
-      const growth =
-        smoothstep(patchEdge - patchSoftness, patchEdge + patchSoftness, patch) *
-        getSlopeWeight(site, x, y, style.slopeLimitDegrees) *
-        getAltitudeWeight(elevation, minimum, maximum, style.altitudeLimit);
-
-      data[offset] = Math.round(growth * 255);
+      ground.slope[index] = getSlopeDegrees(site, x, y);
+      ground.altitude[index] = (elevation - minimum) / Math.max(1e-9, maximum - minimum);
     }
+  }
+
+  return ground;
+}
+
+/**
+ * Where grass grows and how long it gets. Patch noise is sampled in source-frame coordinates, so
+ * moving the crop reveals or hides patches without reshaping them, and raising coverage only grows
+ * grass where there was none.
+ */
+export function createGrassCoverage(
+  ground: GrassGround,
+  style: GrassCoverageStyle,
+): GrassCoverageMap {
+  const { columns, rows } = ground;
+  const data = new Uint8Array(columns * rows * 4);
+  const patches = getPatchNoise(ground, style.clumping);
+  const patchSoftness = 0.04 + (1 - style.clumping) * 0.3;
+  // Noise spans 0..1, so the soft edge sits wholly above it at no coverage and below it at full.
+  const patchEdge = 1 + patchSoftness - style.coverage * (1 + 2 * patchSoftness);
+
+  for (let index = 0; index < columns * rows; index++) {
+    const offset = index * 4;
+    const slope = ground.slope[index];
+
+    data[offset + 1] = ground.dryness[index];
+    data[offset + 3] = 255;
+
+    if (Number.isNaN(slope)) {
+      continue;
+    }
+
+    const growth =
+      smoothstep(patchEdge - patchSoftness, patchEdge + patchSoftness, patches[index]) *
+      (1 - smoothstep(style.slopeLimitDegrees - 10, style.slopeLimitDegrees, slope)) *
+      getAltitudeWeight(ground.altitude[index], style.altitudeLimit);
+
+    data[offset] = Math.round(growth * 255);
   }
 
   return { columns, rows, data };
@@ -116,8 +170,8 @@ function isInsideFootprint(x: number, y: number, site: GrassSite): boolean {
   return x >= 0 && x <= site.width && y >= 0 && y <= site.height;
 }
 
-/** Fades out over the 10° below the limit, measured on the real, unexaggerated slope. */
-function getSlopeWeight(site: GrassSite, x: number, y: number, limitDegrees: number): number {
+/** The real, unexaggerated slope, so exaggeration never moves where grass grows. */
+function getSlopeDegrees(site: GrassSite, x: number, y: number): number {
   const step = site.field.spacing;
   const dx =
     sampleHeightField(site.field, x + step, y) - sampleHeightField(site.field, x - step, y);
@@ -125,25 +179,32 @@ function getSlopeWeight(site: GrassSite, x: number, y: number, limitDegrees: num
     sampleHeightField(site.field, x, y + step) - sampleHeightField(site.field, x, y - step);
   const rise = Math.hypot(dx, dy) * site.metersPerFieldUnit;
   const run = 2 * step * site.metersPerFrameUnit;
-  const slopeDegrees = (Math.atan2(rise, run) * 180) / Math.PI;
 
-  return 1 - smoothstep(limitDegrees - 10, limitDegrees, slopeDegrees);
+  return (Math.atan2(rise, run) * 180) / Math.PI;
 }
 
 /** Fades out over the tenth of the relief below the limit; 1 keeps grass on the summits. */
-function getAltitudeWeight(
-  elevation: number,
-  minimum: number,
-  maximum: number,
-  limit: number,
-): number {
-  if (limit >= 1) {
-    return 1;
+function getAltitudeWeight(altitude: number, limit: number): number {
+  return limit >= 1 ? 1 : 1 - smoothstep(limit - 0.1, limit, altitude);
+}
+
+function getPatchNoise(ground: GrassGround, clumping: number): Float32Array {
+  const cached = patchNoiseCache.get(ground);
+
+  if (cached?.clumping === clumping) {
+    return cached.values;
   }
 
-  const relative = (elevation - minimum) / Math.max(1e-9, maximum - minimum);
+  const scale = 0.004 + (1 - clumping) * 0.01;
+  const values = new Float32Array(ground.sourceX.length);
 
-  return 1 - smoothstep(limit - 0.1, limit, relative);
+  for (let index = 0; index < values.length; index++) {
+    values[index] = fractalNoise(ground.sourceX[index] * scale, ground.sourceY[index] * scale, 11);
+  }
+
+  patchNoiseCache.set(ground, { clumping, values });
+
+  return values;
 }
 
 function getFieldRange(field: HeightField): [number, number] {
