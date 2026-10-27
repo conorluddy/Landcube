@@ -325,7 +325,10 @@ export function createStudioController(actions: DesignControlActions): StudioCon
     const explanation = built?.ok === false ? explainFrameStudioError(settings) : undefined;
     const assembly: Result<FrameAssembly> | undefined =
       built?.ok === false && explanation !== undefined
-        ? { ok: false, error: { ...built.error, message: explanation } }
+        ? {
+            ok: false,
+            error: { ...built.error, message: `${explanation} (${built.error.message})` },
+          }
         : built;
 
     state = { ...state, frame: { ...state.frame, assembly } };
@@ -568,7 +571,8 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       }
 
       state = { ...state, model: next };
-      // Rebuild first so the model redraw already shows the matching frame.
+      // Rebuild first so the model redraw already shows the matching frame; the frame sync
+      // passes the new dimensions to the view itself.
       rebuildFrame();
       effects?.modelChanged();
       publish();

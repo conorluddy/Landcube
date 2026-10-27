@@ -46,7 +46,11 @@ export function createStudioTerrainView(
   let interval: number | undefined;
 
   const syncFrame = () => {
-    const { assembly, settings } = controller.getSnapshot().frame;
+    const { frame, model } = controller.getSnapshot();
+    const { assembly, settings } = frame;
+
+    // The frame scales with the model, so it must never see stale dimensions.
+    view?.setModelSettings(model.dimensions);
 
     if (assembly?.ok === true) {
       view?.setFrame(assembly.data.parts, assembly.data.seatHeightMm, settings.finish);
