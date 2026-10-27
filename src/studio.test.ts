@@ -26,6 +26,8 @@ function setup(fetchRoads?: typeof fetch) {
     downloadStill: () => Promise.resolve({ width: 1, height: 1 }),
     downloadStl: () => undefined,
     roadsChanged: () => undefined,
+    frameChanged: () => undefined,
+    downloadFrameStl: () => undefined,
   };
   const controller = createStudioController(
     {
@@ -363,3 +365,85 @@ function stubBrowserTileDecoding(t: TestContext): void {
     Reflect.deleteProperty(globalThis, 'document');
   });
 }
+
+void test('frame assembly waits for the model height, then follows model and frame edits', () => {
+  const { controller: c } = setup();
+
+  c.frame({ preset: 'tray' });
+  assert.equal(c.getSnapshot().frame.assembly, undefined);
+
+  c.metrics(24);
+  const tray = c.getSnapshot().frame.assembly;
+
+  assert.ok(tray?.ok === true);
+  assert.deepEqual(
+    tray.data.parts.map(({ id }) => id),
+    ['frame'],
+  );
+  assert.ok(Math.abs(tray.data.parts[0].sizeMm.x - 170.6) < 1e-4);
+
+  assert.ok(c.dimensions({ cropShape: 'circle' }));
+  const round = c.getSnapshot().frame.assembly;
+
+  assert.ok(round?.ok === true);
+  assert.ok(Math.abs(round.data.parts[0].sizeMm.x - (150 + 2 * 10.3)) < 1e-3);
+});
+
+void test('an unprintable frame keeps its error and blocks part downloads', () => {
+  const { controller: c } = setup();
+
+  c.metrics(24);
+  c.frame({ preset: 'tray', borderWidthMm: 0.5 });
+  const assembly = c.getSnapshot().frame.assembly;
+
+  assert.ok(assembly?.ok === false);
+  assert.match(assembly.error.message, /minimum is 1\.2 mm/);
+
+  c.downloadFrameStl('frame');
+  assert.match(c.getSnapshot().status, /Frame part frame is not available/);
+});
+
+void test('a finish change recolours the preview without rebuilding the parts', () => {
+  const { controller: c, effects } = setup();
+  let frameChanges = 0;
+
+  effects.frameChanged = () => {
+    frameChanges++;
+  };
+
+  c.metrics(24);
+  c.frame({ preset: 'tray' });
+  const tray = c.getSnapshot().frame.assembly;
+  const changesBefore = frameChanges;
+
+  c.frame({ finish: 'white' });
+  assert.equal(c.getSnapshot().frame.assembly, tray);
+  assert.equal(c.getSnapshot().frame.settings.finish, 'white');
+  assert.ok(frameChanges > changesBefore);
+});
+
+void test('removing a frame empties the assembly so the model drops back to the floor', () => {
+  const { controller: c } = setup();
+
+  c.metrics(24);
+  c.frame({ preset: 'pedestal' });
+  assert.ok(c.getSnapshot().frame.assembly?.ok === true);
+
+  c.frame({ preset: 'none' });
+  const none = c.getSnapshot().frame.assembly;
+
+  assert.ok(none?.ok === true);
+  assert.deepEqual(none.data.parts, []);
+  assert.equal(none.data.seatHeightMm, 0);
+});
+
+void test('frame errors the tab can explain name its controls', () => {
+  const { controller: c } = setup();
+
+  c.metrics(24);
+  c.frame({ preset: 'pedestal', borderWidthMm: 5, edgeShape: 'chamfer', edgeSizeMm: 4.5 });
+  const assembly = c.getSnapshot().frame.assembly;
+
+  assert.ok(assembly?.ok === false);
+  assert.match(assembly.error.message, /Increase Overhang or reduce Edge size/);
+});

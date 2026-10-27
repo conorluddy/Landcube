@@ -7,6 +7,7 @@ import { createCropPreview } from './studio/crop-preview';
 import { mountStudio } from './studio/app';
 import { downloadBlob } from './studio/export-panel';
 import { encodeTerrainStill } from './export/still-export';
+import { createBinaryStl } from './export/stl-export';
 import type { RealTerrain } from './real-terrain';
 import { createFloorPlace } from './floor-geo';
 import { clipRoadsToCrop } from './road-ribbons';
@@ -161,6 +162,14 @@ controls.connect({
     );
 
     return { width: frame.width, height: frame.height };
+  },
+  frameChanged: terrain3d.frameChanged,
+  downloadFrameStl: (part) => {
+    downloadBlob(
+      new Blob([createBinaryStl(part.solid, `Topogra ${part.id}`)], { type: 'model/stl' }),
+      // Size in the name keeps parts for different frames apart in one downloads folder.
+      `topogra-${settings.seed}-${part.id}-${Math.round(part.sizeMm.x)}x${Math.round(part.sizeMm.z)}mm.stl`,
+    );
   },
   downloadStl: () => {
     const model = controls.getSnapshot().model.dimensions;

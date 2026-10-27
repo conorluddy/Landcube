@@ -5,7 +5,7 @@ import type { TerrainModelSettings } from '../terrain-model';
 import type { FrameSettings, FrameSurround, FrameTier } from '../types/frame';
 import type { Result } from '../types/operations';
 import { createFrameAssembly } from './frame-assembly';
-import { composeFrameProfiles } from './frame-composition';
+import { composeFrameProfiles, resolveRimHeightMm } from './frame-composition';
 import type { FramePartProfile } from './frame-composition';
 import { getFrameFootprint } from './frame-outline';
 
@@ -223,3 +223,12 @@ for (const [name, settings, pattern] of [
     assert.match(expectErrorMessage(settings), pattern);
   });
 }
+
+void test('rim heights resolve from the model base, the model top or the floor', () => {
+  const model: TerrainModelSettings = { widthMm: 150, lengthMm: 150, baseThicknessMm: 3 };
+
+  assert.equal(resolveRimHeightMm({ reference: 'model-base', aboveMm: 4 }, model, 24), 7);
+  assert.equal(resolveRimHeightMm({ reference: 'model-top', belowMm: 2 }, model, 24), 22);
+  assert.equal(resolveRimHeightMm({ reference: 'floor', heightMm: 1.5 }, model, 24), 1.5);
+  assert.equal(resolveRimHeightMm({ reference: 'floor', heightMm: 0 }, model, 24), 0);
+});

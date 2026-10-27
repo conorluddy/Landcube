@@ -51,10 +51,19 @@ import { operationErrorCodes } from '../constants/operations';
 import type { RoadNetwork, RoadStyle } from '../types/roads';
 import { createRoadNetworkLoader, getRoadPlacementKey } from './road-loader';
 import { getSuggestedRoadWidthMm } from '../road-ribbons';
+import { createFrameAssembly } from '../frame/frame-assembly';
+import {
+  createStudioFrame,
+  defaultFrameStudioSettings,
+  explainFrameStudioError,
+  type FrameStudioSettings,
+} from '../frame/frame-studio-settings';
+import type { FrameAssembly, FramePart, FramePartId } from '../types/frame';
 
 export type StudioView = '2d' | '3d';
-export type InspectorSection = 'Terrain' | 'Contours' | 'Colour' | 'Scene' | 'Camera' | 'Model';
-export const threeDOnlySections: readonly InspectorSection[] = ['Camera', 'Model'];
+export type InspectorSection =
+  'Terrain' | 'Contours' | 'Colour' | 'Scene' | 'Camera' | 'Model' | 'Frame';
+export const threeDOnlySections: readonly InspectorSection[] = ['Camera', 'Model', 'Frame'];
 export interface SceneSettings {
   contours: boolean;
   engraving: ContourEngravingSettings;
@@ -127,6 +136,8 @@ export interface StudioState {
     /** Real locations suggest a height until the user moves the slider. */
     autoExaggeration: boolean;
   };
+  /** Session-only. `assembly` waits for the 3D model's overall height. */
+  frame: { settings: FrameStudioSettings; assembly?: Result<FrameAssembly> };
   workspace: {
     view: StudioView;
     activating: boolean;
@@ -155,6 +166,9 @@ export interface StudioEffects {
   downloadStl(): void;
   /** A road network arrived or was cleared; style edits go through `sceneChanged`. */
   roadsChanged(): void;
+  /** The frame assembly was rebuilt; the 3D preview should show its parts. */
+  frameChanged(): void;
+  downloadFrameStl(part: FramePart): void;
 }
 
 export interface DesignControlActions {
@@ -191,6 +205,8 @@ export interface StudioController {
   pickFocus: () => Promise<void>;
   model: (patch: Partial<StudioState['model']>) => boolean;
   dimensions: (patch: Partial<TerrainModelSettings>) => boolean;
+  frame: (patch: Partial<FrameStudioSettings>) => void;
+  downloadFrameStl: (partId: FramePartId) => void;
   metrics: (height: number, layerHeight?: number) => void;
   /** Reports the model's longer geographic side; auto road width follows it. */
   modelSpan: (spanKm: number | undefined) => void;
@@ -280,6 +296,7 @@ export function createStudioController(
       exaggeration: 0.3,
       autoExaggeration: true,
     },
+    frame: { settings: { ...defaultFrameStudioSettings } },
     workspace: {
       view: '2d',
       activating: false,
@@ -317,6 +334,33 @@ export function createStudioController(
   const workspace = (patch: Partial<StudioState['workspace']>) => {
     state = { ...state, workspace: { ...state.workspace, ...patch } };
     publish();
+  };
+
+  /** Frames fit the model, so any model, height or frame shape edit rebuilds the assembly. */
+  const rebuildFrame = () => {
+    const height = state.metrics.height;
+    const { settings, assembly: previous } = state.frame;
+
+    // No frame stays empty whatever the model does, so skip the preview round trip.
+    if (settings.preset === 'none' && previous?.ok === true && previous.data.parts.length === 0) {
+      return;
+    }
+
+    const built =
+      height === undefined
+        ? undefined
+        : createFrameAssembly(state.model.dimensions, height, createStudioFrame(settings));
+    const explanation = built?.ok === false ? explainFrameStudioError(settings) : undefined;
+    const assembly: Result<FrameAssembly> | undefined =
+      built?.ok === false && explanation !== undefined
+        ? {
+            ok: false,
+            error: { ...built.error, message: `${explanation} (${built.error.message})` },
+          }
+        : built;
+
+    state = { ...state, frame: { ...state.frame, assembly } };
+    effects?.frameChanged();
   };
 
   const sync = () => {
@@ -611,6 +655,9 @@ export function createStudioController(
       }
 
       state = { ...state, model: next };
+      // Rebuild first so the model redraw already shows the matching frame; the frame sync
+      // passes the new dimensions to the view itself.
+      rebuildFrame();
       effects?.modelChanged();
       publish();
 
@@ -619,12 +666,45 @@ export function createStudioController(
     dimensions(patch: Partial<TerrainModelSettings>) {
       return controller.model({ dimensions: { ...state.model.dimensions, ...patch } });
     },
+    frame(patch: Partial<FrameStudioSettings>) {
+      state = {
+        ...state,
+        frame: { ...state.frame, settings: { ...state.frame.settings, ...patch } },
+      };
+
+      // Finish is preview colour only; the parts keep their shape.
+      if (Object.keys(patch).every((key) => key === 'finish')) {
+        effects?.frameChanged();
+      } else {
+        rebuildFrame();
+      }
+
+      publish();
+    },
+    downloadFrameStl(partId: FramePartId) {
+      const assembly = state.frame.assembly;
+      const part =
+        assembly?.ok === true ? assembly.data.parts.find(({ id }) => id === partId) : undefined;
+
+      if (!part) {
+        notify(`Frame part ${partId} is not available. Fix the frame settings and retry.`);
+
+        return;
+      }
+
+      try {
+        effects?.downloadFrameStl(part);
+      } catch (error) {
+        notify(error instanceof Error ? error.message : 'Frame STL export failed.');
+      }
+    },
     metrics(height: number, layerHeight?: number) {
       if (state.metrics.height === height && state.metrics.layerHeight === layerHeight) {
         return;
       }
 
       state = { ...state, metrics: { ...state.metrics, height, layerHeight } };
+      rebuildFrame();
       publish();
     },
     modelSpan(spanKm: number | undefined) {
