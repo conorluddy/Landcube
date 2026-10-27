@@ -3,9 +3,10 @@ import { test } from 'node:test';
 import { frameProfilePresets } from '../constants/frame';
 import { validatePrintableSolid } from '../export/stl-export';
 import type { TerrainModelSettings } from '../terrain-model';
-import type { FrameAssembly, TrayFrameSettings } from '../types/frame';
+import type { FrameAssembly, FrameProfilePreset, FrameSettings } from '../types/frame';
 import type { Result } from '../types/operations';
-import { createDefaultTrayFrame, createFrameAssembly } from './frame-assembly';
+import { createFrameAssembly } from './frame-assembly';
+import { createTrayPresetFrame } from './frame-presets';
 
 const rectangleModel: TerrainModelSettings = { widthMm: 150, lengthMm: 150, baseThicknessMm: 3 };
 const circleModel: TerrainModelSettings = { ...rectangleModel, cropShape: 'circle' };
@@ -27,11 +28,40 @@ function expectErrorMessage(result: Result<FrameAssembly>): string {
   return result.error.message;
 }
 
-function tray(
-  model: TerrainModelSettings,
-  overrides: Partial<TrayFrameSettings> = {},
-): TrayFrameSettings {
-  return { ...createDefaultTrayFrame(model), ...overrides };
+interface TrayOverrides {
+  profile?: FrameProfilePreset;
+  outline?: FrameSettings['outline'];
+  borderWidthMm?: number;
+  clearanceMm?: number;
+  floorThicknessMm?: number;
+  mounts?: FrameSettings['mounts'];
+}
+
+/** A #34 tray preset with its border, clearance and floor overridden in place. */
+function tray(model: TerrainModelSettings, overrides: TrayOverrides = {}): FrameSettings {
+  const preset = createTrayPresetFrame(overrides.profile ?? 'square', model);
+  const [floor] = preset.tiers;
+  const surround = preset.surround;
+
+  assert.ok(surround !== undefined);
+
+  const clearanceMm = overrides.clearanceMm ?? preset.clearanceMm;
+  const borderWidthMm = overrides.borderWidthMm ?? surround.borderWidthMm;
+
+  return {
+    ...preset,
+    outline: overrides.outline ?? preset.outline,
+    clearanceMm,
+    mounts: overrides.mounts ?? preset.mounts,
+    tiers: [
+      {
+        ...floor,
+        offsetMm: clearanceMm + borderWidthMm,
+        heightMm: overrides.floorThicknessMm ?? floor.heightMm,
+      },
+    ],
+    surround: { ...surround, borderWidthMm },
+  };
 }
 
 for (const [outline, model] of [
@@ -96,28 +126,14 @@ void test('same settings build identical tray buffers', () => {
   assert.deepEqual(first.parts[0].solid.indices, second.parts[0].solid.indices);
 });
 
-void test('a border that collapses the outer ring names borderWidthMm', () => {
-  const message = expectErrorMessage(
-    createFrameAssembly(
-      rectangleModel,
-      overallHeightMm,
-      tray(rectangleModel, { borderWidthMm: -200 }),
-    ),
-  );
+void test('a border of zero or less names borderWidthMm', () => {
+  for (const borderWidthMm of [0, -5]) {
+    const message = expectErrorMessage(
+      createFrameAssembly(rectangleModel, overallHeightMm, tray(rectangleModel, { borderWidthMm })),
+    );
 
-  assert.match(message, /borderWidthMm/);
-});
-
-void test('an outer edge collapsed by clearance names both settings', () => {
-  const message = expectErrorMessage(
-    createFrameAssembly(
-      rectangleModel,
-      overallHeightMm,
-      tray(rectangleModel, { borderWidthMm: -90, clearanceMm: 10 }),
-    ),
-  );
-
-  assert.match(message, /Increase borderWidthMm or clearanceMm so they sum to more than -75 mm/);
+    assert.match(message, /borderWidthMm/);
+  }
 });
 
 void test('square outline does not match a non-square rectangle', () => {
@@ -178,13 +194,6 @@ void test('a 1.2 mm square wall is accepted', () => {
   );
 });
 
-void test('tray defaults raise the rim 4 mm above the base with 0.3 mm clearance', () => {
-  const settings = createDefaultTrayFrame({ ...rectangleModel, baseThicknessMm: 5 });
-
-  assert.equal(settings.wallHeightMm, 9);
-  assert.equal(settings.clearanceMm, 0.3);
-});
-
 void test('outer size covers the border and the full tray height', () => {
   const model = { widthMm: 120, lengthMm: 80, baseThicknessMm: 3 };
   const assembly = expectAssembly(createFrameAssembly(model, overallHeightMm, tray(model)));
@@ -192,9 +201,15 @@ void test('outer size covers the border and the full tray height', () => {
   assert.deepEqual(assembly.outerSizeMm, { x: 140.6, y: 9, z: 100.6 });
 });
 
-void test('no frame style builds no parts', () => {
+void test('no tiers and no surround builds no parts', () => {
   const assembly = expectAssembly(
-    createFrameAssembly(rectangleModel, overallHeightMm, { style: 'none' }),
+    createFrameAssembly(rectangleModel, overallHeightMm, {
+      outline: 'match',
+      clearanceMm: 0.3,
+      tiers: [],
+      mounts: [],
+      display: 'table',
+    }),
   );
 
   assert.deepEqual(assembly.parts, []);
@@ -218,7 +233,7 @@ void test('square outline matches a square rectangular model', () => {
   );
 });
 
-void test('tray rejects mounts until they are supported', () => {
+void test('frames reject mounts until they are supported', () => {
   const message = expectErrorMessage(
     createFrameAssembly(
       rectangleModel,
@@ -239,7 +254,7 @@ void test('invalid model settings return an error instead of throwing', () => {
   }
 });
 
-void test('non-finite tray settings name the setting', () => {
+void test('non-finite tier settings name the tier and setting', () => {
   const message = expectErrorMessage(
     createFrameAssembly(
       rectangleModel,
@@ -248,7 +263,7 @@ void test('non-finite tray settings name the setting', () => {
     ),
   );
 
-  assert.match(message, /floorThicknessMm/);
+  assert.match(message, /Tier 1: heightMm/);
 });
 
 void test('a 1.2 mm wall is accepted whatever the clearance rounding', () => {
@@ -308,30 +323,6 @@ void test('circle outline matches a circular model', () => {
   );
 });
 
-void test('tray rejects a float until it is supported', () => {
-  const message = expectErrorMessage(
-    createFrameAssembly(
-      rectangleModel,
-      overallHeightMm,
-      tray(rectangleModel, { float: { insetMm: 10, liftMm: 5 } }),
-    ),
-  );
-
-  assert.match(message, /float/);
-});
-
-void test('an unknown profile lists the presets', () => {
-  const message = expectErrorMessage(
-    createFrameAssembly(
-      rectangleModel,
-      overallHeightMm,
-      tray(rectangleModel, { profile: 'ogee' as TrayFrameSettings['profile'] }),
-    ),
-  );
-
-  assert.match(message, /square, chamfer, cove, stepped, floating/);
-});
-
 void test('a floor thinner than 1.2 mm is rejected', () => {
   const message = expectErrorMessage(
     createFrameAssembly(
@@ -341,5 +332,60 @@ void test('a floor thinner than 1.2 mm is rejected', () => {
     ),
   );
 
-  assert.match(message, /floorThicknessMm 0\.4/);
+  assert.match(message, /Part frame is 0\.4 mm thick/);
+});
+
+for (const [display, issue] of [
+  ['wall', '#36'],
+  ['standing', '#33'],
+  ['wall-perpendicular', '#52'],
+] as const) {
+  void test(`${display} display points at ${issue} until it is built`, () => {
+    const message = expectErrorMessage(
+      createFrameAssembly(rectangleModel, overallHeightMm, { ...tray(rectangleModel), display }),
+    );
+
+    assert.match(message, new RegExp(`${display} is not built yet \\(${issue}\\)`));
+  });
+}
+
+void test('a wall mount on a table frame is rejected', () => {
+  const message = expectErrorMessage(
+    createFrameAssembly(rectangleModel, overallHeightMm, {
+      ...tray(rectangleModel),
+      wallMount: { wallEdge: 'north', backplate: 'plain-plate' },
+    }),
+  );
+
+  assert.match(message, /wallMount/);
+});
+
+void test('an inner edge counts against the surround wall', () => {
+  const settings = tray(rectangleModel, { borderWidthMm: 3 });
+  const message = expectErrorMessage(
+    createFrameAssembly(rectangleModel, overallHeightMm, {
+      ...settings,
+      surround: settings.surround && {
+        ...settings.surround,
+        innerEdge: { shape: 'chamfer', sizeMm: 2 },
+      },
+    }),
+  );
+
+  assert.match(message, /surround wall is 1\.00 mm/);
+});
+
+void test('a joined tier wider than the one below is an overhang', () => {
+  const message = expectErrorMessage(
+    createFrameAssembly(rectangleModel, overallHeightMm, {
+      ...tray(rectangleModel),
+      surround: undefined,
+      tiers: [
+        { offsetMm: 10, heightMm: 3, edge: { shape: 'square' }, part: 'separate' },
+        { offsetMm: 20, heightMm: 3, edge: { shape: 'square' }, part: 'join-below' },
+      ],
+    }),
+  );
+
+  assert.match(message, /^Part frame: Profile segment 1 .* overhangs 90\.0°/);
 });

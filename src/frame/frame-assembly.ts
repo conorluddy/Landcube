@@ -1,38 +1,26 @@
-import {
-  defaultTrayBorderWidthMm,
-  defaultTrayClearanceMm,
-  defaultTrayFloorThicknessMm,
-  frameProfilePresets,
-  maximumFrameDimensionMm,
-  minimumFrameWallMm,
-  trayWallAboveBaseMm,
-} from '../constants/frame';
+import { minimumFrameWallMm } from '../constants/frame';
 import { operationErrorCodes } from '../constants/operations';
 import { validateTerrainModelSettings } from '../terrain-model';
 import type { TerrainModelSettings } from '../terrain-model';
-import type {
-  FrameAssembly,
-  FrameFootprint,
-  FrameSettings,
-  TrayFrameSettings,
-} from '../types/frame';
+import type { FrameAssembly, FrameFootprint, FramePart, FrameSettings } from '../types/frame';
 import type { Result } from '../types/operations';
-import { getFrameFootprint, getOutlineHalfExtentMm } from './frame-outline';
-import {
-  createTrayProfile,
-  measureNarrowestWallMm,
-  validateProfileOverhang,
-} from './frame-profiles';
+import { composeFrameProfiles } from './frame-composition';
+import type { FramePartProfile } from './frame-composition';
+import { getFrameFootprint } from './frame-outline';
+import { measureNarrowestWallMm, validateProfileOverhang } from './frame-profiles';
 import { sweepFrameProfile } from './frame-sweep';
 
 const wallToleranceMm = 1e-9;
+
+/** Where each display that does not build yet is planned. */
+const pendingDisplayIssues = { wall: '#36', standing: '#33', 'wall-perpendicular': '#52' } as const;
 
 // === PUBLIC API ===
 
 /**
  * Builds printable frame parts that fit the model's footprint. Pure and deterministic:
- * the same inputs always give the same buffers. `overallHeightMm` sets shadow-box depth
- * (#36); the tray only validates it.
+ * the same inputs always give the same buffers. `overallHeightMm` lets a rim measure
+ * down from the model's top.
  */
 export function createFrameAssembly(
   model: TerrainModelSettings,
@@ -52,141 +40,113 @@ export function createFrameAssembly(
     );
   }
 
-  if (frame.style === 'none') {
-    return { ok: true, data: { parts: [], outerSizeMm: { x: 0, y: 0, z: 0 }, warnings: [] } };
-  }
-
-  return createTrayAssembly(getFrameFootprint(model), frame);
-}
-
-/** The rim clears the model's base by `trayWallAboveBaseMm`. */
-export function createDefaultTrayFrame(model: TerrainModelSettings): TrayFrameSettings {
-  return {
-    style: 'tray',
-    outline: 'match',
-    profile: 'square',
-    borderWidthMm: defaultTrayBorderWidthMm,
-    wallHeightMm: model.baseThicknessMm + trayWallAboveBaseMm,
-    floorThicknessMm: defaultTrayFloorThicknessMm,
-    clearanceMm: defaultTrayClearanceMm,
-    mounts: [],
-  };
-}
-
-// === TRAY ===
-
-function createTrayAssembly(
-  footprint: FrameFootprint,
-  tray: TrayFrameSettings,
-): Result<FrameAssembly> {
-  const settingsError = findTraySettingsError(footprint, tray);
+  const footprint = getFrameFootprint(model);
+  const settingsError = findFrameSettingsError(footprint, frame);
 
   if (settingsError !== undefined) {
     return invalidSettings(settingsError);
   }
 
-  const profile = createTrayProfile(tray.profile, {
-    innerOffsetMm: tray.clearanceMm,
-    outerOffsetMm: tray.clearanceMm + tray.borderWidthMm,
-    floorHeightMm: tray.floorThicknessMm,
-    topHeightMm: tray.floorThicknessMm + tray.wallHeightMm,
-  });
-  const narrowestWallMm = measureNarrowestWallMm(
-    profile.points,
-    tray.clearanceMm,
-    tray.floorThicknessMm,
-  );
+  const profiles = composeFrameProfiles(footprint, model, overallHeightMm, frame);
 
-  // Tolerance absorbs rounding in (clearance + border) - clearance at exactly the minimum.
-  if (narrowestWallMm < minimumFrameWallMm - wallToleranceMm) {
-    return invalidSettings(
-      `The ${tray.profile} tray wall is ${narrowestWallMm.toFixed(2)} mm at its narrowest; the minimum is ${minimumFrameWallMm} mm. Increase borderWidthMm.`,
-    );
+  if (!profiles.ok) {
+    return profiles;
+  }
+
+  const parts: FramePart[] = [];
+
+  for (const partProfile of profiles.data) {
+    const printable = validatePartPrintability(partProfile);
+
+    if (!printable.ok) {
+      return printable;
+    }
+
+    parts.push({
+      id: partProfile.id,
+      solid: sweepFrameProfile(footprint, partProfile.profile.points),
+      printOrientation: partProfile.profile.printOrientation,
+    });
+  }
+
+  return {
+    ok: true,
+    data: { parts, outerSizeMm: measureOuterSizeMm(footprint, profiles.data), warnings: [] },
+  };
+}
+
+// === PRINTABILITY ===
+
+function validatePartPrintability(partProfile: FramePartProfile): Result<FramePartProfile> {
+  const { id, profile, wall } = partProfile;
+
+  if (wall !== undefined) {
+    // An inner edge thins the rim land by its own size.
+    const narrowestWallMm =
+      measureNarrowestWallMm(profile.points, wall.innerOffsetMm, wall.floorHeightMm) -
+      wall.innerEdgeMm;
+
+    // Tolerance absorbs rounding in (clearance + border) - clearance at exactly the minimum.
+    if (narrowestWallMm < minimumFrameWallMm - wallToleranceMm) {
+      return invalidSettings(
+        `Part ${id}'s surround wall is ${narrowestWallMm.toFixed(2)} mm at its narrowest; the minimum is ${minimumFrameWallMm} mm. Increase borderWidthMm or shrink its edges.`,
+      );
+    }
   }
 
   const overhang = validateProfileOverhang(profile);
 
   if (!overhang.ok) {
-    return overhang;
+    return invalidSettings(`Part ${id}: ${overhang.error.message}`);
   }
 
-  const outerOffsetMm = Math.max(...profile.points.map(({ offsetMm }) => offsetMm));
-  const outerHalfWidthMm =
-    (footprint.shape === 'circle' ? footprint.radiusMm : footprint.halfWidthMm) + outerOffsetMm;
-  const outerHalfLengthMm =
-    (footprint.shape === 'circle' ? footprint.radiusMm : footprint.halfLengthMm) + outerOffsetMm;
+  return { ok: true, data: partProfile };
+}
+
+function measureOuterSizeMm(
+  footprint: FrameFootprint,
+  profiles: readonly FramePartProfile[],
+): FrameAssembly['outerSizeMm'] {
+  if (profiles.length === 0) {
+    return { x: 0, y: 0, z: 0 };
+  }
+
+  const points = profiles.flatMap(({ profile }) => profile.points);
+  const outerOffsetMm = Math.max(...points.map(({ offsetMm }) => offsetMm));
+  const halfWidthMm = footprint.shape === 'circle' ? footprint.radiusMm : footprint.halfWidthMm;
+  const halfLengthMm = footprint.shape === 'circle' ? footprint.radiusMm : footprint.halfLengthMm;
 
   return {
-    ok: true,
-    data: {
-      parts: [
-        {
-          id: 'frame',
-          solid: sweepFrameProfile(footprint, profile.points),
-          printOrientation: profile.printOrientation,
-        },
-      ],
-      outerSizeMm: {
-        x: outerHalfWidthMm * 2,
-        y: tray.floorThicknessMm + tray.wallHeightMm,
-        z: outerHalfLengthMm * 2,
-      },
-      warnings: [],
-    },
+    x: (halfWidthMm + outerOffsetMm) * 2,
+    y: Math.max(...points.map(({ heightMm }) => heightMm)),
+    z: (halfLengthMm + outerOffsetMm) * 2,
   };
 }
 
-function findTraySettingsError(
+// === SETTINGS ===
+
+function findFrameSettingsError(
   footprint: FrameFootprint,
-  tray: TrayFrameSettings,
+  frame: FrameSettings,
 ): string | undefined {
-  if (!isOutlineMatchingFootprint(footprint, tray.outline)) {
-    return `Outline ${tray.outline} does not match the model's ${footprint.shape} footprint. Mismatched outlines are not supported yet; use outline match.`;
+  if (!isOutlineMatchingFootprint(footprint, frame.outline)) {
+    return `Outline ${frame.outline} does not match the model's ${footprint.shape} footprint. Mismatched outlines are not supported yet; use outline match.`;
   }
 
-  if (!frameProfilePresets.includes(tray.profile)) {
-    return `Profile ${tray.profile} is unknown. Use one of ${frameProfilePresets.join(', ')}.`;
+  if (frame.display !== 'table') {
+    const issue = pendingDisplayIssues[frame.display] as string | undefined;
+
+    return issue === undefined
+      ? `Display ${frame.display} is unknown. Use table, wall, standing or wall-perpendicular.`
+      : `Display ${frame.display} is not built yet (${issue}). Use display table.`;
   }
 
-  if (tray.mounts.length > 0 || tray.float !== undefined) {
-    return 'Tray frames do not support mounts or a float yet. Pass mounts: [] and omit float.';
+  if (frame.wallMount !== undefined) {
+    return 'wallMount only applies to display wall-perpendicular (#52). Omit wallMount.';
   }
 
-  for (const [name, value] of [
-    ['borderWidthMm', tray.borderWidthMm],
-    ['clearanceMm', tray.clearanceMm],
-  ] as const) {
-    if (!Number.isFinite(value) || Math.abs(value) > maximumFrameDimensionMm) {
-      return `${name} must be a number of millimetres up to ${maximumFrameDimensionMm}; got ${value}.`;
-    }
-  }
-
-  for (const [name, value] of [
-    ['wallHeightMm', tray.wallHeightMm],
-    ['floorThicknessMm', tray.floorThicknessMm],
-  ] as const) {
-    if (!Number.isFinite(value) || value <= 0 || value > maximumFrameDimensionMm) {
-      return `${name} must be above 0 and at most ${maximumFrameDimensionMm} mm; got ${value}.`;
-    }
-  }
-
-  if (tray.floorThicknessMm < minimumFrameWallMm - wallToleranceMm) {
-    return `floorThicknessMm ${tray.floorThicknessMm} is too thin to print; the minimum is ${minimumFrameWallMm} mm.`;
-  }
-
-  // Every tray ring lies between the opening (clearance) and the outer edge (clearance + border).
-  const openingHalfExtentMm = getOutlineHalfExtentMm(footprint, tray.clearanceMm);
-  const outerHalfExtentMm = getOutlineHalfExtentMm(
-    footprint,
-    tray.clearanceMm + tray.borderWidthMm,
-  );
-
-  if (openingHalfExtentMm <= 0) {
-    return `clearanceMm ${tray.clearanceMm} collapses the tray opening to a half-extent of ${openingHalfExtentMm} mm. Use a clearance above ${-getOutlineHalfExtentMm(footprint, 0)} mm.`;
-  }
-
-  if (outerHalfExtentMm <= 0) {
-    return `borderWidthMm ${tray.borderWidthMm} with clearanceMm ${tray.clearanceMm} collapses the tray's outer edge to a half-extent of ${outerHalfExtentMm} mm. Increase borderWidthMm or clearanceMm so they sum to more than ${-getOutlineHalfExtentMm(footprint, 0)} mm.`;
+  if (frame.mounts.length > 0) {
+    return 'Frames do not support mounts yet (#36). Pass mounts: [].';
   }
 
   return undefined;
@@ -194,7 +154,7 @@ function findTraySettingsError(
 
 function isOutlineMatchingFootprint(
   footprint: FrameFootprint,
-  outline: TrayFrameSettings['outline'],
+  outline: FrameSettings['outline'],
 ): boolean {
   switch (outline) {
     case 'match':

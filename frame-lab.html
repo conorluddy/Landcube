@@ -1,0 +1,71 @@
+<!doctype html>
+<!-- Dev-only frame lab: `npm run dev`, then open /frame-lab.html. Vite builds only index.html. -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>Frame Lab</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font:
+          14px/1.4 system-ui,
+          sans-serif;
+        background: #202326;
+        color: #e6e1d8;
+      }
+      main {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+        padding: 16px;
+      }
+      article {
+        background: #2a2e32;
+        border-radius: 8px;
+        padding: 12px;
+      }
+      h1 {
+        margin: 16px 16px 0;
+        font-size: 18px;
+      }
+      h2 {
+        margin: 0 0 8px;
+        font-size: 14px;
+      }
+      svg {
+        width: 100%;
+        height: 160px;
+        background: #1b1e21;
+        border-radius: 4px;
+      }
+      .bed {
+        stroke: #555;
+        stroke-width: 0.3;
+      }
+      .model {
+        fill: #4a5a4a;
+      }
+      .part {
+        stroke: #e6e1d8;
+        stroke-width: 0.15;
+      }
+      .verdict {
+        margin: 8px 0 0;
+        font-size: 12px;
+      }
+      .ok {
+        color: #9bc47a;
+      }
+      .fail {
+        color: #e08a7a;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Frame lab: half cross-sections, model edge at 0</h1>
+    <main id="frame-lab"></main>
+    <script type="module" src="/src/frame-lab/main.ts"></script>
+  </body>
+</html>
