@@ -46,12 +46,12 @@ export function createStudioTerrainView(
   let interval: number | undefined;
 
   const syncFrame = () => {
-    const assembly = controller.getSnapshot().frame.assembly;
+    const { assembly, settings } = controller.getSnapshot().frame;
 
     if (assembly?.ok === true) {
-      view?.setFrame(assembly.data.parts, assembly.data.seatHeightMm);
+      view?.setFrame(assembly.data.parts, assembly.data.seatHeightMm, settings.finish);
     } else {
-      view?.setFrame([], 0);
+      view?.setFrame([], 0, settings.finish);
     }
   };
 

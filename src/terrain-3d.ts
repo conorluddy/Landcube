@@ -19,6 +19,7 @@ import { createTerraceContours, type TerrainTerraceLevels } from './terrain-terr
 import { sampleHeightField } from './terrain-surface';
 import { createWaterVolume } from './terrain-water-volume';
 import { createTerrainStage, defaultTerrainGroundColor } from './terrain-stage';
+import type { FrameFinish } from './frame/frame-studio-settings';
 import { createTerrainFramePreview } from './terrain-frame-preview';
 import type { FramePart } from './types/frame';
 import type { FloorPlace } from './floor-geo';
@@ -84,7 +85,7 @@ export interface Terrain3d {
   setHeight(value: number, shouldRebuild?: boolean): void;
   setModelSettings(value: TerrainModelSettings): void;
   /** Shows frame parts around the model and lifts the model onto `seatHeightMm`. */
-  setFrame(parts: readonly FramePart[], seatHeightMm: number): void;
+  setFrame(parts: readonly FramePart[], seatHeightMm: number, finish: FrameFinish): void;
   getStl(): ArrayBuffer;
   setLandFinish(value: LandFinish): void;
   setElevationGradient(value: ElevationGradientSettings): void;
@@ -1150,14 +1151,14 @@ export function createTerrain3d(
     setModelSettings(value: TerrainModelSettings) {
       modelSettings = { ...value };
     },
-    setFrame(parts, seatHeightMm) {
+    setFrame(parts, seatHeightMm, finish) {
       const previewScale =
         2 /
         (modelSettings.cropShape === 'circle'
           ? modelSettings.widthMm
           : Math.max(modelSettings.widthMm, modelSettings.lengthMm));
 
-      framePreview.update(parts, previewScale);
+      framePreview.update(parts, previewScale, finish);
       landscape.position.y = seatHeightMm * previewScale;
       draw();
     },

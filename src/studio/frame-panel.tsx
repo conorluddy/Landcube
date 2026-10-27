@@ -1,7 +1,15 @@
 import type { ReactNode } from 'react';
-import { frameStudioPresets, pedestalRecessDepthMm } from '../frame/frame-studio-settings';
-import type { FrameStudioSettings } from '../frame/frame-studio-settings';
-import { Group, Hint, NumberField, Select, Toggle } from './fields';
+import {
+  frameFinishes,
+  frameStudioPresets,
+  pedestalRecessDepthMm,
+} from '../frame/frame-studio-settings';
+import type {
+  FrameFinish,
+  FrameStudioPreset,
+  FrameStudioSettings,
+} from '../frame/frame-studio-settings';
+import { Group, Hint, Range, Select, Toggle } from './fields';
 import type { PanelProps } from './panels';
 
 const edgeShapeOptions: readonly FrameStudioSettings['edgeShape'][] = [
@@ -22,14 +30,40 @@ export function FramePanel({ controller: c, state: s }: PanelProps): ReactNode {
   return (
     <>
       <Group title="Frame">
-        <Select
-          label="Frame style"
-          value={settings.preset}
-          options={frameStudioPresets}
-          onChange={(preset) => {
-            c.frame({ preset });
-          }}
-        />
+        <div role="group" aria-label="Frame style" className="frame-choices">
+          {frameStudioPresets.map(({ value, label }) => (
+            <button
+              type="button"
+              key={value}
+              aria-pressed={settings.preset === value}
+              title={label}
+              onClick={() => {
+                c.frame({ preset: value });
+              }}
+            >
+              <FrameStyleThumbnail preset={value} />
+              {label}
+            </button>
+          ))}
+        </div>
+        {settings.preset !== 'none' && (
+          <div role="group" aria-label="Frame finish" className="frame-choices">
+            {Object.entries(frameFinishes).map(([value, { label, color }]) => (
+              <button
+                type="button"
+                key={value}
+                aria-pressed={settings.finish === value}
+                title={label}
+                onClick={() => {
+                  c.frame({ finish: value as FrameFinish });
+                }}
+              >
+                <span className="preset-swatch" style={{ background: color }} />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         {settings.preset === 'none' && (
           <Hint>Add a tray or pedestal printed separately to fit this model.</Hint>
         )}
@@ -39,56 +73,56 @@ export function FramePanel({ controller: c, state: s }: PanelProps): ReactNode {
       </Group>
       {settings.preset !== 'none' && (
         <Group title="Dimensions">
-          <div className="control-grid">
-            <NumberField
-              label={isTray ? 'Border (mm)' : 'Overhang (mm)'}
+          <>
+            <Range
+              label={isTray ? 'Border' : 'Overhang'}
               value={settings.borderWidthMm}
               min={1.2}
-              max={200}
+              max={60}
+              step={0.1}
+              suffix=" mm"
               onChange={(value) => {
-                if (value !== undefined) {
-                  c.frame({ borderWidthMm: value });
-                }
+                c.frame({ borderWidthMm: value });
               }}
             />
-            <NumberField
-              label="Clearance (mm)"
+            <Range
+              label="Clearance"
               value={settings.clearanceMm}
               min={-1}
-              max={5}
+              max={2}
+              step={0.05}
+              suffix=" mm"
               onChange={(value) => {
-                if (value !== undefined) {
-                  c.frame({ clearanceMm: value });
-                }
+                c.frame({ clearanceMm: value });
               }}
             />
             {isTray && (
-              <NumberField
-                label="Rim above base (mm)"
+              <Range
+                label="Rim above base"
                 value={settings.rimAboveBaseMm}
-                min={-50}
-                max={200}
+                min={-20}
+                max={50}
+                step={0.5}
+                suffix=" mm"
                 onChange={(value) => {
-                  if (value !== undefined) {
-                    c.frame({ rimAboveBaseMm: value });
-                  }
+                  c.frame({ rimAboveBaseMm: value });
                 }}
               />
             )}
             {hasStand && (
-              <NumberField
-                label="Stand height (mm)"
+              <Range
+                label="Stand height"
                 value={settings.standHeightMm}
                 min={1.2}
-                max={200}
+                max={100}
+                step={0.5}
+                suffix=" mm"
                 onChange={(value) => {
-                  if (value !== undefined) {
-                    c.frame({ standHeightMm: value });
-                  }
+                  c.frame({ standHeightMm: value });
                 }}
               />
             )}
-          </div>
+          </>
         </Group>
       )}
       {settings.preset !== 'none' && (
@@ -102,15 +136,15 @@ export function FramePanel({ controller: c, state: s }: PanelProps): ReactNode {
             }}
           />
           {settings.edgeShape !== 'square' && (
-            <NumberField
-              label="Edge size (mm)"
+            <Range
+              label="Edge size"
               value={settings.edgeSizeMm}
               min={0.2}
-              max={50}
+              max={20}
+              step={0.1}
+              suffix=" mm"
               onChange={(value) => {
-                if (value !== undefined) {
-                  c.frame({ edgeSizeMm: value });
-                }
+                c.frame({ edgeSizeMm: value });
               }}
             />
           )}
@@ -126,5 +160,27 @@ export function FramePanel({ controller: c, state: s }: PanelProps): ReactNode {
       {assembly?.ok === false && <p role="alert">{assembly.error.message}</p>}
       {settings.preset !== 'none' && <Hint>Download each part from Export → Frame STL.</Hint>}
     </>
+  );
+}
+
+// === HELPERS ===
+
+/** Side profiles: the model in green, frame parts in the button's text colour. */
+const styleProfiles: Record<FrameStudioPreset, { frame: string; modelY: number }> = {
+  none: { frame: '', modelY: 14 },
+  tray: { frame: 'M4 6h4v12h24V6h4v16H4z', modelY: 12 },
+  pedestal: { frame: 'M4 16h32v6H4z', modelY: 8 },
+  'stacked-pedestal': { frame: 'M8 13h24v4H8zM3 17h34v5H3z', modelY: 5 },
+  'tray-on-plinth': { frame: 'M6 4h3v10h22V4h3v12H6zM3 16h34v6H3z', modelY: 8 },
+};
+
+function FrameStyleThumbnail({ preset }: { preset: FrameStudioPreset }): ReactNode {
+  const { frame, modelY } = styleProfiles[preset];
+
+  return (
+    <svg className="frame-thumbnail" viewBox="0 0 40 24" aria-hidden="true">
+      <path d={`M10 ${modelY + 6}V${modelY + 2}l5-3 4 2 5-5 6 5v7z`} fill="#7f9a6a" />
+      {frame && <path d={frame} fill="currentColor" />}
+    </svg>
   );
 }

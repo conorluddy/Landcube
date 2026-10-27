@@ -4,6 +4,9 @@ import type { FrameEdge, FrameEdgeShape, FrameSettings, FrameTier } from '../typ
 export type FrameStudioPreset =
   'none' | 'tray' | 'pedestal' | 'stacked-pedestal' | 'tray-on-plinth';
 
+/** Preview colour only; prints take whatever filament is loaded. */
+export type FrameFinish = 'light-wood' | 'dark-wood' | 'white' | 'black' | 'concrete';
+
 /** The Frame tab's few controls. Session-only, like model settings, and never in links. */
 export interface FrameStudioSettings {
   preset: FrameStudioPreset;
@@ -17,6 +20,7 @@ export interface FrameStudioSettings {
   standHeightMm: number;
   clearanceMm: number;
   hasFloatingToe: boolean;
+  finish: FrameFinish;
 }
 
 export const frameStudioPresets: readonly { value: FrameStudioPreset; label: string }[] = [
@@ -27,6 +31,16 @@ export const frameStudioPresets: readonly { value: FrameStudioPreset; label: str
   { value: 'tray-on-plinth', label: 'Tray on a plinth' },
 ];
 
+export const frameFinishes: Readonly<
+  Record<FrameFinish, { label: string; color: string; roughness: number }>
+> = {
+  'light-wood': { label: 'Light wood', color: '#c9a37a', roughness: 0.65 },
+  'dark-wood': { label: 'Dark wood', color: '#5a3a24', roughness: 0.6 },
+  white: { label: 'White', color: '#ecebe6', roughness: 0.5 },
+  black: { label: 'Black', color: '#222326', roughness: 0.45 },
+  concrete: { label: 'Concrete', color: '#9a9893', roughness: 0.95 },
+};
+
 export const defaultFrameStudioSettings: Readonly<FrameStudioSettings> = Object.freeze({
   preset: 'none',
   edgeShape: 'square',
@@ -36,6 +50,7 @@ export const defaultFrameStudioSettings: Readonly<FrameStudioSettings> = Object.
   standHeightMm: 8,
   clearanceMm: 0.3,
   hasFloatingToe: false,
+  finish: 'dark-wood',
 });
 
 /** A 45° toe this tall reads as a shadow line at arm's length. */

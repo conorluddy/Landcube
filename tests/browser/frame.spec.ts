@@ -36,7 +36,10 @@ test('a tray downloads at the model size plus border and clearance, leaving the 
   const before = await modelDownload(page);
 
   await section(page, 'Frame');
-  await page.getByLabel('Frame style').selectOption('tray');
+  await page
+    .getByRole('group', { name: 'Frame style' })
+    .getByRole('button', { name: 'Tray', exact: true })
+    .click();
   const frame = await frameDownload(page);
   const bounds = stlBounds(frame.bytes);
 
@@ -53,7 +56,10 @@ test('switching the crop to circle rebuilds a round frame', async ({ page }) => 
   await page.goto(`${appUrl}?v=1&seed=123`);
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await section(page, 'Frame');
-  await page.getByLabel('Frame style').selectOption('tray');
+  await page
+    .getByRole('group', { name: 'Frame style' })
+    .getByRole('button', { name: 'Tray', exact: true })
+    .click();
   await section(page, 'Model');
   await page.getByLabel('Crop shape').selectOption('circle');
   const bounds = stlBounds((await frameDownload(page)).bytes);
@@ -66,9 +72,12 @@ test('an unprintable frame shows its error and disables downloads', async ({ pag
   await page.goto(`${appUrl}?v=1&seed=123`);
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await section(page, 'Frame');
-  await page.getByLabel('Frame style').selectOption('tray');
-  await page.getByLabel('Border (mm)', { exact: true }).fill('1.2');
-  await page.getByLabel('Border (mm)', { exact: true }).press('Tab');
+  await page
+    .getByRole('group', { name: 'Frame style' })
+    .getByRole('button', { name: 'Tray', exact: true })
+    .click();
+  await page.getByLabel('Border', { exact: true }).fill('1.2');
+  await page.getByLabel('Border', { exact: true }).press('Tab');
   await page.getByLabel('Edge shape').selectOption('chamfer');
   await expect(page.getByRole('alert').filter({ hasText: 'minimum is 1.2 mm' })).toBeVisible();
   await page.getByRole('button', { name: 'Export ↗' }).click();

@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import { frameFinishes } from './frame/frame-studio-settings';
+import type { FrameFinish } from './frame/frame-studio-settings';
 import type { FramePart } from './types/frame';
 
-/** Walnut, bone, ink: fixed per part so separate tiers read as contrasting prints (#35 OQ-1). */
-export const framePartColors = ['#6b4a32', '#e8e0d0', '#2a2a2e'] as const;
+/** Each tier darkens a little so stacked parts still read as separate prints. */
+const tierShadeStep = 0.05;
 
 // === PUBLIC API ===
 
@@ -12,18 +14,18 @@ export const framePartColors = ['#6b4a32', '#e8e0d0', '#2a2a2e'] as const;
  */
 export function createTerrainFramePreview(): {
   group: THREE.Group;
-  update(parts: readonly FramePart[], previewScale: number): void;
+  update(parts: readonly FramePart[], previewScale: number, finish: FrameFinish): void;
 } {
   const group = new THREE.Group();
-  const materials = framePartColors.map(
-    (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0 }),
-  );
 
   return {
     group,
-    update(parts, previewScale) {
+    update(parts, previewScale, finish) {
+      const { color, roughness } = frameFinishes[finish];
+
       for (const mesh of group.children as THREE.Mesh[]) {
         mesh.geometry.dispose();
+        (mesh.material as THREE.Material).dispose();
       }
 
       group.clear();
@@ -45,7 +47,12 @@ export function createTerrainFramePreview(): {
 
         geometry.dispose();
         rendered.computeVertexNormals();
-        const mesh = new THREE.Mesh(rendered, materials[index % materials.length]);
+        const material = new THREE.MeshStandardMaterial({
+          color: new THREE.Color(color).offsetHSL(0, 0, -tierShadeStep * index),
+          roughness,
+          metalness: 0,
+        });
+        const mesh = new THREE.Mesh(rendered, material);
 
         mesh.name = part.id;
         mesh.castShadow = true;
