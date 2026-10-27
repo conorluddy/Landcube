@@ -1,4 +1,4 @@
-import { roadSpanLimitsKm } from '../constants/roads';
+import { cachedRoadNetworkLimit, roadSpanLimitsKm } from '../constants/roads';
 import { operationErrorCodes } from '../constants/operations';
 import { getAvailableRoadDetail, loadMappedRoads } from '../osm-roads';
 import { getRealTerrainSourceBounds } from '../real-terrain-projection';
@@ -14,7 +14,7 @@ export interface RoadNetworkLoader {
   cancel(): void;
 }
 
-/** One request at a time; each source patch is fetched at most once per session. */
+/** One request at a time; recent source patches are fetched at most once per session. */
 export function createRoadNetworkLoader(fetchRoads: typeof fetch): RoadNetworkLoader {
   const cache = new Map<string, RoadNetwork>();
   let active: AbortController | undefined;
@@ -56,6 +56,15 @@ export function createRoadNetworkLoader(fetchRoads: typeof fetch): RoadNetworkLo
 
         if (result.ok) {
           cache.set(key, result.data);
+
+          // Maps keep insertion order, so the first key is the oldest place.
+          for (const oldest of cache.keys()) {
+            if (cache.size <= cachedRoadNetworkLimit) {
+              break;
+            }
+
+            cache.delete(oldest);
+          }
         }
 
         return controller.signal.aborted ? undefined : result;

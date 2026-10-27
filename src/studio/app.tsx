@@ -1,7 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { threeDOnlySections, type StudioController, type InspectorSection } from './controller';
+import {
+  areRoadsDrawn,
+  threeDOnlySections,
+  type StudioController,
+  type InspectorSection,
+} from './controller';
 import { CameraPanel, OrbitPanel } from './camera-panel';
 import {
   ColourPanel,
@@ -434,8 +439,8 @@ function Studio({
               {state.source.terrain.attribution}
             </span>
           )}
-          {state.workspace.view === '3d' && state.scene.roads.enabled && state.roads.network && (
-            <span className="attribution">{state.roads.network.attribution}</span>
+          {areRoadsDrawn(state) && (
+            <span className="attribution">{state.roads.network?.attribution}</span>
           )}
         </div>
         <a

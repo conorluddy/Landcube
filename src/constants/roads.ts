@@ -51,6 +51,10 @@ export const roadSpanLimitsKm = { allRoads: 25, majorRoads: 100 } as const;
 
 export const overpassEndpoint = 'https://overpass-api.de/api/interpreter';
 export const overpassTimeoutSeconds = 30;
+/** Parsing and draping more than this on the main thread stalls the studio. */
+export const overpassMaximumResponseBytes = 20 * 1024 * 1024;
+/** Places whose road networks stay cached; autoplay tours would otherwise keep every one. */
+export const cachedRoadNetworkLimit = 5;
 export const roadAttribution = 'Roads © OpenStreetMap contributors';
 
 export const defaultRoadStyle = {

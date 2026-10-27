@@ -46,7 +46,10 @@ export function projectToRealTerrainFrame(
   };
 }
 
-/** Geographic edges of the square source patch, so a feature query covers every possible crop. */
+/**
+ * Geographic edges of the square source patch, so a feature query covers every possible crop.
+ * Near the antimeridian `west` or `east` runs past ±180°; queries split such a patch in two.
+ */
 export function getRealTerrainSourceBounds(placement: RealTerrainPlacement): GeoBounds {
   const { location, spanKm } = placement;
   const halfSpan = getMercatorSpanFraction(location.latitude, spanKm) / 2;

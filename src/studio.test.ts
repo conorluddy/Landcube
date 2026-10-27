@@ -311,6 +311,31 @@ void test('a failed road download keeps the terrain and explains how to recover'
   assert.equal(c.getSnapshot().source.terrain, terrain);
   assert.equal(c.getSnapshot().roads.loading, false);
   assert.match(c.getSnapshot().roads.status, /busy/);
+  assert.equal(c.getSnapshot().roads.canRetry, true);
+});
+
+void test('style edits after a failed road download never refetch; Retry does', async (t) => {
+  let downloads = 0;
+  const { controller: c } = setup(() => {
+    downloads++;
+
+    return Promise.resolve(new Response('', { status: 502 }));
+  });
+
+  stubBrowserTileDecoding(t);
+  await c.loadTerrain();
+  c.roads({ enabled: true });
+  await new Promise(setImmediate);
+
+  for (let index = 0; index < 30; index++) {
+    c.roads({ widthMm: 0.5 + index / 100, autoWidth: false });
+  }
+
+  await new Promise(setImmediate);
+  assert.equal(downloads, 1);
+  c.retryRoads();
+  await new Promise(setImmediate);
+  assert.equal(downloads, 2);
 });
 
 void test('auto road width follows the model area until the width is edited', () => {

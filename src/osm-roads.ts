@@ -1,5 +1,6 @@
 import {
   overpassEndpoint,
+  overpassMaximumResponseBytes,
   overpassTimeoutSeconds,
   roadAttribution,
   roadClasses,
@@ -20,15 +21,19 @@ export function getAvailableRoadDetail(spanKm: number): RoadDetail | undefined {
   return spanKm <= roadSpanLimitsKm.majorRoads ? 'major' : undefined;
 }
 
-/** Overpass QL for every drawable way touching the bounds, with full geometry and tags. */
+/**
+ * Overpass QL for every drawable way touching the bounds, with full geometry and tags.
+ * Bounds may run past ±180°; a patch across the antimeridian becomes one box on each side.
+ */
 export function createOverpassRoadQuery(bounds: GeoBounds, detail: RoadDetail): string {
-  const box = [bounds.south, bounds.west, bounds.north, bounds.east]
-    .map((value) => value.toFixed(6))
-    .join(',');
+  const filter = `way["highway"~"^(${roadDetailClasses[detail].join('|')})$"]`;
+  const boxes = splitAtAntimeridian(bounds.west, bounds.east).map(([west, east]) =>
+    [bounds.south, west, bounds.north, east].map((value) => value.toFixed(6)).join(','),
+  );
 
   return [
     `[out:json][timeout:${overpassTimeoutSeconds}];`,
-    `way["highway"~"^(${roadDetailClasses[detail].join('|')})$"](${box});`,
+    `(${boxes.map((box) => `${filter}(${box});`).join(' ')});`,
     'out body geom qt;',
   ].join('\n');
 }
@@ -70,7 +75,13 @@ export async function loadMappedRoads(
   }
 
   try {
-    return parseOverpassRoads(await response.json(), detail, now().toISOString());
+    const text = await readLimitedText(response, overpassMaximumResponseBytes);
+
+    if (text === undefined) {
+      return failure('This area has too many roads to draw. Choose a smaller area span.', false);
+    }
+
+    return parseOverpassRoads(JSON.parse(text), detail, now().toISOString());
   } catch (error) {
     if (signal?.aborted === true) {
       throw error;
@@ -113,6 +124,69 @@ export function parseOverpassRoads(
 }
 
 // === HELPERS ===
+
+/** West-to-east longitude ranges inside ±180° that together cover `west`…`east`. */
+function splitAtAntimeridian(west: number, east: number): [number, number][] {
+  if (east - west >= 360) {
+    return [[-180, 180]];
+  }
+
+  const wrappedWest = wrapLongitude(west);
+  const wrappedEast = wrapLongitude(east);
+
+  return wrappedWest <= wrappedEast
+    ? [[wrappedWest, wrappedEast]]
+    : [
+        [wrappedWest, 180],
+        [-180, wrappedEast],
+      ];
+}
+
+function wrapLongitude(longitude: number): number {
+  return ((((longitude + 180) % 360) + 360) % 360) - 180;
+}
+
+/** Undefined once the body passes `maximumBytes`, without buffering the rest of it. */
+async function readLimitedText(
+  response: Response,
+  maximumBytes: number,
+): Promise<string | undefined> {
+  if (Number(response.headers.get('content-length') ?? 0) > maximumBytes) {
+    await response.body?.cancel();
+
+    return undefined;
+  }
+
+  if (!response.body) {
+    return response.text();
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+    totalBytes += chunk.value.byteLength;
+
+    if (totalBytes > maximumBytes) {
+      await reader.cancel();
+
+      return undefined;
+    }
+
+    chunks.push(chunk.value);
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return new TextDecoder().decode(bytes);
+}
 
 type ParsedRoadElement = { kind: 'tunnel' | 'bridge' } | { kind: 'road'; road: MappedRoad };
 

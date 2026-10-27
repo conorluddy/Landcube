@@ -106,6 +106,8 @@ export interface RoadNetworkState {
   sourceKey: string;
   loading: boolean;
   status: string;
+  /** The last download failed in a way a later attempt may fix. */
+  canRetry: boolean;
 }
 export interface TerrainSourceState {
   selected: 'generated' | 'real';
@@ -217,8 +219,10 @@ export interface StudioController {
   loadTerrain: () => Promise<void>;
   autoplay: (patch: Partial<TerrainSourceState['autoplay']>) => Promise<void>;
   daylightCycle: (patch: Partial<SceneSettings['daylightCycle']>) => void;
-  /** Edits road style; enabling roads on real terrain fetches them once. */
+  /** Edits road style; switching roads on for real terrain fetches them once. */
   roads: (patch: Partial<RoadStyle>) => void;
+  /** Downloads roads again after a retryable failure. */
+  retryRoads: () => void;
   interval: (value: 'auto' | number) => boolean;
   hatching: (value: boolean) => void;
   resetCamera: () => void;
@@ -289,7 +293,7 @@ export function createStudioController(
       rotationDirection: 'counterclockwise',
       roads: { ...defaultRoadStyle },
     },
-    roads: { sourceKey: '', loading: false, status: '' },
+    roads: { sourceKey: '', loading: false, status: '', canRetry: false },
     model: {
       dimensions: { ...defaultTerrainModelSettings },
       crop: { ...defaultTerrainCrop },
@@ -385,7 +389,10 @@ export function createStudioController(
     // Stale roads are dropped before the renderer sees the new terrain.
     if (roadSourceChanged) {
       roadLoader.cancel();
-      state = { ...state, roads: { sourceKey: roadSourceKey, loading: false, status: '' } };
+      state = {
+        ...state,
+        roads: { sourceKey: roadSourceKey, loading: false, status: '', canRetry: false },
+      };
     }
 
     if (locationChanged && state.scene.gradientSource === 'location') {
@@ -436,7 +443,7 @@ export function createStudioController(
       return;
     }
 
-    setRoads({ loading: true, status: 'Downloading OpenStreetMap roads…' });
+    setRoads({ loading: true, status: 'Downloading OpenStreetMap roads…', canRetry: false });
     let result: Awaited<ReturnType<typeof roadLoader.load>>;
 
     try {
@@ -458,7 +465,7 @@ export function createStudioController(
     }
 
     if (!result.ok) {
-      setRoads({ loading: false, status: result.error.message });
+      setRoads({ loading: false, status: result.error.message, canRetry: result.error.retryable });
 
       return;
     }
@@ -893,12 +900,19 @@ export function createStudioController(
       }
     },
     roads(patch: Partial<RoadStyle>) {
+      const wasEnabled = state.scene.roads.enabled;
       const merged = { ...state.scene.roads, ...patch };
       const suggestedWidthMm = getAutoRoadWidthMm(merged, state.metrics.spanKm);
 
       controller.scene({ roads: { ...merged, widthMm: suggestedWidthMm ?? merged.widthMm } });
 
-      if (state.scene.roads.enabled) {
+      // Style edits never refetch, so dragging a slider after a failure cannot flood Overpass.
+      if (merged.enabled && !wasEnabled) {
+        void loadRoads();
+      }
+    },
+    retryRoads() {
+      if (state.scene.roads.enabled && state.roads.canRetry) {
         void loadRoads();
       }
     },
@@ -977,6 +991,16 @@ function getRoadPlacement(
   return terrain?.location && terrain.spanKm !== undefined
     ? { location: terrain.location, spanKm: terrain.spanKm }
     : undefined;
+}
+
+/** True when road ribbons are on screen, so their source needs crediting. */
+export function areRoadsDrawn(state: StudioState): boolean {
+  return (
+    state.workspace.view === '3d' &&
+    state.scene.roads.enabled &&
+    state.roads.network !== undefined &&
+    state.model.dimensions.terrainShape !== 'terraced'
+  );
 }
 
 /** Counts what the current detail draws and says what was left out. */

@@ -118,3 +118,39 @@ void test('road downloads post the query and record when they were fetched', asy
   assert.equal(result.data.fetchedAt, '2026-10-27T12:00:00.000Z');
   assert.equal(result.data.detail, 'major');
 });
+
+void test('a source across the antimeridian queries one box on each side of it', () => {
+  const query = createOverpassRoadQuery(
+    { north: -16.9, south: -17.1, west: 179.9, east: 180.1 },
+    'all',
+  );
+
+  assert.match(query, /\(-17\.100000,179\.900000,-16\.900000,180\.000000\)/);
+  assert.match(query, /\(-17\.100000,-180\.000000,-16\.900000,-179\.900000\)/);
+  assert.doesNotMatch(query, /180\.1/);
+});
+
+void test('oversized road responses fail without buffering the whole body', async () => {
+  const megabyte = new Uint8Array(1024 * 1024).fill(32);
+  let sentChunks = 0;
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      sentChunks++;
+      controller.enqueue(megabyte);
+    },
+  });
+  const streamed = await loadMappedRoads(bounds, 'all', () => Promise.resolve(new Response(body)));
+  const declared = await loadMappedRoads(bounds, 'all', () =>
+    Promise.resolve(
+      new Response('{}', { headers: { 'content-length': String(64 * 1024 * 1024) } }),
+    ),
+  );
+
+  for (const result of [streamed, declared]) {
+    assert.ok(!result.ok);
+    assert.match(result.error.message, /smaller area/);
+    assert.equal(result.error.retryable, false);
+  }
+
+  assert.ok(sentChunks <= 22, `read ${sentChunks} MB`);
+});

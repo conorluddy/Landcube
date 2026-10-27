@@ -1040,6 +1040,15 @@ function RoadsGroup({ controller: c, state: s }: PanelProps): ReactNode {
         }}
       />
       {status && <Hint>{status}</Hint>}
+      {style.enabled && s.roads.canRetry && (
+        <Button
+          onClick={() => {
+            c.retryRoads();
+          }}
+        >
+          Retry download
+        </Button>
+      )}
       <Hint>
         Experimental. Width is on the printed model; auto width is {roadWidthMmPerModelKm} mm per km
         of model area. Tunnels and bridges are hidden. Session-only and omitted from STL.{' '}
