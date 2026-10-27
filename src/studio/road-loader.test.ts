@@ -98,3 +98,36 @@ void test('areas too large for roads fail without a download or a retry', async 
   assert.ok(result !== undefined && !result.ok);
   assert.equal(result.error.retryable, false);
 });
+
+void test('a final failure is remembered, so switching roads back on never re-downloads it', async () => {
+  let downloads = 0;
+  const loader = createRoadNetworkLoader(() => {
+    downloads++;
+
+    return Promise.resolve(
+      new Response('{}', { headers: { 'content-length': String(64 * 1024 * 1024) } }),
+    );
+  });
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const result = await loader.load(placement(-6));
+
+    assert.ok(result !== undefined && !result.ok);
+    assert.match(result.error.message, /smaller area/);
+  }
+
+  assert.equal(downloads, 1);
+});
+
+void test('a retryable failure is fetched again on the next attempt', async () => {
+  let downloads = 0;
+  const loader = createRoadNetworkLoader(() => {
+    downloads++;
+
+    return Promise.resolve(new Response('', { status: 502 }));
+  });
+
+  await loader.load(placement(-6));
+  await loader.load(placement(-6));
+  assert.equal(downloads, 2);
+});

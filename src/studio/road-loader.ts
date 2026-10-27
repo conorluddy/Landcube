@@ -14,9 +14,10 @@ export interface RoadNetworkLoader {
   cancel(): void;
 }
 
-/** One request at a time; recent source patches are fetched at most once per session. */
+/** One request at a time; recent places are fetched at most once per session unless a retry can help. */
 export function createRoadNetworkLoader(fetchRoads: typeof fetch): RoadNetworkLoader {
-  const cache = new Map<string, RoadNetwork>();
+  // Networks and final failures; retrying cannot change either, so neither is fetched twice.
+  const cache = new Map<string, Result<RoadNetwork>>();
   let active: AbortController | undefined;
 
   return {
@@ -30,7 +31,7 @@ export function createRoadNetworkLoader(fetchRoads: typeof fetch): RoadNetworkLo
         cache.delete(key);
         cache.set(key, cached);
 
-        return { ok: true, data: cached };
+        return cached;
       }
 
       const detail = getAvailableRoadDetail(placement.spanKm);
@@ -58,8 +59,8 @@ export function createRoadNetworkLoader(fetchRoads: typeof fetch): RoadNetworkLo
           controller.signal,
         );
 
-        if (result.ok) {
-          cache.set(key, result.data);
+        if (result.ok || !result.error.retryable) {
+          cache.set(key, result);
 
           // Maps keep insertion order, so the first key is the oldest place.
           for (const oldest of cache.keys()) {
