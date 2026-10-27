@@ -118,7 +118,9 @@ async function requestMappedRoads(
       throw error;
     }
 
-    return failure('Roads could not be downloaded. Check your connection and retry.', true);
+    return requestSignal.aborted
+      ? timedOut()
+      : failure('Roads could not be downloaded. Check your connection and retry.', true);
   }
 
   if (!response.ok) {
@@ -143,7 +145,10 @@ async function requestMappedRoads(
       throw error;
     }
 
-    return failure('The road response was not valid JSON. Retry later.', true);
+    // Only the request's own timeout aborts it here, since the caller's abort rethrows above.
+    return requestSignal.aborted
+      ? timedOut()
+      : failure('The road response was not valid JSON. Retry later.', true);
   }
 }
 
@@ -298,6 +303,10 @@ function isLongitude(value: unknown): value is number {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function timedOut(): Result<never> {
+  return failure('The road service took too long. Retry, or choose a smaller area span.', true);
 }
 
 function failure(message: string, retryable: boolean): Result<never> {

@@ -170,6 +170,30 @@ void test('road downloads work without AbortSignal.any and forward the caller ab
   await assert.rejects(pending, /Aborted/);
 });
 
+void test('a response that stalls mid-body reports a timeout, not invalid JSON', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const pending = loadMappedRoads(bounds, 'all', (_url, init) => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"elements": ['));
+        init?.signal?.addEventListener('abort', () => {
+          controller.error(init.signal?.reason);
+        });
+      },
+    });
+
+    return Promise.resolve(new Response(body));
+  });
+
+  await new Promise(setImmediate);
+  t.mock.timers.tick(36_000);
+  const result = await pending;
+
+  assert.ok(!result.ok);
+  assert.match(result.error.message, /took too long/);
+  assert.equal(result.error.retryable, true);
+});
+
 void test('road downloads post the query and record when they were fetched', async () => {
   let body = '';
   const result = await loadMappedRoads(
