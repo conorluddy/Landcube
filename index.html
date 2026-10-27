@@ -9,7 +9,9 @@
     <title>Topogra</title>
     <!-- Google tag (gtag.js): hosted site only, so dev servers, forks and self-hosts stay silent -->
     <script>
-      if (location.hostname === 'conorluddy.github.io') {
+      const analyticsHostname = 'conorluddy.github.io';
+
+      if (location.hostname === analyticsHostname) {
         window.dataLayer = window.dataLayer || [];
         function gtag() {
           dataLayer.push(arguments);

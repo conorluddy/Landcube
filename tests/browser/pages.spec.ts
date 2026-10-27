@@ -87,6 +87,8 @@ test('analytics loads only on the hosted site and never sees the design-link que
     });
   });
   await page.goto('https://conorluddy.github.io/Topogra/?v=1&seed=123');
+  await page.getByRole('button', { name: 'New landscape' }).click();
+  await expect(page).not.toHaveURL(/seed=123/);
   const dataLayer = JSON.stringify(
     await page.evaluate(() =>
       Array.from((window as unknown as { dataLayer: ArrayLike<unknown>[] }).dataLayer, (entry) =>
