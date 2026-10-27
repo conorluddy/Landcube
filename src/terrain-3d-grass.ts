@@ -107,6 +107,7 @@ export function createTerrainGrassLayer(): TerrainGrassLayer {
       site.shape,
       site.originX,
       site.originY,
+      site.frameUnitsPerMm,
       site.metersPerFieldUnit,
       site.metersPerFrameUnit,
       site.seaLevel,

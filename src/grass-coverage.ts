@@ -25,26 +25,6 @@ export interface GrassSite {
   roads: readonly { points: readonly { x: number; y: number }[]; halfWidth: number }[];
 }
 
-/** Drawn roads as grass clearances, matching the ribbons' classes and widths; none when roads are off. */
-export function getGrassRoads(
-  paths: readonly RoadPath[],
-  style: Pick<RoadStyle, 'enabled' | 'detail' | 'widthMm'>,
-  frameUnitsPerMm: number,
-): GrassSite['roads'] {
-  if (!style.enabled) {
-    return [];
-  }
-
-  const classes: readonly string[] = roadDetailClasses[style.detail];
-
-  return paths
-    .filter((path) => classes.includes(path.roadClass))
-    .map((path) => ({
-      points: path.points,
-      halfWidth: getRoadHalfWidth(path.roadClass, style.widthMm, frameUnitsPerMm),
-    }));
-}
-
 /** The real-world scale and source anchoring the studio knows and the renderer does not. */
 export type GrassGeography = Pick<
   GrassSite,
@@ -78,19 +58,46 @@ export interface GrassGround {
   slope: Float32Array;
   /** Elevation as a share of the field's relief, 0 to 1. */
   altitude: Float32Array;
-  /** Source-frame centre of each texel, where patch noise is anchored. */
-  sourceX: Float32Array;
-  sourceY: Float32Array;
+  /**
+   * Each texel's source-frame centre in printed millimetres, where patch noise is anchored. The
+   * frame follows the window size at 3D start, so millimetres keep patches the same size anyway.
+   */
+  sourceXMm: Float32Array;
+  sourceYMm: Float32Array;
   /** Dry patch noise, 0 to 255. */
   dryness: Uint8Array;
+  /** Patch noise is the slowest part of a style rebuild and depends only on clumping. */
+  patchNoise?: { clumping: number; values: Float32Array };
 }
 
 /** Texels along the crop's longer side: about 0.3 mm on a 150 mm model, finer than any road. */
 export const grassCoverageResolution = 512;
 
 const grassSeed = 0x6a55;
-// Patch noise is the slowest part of a style rebuild and depends only on clumping.
-const patchNoiseCache = new WeakMap<GrassGround, { clumping: number; values: Float32Array }>();
+/** Noise frequencies per printed millimetre: dry patches ~17 mm, grass patches 14–50 mm. */
+const dryPatchesPerMm = 0.06;
+const sparsePatchesPerMm = 0.07;
+const clumpedPatchesPerMm = 0.02;
+
+/** Drawn roads as grass clearances, matching the ribbons' classes and widths; none when roads are off. */
+export function getGrassRoads(
+  paths: readonly RoadPath[],
+  style: Pick<RoadStyle, 'enabled' | 'detail' | 'widthMm'>,
+  frameUnitsPerMm: number,
+): GrassSite['roads'] {
+  if (!style.enabled) {
+    return [];
+  }
+
+  const classes: readonly string[] = roadDetailClasses[style.detail];
+
+  return paths
+    .filter((path) => classes.includes(path.roadClass))
+    .map((path) => ({
+      points: path.points,
+      halfWidth: getRoadHalfWidth(path.roadClass, style.widthMm, frameUnitsPerMm),
+    }));
+}
 
 /** Measures the crop once per terrain, crop or road change. */
 export function surveyGrassGround(
@@ -106,8 +113,8 @@ export function surveyGrassGround(
     rows,
     slope: new Float32Array(count).fill(Number.NaN),
     altitude: new Float32Array(count),
-    sourceX: new Float32Array(count),
-    sourceY: new Float32Array(count),
+    sourceXMm: new Float32Array(count),
+    sourceYMm: new Float32Array(count),
     dryness: new Uint8Array(count),
   };
   const [minimum, maximum] = getFieldRange(site.field);
@@ -132,12 +139,14 @@ export function surveyGrassGround(
       const x = (column + 0.5) * columnUnits;
       const y = (row + 0.5) * rowUnits;
       const index = row * columns + column;
-      const sourceX = x + site.originX;
-      const sourceY = y + site.originY;
+      const sourceXMm = (x + site.originX) / site.frameUnitsPerMm;
+      const sourceYMm = (y + site.originY) / site.frameUnitsPerMm;
 
-      ground.sourceX[index] = sourceX;
-      ground.sourceY[index] = sourceY;
-      ground.dryness[index] = Math.round(fractalNoise(sourceX * 0.012, sourceY * 0.012, 23) * 255);
+      ground.sourceXMm[index] = sourceXMm;
+      ground.sourceYMm[index] = sourceYMm;
+      ground.dryness[index] = Math.round(
+        fractalNoise(sourceXMm * dryPatchesPerMm, sourceYMm * dryPatchesPerMm, 23) * 255,
+      );
 
       const elevation = elevations[index];
 
@@ -239,20 +248,22 @@ function getAltitudeWeight(altitude: number, limit: number): number {
 }
 
 function getPatchNoise(ground: GrassGround, clumping: number): Float32Array {
-  const cached = patchNoiseCache.get(ground);
-
-  if (cached?.clumping === clumping) {
-    return cached.values;
+  if (ground.patchNoise?.clumping === clumping) {
+    return ground.patchNoise.values;
   }
 
-  const scale = 0.004 + (1 - clumping) * 0.01;
-  const values = new Float32Array(ground.sourceX.length);
+  const scale = clumpedPatchesPerMm + (1 - clumping) * (sparsePatchesPerMm - clumpedPatchesPerMm);
+  const values = new Float32Array(ground.sourceXMm.length);
 
   for (let index = 0; index < values.length; index++) {
-    values[index] = fractalNoise(ground.sourceX[index] * scale, ground.sourceY[index] * scale, 11);
+    values[index] = fractalNoise(
+      ground.sourceXMm[index] * scale,
+      ground.sourceYMm[index] * scale,
+      11,
+    );
   }
 
-  patchNoiseCache.set(ground, { clumping, values });
+  ground.patchNoise = { clumping, values };
 
   return values;
 }

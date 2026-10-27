@@ -195,3 +195,16 @@ void test('grass clears exactly the drawn roads: their classes and widths, none 
   assert.equal(getGrassRoads(paths, { ...style, detail: 'tracks' }, 4).length, 2);
   assert.deepEqual(getGrassRoads(paths, { ...style, enabled: false }, 4), []);
 });
+
+void test('patches are sized in printed millimetres, whatever window size the frame came from', () => {
+  const small = createSite();
+  const large = createSite({
+    field: createField(0.001, 201, 201),
+    width: 1000,
+    height: 1000,
+    frameUnitsPerMm: 8,
+  });
+  const patchy = { ...style, coverage: 0.5 };
+
+  assert.deepEqual(grow(large, patchy, resolution).data, grow(small, patchy, resolution).data);
+});
