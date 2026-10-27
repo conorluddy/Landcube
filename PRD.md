@@ -16,7 +16,7 @@ The default appearance is a charcoal background with subtle, lighter contour lin
 - A new random seed on every page load.
 - Smooth procedural terrain and mathematically derived contour lines.
 - Crisp rendering at different viewport sizes and pixel densities.
-- No accounts, backend, or runtime network dependencies. The one external service is Google Analytics page-view tracking, which receives the site origin and path only, never design-link query strings.
+- No accounts, backend, or runtime network dependencies. The one external service is Google Analytics page-view tracking, which receives the site origin and path, not design-link query strings, plus the standard browser details Google collects (IP address, user agent, referrer, screen size).
 
 Controls, export buttons, animation, real geographic data, 3D previews, and website-content previews are outside this version.
 

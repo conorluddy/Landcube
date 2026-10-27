@@ -16,7 +16,8 @@
       }
       gtag('js', new Date());
 
-      gtag('config', 'G-09DGBRV9NB', {
+      gtag('config', 'G-09DGBRV9NB', { send_page_view: false });
+      gtag('event', 'page_view', {
         page_location: location.origin + location.pathname,
       });
     </script>
