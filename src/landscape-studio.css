@@ -460,6 +460,9 @@ input[type='range']::-moz-range-thumb {
   min-width: 0;
   padding: 6px 3px;
 }
+.edge-choices {
+  grid-template-columns: repeat(6, 1fr);
+}
 .frame-thumbnail {
   display: block;
   width: 100%;

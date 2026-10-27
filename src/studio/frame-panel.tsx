@@ -9,17 +9,20 @@ import type {
   FrameStudioPreset,
   FrameStudioSettings,
 } from '../frame/frame-studio-settings';
-import { Group, Hint, Range, Select, Toggle } from './fields';
+import { Group, Hint, Range, Toggle } from './fields';
 import type { PanelProps } from './panels';
 
-const edgeShapeOptions: readonly FrameStudioSettings['edgeShape'][] = [
-  'square',
-  'chamfer',
-  'cove',
-  'round',
-  'ogee',
-  'step',
-];
+type EdgeShape = FrameStudioSettings['edgeShape'];
+
+/** Cross-sections of the frame's top outer corner, in the button's text colour. */
+const edgeShapeProfiles: Record<EdgeShape, string> = {
+  square: 'M4 20V4h16v16z',
+  chamfer: 'M4 20V4h8l8 8v8z',
+  cove: 'M4 20V4h8a8 8 0 0 0 8 8v8z',
+  round: 'M4 20V4h8a8 8 0 0 1 8 8v8z',
+  ogee: 'M4 20V4h8q4 0 4 4t4 4v8z',
+  step: 'M4 20V4h8v4h4v4h4v8z',
+};
 
 /** Picks a printable frame preset and its key dimensions; parts download from Export. */
 export function FramePanel({ controller: c, state: s }: PanelProps): ReactNode {
@@ -127,14 +130,23 @@ export function FramePanel({ controller: c, state: s }: PanelProps): ReactNode {
       )}
       {settings.preset !== 'none' && (
         <Group title="Edge">
-          <Select
-            label="Edge shape"
-            value={settings.edgeShape}
-            options={edgeShapeOptions}
-            onChange={(edgeShape) => {
-              c.frame({ edgeShape });
-            }}
-          />
+          <div role="group" aria-label="Edge shape" className="frame-choices edge-choices">
+            {Object.entries(edgeShapeProfiles).map(([shape, profile]) => (
+              <button
+                type="button"
+                key={shape}
+                aria-pressed={settings.edgeShape === shape}
+                onClick={() => {
+                  c.frame({ edgeShape: shape as EdgeShape });
+                }}
+              >
+                <svg className="frame-thumbnail" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d={profile} fill="currentColor" />
+                </svg>
+                {shape[0].toUpperCase() + shape.slice(1)}
+              </button>
+            ))}
+          </div>
           {settings.edgeShape !== 'square' && (
             <Range
               label="Edge size"

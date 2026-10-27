@@ -78,7 +78,10 @@ test('an unprintable frame shows its error and disables downloads', async ({ pag
     .click();
   await page.getByLabel('Border', { exact: true }).fill('1.2');
   await page.getByLabel('Border', { exact: true }).press('Tab');
-  await page.getByLabel('Edge shape').selectOption('chamfer');
+  await page
+    .getByRole('group', { name: 'Edge shape' })
+    .getByRole('button', { name: 'Chamfer', exact: true })
+    .click();
   await expect(page.getByRole('alert').filter({ hasText: 'minimum is 1.2 mm' })).toBeVisible();
   await page.getByRole('button', { name: 'Export ↗' }).click();
   await expect(
