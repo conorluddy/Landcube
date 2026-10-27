@@ -413,6 +413,9 @@ function Studio({
               {state.source.terrain.attribution}
             </span>
           )}
+          {state.workspace.view === '3d' && state.scene.roads.enabled && state.roads.network && (
+            <span className="attribution">{state.roads.network.attribution}</span>
+          )}
         </div>
         <a
           className="studio-github"

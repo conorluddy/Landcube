@@ -28,6 +28,7 @@ import {
   type TerrainLightingSettings,
 } from './terrain-lighting';
 import { createTerrainLineBuffers } from './terrain-3d-lines';
+import { createTerrainRoadLayer } from './terrain-3d-roads';
 import {
   baseTerrainFovDegrees,
   defaultTerrainCameraSettings,
@@ -63,6 +64,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createTerrainPostProcessing, type TerrainPostProcessing } from './terrain-post-processing';
 import type { Contour } from './types/contours';
 import type { DesignSettings } from './types/design';
+import type { RoadPath, RoadStyle } from './types/roads';
 
 export type WaterStyle = 'hatched' | 'solid' | 'off';
 
@@ -76,6 +78,7 @@ export interface Terrain3d {
     field: HeightField,
     seaLevel?: SeaLevelGeometry,
     terraceLevels?: TerrainTerraceLevels,
+    roads?: readonly RoadPath[],
   ): void;
   setVisible(value: boolean): void;
   /** Pass false when a terrain update follows, so the new height morphs with it. */
@@ -100,6 +103,7 @@ export interface Terrain3d {
   setWaterStyle(value: WaterStyle): void;
   setWaterColor(value: string | undefined): void;
   setContours(value: boolean): void;
+  setRoadStyle(value: Readonly<RoadStyle>): void;
   setContourEngraving(value: ContourEngravingSettings): void;
   setSurfaceColor(value: string | undefined): void;
   setRotating(value: boolean): void;
@@ -423,7 +427,9 @@ export function createTerrain3d(
 
   const landscape = new THREE.Group();
 
-  landscape.add(surface, base, contourLayer, sea, waterSides);
+  const roads = createTerrainRoadLayer();
+
+  landscape.add(surface, base, contourLayer, roads.mesh, sea, waterSides);
   scene.add(landscape);
   let visible = false;
   let rotating = false;
@@ -679,6 +685,7 @@ export function createTerrain3d(
 
     syncContourTreatment();
     syncWater();
+    roads.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
   };
 
   const applyPendingMapGrid = () => {
@@ -837,8 +844,9 @@ export function createTerrain3d(
       field: HeightField,
       seaLevel?: SeaLevelGeometry,
       terraceLevels?: TerrainTerraceLevels,
+      roadPaths: readonly RoadPath[] = [],
     ) {
-      lastUpdate = [contours, width, height, settings, field, seaLevel, terraceLevels];
+      lastUpdate = [contours, width, height, settings, field, seaLevel, terraceLevels, roadPaths];
       // Terrace levels follow the contour interval but only shape terraced models.
       const morphKey = JSON.stringify([
         width,
@@ -1005,6 +1013,16 @@ export function createTerrain3d(
       engraving.update(contours, settings, previewScale);
       const elevationOffset = model.elevationOffsetMm * previewScale;
 
+      roads.update({
+        paths: roadPaths,
+        field,
+        width,
+        height,
+        modelSettings,
+        exaggeration,
+        elevationOffset,
+      });
+
       const scale = 2 / Math.max(width, height);
 
       strokeOpacity = settings.strokeOpacity;
@@ -1153,6 +1171,10 @@ export function createTerrain3d(
     setContours(value: boolean) {
       showContours = value;
       syncContourTreatment();
+      draw();
+    },
+    setRoadStyle(value: Readonly<RoadStyle>) {
+      roads.setStyle(value);
       draw();
     },
     setContourEngraving(value: ContourEngravingSettings) {

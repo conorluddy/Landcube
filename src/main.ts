@@ -9,6 +9,8 @@ import { downloadBlob } from './studio/export-panel';
 import { encodeTerrainStill } from './export/still-export';
 import type { RealTerrain } from './real-terrain';
 import { createFloorPlace } from './floor-geo';
+import { clipRoadsToCrop } from './road-ribbons';
+import type { RoadPath } from './types/roads';
 import { findTerrainSummits } from './summit-markers';
 import { getRequiredElement } from './dom-elements';
 import './landscape-studio.css';
@@ -152,7 +154,7 @@ controls.connect({
     const frame = terrain3d.captureStill(scale);
 
     downloadBlob(
-      await encodeTerrainStill(frame, realTerrain?.attribution),
+      await encodeTerrainStill(frame, getStillAttribution()),
       `topogra-${settings.seed}-3d-${scale}x.png`,
     );
 
@@ -168,6 +170,7 @@ controls.connect({
         : `topogra-${settings.seed}-${model.widthMm}x${model.lengthMm}mm.stl`,
     );
   },
+  roadsChanged: updateTerrain3d,
   applyTerrain: (loadedTerrain, shouldTransition) => {
     if (shouldTransition) {
       requestTerrainTransition();
@@ -316,6 +319,7 @@ let modelSourceSampler: typeof terrain | undefined;
 let modelSourceField: HeightField | undefined;
 let modelCropKey = '';
 let modelCrop: ReturnType<typeof cropTerrainModelField> | undefined;
+let roadPaths: { key: unknown[]; paths: RoadPath[] } = { key: [], paths: [] };
 
 function updateTerrain3d(): void {
   if (!terrain3d.isActive()) {
@@ -377,7 +381,46 @@ function updateTerrain3d(): void {
     createFloorPlace(realTerrain, modelCrop, modelSourceFrame),
     getRealContourInterval(realTerrain),
     getTerrainTerraceLevels(settings, engineConfiguration, realTerrain),
+    getCroppedRoadPaths(modelSourceFrame, modelCrop, dimensions.cropShape ?? 'rectangle'),
   );
+}
+
+/** Projects the current road network into the model crop, reusing the last result when unchanged. */
+function getCroppedRoadPaths(
+  frame: { width: number; height: number },
+  crop: NonNullable<typeof modelCrop>,
+  shape: 'rectangle' | 'circle',
+): RoadPath[] {
+  const { roads } = controls.getSnapshot();
+  const location = realTerrain?.location;
+  const spanKm = realTerrain?.spanKm;
+
+  // Disabled roads still project, so switching them back on needs no terrain update.
+  if (!roads.network || !location || spanKm === undefined) {
+    return [];
+  }
+
+  const key = [roads.network, location, spanKm, frame, crop, shape];
+
+  if (key.some((value, index) => value !== roadPaths.key[index])) {
+    roadPaths = {
+      key,
+      paths: clipRoadsToCrop(roads.network.roads, { location, spanKm }, frame, crop, shape),
+    };
+  }
+
+  return roadPaths.paths;
+}
+
+/** Credits every external source visible in the 3D view. */
+function getStillAttribution(): string | undefined {
+  const { roads, scene } = controls.getSnapshot();
+  const credits = [
+    realTerrain?.attribution,
+    scene.roads.enabled ? roads.network?.attribution : undefined,
+  ].filter((credit) => credit !== undefined && credit !== '');
+
+  return credits.length > 0 ? credits.join(' · ') : undefined;
 }
 
 /** Eases cursor deformation with capped frame pacing until settled. */

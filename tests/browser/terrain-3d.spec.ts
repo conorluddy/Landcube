@@ -342,3 +342,55 @@ async function recordTerrainTransitions(page: Page): Promise<() => Promise<strin
   return () =>
     page.evaluate(() => (window as unknown as { terrainTransitions: string[] }).terrainTransitions);
 }
+
+test('mapped roads load once per place, restyle without refetching and credit OpenStreetMap', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  const queries: string[] = [];
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.route('https://overpass-api.de/api/interpreter', async (route) => {
+    queries.push(new URLSearchParams(route.request().postData() ?? '').get('data') ?? '');
+    // Synthetic ways near the first preset; real responses carry the same shape.
+    await route.fulfill({
+      json: {
+        elements: [
+          syntheticWay(1, 'primary', {}),
+          syntheticWay(2, 'track', {}),
+          syntheticWay(3, 'secondary', { bridge: 'yes' }),
+        ],
+      },
+      headers: { 'access-control-allow-origin': '*' },
+    });
+  });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await loadLocation(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await page.getByRole('switch', { name: 'Mapped roads', exact: true }).check();
+  await expect(page.getByText('1 mapped roads · 1 bridges and 0 tunnels hidden.')).toBeVisible();
+  await page.getByLabel('Detail').selectOption('tracks');
+  await expect(page.getByText('2 mapped roads · 1 bridges and 0 tunnels hidden.')).toBeVisible();
+  await page.getByLabel('Road width').fill('2');
+  await page.getByRole('switch', { name: 'Mapped roads', exact: true }).uncheck();
+  await page.getByRole('switch', { name: 'Mapped roads', exact: true }).check();
+  await expect(
+    page.locator('footer .attribution').filter({ hasText: 'OpenStreetMap' }),
+  ).toBeVisible();
+  expect(queries).toHaveLength(1);
+  expect(queries[0]).toContain('way["highway"');
+  expect(errors).toEqual([]);
+});
+
+function syntheticWay(id: number, highway: string, tags: Record<string, string>) {
+  return {
+    type: 'way',
+    id,
+    tags: { highway, ...tags },
+    geometry: Array.from({ length: 12 }, (_, index) => ({
+      lat: 52.98 + index * 0.004 * id,
+      lon: -6.38 + index * 0.006,
+    })),
+  };
+}

@@ -7,7 +7,7 @@ import {
   validateDesignSettings,
 } from './design-settings';
 
-function setup() {
+function setup(fetchRoads?: typeof fetch) {
   const initial = parseDesignParameters(new URLSearchParams('v=1&seed=123&width=480&height=320'));
 
   assert.ok(initial.ok);
@@ -25,31 +25,35 @@ function setup() {
     pickFocus: () => Promise.resolve(false),
     downloadStill: () => Promise.resolve({ width: 1, height: 1 }),
     downloadStl: () => undefined,
+    roadsChanged: () => undefined,
   };
-  const controller = createStudioController({
-    getSettings: () => design,
-    updateSettings: (candidate) => {
-      const result = validateDesignSettings(candidate);
+  const controller = createStudioController(
+    {
+      getSettings: () => design,
+      updateSettings: (candidate) => {
+        const result = validateDesignSettings(candidate);
 
-      if (!result.ok) {
-        return false;
-      }
+        if (!result.ok) {
+          return false;
+        }
 
-      design = result.data;
+        design = result.data;
 
-      return true;
+        return true;
+      },
+      newLandscape: () => {
+        const result = validateDesignSettings({ ...design, seed: design.seed + 1 });
+
+        assert.ok(result.ok);
+        design = result.data;
+      },
+      isSeedLocked: false,
+      lockSeed: () => undefined,
+      getShareUrl: () => `https://topogra.test/?${serializeDesignParameters(design).toString()}`,
+      copyLink: () => Promise.resolve({ ok: true, data: undefined }),
     },
-    newLandscape: () => {
-      const result = validateDesignSettings({ ...design, seed: design.seed + 1 });
-
-      assert.ok(result.ok);
-      design = result.data;
-    },
-    isSeedLocked: false,
-    lockSeed: () => undefined,
-    getShareUrl: () => `https://topogra.test/?${serializeDesignParameters(design).toString()}`,
-    copyLink: () => Promise.resolve({ ok: true, data: undefined }),
-  });
+    fetchRoads,
+  );
 
   controller.connect(effects);
 
@@ -199,6 +203,75 @@ void test('daylight cycle sweeps the sun until a manual lighting edit pauses it'
   assert.equal(c.getSnapshot().scene.daylightCycle.enabled, false);
   assert.equal(c.getSnapshot().scene.lighting.timeOfDay, 12);
 });
+
+void test('road edits restyle without refetching and a superseded download never reaches the new place', async (t) => {
+  const requests: ((elements: unknown[]) => void)[] = [];
+  const { controller: c, effects } = setup(
+    () =>
+      new Promise((resolve) => {
+        // Ignores abort signals, so a superseded response still arrives late.
+        requests.push((elements) => {
+          resolve(Response.json({ elements }));
+        });
+      }),
+  );
+  let roadUpdates = 0;
+
+  effects.roadsChanged = () => {
+    roadUpdates++;
+  };
+
+  stubBrowserTileDecoding(t);
+  await c.loadTerrain();
+  c.roads({ enabled: true });
+  assert.equal(requests.length, 1);
+  assert.equal(c.getSnapshot().roads.loading, true);
+
+  c.source({ latitude: 53.2707, longitude: -9.0568 });
+  await c.loadTerrain();
+  assert.equal(requests.length, 2);
+  requests[1]([roadElement(2)]);
+  await new Promise(setImmediate);
+  requests[0]([roadElement(1)]);
+  await new Promise(setImmediate);
+  assert.deepEqual(
+    c.getSnapshot().roads.network?.roads.map((road) => road.id),
+    [2],
+  );
+
+  c.roads({ color: '#ff0000', widthMm: 1.2, detail: 'major' });
+  c.roads({ enabled: false });
+  c.roads({ enabled: true });
+  assert.equal(requests.length, 2);
+  assert.equal(roadUpdates, 1);
+  assert.equal(c.getSnapshot().scene.roads.color, '#ff0000');
+});
+
+void test('a failed road download keeps the terrain and explains how to recover', async (t) => {
+  const { controller: c } = setup(() => Promise.resolve(new Response('', { status: 504 })));
+
+  stubBrowserTileDecoding(t);
+  await c.loadTerrain();
+  const terrain = c.getSnapshot().source.terrain;
+
+  c.roads({ enabled: true });
+  await new Promise(setImmediate);
+  assert.equal(c.getSnapshot().source.terrain, terrain);
+  assert.equal(c.getSnapshot().roads.loading, false);
+  assert.match(c.getSnapshot().roads.status, /busy/);
+});
+
+function roadElement(id: number) {
+  return {
+    type: 'way',
+    id,
+    tags: { highway: 'primary' },
+    geometry: [
+      { lat: 53, lon: -6 },
+      { lat: 53.01, lon: -6 },
+    ],
+  };
+}
 
 /** Serves flat Terrarium tiles through the browser decoding path without a network or canvas. */
 function stubBrowserTileDecoding(t: TestContext): void {

@@ -42,6 +42,10 @@ import type { Result } from '../types/operations';
 import type { WaterStyle } from '../terrain-3d';
 import type { FloorStyle } from '../terrain-floor-styles';
 import type { TerrainStillScale } from '../export/still-export';
+import { defaultRoadStyle, roadDetailClasses, roadSpanLimitsKm } from '../constants/roads';
+import { operationErrorCodes } from '../constants/operations';
+import type { RoadNetwork, RoadStyle } from '../types/roads';
+import { createRoadNetworkLoader, getRoadPlacementKey } from './road-loader';
 
 export type StudioView = '2d' | '3d';
 export type InspectorSection = 'Terrain' | 'Contours' | 'Colour' | 'Scene' | 'Camera' | 'Model';
@@ -79,6 +83,15 @@ export interface SceneSettings {
   rotating: boolean;
   rotationSeconds: number;
   rotationDirection: TurntableDirection;
+  roads: RoadStyle;
+}
+/** Mapped roads for the loaded real terrain; never part of design links. */
+export interface RoadNetworkState {
+  network?: RoadNetwork;
+  /** The source patch `network` belongs to, from `getRoadPlacementKey`. */
+  sourceKey: string;
+  loading: boolean;
+  status: string;
 }
 export interface TerrainSourceState {
   selected: 'generated' | 'real';
@@ -100,6 +113,7 @@ export interface TerrainSourceState {
 export interface StudioState {
   design: ValidatedDesignSettings;
   source: TerrainSourceState;
+  roads: RoadNetworkState;
   scene: SceneSettings;
   model: {
     dimensions: TerrainModelSettings;
@@ -133,6 +147,8 @@ export interface StudioEffects {
   /** Resolves to the saved image's pixel size. */
   downloadStill(scale: TerrainStillScale): Promise<{ width: number; height: number }>;
   downloadStl(): void;
+  /** A road network arrived or was cleared; style edits go through `sceneChanged`. */
+  roadsChanged(): void;
 }
 
 export interface DesignControlActions {
@@ -177,6 +193,8 @@ export interface StudioController {
   loadTerrain: () => Promise<void>;
   autoplay: (patch: Partial<TerrainSourceState['autoplay']>) => Promise<void>;
   daylightCycle: (patch: Partial<SceneSettings['daylightCycle']>) => void;
+  /** Edits road style; enabling roads on real terrain fetches them once. */
+  roads: (patch: Partial<RoadStyle>) => void;
   interval: (value: 'auto' | number) => boolean;
   hatching: (value: boolean) => void;
   resetCamera: () => void;
@@ -188,7 +206,10 @@ export interface StudioController {
 const daylightFrameMs = 50;
 
 /** Session state is independent of controls, rendering and version-one URL serialization. */
-export function createStudioController(actions: DesignControlActions): StudioController {
+export function createStudioController(
+  actions: DesignControlActions,
+  fetchRoads: typeof fetch = (...request) => fetch(...request),
+): StudioController {
   const first = realTerrainPresets[0];
   const natural = terrainMaterialPresets.natural;
   let state: StudioState = {
@@ -242,7 +263,9 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       rotating: false,
       rotationSeconds: defaultRotationSeconds,
       rotationDirection: 'counterclockwise',
+      roads: { ...defaultRoadStyle },
     },
+    roads: { sourceKey: '', loading: false, status: '' },
     model: {
       dimensions: { ...defaultTerrainModelSettings },
       crop: { ...defaultTerrainCrop },
@@ -270,6 +293,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
   let parked: { terrain: RealTerrain; fieldsKey: string } | undefined;
   let loadedFieldsKey = '';
   const listeners = new Set<() => void>();
+  const roadLoader = createRoadNetworkLoader(fetchRoads);
 
   const publish = () => {
     for (const listener of listeners) {
@@ -303,6 +327,14 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       previousLocation?.longitude !== nextLocation?.longitude;
 
     state = { ...state, source: { ...state.source, terrain } };
+    const roadSourceKey = getRoadPlacementKey(getRoadPlacement(terrain));
+    const roadSourceChanged = roadSourceKey !== state.roads.sourceKey;
+
+    // Stale roads are dropped before the renderer sees the new terrain.
+    if (roadSourceChanged) {
+      roadLoader.cancel();
+      state = { ...state, roads: { sourceKey: roadSourceKey, loading: false, status: '' } };
+    }
 
     if (locationChanged && state.scene.gradientSource === 'location') {
       state = { ...state, scene: applyLocationGradient(state.scene, nextLocation) };
@@ -333,6 +365,54 @@ export function createStudioController(actions: DesignControlActions): StudioCon
     }
 
     publish();
+
+    if (roadSourceChanged && state.scene.roads.enabled) {
+      void loadRoads();
+    }
+  };
+
+  const setRoads = (patch: Partial<RoadNetworkState>) => {
+    state = { ...state, roads: { ...state.roads, ...patch } };
+    publish();
+  };
+
+  const loadRoads = async () => {
+    const placement = getRoadPlacement(state.source.terrain);
+    const sourceKey = getRoadPlacementKey(placement);
+
+    if (!placement || state.roads.network || state.roads.loading) {
+      return;
+    }
+
+    setRoads({ loading: true, status: 'Downloading OpenStreetMap roads…' });
+    let result: Awaited<ReturnType<typeof roadLoader.load>>;
+
+    try {
+      result = await roadLoader.load(placement);
+    } catch (error) {
+      result = {
+        ok: false,
+        error: {
+          code: operationErrorCodes.mapDataFailed,
+          message: error instanceof Error ? error.message : 'Roads could not load. Retry later.',
+          retryable: true,
+        },
+      };
+    }
+
+    // A newer source owns the road state now; its own load reports instead.
+    if (result === undefined || sourceKey !== state.roads.sourceKey) {
+      return;
+    }
+
+    if (!result.ok) {
+      setRoads({ loading: false, status: result.error.message });
+
+      return;
+    }
+
+    setRoads({ network: result.data, loading: false, status: '' });
+    effects?.roadsChanged();
   };
 
   const controller: StudioController = {
@@ -708,6 +788,13 @@ export function createStudioController(actions: DesignControlActions): StudioCon
         }
       }
     },
+    roads(patch: Partial<RoadStyle>) {
+      controller.scene({ roads: { ...state.scene.roads, ...patch } });
+
+      if (state.scene.roads.enabled) {
+        void loadRoads();
+      }
+    },
     interval(value: 'auto' | number) {
       try {
         validateRealContourInterval(value);
@@ -767,6 +854,33 @@ function getSourceFieldsKey(source: TerrainSourceState): string {
     source.elevationFloor,
     source.maxDepth,
   ]);
+}
+
+/** Real terrain with a location and span can carry roads; generated terrain cannot. */
+function getRoadPlacement(
+  terrain: RealTerrain | undefined,
+): Required<Pick<RealTerrain, 'location' | 'spanKm'>> | undefined {
+  return terrain?.location && terrain.spanKm !== undefined
+    ? { location: terrain.location, spanKm: terrain.spanKm }
+    : undefined;
+}
+
+/** Counts what the current detail draws and says what was left out. */
+export function describeRoadNetwork(network: RoadNetwork, style: RoadStyle): string {
+  const classes: readonly string[] = roadDetailClasses[style.detail];
+  const drawn = network.roads.filter((road) => classes.includes(road.roadClass)).length;
+  const hidden = network.omitted.tunnels + network.omitted.bridges;
+  const parts = [`${drawn.toLocaleString('en')} mapped roads`];
+
+  if (hidden > 0) {
+    parts.push(`${network.omitted.bridges} bridges and ${network.omitted.tunnels} tunnels hidden`);
+  }
+
+  if (network.detail === 'major' && style.detail !== 'major') {
+    parts.push(`minor roads need an area of ${roadSpanLimitsKm.allRoads} km or less`);
+  }
+
+  return `${parts.join(' · ')}.`;
 }
 
 /** Unknown places (typed coordinates, generated terrain) keep the current gradient. */
