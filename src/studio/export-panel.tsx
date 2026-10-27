@@ -47,6 +47,9 @@ export function ExportPanel({
     ? maximumExtraLargeOutputDimensionPixels
     : maximumOutputDimensionPixels;
 
+  const frameParts =
+    s.workspace.view === '3d' && s.frame.assembly?.ok === true ? s.frame.assembly.data.parts : [];
+
   const activePreview = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -338,7 +341,7 @@ export function ExportPanel({
         </Group>
       )}
       {s.workspace.view === '3d' && (
-        <Group title="STL model">
+        <Group title="STL">
           <Hint>
             {s.model.dimensions.widthMm}{' '}
             {s.model.dimensions.cropShape === 'circle'
@@ -350,14 +353,40 @@ export function ExportPanel({
             Terrain and solid base, in millimeters. Scene materials, water, decorations and engraved
             grooves are excluded.
           </Hint>
-          <Button
-            primary
-            onClick={() => {
-              c.downloadStl();
-            }}
-          >
-            Download STL
-          </Button>
+          {/* The Frame tab owns the alert; repeating it here would announce it twice. */}
+          {s.frame.settings.preset !== 'none' && s.frame.assembly?.ok === false && (
+            <Hint>Fix the frame in the Frame tab: {s.frame.assembly.error.message}</Hint>
+          )}
+          {s.frame.settings.preset !== 'none' && s.frame.assembly === undefined && (
+            <Hint>Frame parts appear once the 3D model has finished building.</Hint>
+          )}
+          {frameParts.map((part) => (
+            <Hint key={part.id}>
+              {part.id}: {formatMm(part.sizeMm.x)} × {formatMm(part.sizeMm.z)} ×{' '}
+              {formatMm(part.sizeMm.y)} mm · print {part.printOrientation}
+            </Hint>
+          ))}
+          <div className="button-group" role="group" aria-label="STL downloads">
+            <Button
+              primary
+              onClick={() => {
+                c.downloadStl();
+              }}
+            >
+              Download STL
+            </Button>
+            {frameParts.map((part) => (
+              <Button
+                key={part.id}
+                primary
+                onClick={() => {
+                  c.downloadFrameStl(part.id);
+                }}
+              >
+                Download {part.id} STL
+              </Button>
+            ))}
+          </div>
           {s.source.terrain && (
             <>
               <Hint>{s.source.terrain.attribution}</Hint>
@@ -373,32 +402,6 @@ export function ExportPanel({
               </Button>
             </>
           )}
-        </Group>
-      )}
-      {s.workspace.view === '3d' && s.frame.settings.preset !== 'none' && (
-        <Group title="Frame STL">
-          {/* The Frame tab owns the alert; repeating it here would announce it twice. */}
-          {s.frame.assembly?.ok === false && (
-            <Hint>Fix the frame in the Frame tab: {s.frame.assembly.error.message}</Hint>
-          )}
-          {s.frame.assembly === undefined && (
-            <Hint>Frame parts appear once the 3D model has finished building.</Hint>
-          )}
-          {(s.frame.assembly?.ok === true ? s.frame.assembly.data.parts : []).map((part) => (
-            <div key={part.id}>
-              <Hint>
-                {part.id}: {formatMm(part.sizeMm.x)} × {formatMm(part.sizeMm.z)} ×{' '}
-                {formatMm(part.sizeMm.y)} mm · print {part.printOrientation}
-              </Hint>
-              <Button
-                onClick={() => {
-                  c.downloadFrameStl(part.id);
-                }}
-              >
-                Download {part.id} STL
-              </Button>
-            </div>
-          ))}
         </Group>
       )}
     </>

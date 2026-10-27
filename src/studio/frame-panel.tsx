@@ -50,7 +50,7 @@ export function FramePanel({ controller: c, state: s }: PanelProps): ReactNode {
           ))}
         </div>
         {settings.preset !== 'none' && (
-          <div role="group" aria-label="Frame finish" className="frame-choices">
+          <div role="group" aria-label="Frame finish" className="frame-choices finish-choices">
             {frameFinishKeys.map((finish) => (
               <button
                 type="button"
@@ -173,7 +173,7 @@ export function FramePanel({ controller: c, state: s }: PanelProps): ReactNode {
         </Group>
       )}
       {assembly?.ok === false && <p role="alert">{assembly.error.message}</p>}
-      {settings.preset !== 'none' && <Hint>Download each part from Export → Frame STL.</Hint>}
+      {settings.preset !== 'none' && <Hint>Download each part from Export → STL.</Hint>}
     </>
   );
 }

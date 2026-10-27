@@ -5,7 +5,7 @@ export type FrameStudioPreset =
   'none' | 'tray' | 'pedestal' | 'stacked-pedestal' | 'tray-on-plinth';
 
 /** Preview colour only; prints take whatever filament is loaded. */
-export type FrameFinish = 'light-wood' | 'dark-wood' | 'white' | 'black' | 'concrete';
+export type FrameFinish = 'light-wood' | 'dark-wood' | 'white' | 'black' | 'concrete' | 'glass';
 
 /** The Frame tab's few controls. Session-only, like model settings, and never in links. */
 export interface FrameStudioSettings {
@@ -29,6 +29,7 @@ export const frameFinishKeys: readonly FrameFinish[] = [
   'white',
   'black',
   'concrete',
+  'glass',
 ];
 
 export const frameStudioPresets: readonly { value: FrameStudioPreset; label: string }[] = [
@@ -40,13 +41,14 @@ export const frameStudioPresets: readonly { value: FrameStudioPreset; label: str
 ];
 
 export const frameFinishes: Readonly<
-  Record<FrameFinish, { label: string; color: string; roughness: number }>
+  Record<FrameFinish, { label: string; color: string; roughness: number; opacity?: number }>
 > = {
   'light-wood': { label: 'Light wood', color: '#c9a37a', roughness: 0.65 },
   'dark-wood': { label: 'Dark wood', color: '#5a3a24', roughness: 0.6 },
   white: { label: 'White', color: '#ecebe6', roughness: 0.5 },
   black: { label: 'Black', color: '#222326', roughness: 0.45 },
   concrete: { label: 'Concrete', color: '#9a9893', roughness: 0.95 },
+  glass: { label: 'Clear glass', color: '#b4dde2', roughness: 0.03, opacity: 0.32 },
 };
 
 export const defaultFrameStudioSettings: Readonly<FrameStudioSettings> = Object.freeze({
