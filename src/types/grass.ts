@@ -8,7 +8,7 @@ export interface GrassStyle {
   /** 'custom' once any colour or length setting is edited by hand. */
   preset: GrassPresetKey | 'custom';
   /** Blades per square centimetre of printed model where coverage is full. */
-  density: number;
+  bladesPerSquareCm: number;
   /** Share of the ground in grass patches, 0 to 1. */
   coverage: number;
   /** 0 spreads grass evenly; 1 gathers it into distinct clumps with bare ground between. */

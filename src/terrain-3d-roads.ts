@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { createRoadRibbonBuffers } from './road-ribbons';
 import { createTerrainRoadMaterial } from './terrain-road-material';
 import { defaultRoadStyle } from './constants/roads';
-import type { TerrainModelSettings } from './terrain-model';
+import { getFrameUnitsPerMm, type TerrainModelSettings } from './terrain-model';
 import type { HeightField } from './types/terrain';
 import type { RoadPath, RoadStyle } from './types/roads';
 
@@ -67,10 +67,7 @@ export function createTerrainRoadLayer(): TerrainRoadLayer {
     }
 
     const { paths, field, width, height, modelSettings, exaggeration, elevationOffset } = inputs;
-    const frameUnitsPerMm =
-      modelSettings.cropShape === 'circle'
-        ? width / modelSettings.widthMm
-        : Math.max(width, height) / Math.max(modelSettings.widthMm, modelSettings.lengthMm);
+    const frameUnitsPerMm = getFrameUnitsPerMm(width, height, modelSettings);
     const buffers = createRoadRibbonBuffers(
       paths,
       field,

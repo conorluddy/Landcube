@@ -1,7 +1,10 @@
+import { getRoadHalfWidth } from './road-ribbons';
 import { sampleHeightField } from './terrain-surface';
+import { roadDetailClasses } from './constants/roads';
 import type { TerrainCropShape } from './terrain-crop';
 import type { HeightField } from './types/terrain';
 import type { GrassStyle } from './types/grass';
+import type { RoadPath, RoadStyle } from './types/roads';
 
 /** Where grass may grow: the model crop plus the geography that rules places out. */
 export interface GrassSite {
@@ -20,6 +23,26 @@ export interface GrassSite {
   seaLevel?: number;
   /** Road centrelines in crop units with their half-widths; grass never grows on them. */
   roads: readonly { points: readonly { x: number; y: number }[]; halfWidth: number }[];
+}
+
+/** Drawn roads as grass clearances, matching the ribbons' classes and widths; none when roads are off. */
+export function getGrassRoads(
+  paths: readonly RoadPath[],
+  style: Pick<RoadStyle, 'enabled' | 'detail' | 'widthMm'>,
+  frameUnitsPerMm: number,
+): GrassSite['roads'] {
+  if (!style.enabled) {
+    return [];
+  }
+
+  const classes: readonly string[] = roadDetailClasses[style.detail];
+
+  return paths
+    .filter((path) => classes.includes(path.roadClass))
+    .map((path) => ({
+      points: path.points,
+      halfWidth: getRoadHalfWidth(path.roadClass, style.widthMm, frameUnitsPerMm),
+    }));
 }
 
 /** The real-world scale and source anchoring the studio knows and the renderer does not. */
@@ -89,11 +112,25 @@ export function surveyGrassGround(
   };
   const [minimum, maximum] = getFieldRange(site.field);
   const roads = createRoadIndex(site.roads);
+  const columnUnits = site.width / columns;
+  const rowUnits = site.height / rows;
+  // One height sample per texel; slopes come from neighbouring texels rather than more samples.
+  const elevations = new Float32Array(count);
 
   for (let row = 0; row < rows; row++) {
     for (let column = 0; column < columns; column++) {
-      const x = ((column + 0.5) / columns) * site.width;
-      const y = ((row + 0.5) / rows) * site.height;
+      elevations[row * columns + column] = sampleHeightField(
+        site.field,
+        (column + 0.5) * columnUnits,
+        (row + 0.5) * rowUnits,
+      );
+    }
+  }
+
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      const x = (column + 0.5) * columnUnits;
+      const y = (row + 0.5) * rowUnits;
       const index = row * columns + column;
       const sourceX = x + site.originX;
       const sourceY = y + site.originY;
@@ -102,17 +139,17 @@ export function surveyGrassGround(
       ground.sourceY[index] = sourceY;
       ground.dryness[index] = Math.round(fractalNoise(sourceX * 0.012, sourceY * 0.012, 23) * 255);
 
-      if (!isInsideFootprint(x, y, site) || roads.covers(x, y)) {
+      const elevation = elevations[index];
+
+      if (
+        !isInsideFootprint(x, y, site) ||
+        (site.seaLevel !== undefined && elevation <= site.seaLevel) ||
+        roads.covers(x, y)
+      ) {
         continue;
       }
 
-      const elevation = sampleHeightField(site.field, x, y);
-
-      if (site.seaLevel !== undefined && elevation <= site.seaLevel) {
-        continue;
-      }
-
-      ground.slope[index] = getSlopeDegrees(site, x, y);
+      ground.slope[index] = getSlopeDegrees(site, elevations, columns, rows, column, row);
       ground.altitude[index] = (elevation - minimum) / Math.max(1e-9, maximum - minimum);
     }
   }
@@ -170,17 +207,30 @@ function isInsideFootprint(x: number, y: number, site: GrassSite): boolean {
   return x >= 0 && x <= site.width && y >= 0 && y <= site.height;
 }
 
-/** The real, unexaggerated slope, so exaggeration never moves where grass grows. */
-function getSlopeDegrees(site: GrassSite, x: number, y: number): number {
-  const step = site.field.spacing;
-  const dx =
-    sampleHeightField(site.field, x + step, y) - sampleHeightField(site.field, x - step, y);
-  const dy =
-    sampleHeightField(site.field, x, y + step) - sampleHeightField(site.field, x, y - step);
-  const rise = Math.hypot(dx, dy) * site.metersPerFieldUnit;
-  const run = 2 * step * site.metersPerFrameUnit;
+/** The real, unexaggerated slope from neighbouring texels, so exaggeration never moves grass. */
+function getSlopeDegrees(
+  site: GrassSite,
+  elevations: Float32Array,
+  columns: number,
+  rows: number,
+  column: number,
+  row: number,
+): number {
+  const left = Math.max(0, column - 1);
+  const right = Math.min(columns - 1, column + 1);
+  const top = Math.max(0, row - 1);
+  const bottom = Math.min(rows - 1, row + 1);
+  const riseX =
+    (elevations[row * columns + right] - elevations[row * columns + left]) /
+    Math.max(1, right - left) /
+    (site.width / columns);
+  const riseY =
+    (elevations[bottom * columns + column] - elevations[top * columns + column]) /
+    Math.max(1, bottom - top) /
+    (site.height / rows);
+  const gradient = (Math.hypot(riseX, riseY) * site.metersPerFieldUnit) / site.metersPerFrameUnit;
 
-  return (Math.atan2(rise, run) * 180) / Math.PI;
+  return (Math.atan(gradient) * 180) / Math.PI;
 }
 
 /** Fades out over the tenth of the relief below the limit; 1 keeps grass on the summits. */
@@ -223,8 +273,8 @@ function getFieldRange(field: HeightField): [number, number] {
 function createRoadIndex(roads: GrassSite['roads']): { covers: (x: number, y: number) => boolean } {
   const bucketUnits = 16;
   const buckets = new Map<
-    string,
-    { ax: number; ay: number; bx: number; by: number; r: number }[]
+    number,
+    { startX: number; startY: number; endX: number; endY: number; reachUnits: number }[]
   >();
 
   for (const road of roads) {
@@ -234,7 +284,7 @@ function createRoadIndex(roads: GrassSite['roads']): { covers: (x: number, y: nu
     for (let index = 1; index < road.points.length; index++) {
       const a = road.points[index - 1];
       const b = road.points[index];
-      const segment = { ax: a.x, ay: a.y, bx: b.x, by: b.y, r: reach };
+      const segment = { startX: a.x, startY: a.y, endX: b.x, endY: b.y, reachUnits: reach };
 
       for (
         let gx = Math.floor((Math.min(a.x, b.x) - reach) / bucketUnits);
@@ -246,7 +296,7 @@ function createRoadIndex(roads: GrassSite['roads']): { covers: (x: number, y: nu
           gy <= Math.floor((Math.max(a.y, b.y) + reach) / bucketUnits);
           gy++
         ) {
-          const key = `${gx},${gy}`;
+          const key = getBucketKey(gx, gy);
           const bucket = buckets.get(key);
 
           if (bucket) {
@@ -261,35 +311,46 @@ function createRoadIndex(roads: GrassSite['roads']): { covers: (x: number, y: nu
 
   return {
     covers(x, y) {
-      const bucket = buckets.get(`${Math.floor(x / bucketUnits)},${Math.floor(y / bucketUnits)}`);
+      if (buckets.size === 0) {
+        return false;
+      }
+
+      const bucket = buckets.get(
+        getBucketKey(Math.floor(x / bucketUnits), Math.floor(y / bucketUnits)),
+      );
 
       return (
-        bucket?.some(
-          (segment) =>
-            distanceToSegment(x, y, segment.ax, segment.ay, segment.bx, segment.by) < segment.r,
-        ) ?? false
+        bucket?.some((segment) => distanceToSegment(x, y, segment) < segment.reachUnits) ?? false
       );
     },
   };
 }
 
+/** Numeric keys avoid building a string per texel; crops stay far inside ±2^20 buckets. */
+function getBucketKey(column: number, row: number): number {
+  return (column + 2 ** 20) * 2 ** 21 + (row + 2 ** 20);
+}
+
 function distanceToSegment(
   x: number,
   y: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
+  segment: { startX: number; startY: number; endX: number; endY: number },
 ): number {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const lengthSquared = dx * dx + dy * dy;
-  const t =
+  const deltaX = segment.endX - segment.startX;
+  const deltaY = segment.endY - segment.startY;
+  const lengthSquared = deltaX * deltaX + deltaY * deltaY;
+  const along =
     lengthSquared === 0
       ? 0
-      : Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / lengthSquared));
+      : Math.max(
+          0,
+          Math.min(
+            1,
+            ((x - segment.startX) * deltaX + (y - segment.startY) * deltaY) / lengthSquared,
+          ),
+        );
 
-  return Math.hypot(x - (ax + dx * t), y - (ay + dy * t));
+  return Math.hypot(x - (segment.startX + deltaX * along), y - (segment.startY + deltaY * along));
 }
 
 /** Integer hash of a cell and salt to [0, 1); stable across platforms and sessions. */

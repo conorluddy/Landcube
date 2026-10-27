@@ -55,7 +55,7 @@ export const grassPresets = {
 export const defaultGrassStyle = {
   enabled: false,
   preset: 'meadow',
-  density: 800,
+  bladesPerSquareCm: 800,
   coverage: 0.7,
   clumping: 0.5,
   slopeLimitDegrees: 35,

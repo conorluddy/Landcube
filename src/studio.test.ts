@@ -531,7 +531,7 @@ void test('grass presets apply their look until a look value is set by hand', ()
   assert.equal(c.getSnapshot().scene.grass.preset, 'autumn');
   assert.equal(c.getSnapshot().scene.grass.tipColor, grassPresets.autumn.tipColor);
 
-  c.grass({ density: 400, wind: 0 });
+  c.grass({ bladesPerSquareCm: 400, wind: 0 });
   assert.equal(c.getSnapshot().scene.grass.preset, 'autumn');
 
   c.grass({ lengthMm: 2 });

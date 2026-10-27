@@ -1063,14 +1063,14 @@ function GrassGroup({ controller: c, state: s }: PanelProps): ReactNode {
       {percent('Dry patches', 'dryness')}
       <Range
         label="Density"
-        value={grass.density}
+        value={grass.bladesPerSquareCm}
         min={50}
         max={5000}
         step={50}
         suffix=" /cm²"
         disabled={off}
         onChange={(value) => {
-          c.grass({ density: value });
+          c.grass({ bladesPerSquareCm: value });
         }}
       />
       {percent('Coverage', 'coverage')}

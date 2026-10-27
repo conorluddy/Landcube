@@ -57,7 +57,7 @@ void test('colour, length, density and wind restyle grass without regrowing it',
     wind: 1,
     colorVariation: 1,
     lengthMm: enabled.lengthMm * 2,
-    density: enabled.density / 2,
+    bladesPerSquareCm: enabled.bladesPerSquareCm / 2,
   });
 
   assert.ok(coverage);
@@ -102,4 +102,37 @@ void test('a terrain without a grass site hides the carpet and lets go of the su
   assert.notEqual(layer.mesh.geometry, inputs.surface);
   layer.update(inputs);
   assert.equal(layer.mesh.visible, true);
+});
+
+void test('roads regrow the mask; wind animates only visible grass while motion is allowed', (t) => {
+  const layer = createTerrainGrassLayer();
+
+  layer.update(inputs);
+  layer.setStyle(enabled);
+  const coverage = layer.getCoverage();
+  const road = {
+    points: [
+      { x: 0, y: 100 },
+      { x: 200, y: 100 },
+    ],
+    halfWidth: 4,
+  };
+
+  layer.update({ ...inputs, site: { ...inputs.site, roads: [road] } });
+  assert.notEqual(layer.getCoverage(), coverage);
+
+  assert.equal(layer.isAnimated(), true);
+  layer.setStyle({ ...enabled, wind: 0 });
+  assert.equal(layer.isAnimated(), false);
+  layer.setStyle(enabled);
+  layer.setSuppressed(true);
+  assert.equal(layer.isAnimated(), false);
+  layer.setSuppressed(false);
+
+  // Node has no matchMedia, so stand one in that prefers reduced motion.
+  Object.assign(globalThis, { matchMedia: () => ({ matches: true }) });
+  t.after(() => {
+    Reflect.deleteProperty(globalThis, 'matchMedia');
+  });
+  assert.equal(layer.isAnimated(), false);
 });

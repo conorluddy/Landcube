@@ -75,7 +75,7 @@ export function createTerrainGrassLayer(): TerrainGrassLayer {
   const syncShape = (site: GrassSite) => {
     const scale = 2 / Math.max(site.width, site.height);
     // Density is blades per square centimetre, so each blade owns a cell this many mm across.
-    const cellMm = 10 / Math.sqrt(Math.max(1, style.density));
+    const cellMm = 10 / Math.sqrt(Math.max(1, style.bladesPerSquareCm));
 
     uniforms.grassShellHeight.value = style.lengthMm * scale * site.frameUnitsPerMm;
     uniforms.grassCellUnits.value = cellMm * site.frameUnitsPerMm;

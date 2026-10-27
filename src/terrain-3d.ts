@@ -33,9 +33,9 @@ import {
 import { createTerrainLineBuffers } from './terrain-3d-lines';
 import { createTerrainRoadLayer } from './terrain-3d-roads';
 import { createTerrainGrassLayer } from './terrain-3d-grass';
-import type { GrassGeography, GrassSite } from './grass-coverage';
+import { getGrassRoads, type GrassGeography, type GrassSite } from './grass-coverage';
 import type { GrassStyle } from './types/grass';
-import { defaultRoadStyle, roadClassWidthFactors, roadDetailClasses } from './constants/roads';
+import { defaultRoadStyle } from './constants/roads';
 import { noRoadPaths } from './road-ribbons';
 import {
   baseTerrainFovDegrees,
@@ -60,6 +60,7 @@ import { terrain3dElevationScale } from './terrain-surface';
 import {
   createTerrainModel,
   defaultTerrainModelSettings,
+  getFrameUnitsPerMm,
   type TerrainModelSettings,
   type TerrainModel,
 } from './terrain-model';
@@ -461,10 +462,7 @@ export function createTerrain3d(
     }
 
     const { field, width, height, seaLevel, roadPaths, geography } = grassTerrain;
-    const frameUnitsPerMm =
-      modelSettings.cropShape === 'circle'
-        ? width / modelSettings.widthMm
-        : Math.max(width, height) / Math.max(modelSettings.widthMm, modelSettings.lengthMm);
+    const frameUnitsPerMm = getFrameUnitsPerMm(width, height, modelSettings);
     const roadKey = [
       roadPaths,
       roadStyle.enabled,
@@ -473,21 +471,9 @@ export function createTerrain3d(
       frameUnitsPerMm,
     ];
 
+    // A stable road list keeps grass from resurveying the ground on unrelated updates.
     if (roadKey.some((value, index) => value !== grassRoads.key[index])) {
-      const classes: readonly string[] = roadDetailClasses[roadStyle.detail];
-
-      grassRoads = {
-        key: roadKey,
-        roads: roadStyle.enabled
-          ? roadPaths
-              .filter((path) => classes.includes(path.roadClass))
-              .map((path) => ({
-                points: path.points,
-                halfWidth:
-                  (roadStyle.widthMm * roadClassWidthFactors[path.roadClass] * frameUnitsPerMm) / 2,
-              }))
-          : [],
-      };
+      grassRoads = { key: roadKey, roads: getGrassRoads(roadPaths, roadStyle, frameUnitsPerMm) };
     }
 
     grass.update({
@@ -774,7 +760,14 @@ export function createTerrain3d(
     syncContourTreatment();
     syncWater();
     roads.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
+    const wasAnimated = grass.isAnimated();
+
     grass.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
+
+    // Wind keeps the loop running, so showing or hiding grass starts or stops it.
+    if (grass.isAnimated() !== wasAnimated) {
+      updateLoop();
+    }
   };
 
   const applyPendingMapGrid = () => {
@@ -920,6 +913,8 @@ export function createTerrain3d(
     updateLoop();
     draw();
   });
+  // Grass wind pauses as soon as reduced motion is turned on, not at the next scene edit.
+  matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', updateLoop);
   new ResizeObserver(resize).observe(viewport);
   resize();
   reset();

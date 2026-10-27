@@ -59,6 +59,15 @@ export function clipRoadsToCrop(
  * Drapes flat road ribbons over the height field in 3D preview units, before exaggeration.
  * Both edges sample the terrain, so a road on a side slope tilts with it instead of floating.
  */
+/** Half a drawn road's width in crop units; grass clearance uses the same measure. */
+export function getRoadHalfWidth(
+  roadClass: RoadPath['roadClass'],
+  widthMm: number,
+  frameUnitsPerMm: number,
+): number {
+  return (widthMm * roadClassWidthFactors[roadClass] * frameUnitsPerMm) / 2;
+}
+
 export function createRoadRibbonBuffers(
   paths: readonly RoadPath[],
   field: HeightField,
@@ -79,7 +88,7 @@ export function createRoadRibbonBuffers(
       continue;
     }
 
-    const halfWidth = (style.widthMm * roadClassWidthFactors[path.roadClass] * frameUnitsPerMm) / 2;
+    const halfWidth = getRoadHalfWidth(path.roadClass, style.widthMm, frameUnitsPerMm);
     const points = densifyPolyline(path.points, field.spacing);
 
     if (points.length < 2) {

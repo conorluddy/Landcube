@@ -2,11 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createGrassCoverage,
+  getGrassRoads,
   surveyGrassGround,
   type GrassCoverageMap,
   type GrassSite,
 } from './grass-coverage';
 import { defaultGrassStyle } from './constants/grass';
+import { defaultRoadStyle } from './constants/roads';
+import { getRoadHalfWidth } from './road-ribbons';
 import type { GrassStyle } from './types/grass';
 import type { HeightField } from './types/terrain';
 
@@ -163,4 +166,32 @@ void test('one ground survey serves every style, including clumping changes', ()
 
     assert.deepEqual(createGrassCoverage(ground, patchy).data, grow(site, patchy, resolution).data);
   }
+});
+
+void test('grass clears exactly the drawn roads: their classes and widths, none when roads are off', () => {
+  const paths = [
+    {
+      roadClass: 'primary' as const,
+      points: [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+      ],
+    },
+    {
+      roadClass: 'track' as const,
+      points: [
+        { x: 0, y: 5 },
+        { x: 10, y: 5 },
+      ],
+    },
+  ];
+  const style = { ...defaultRoadStyle, enabled: true, widthMm: 1 };
+  const major = getGrassRoads(paths, { ...style, detail: 'major' }, 4);
+
+  assert.deepEqual(
+    major.map((road) => road.halfWidth),
+    [getRoadHalfWidth('primary', 1, 4)],
+  );
+  assert.equal(getGrassRoads(paths, { ...style, detail: 'tracks' }, 4).length, 2);
+  assert.deepEqual(getGrassRoads(paths, { ...style, enabled: false }, 4), []);
 });
