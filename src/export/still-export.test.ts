@@ -35,6 +35,18 @@ void test('real-terrain stills are stamped with attribution in the bottom-left c
   assert.equal(context.font, '20px sans-serif');
 });
 
+void test('each credit gets its own line, the last on the bottom', async () => {
+  const { frame, drawnText } = createFakeFrame();
+
+  await encodeTerrainStill(frame, ['Copernicus DEM', 'Roads © OpenStreetMap contributors']);
+  assert.deepEqual(
+    drawnText.map((line) => line.text),
+    ['Copernicus DEM', 'Roads © OpenStreetMap contributors'],
+  );
+  assert.ok(drawnText[0].y < drawnText[1].y);
+  assert.equal(drawnText[0].x, drawnText[1].x);
+});
+
 void test('generated-terrain stills are encoded without attribution', async () => {
   const { frame, drawnText } = createFakeFrame();
 

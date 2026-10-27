@@ -22,10 +22,12 @@ export function getStillPixelRatio(
 /** Encodes a captured 3D frame as PNG, stamping real-terrain attribution bottom-left like SVG exports. */
 export async function encodeTerrainStill(
   frame: HTMLCanvasElement,
-  attribution: string | undefined,
+  attribution: string | readonly string[] | undefined,
 ): Promise<Blob> {
-  if (attribution !== undefined) {
-    drawAttribution(frame, attribution);
+  const credits = typeof attribution === 'string' ? [attribution] : (attribution ?? []);
+
+  if (credits.length > 0) {
+    drawAttribution(frame, credits);
   }
 
   return new Promise((resolve, reject) => {
@@ -41,7 +43,8 @@ export async function encodeTerrainStill(
 
 // === HELPERS ===
 
-function drawAttribution(frame: HTMLCanvasElement, attribution: string): void {
+/** One credit per line, the last on the bottom, so joined sources never squeeze into one line. */
+function drawAttribution(frame: HTMLCanvasElement, credits: readonly string[]): void {
   const context = frame.getContext('2d');
 
   if (!context) {
@@ -57,5 +60,14 @@ function drawAttribution(frame: HTMLCanvasElement, attribution: string): void {
   context.shadowColor = 'rgba(0, 0, 0, 0.6)';
   context.shadowBlur = fontSizePx / 3;
   context.fillStyle = 'rgba(255, 255, 255, 0.85)';
-  context.fillText(attribution, marginPx, frame.height - marginPx, frame.width - marginPx * 2);
+  credits.forEach((credit, index) => {
+    const lineFromBottom = credits.length - 1 - index;
+
+    context.fillText(
+      credit,
+      marginPx,
+      frame.height - marginPx - lineFromBottom * fontSizePx * 1.3,
+      frame.width - marginPx * 2,
+    );
+  });
 }

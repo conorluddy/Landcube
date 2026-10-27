@@ -1039,7 +1039,10 @@ function RoadsGroup({ controller: c, state: s }: PanelProps): ReactNode {
           c.roads({ texture: value / 100 });
         }}
       />
-      {status && <Hint>{status}</Hint>}
+      {/* Always mounted, so screen readers announce download progress and failures. */}
+      <p role="status" className="export-hint">
+        {status}
+      </p>
       {style.enabled && s.roads.canRetry && (
         <Button
           onClick={() => {

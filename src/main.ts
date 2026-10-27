@@ -2,7 +2,7 @@ import { cropTerrainModelField } from './terrain-model';
 import type { HeightField } from './types/terrain';
 import { createSeaLevelGeometry, type SeaLevelGeometry } from './sea-level';
 import { createStudioTerrainView } from './studio/terrain-view';
-import { areRoadsDrawn, createStudioController } from './studio/controller';
+import { createStudioController, getSceneCredits } from './studio/controller';
 import { createCropPreview } from './studio/crop-preview';
 import { mountStudio } from './studio/app';
 import { downloadBlob } from './studio/export-panel';
@@ -428,14 +428,8 @@ function getCroppedRoadPaths(
 }
 
 /** Credits every external source visible in the 3D view. */
-function getStillAttribution(): string | undefined {
-  const studio = controls.getSnapshot();
-  const credits = [
-    realTerrain?.attribution,
-    areRoadsDrawn(studio) ? studio.roads.network?.attribution : undefined,
-  ].filter((credit) => credit !== undefined && credit !== '');
-
-  return credits.length > 0 ? credits.join(' · ') : undefined;
+function getStillAttribution(): string[] {
+  return getSceneCredits(controls.getSnapshot(), realTerrain?.attribution);
 }
 
 /** Eases cursor deformation with capped frame pacing until settled. */

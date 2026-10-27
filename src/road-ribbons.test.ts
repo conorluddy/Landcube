@@ -231,3 +231,34 @@ void test('suggested road width is 0.1 mm per model kilometre within the slider 
   assert.equal(getSuggestedRoadWidthMm(0.4), 0.1);
   assert.equal(getSuggestedRoadWidthMm(100), 3);
 });
+
+void test('a right-angle bend keeps the full ribbon width on both legs', () => {
+  const { positions } = createRoadRibbonBuffers(
+    [
+      {
+        roadClass: 'secondary',
+        points: [
+          { x: 20, y: 50 },
+          { x: 50, y: 50 },
+          { x: 50, y: 80 },
+        ],
+      },
+    ],
+    { ...field, spacing: 100 },
+    100,
+    100,
+    { detail: 'all', widthMm: 4 },
+    1,
+    'rectangle',
+  );
+  const scale = 2 / 100;
+  const vertex = (index: number) => ({
+    x: positions[index * 3] / scale + 50,
+    y: positions[index * 3 + 2] / scale + 50,
+  });
+  const [left, right] = [vertex(2), vertex(3)];
+
+  // Across each leg the corner's two edges sit a full width apart, so the bend never pinches.
+  assert.ok(Math.abs(Math.abs(left.y - right.y) - 4) < 1e-6, 'incoming leg');
+  assert.ok(Math.abs(Math.abs(left.x - right.x) - 4) < 1e-6, 'outgoing leg');
+});

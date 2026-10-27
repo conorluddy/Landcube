@@ -1003,6 +1003,18 @@ export function areRoadsDrawn(state: StudioState): boolean {
   );
 }
 
+/** Terrain and drawn-road credits for a 3D still, one source per line. */
+export function getSceneCredits(
+  state: StudioState,
+  terrainAttribution: string | undefined,
+): string[] {
+  const roadAttribution = areRoadsDrawn(state) ? state.roads.network?.attribution : undefined;
+
+  return [terrainAttribution, roadAttribution].filter(
+    (credit): credit is string => credit !== undefined && credit !== '',
+  );
+}
+
 /** Counts what the current detail draws and says what was left out. */
 export function describeRoadNetwork(network: RoadNetwork, style: RoadStyle): string {
   const classes: readonly string[] = roadDetailClasses[style.detail];

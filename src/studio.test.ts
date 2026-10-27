@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
-import { createStudioController, type StudioEffects } from './studio/controller';
+import { createStudioController, getSceneCredits, type StudioEffects } from './studio/controller';
 import {
   parseDesignParameters,
   serializeDesignParameters,
@@ -111,6 +111,7 @@ void test('scene and model edits cannot leak into version-one style links', asyn
   c.material('porcelain');
   c.dimensions({ widthMm: 220, cropShape: 'circle' });
   c.lighting({ direction: 75 });
+  c.roads({ enabled: true, detail: 'tracks', color: '#ff0000', widthMm: 2, texture: 1 });
   await c.selectView('3d');
   assert.equal(serializeDesignParameters(c.getSnapshot().design).toString(), before);
   c.lockSeed(true);
@@ -354,6 +355,30 @@ void test('auto road width follows the model area until the width is edited', ()
 
   c.roads({ autoWidth: true });
   assert.equal(c.getSnapshot().scene.roads.widthMm, 0.5);
+});
+
+void test('stills credit OpenStreetMap only while roads are drawn', async (t) => {
+  const { controller: c } = setup(() =>
+    Promise.resolve(Response.json({ elements: [roadElement(1)] })),
+  );
+  const credits = () => getSceneCredits(c.getSnapshot(), 'EU-DEM');
+
+  stubBrowserTileDecoding(t);
+  await c.loadTerrain();
+  await c.selectView('3d');
+  assert.deepEqual(credits(), ['EU-DEM'], 'roads off');
+
+  c.roads({ enabled: true });
+  assert.deepEqual(credits(), ['EU-DEM'], 'roads enabled before the network arrives');
+  await new Promise(setImmediate);
+  assert.equal(credits().length, 2);
+  assert.match(credits()[1], /OpenStreetMap/);
+
+  c.dimensions({ terrainShape: 'terraced' });
+  assert.deepEqual(credits(), ['EU-DEM'], 'terraced models hide roads');
+  c.dimensions({ terrainShape: 'smooth' });
+  await c.selectView('2d');
+  assert.deepEqual(credits(), ['EU-DEM'], 'the 2D view draws no roads');
 });
 
 function roadElement(id: number) {
