@@ -216,32 +216,30 @@ export function createTerrain3d(
     polygonOffsetFactor: 2,
     polygonOffsetUnits: 2,
   });
-  const baseMaterial = surfaceMaterial.clone();
   const engraving = createContourEngraving();
   let contourTreatment = defaultContourEngraving.treatment;
   let showContours = true;
 
   engraving.applyTo(surfaceMaterial);
   const naturalSurfaceMaterial = createNaturalTerrainMaterial(false);
-  const naturalBaseMaterial = createNaturalTerrainMaterial(true);
+  // Every finish and gradient keeps the layered-earth cut edges; only the land surface changes.
+  const baseMaterial = createNaturalTerrainMaterial(true);
+  let landFinish: LandFinish = 'natural';
 
   engraving.applyTo(naturalSurfaceMaterial);
   const elevationGradient = createTerrainElevationMaterial();
 
-  for (const material of [
-    surfaceMaterial,
-    baseMaterial,
-    naturalSurfaceMaterial,
-    naturalBaseMaterial,
-  ]) {
+  for (const material of [surfaceMaterial, naturalSurfaceMaterial]) {
     elevationGradient.applyTo(material);
   }
 
   const updateLandColor = () => {
     surfaceMaterial.color.set(customSurfaceColor ?? backgroundColor);
-    baseMaterial.color.copy(surfaceMaterial.color);
     naturalSurfaceMaterial.color.set(customSurfaceColor ?? '#ffffff');
-    naturalBaseMaterial.color.set(customSurfaceColor ?? '#ffffff');
+    // A dark preset colour would bury the rock layers, so only the natural tint reaches them.
+    baseMaterial.color.set(
+      landFinish === 'natural' ? (customSurfaceColor ?? '#ffffff') : '#ffffff',
+    );
   };
 
   const surface = new THREE.Mesh(new THREE.BufferGeometry(), surfaceMaterial);
@@ -1171,12 +1169,11 @@ export function createTerrain3d(
       draw();
     },
     setLandFinish(value: LandFinish) {
+      landFinish = value;
+      updateLandColor();
       surface.material = value === 'natural' ? naturalSurfaceMaterial : surfaceMaterial;
-      base.material = value === 'natural' ? naturalBaseMaterial : baseMaterial;
       surfaceMaterial.roughness = landFinishes[value].roughness;
       surfaceMaterial.clearcoat = landFinishes[value].clearcoat;
-      baseMaterial.roughness = surfaceMaterial.roughness;
-      baseMaterial.clearcoat = surfaceMaterial.clearcoat;
       draw();
     },
     setWaterFinish(value: WaterFinish) {

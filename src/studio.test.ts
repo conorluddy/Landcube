@@ -147,6 +147,16 @@ void test('location loads and source switches morph terrain while interval and h
   assert.deepEqual(transitions, [true, false, false, true, true]);
 });
 
+void test('new sessions colour the land by elevation from the loaded location', async (t) => {
+  const { controller: c } = setup();
+
+  assert.equal(c.getSnapshot().scene.gradient.enabled, true);
+  assert.equal(c.getSnapshot().scene.gradientSource, 'location');
+  stubBrowserTileDecoding(t);
+  await c.loadTerrain();
+  assert.equal(c.getSnapshot().scene.gradientPreset, 'landscape-temperate');
+});
+
 void test('location gradient follows loaded places until the user picks one', async (t) => {
   const { controller: c } = setup();
 

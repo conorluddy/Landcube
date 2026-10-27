@@ -221,7 +221,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       surfaceMatch: false,
       surfaceColor: natural.land,
       gradient: copyElevationGradient({
-        enabled: false,
+        enabled: true,
         transition: 'soft',
         stops: elevationGradientPresets.paper.stops,
       }),
