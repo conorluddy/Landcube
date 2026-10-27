@@ -375,6 +375,36 @@ export function ExportPanel({
           )}
         </Group>
       )}
+      {s.workspace.view === '3d' && s.frame.settings.preset !== 'none' && (
+        <Group title="Frame STL">
+          {/* The Frame tab owns the alert; repeating it here would announce it twice. */}
+          {s.frame.assembly?.ok === false && (
+            <Hint>Fix the frame in the Frame tab: {s.frame.assembly.error.message}</Hint>
+          )}
+          {s.frame.assembly === undefined && (
+            <Hint>Frame parts appear once the 3D model has finished building.</Hint>
+          )}
+          {(s.frame.assembly?.ok === true ? s.frame.assembly.data.parts : []).map((part) => (
+            <div key={part.id}>
+              <Hint>
+                {part.id}: {formatMm(part.sizeMm.x)} × {formatMm(part.sizeMm.z)} ×{' '}
+                {formatMm(part.sizeMm.y)} mm · print {part.printOrientation}
+              </Hint>
+              <Button
+                onClick={() => {
+                  c.downloadFrameStl(part.id);
+                }}
+              >
+                Download {part.id} STL
+              </Button>
+            </div>
+          ))}
+        </Group>
+      )}
     </>
   );
+}
+
+function formatMm(valueMm: number): string {
+  return String(Math.round(valueMm * 10) / 10);
 }

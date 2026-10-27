@@ -13,6 +13,7 @@ interface StudioTerrainView {
   activate: (mode: StudioView) => Promise<void>;
   sceneChanged: (previous: SceneSettings) => void;
   modelChanged: () => void;
+  frameChanged: () => void;
   resetCamera: () => void;
   applyViewPreset: (preset: TerrainViewPreset) => void;
   pickFocus: () => Promise<boolean>;
@@ -43,6 +44,20 @@ export function createStudioTerrainView(
   let active = false;
   let floorPlace: FloorPlace | undefined;
   let interval: number | undefined;
+
+  const syncFrame = () => {
+    const { frame, model } = controller.getSnapshot();
+    const { assembly, settings } = frame;
+
+    // The frame scales with the model, so it must never see stale dimensions.
+    view?.setModelSettings(model.dimensions);
+
+    if (assembly?.ok === true) {
+      view?.setFrame(assembly.data.parts, assembly.data.seatHeightMm, settings.finish);
+    } else {
+      view?.setFrame([], 0, settings.finish);
+    }
+  };
 
   const syncScene = (previous?: SceneSettings) => {
     if (!view) {
@@ -153,11 +168,16 @@ export function createStudioTerrainView(
 
         view.setModelSettings(model.dimensions);
         view.setHeight(model.exaggeration);
+        syncFrame();
       }
 
       changed();
     },
     sceneChanged: syncScene,
+    frameChanged() {
+      syncFrame();
+      changed();
+    },
     modelChanged() {
       const model = controller.getSnapshot().model;
 

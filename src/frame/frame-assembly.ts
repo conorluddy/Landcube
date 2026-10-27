@@ -2,6 +2,7 @@ import { minimumFrameWallMm } from '../constants/frame';
 import { operationErrorCodes } from '../constants/operations';
 import { validateTerrainModelSettings } from '../terrain-model';
 import type { TerrainModelSettings } from '../terrain-model';
+import type { TerrainSurfaceBuffers } from '../terrain-surface';
 import type { FrameAssembly, FrameFootprint, FramePart, FrameSettings } from '../types/frame';
 import type { Result } from '../types/operations';
 import { composeFrameProfiles } from './frame-composition';
@@ -62,16 +63,24 @@ export function createFrameAssembly(
       return printable;
     }
 
+    const solid = sweepFrameProfile(footprint, partProfile.profile.points);
+
     parts.push({
       id: partProfile.id,
-      solid: sweepFrameProfile(footprint, partProfile.profile.points),
+      solid,
       printOrientation: partProfile.profile.printOrientation,
+      sizeMm: measureSolidSizeMm(solid),
     });
   }
 
   return {
     ok: true,
-    data: { parts, outerSizeMm: measureOuterSizeMm(footprint, profiles.data), warnings: [] },
+    data: {
+      parts,
+      outerSizeMm: measureOuterSizeMm(footprint, profiles.data),
+      seatHeightMm: frame.tiers.reduce((sumMm, tier) => sumMm + tier.heightMm, 0),
+      warnings: [],
+    },
   };
 }
 
@@ -121,6 +130,20 @@ function measureOuterSizeMm(
     y: Math.max(...points.map(({ heightMm }) => heightMm)),
     z: (halfLengthMm + outerOffsetMm) * 2,
   };
+}
+
+function measureSolidSizeMm(solid: TerrainSurfaceBuffers): FramePart['sizeMm'] {
+  const minimum = [Infinity, Infinity, Infinity];
+  const maximum = [-Infinity, -Infinity, -Infinity];
+
+  for (let offset = 0; offset < solid.positions.length; offset += 3) {
+    for (let axis = 0; axis < 3; axis++) {
+      minimum[axis] = Math.min(minimum[axis], solid.positions[offset + axis]);
+      maximum[axis] = Math.max(maximum[axis], solid.positions[offset + axis]);
+    }
+  }
+
+  return { x: maximum[0] - minimum[0], y: maximum[1] - minimum[1], z: maximum[2] - minimum[2] };
 }
 
 // === SETTINGS ===
