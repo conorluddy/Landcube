@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { appUrl, download, section, serveStudio } from './studio-fixture';
 
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
@@ -55,4 +57,47 @@ test('GitHub Pages repository subpath loads the studio, lazy 3D, style links and
   expect(assets.every((url) => new URL(url).pathname.startsWith('/Topogra/assets/'))).toBe(true);
   expect(assets.some((url) => url.includes('/terrain-3d-'))).toBe(true);
   expect(errors).toEqual([]);
+});
+
+test('analytics loads only on the hosted site and never sees the design-link query', async ({
+  page,
+}) => {
+  const tagRequests: string[] = [];
+
+  await serveStudio(page);
+  page.on('request', (request) => {
+    if (request.url().includes('googletagmanager.com')) {
+      tagRequests.push(request.url());
+    }
+  });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.waitForLoadState('load');
+  expect(tagRequests).toEqual([]);
+
+  await page.route('https://www.googletagmanager.com/**', (route) =>
+    route.fulfill({ body: '', contentType: 'text/javascript' }),
+  );
+  await page.route('https://conorluddy.github.io/Topogra/**', async (route) => {
+    const filename =
+      new URL(route.request().url()).pathname.replace('/Topogra/', '') || 'index.html';
+
+    await route.fulfill({
+      body: await readFile(resolve('dist', filename)),
+      contentType: filename.endsWith('.js') ? 'text/javascript' : 'text/html',
+    });
+  });
+  await page.goto('https://conorluddy.github.io/Topogra/?v=1&seed=123');
+  await page.getByRole('button', { name: 'New landscape' }).click();
+  await expect(page).not.toHaveURL(/seed=123/);
+  const dataLayer = JSON.stringify(
+    await page.evaluate(() =>
+      Array.from((window as unknown as { dataLayer: ArrayLike<unknown>[] }).dataLayer, (entry) =>
+        Array.from(entry),
+      ),
+    ),
+  );
+
+  expect(dataLayer).toContain('G-09DGBRV9NB');
+  expect(dataLayer).toContain('"page_location":"https://conorluddy.github.io/Topogra/"');
+  expect(dataLayer).not.toContain('seed=123');
 });
