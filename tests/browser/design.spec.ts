@@ -316,16 +316,16 @@ test('fresh visits load the default location from bundled tiles without download
 
 test('footer tour button plays and pauses autoplay', async ({ page }) => {
   await openDefaultStudio(page);
-  await page.getByRole('button', { name: 'Play tour', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Pause tour', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  const tour = page.getByRole('button', { name: 'Tour', exact: true });
+
+  await expect(tour).toHaveAttribute('aria-pressed', 'false');
+  await tour.click();
+  await expect(tour).toHaveAttribute('aria-pressed', 'true');
   await section(page, 'Terrain');
   await expect(page.getByRole('switch', { name: 'Tour preset locations' })).toBeChecked();
-  await page.getByRole('button', { name: 'Pause tour', exact: true }).click();
+  await tour.click();
   await expect(page.getByRole('switch', { name: 'Tour preset locations' })).not.toBeChecked();
-  await expect(page.getByRole('button', { name: 'Play tour', exact: true })).toBeVisible();
+  await expect(tour).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('failed preview decoding retains the last image and obsolete previews cannot replace newer output', async ({

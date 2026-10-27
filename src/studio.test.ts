@@ -147,6 +147,16 @@ void test('location loads and source switches morph terrain while interval and h
   assert.deepEqual(transitions, [true, false, false, true, true]);
 });
 
+void test('new sessions colour the land by elevation from the loaded location', async (t) => {
+  const { controller: c } = setup();
+
+  assert.equal(c.getSnapshot().scene.gradient.enabled, true);
+  assert.equal(c.getSnapshot().scene.gradientSource, 'location');
+  stubBrowserTileDecoding(t);
+  await c.loadTerrain();
+  assert.equal(c.getSnapshot().scene.gradientPreset, 'landscape-temperate');
+});
+
 void test('location gradient follows loaded places until the user picks one', async (t) => {
   const { controller: c } = setup();
 
@@ -192,7 +202,7 @@ void test('default location loads bundled tiles and credits only their recorded 
   t.mock.method(globalThis, 'fetch', (url: string) => {
     requestedUrls.push(url);
 
-    return Promise.resolve(new Response('tile'));
+    return Promise.resolve(new Response('tile', pngHeaders));
   });
   await c.loadTerrain();
 
@@ -202,7 +212,7 @@ void test('default location loads bundled tiles and credits only their recorded 
   assert.doesNotMatch(c.getSnapshot().source.terrain?.attribution ?? '', /Geological Survey/);
 });
 
-void test('unreachable bundled tiles fall back to the public tile service', async (t) => {
+void test('bundled tiles served as HTML fall back to the public tile service', async (t) => {
   const { controller: c } = setup();
   const requestedUrls: string[] = [];
 
@@ -211,8 +221,11 @@ void test('unreachable bundled tiles fall back to the public tile service', asyn
   t.mock.method(globalThis, 'fetch', (url: string) => {
     requestedUrls.push(url);
 
+    // Static hosts may answer a missing bundled file with their HTML page and a 200 status.
     return Promise.resolve(
-      new Response('tile', { status: url.includes('/terrain-tiles/') ? 404 : 200 }),
+      url.includes('/terrain-tiles/')
+        ? new Response('<!doctype html>', { headers: { 'content-type': 'text/html' } })
+        : new Response('tile', pngHeaders),
     );
   });
   await c.loadTerrain();
@@ -237,12 +250,14 @@ void test('daylight cycle sweeps the sun until a manual lighting edit pauses it'
   assert.equal(c.getSnapshot().scene.lighting.timeOfDay, 12);
 });
 
+const pngHeaders = { headers: { 'content-type': 'image/png' } };
+
 /** Serves flat Terrarium tiles through the browser decoding path without a network or canvas. */
 function stubBrowserTileDecoding(t: TestContext): void {
   const tileSizePixels = 256;
   const pixels = new Uint8ClampedArray(tileSizePixels * tileSizePixels * 4).fill(128);
 
-  t.mock.method(globalThis, 'fetch', () => Promise.resolve(new Response('tile')));
+  t.mock.method(globalThis, 'fetch', () => Promise.resolve(new Response('tile', pngHeaders)));
   Object.assign(globalThis, {
     createImageBitmap: () => Promise.resolve({ close: () => undefined }),
     document: {

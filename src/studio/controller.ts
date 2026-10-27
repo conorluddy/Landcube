@@ -221,7 +221,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       surfaceMatch: false,
       surfaceColor: natural.land,
       gradient: copyElevationGradient({
-        enabled: false,
+        enabled: true,
         transition: 'soft',
         stops: elevationGradientPresets.paper.stops,
       }),
@@ -411,7 +411,7 @@ export function createStudioController(actions: DesignControlActions): StudioCon
         workspace({ view, activating: false });
       } catch {
         workspace({ view: '2d', activating: false });
-        notify('The 3D preview could not start. Your browser needs WebGL 2 support.');
+        notify('Showing 2D: the 3D preview needs WebGL 2, which this browser does not support.');
       }
     },
     scene(patch: Partial<SceneSettings>, custom = false) {

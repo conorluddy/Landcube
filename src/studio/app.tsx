@@ -403,8 +403,8 @@ function Studio({
           <button
             type="button"
             aria-pressed={state.source.autoplay.enabled}
-            aria-label={state.source.autoplay.enabled ? 'Pause tour' : 'Play tour'}
-            title="Tour preset locations"
+            aria-label="Tour"
+            title={state.source.autoplay.enabled ? 'Pause tour' : 'Play tour'}
             onClick={() => {
               void c.autoplay({ enabled: !state.source.autoplay.enabled });
             }}
