@@ -184,6 +184,43 @@ void test('autoplay tours preset locations after each delay until switched off',
   assert.equal(c.getSnapshot().source.place, secondPlace);
 });
 
+void test('default location loads bundled tiles and credits only their recorded sources', async (t) => {
+  const { controller: c } = setup();
+  const requestedUrls: string[] = [];
+
+  stubBrowserTileDecoding(t);
+  t.mock.method(globalThis, 'fetch', (url: string) => {
+    requestedUrls.push(url);
+
+    return Promise.resolve(new Response('tile'));
+  });
+  await c.loadTerrain();
+
+  assert.ok(requestedUrls.length > 0);
+  assert.ok(requestedUrls.every((url) => url.startsWith('https://topogra.test/terrain-tiles/')));
+  assert.match(c.getSnapshot().source.terrain?.attribution ?? '', /Copernicus/);
+  assert.doesNotMatch(c.getSnapshot().source.terrain?.attribution ?? '', /Geological Survey/);
+});
+
+void test('unreachable bundled tiles fall back to the public tile service', async (t) => {
+  const { controller: c } = setup();
+  const requestedUrls: string[] = [];
+
+  stubBrowserTileDecoding(t);
+  t.mock.method(console, 'warn', () => undefined);
+  t.mock.method(globalThis, 'fetch', (url: string) => {
+    requestedUrls.push(url);
+
+    return Promise.resolve(
+      new Response('tile', { status: url.includes('/terrain-tiles/') ? 404 : 200 }),
+    );
+  });
+  await c.loadTerrain();
+
+  assert.match(c.getSnapshot().source.status, /Real terrain loaded/);
+  assert.ok(requestedUrls.some((url) => url.includes('/terrarium/')));
+});
+
 void test('daylight cycle sweeps the sun until a manual lighting edit pauses it', (t) => {
   const { controller: c } = setup();
 
@@ -209,6 +246,7 @@ function stubBrowserTileDecoding(t: TestContext): void {
   Object.assign(globalThis, {
     createImageBitmap: () => Promise.resolve({ close: () => undefined }),
     document: {
+      baseURI: 'https://topogra.test/',
       createElement: () => ({
         getContext: () => ({ drawImage: () => undefined, getImageData: () => ({ data: pixels }) }),
       }),

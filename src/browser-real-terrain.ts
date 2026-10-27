@@ -1,10 +1,12 @@
 import { downloadTerrainTile } from './terrain-tile-download';
+import { bundledTerrainTileSources } from './constants/bundled-terrain-tiles';
 import { loadRealTerrain as loadTerrainFromTiles } from './real-terrain';
 import type { DecodedTerrainTile, RealTerrain } from './real-terrain';
 
 const terrainTileSizePixels = 256;
 /** Terrarium tiles are immutable; bump the version only if the cached format changes. */
 const terrainTileCacheName = 'topogra-terrain-tiles-v1';
+const terrainTileKeyPattern = /\/terrarium\/(\d+\/\d+\/\d+)\.png$/;
 
 /** Loads real terrain using browser image APIs while retaining shared sampling behaviour. */
 export async function loadBrowserRealTerrain(
@@ -26,7 +28,7 @@ export async function loadBrowserRealTerrain(
 
 /** Downloads and decodes a Terrarium tile through browser canvas APIs. */
 async function decodeBrowserTerrainTile(tileUrl: string): Promise<DecodedTerrainTile> {
-  const response = await fetchCachedTerrainTile(tileUrl);
+  const { response, imagerySources } = await fetchTerrainTile(tileUrl);
 
   const bitmap = await createImageBitmap(await response.blob());
 
@@ -46,11 +48,39 @@ async function decodeBrowserTerrainTile(tileUrl: string): Promise<DecodedTerrain
       pixels: new Uint8Array(
         context.getImageData(0, 0, terrainTileSizePixels, terrainTileSizePixels).data,
       ),
-      imagerySources: response.headers.get('x-amz-meta-x-imagery-sources') ?? '',
+      imagerySources,
     };
   } finally {
     bitmap.close();
   }
+}
+
+/** The default location ships with the site, so the studio opens without tile downloads. */
+async function fetchTerrainTile(
+  tileUrl: string,
+): Promise<{ response: Response; imagerySources: string }> {
+  const tileKey = terrainTileKeyPattern.exec(tileUrl)?.[1];
+  const bundledSources = tileKey === undefined ? undefined : bundledTerrainTileSources[tileKey];
+
+  if (tileKey !== undefined && bundledSources !== undefined) {
+    const bundledUrl = new URL(`terrain-tiles/${tileKey}.png`, document.baseURI).href;
+
+    try {
+      return { response: await downloadTerrainTile(bundledUrl), imagerySources: bundledSources };
+    } catch (error) {
+      // A host that drops the bundled files still has the public tile service to fall back on.
+      console.warn(
+        JSON.stringify({ event: 'bundled_terrain_tile_failed', tileUrl, error: String(error) }),
+      );
+    }
+  }
+
+  const response = await fetchCachedTerrainTile(tileUrl);
+
+  return {
+    response,
+    imagerySources: response.headers.get('x-amz-meta-x-imagery-sources') ?? '',
+  };
 }
 
 /** Serves tiles from Cache Storage when present, so revisited places load without the network. */
