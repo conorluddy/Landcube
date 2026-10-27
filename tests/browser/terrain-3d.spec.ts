@@ -4,6 +4,7 @@ import {
   download,
   loadLocation,
   modelDownload,
+  openDefaultStudio,
   section,
   serveStudio,
   stlBounds,
@@ -14,6 +15,36 @@ test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 test.describe.configure({ timeout: 90_000 });
 test.beforeEach(async ({ page }) => {
   await serveStudio(page);
+});
+
+test('fresh visits open Errigal in 3D and reload to the same default', async ({ page }) => {
+  await openDefaultStudio(page);
+  await expect(page.locator('canvas.terrain-3d')).toBeVisible();
+  await expect(page.locator('#terrain')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Coordinates', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.locator('#terrain-place')).toHaveValue('55.0343,-8.113');
+  expect(new URL(page.url()).search).toBe('');
+  await page.reload();
+  await expect(page.getByRole('button', { name: '3D', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.locator('#terrain-place')).toHaveValue('55.0343,-8.113');
+});
+
+test('fresh visits without WebGL 2 show the default location in 2D', async ({ page }) => {
+  await page.route('**/assets/terrain-3d-*.js', (route) => route.abort());
+  await page.goto(appUrl);
+  await expect(page.getByRole('status').filter({ hasText: 'WebGL 2' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '2D', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible();
+  await expect(page.locator('#terrain')).toBeVisible();
 });
 
 test('view selection activates 3D directly and restores independent inspector sections', async ({

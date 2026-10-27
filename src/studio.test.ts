@@ -149,6 +149,16 @@ void test('location loads and source switches morph terrain while interval and h
   assert.deepEqual(transitions, [true, false, false, true, true]);
 });
 
+void test('new sessions colour the land by elevation from the loaded location', async (t) => {
+  const { controller: c } = setup();
+
+  assert.equal(c.getSnapshot().scene.gradient.enabled, true);
+  assert.equal(c.getSnapshot().scene.gradientSource, 'location');
+  stubBrowserTileDecoding(t);
+  await c.loadTerrain();
+  assert.equal(c.getSnapshot().scene.gradientPreset, 'landscape-temperate');
+});
+
 void test('location gradient follows loaded places until the user picks one', async (t) => {
   const { controller: c } = setup();
 
@@ -186,6 +196,46 @@ void test('autoplay tours preset locations after each delay until switched off',
   assert.equal(c.getSnapshot().source.place, secondPlace);
 });
 
+void test('default location loads bundled tiles and credits only their recorded sources', async (t) => {
+  const { controller: c } = setup();
+  const requestedUrls: string[] = [];
+
+  stubBrowserTileDecoding(t);
+  t.mock.method(globalThis, 'fetch', (url: string) => {
+    requestedUrls.push(url);
+
+    return Promise.resolve(new Response('tile', pngHeaders));
+  });
+  await c.loadTerrain();
+
+  assert.ok(requestedUrls.length > 0);
+  assert.ok(requestedUrls.every((url) => url.startsWith('https://topogra.test/terrain-tiles/')));
+  assert.match(c.getSnapshot().source.terrain?.attribution ?? '', /Copernicus/);
+  assert.doesNotMatch(c.getSnapshot().source.terrain?.attribution ?? '', /Geological Survey/);
+});
+
+void test('bundled tiles served as HTML fall back to the public tile service', async (t) => {
+  const { controller: c } = setup();
+  const requestedUrls: string[] = [];
+
+  stubBrowserTileDecoding(t);
+  t.mock.method(console, 'warn', () => undefined);
+  t.mock.method(globalThis, 'fetch', (url: string) => {
+    requestedUrls.push(url);
+
+    // Static hosts may answer a missing bundled file with their HTML page and a 200 status.
+    return Promise.resolve(
+      url.includes('/terrain-tiles/')
+        ? new Response('<!doctype html>', { headers: { 'content-type': 'text/html' } })
+        : new Response('tile', pngHeaders),
+    );
+  });
+  await c.loadTerrain();
+
+  assert.match(c.getSnapshot().source.status, /Real terrain loaded/);
+  assert.ok(requestedUrls.some((url) => url.includes('/terrarium/')));
+});
+
 void test('daylight cycle sweeps the sun until a manual lighting edit pauses it', (t) => {
   const { controller: c } = setup();
 
@@ -202,15 +252,18 @@ void test('daylight cycle sweeps the sun until a manual lighting edit pauses it'
   assert.equal(c.getSnapshot().scene.lighting.timeOfDay, 12);
 });
 
+const pngHeaders = { headers: { 'content-type': 'image/png' } };
+
 /** Serves flat Terrarium tiles through the browser decoding path without a network or canvas. */
 function stubBrowserTileDecoding(t: TestContext): void {
   const tileSizePixels = 256;
   const pixels = new Uint8ClampedArray(tileSizePixels * tileSizePixels * 4).fill(128);
 
-  t.mock.method(globalThis, 'fetch', () => Promise.resolve(new Response('tile')));
+  t.mock.method(globalThis, 'fetch', () => Promise.resolve(new Response('tile', pngHeaders)));
   Object.assign(globalThis, {
     createImageBitmap: () => Promise.resolve({ close: () => undefined }),
     document: {
+      baseURI: 'https://topogra.test/',
       createElement: () => ({
         getContext: () => ({ drawImage: () => undefined, getImageData: () => ({ data: pixels }) }),
       }),

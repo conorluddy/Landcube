@@ -15,10 +15,7 @@ export function loadInitialDesign(
   randomSeed: number,
   storedSeed: number | null,
 ): Result<LoadedDesign> {
-  const hasDesign =
-    parameters.has('v') || Object.keys(versionOneDesignDefaults).some((key) => parameters.has(key));
-
-  if (hasDesign) {
+  if (hasDesignParameters(parameters)) {
     const result = parseDesignParameters(parameters);
 
     if (!result.ok || parameters.has('seed')) {
@@ -36,6 +33,13 @@ export function loadInitialDesign(
     width: clampOutputDimensionPixels(viewport.width),
     height: clampOutputDimensionPixels(viewport.height),
   });
+}
+
+/** True when the URL carries a design link rather than opening the studio fresh. */
+export function hasDesignParameters(parameters: URLSearchParams): boolean {
+  return (
+    parameters.has('v') || Object.keys(versionOneDesignDefaults).some((key) => parameters.has(key))
+  );
 }
 
 /** Reads and validates the optional persistent seed lock. */
