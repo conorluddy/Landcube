@@ -430,6 +430,13 @@ export function createTerrain3d(
   scene.add(landscape);
   const framePreview = createTerrainFramePreview();
 
+  /** Scene units per millimetre: the model's longest side spans two units. */
+  const getPreviewScale = () =>
+    2 /
+    (modelSettings.cropShape === 'circle'
+      ? modelSettings.widthMm
+      : Math.max(modelSettings.widthMm, modelSettings.lengthMm));
+
   scene.add(framePreview.group);
   let visible = false;
   let rotating = false;
@@ -890,11 +897,7 @@ export function createTerrain3d(
             : undefined;
         const gradientOffsetMm = model.elevationOffsetMm;
         const gradientScaleMm = model.elevationScaleMm;
-        const previewScale =
-          2 /
-          (modelSettings.cropShape === 'circle'
-            ? modelSettings.widthMm
-            : Math.max(modelSettings.widthMm, modelSettings.lengthMm));
+        const previewScale = getPreviewScale();
 
         for (const [mesh, buffers] of [
           [surface, model.surface],
@@ -998,11 +1001,7 @@ export function createTerrain3d(
         }
       }
 
-      const previewScale =
-        2 /
-        (modelSettings.cropShape === 'circle'
-          ? modelSettings.widthMm
-          : Math.max(modelSettings.widthMm, modelSettings.lengthMm));
+      const previewScale = getPreviewScale();
 
       if (!model) {
         throw new Error('Terrain model is unavailable.');
@@ -1150,11 +1149,7 @@ export function createTerrain3d(
       modelSettings = { ...value };
     },
     setFrame(parts, seatHeightMm, finish) {
-      const previewScale =
-        2 /
-        (modelSettings.cropShape === 'circle'
-          ? modelSettings.widthMm
-          : Math.max(modelSettings.widthMm, modelSettings.lengthMm));
+      const previewScale = getPreviewScale();
 
       framePreview.update(parts, previewScale, finish);
       landscape.position.y = seatHeightMm * previewScale;

@@ -82,6 +82,10 @@ export function explainFrameStudioError(settings: FrameStudioSettings): string |
   const edgeSizeMm = settings.edgeShape === 'square' ? 0 : settings.edgeSizeMm;
   const bottomTierHeightMm = getBottomTierHeightMm(settings);
 
+  if (bottomTierHeightMm < minimumFrameWallMm) {
+    return `Each stand tier is ${formatMm(bottomTierHeightMm)} mm thick; the minimum is ${minimumFrameWallMm} mm. Increase Stand height to at least ${formatMm(getMinimumStandHeightMm(settings.preset))} mm.`;
+  }
+
   if (edgeSizeMm > bottomTierHeightMm) {
     return `Edge size ${formatMm(edgeSizeMm)} mm is taller than the ${formatMm(bottomTierHeightMm)} mm stand face it cuts. Increase Stand height or reduce Edge size.`;
   }
@@ -164,6 +168,11 @@ export function createStudioFrame(settings: FrameStudioSettings): FrameSettings 
         surround: surround(settings.borderWidthMm, trayRim, edge),
       };
   }
+}
+
+/** A stacked pedestal splits its stand into two tiers, each needing a full wall. */
+export function getMinimumStandHeightMm(preset: FrameStudioPreset): number {
+  return preset === 'stacked-pedestal' ? minimumFrameWallMm * 2 : minimumFrameWallMm;
 }
 
 // === HELPERS ===

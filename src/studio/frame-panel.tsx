@@ -3,6 +3,7 @@ import {
   frameFinishKeys,
   frameFinishes,
   frameStudioPresets,
+  getMinimumStandHeightMm,
   isPedestalPreset,
   pedestalRecessDepthMm,
 } from '../frame/frame-studio-settings';
@@ -118,7 +119,7 @@ export function FramePanel({ controller: c, state: s }: PanelProps): ReactNode {
               <Range
                 label="Stand height"
                 value={settings.standHeightMm}
-                min={1.2}
+                min={getMinimumStandHeightMm(settings.preset)}
                 max={100}
                 step={0.5}
                 suffix=" mm"

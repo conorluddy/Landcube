@@ -102,6 +102,14 @@ void test('the tab explains the frame constraints its controls can break', () =>
     }) ?? '',
     /turn off Floating toe/,
   );
+  assert.match(
+    explainFrameStudioError({
+      ...defaultFrameStudioSettings,
+      preset: 'stacked-pedestal',
+      standHeightMm: 1.2,
+    }) ?? '',
+    /Increase Stand height to at least 2.4 mm/,
+  );
   assert.equal(explainFrameStudioError(pedestal), undefined);
   assert.equal(
     explainFrameStudioError({

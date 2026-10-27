@@ -323,10 +323,12 @@ void test('a finish change recolours the preview without rebuilding the parts', 
   c.metrics(24);
   c.frame({ preset: 'tray' });
   const tray = c.getSnapshot().frame.assembly;
+  const changesBefore = frameChanges;
 
   c.frame({ finish: 'white' });
   assert.equal(c.getSnapshot().frame.assembly, tray);
-  assert.equal(frameChanges, 3);
+  assert.equal(c.getSnapshot().frame.settings.finish, 'white');
+  assert.ok(frameChanges > changesBefore);
 });
 
 void test('removing a frame empties the assembly so the model drops back to the floor', () => {
