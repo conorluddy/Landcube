@@ -66,7 +66,14 @@ async function fetchTerrainTile(
     const bundledUrl = new URL(`terrain-tiles/${tileKey}.png`, document.baseURI).href;
 
     try {
-      return { response: await downloadTerrainTile(bundledUrl), imagerySources: bundledSources };
+      const response = await downloadTerrainTile(bundledUrl);
+
+      // Static hosts can answer a missing file with their HTML page and a 200 status.
+      if (response.headers.get('content-type')?.startsWith('image/png') !== true) {
+        throw new Error(`Bundled tile ${bundledUrl} is not a PNG.`);
+      }
+
+      return { response, imagerySources: bundledSources };
     } catch (error) {
       // A host that drops the bundled files still has the public tile service to fall back on.
       console.warn(

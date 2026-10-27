@@ -22,6 +22,12 @@ await loadRealTerrain(latitude, longitude, spanKm, async (tileUrl) => {
   const response = await downloadTerrainTile(tileUrl);
   const bytes = Buffer.from(await response.arrayBuffer());
   const imagerySources = response.headers.get('x-amz-meta-x-imagery-sources') ?? '';
+
+  // Bundled tiles must keep their credit; an empty source list would ship them unattributed.
+  if (imagerySources === '') {
+    throw new Error(`Terrarium tile ${tileKey} has no imagery sources header; retry the bundle.`);
+  }
+
   const tilePath = `${tileDirectory}/${tileKey}.png`;
 
   await mkdir(tilePath.slice(0, tilePath.lastIndexOf('/')), { recursive: true });
@@ -33,7 +39,7 @@ await loadRealTerrain(latitude, longitude, spanKm, async (tileUrl) => {
 
 const entries = Object.keys(imagerySourcesByTile)
   .sort()
-  .map((tileKey) => `  '${tileKey}': '${imagerySourcesByTile[tileKey]}',`)
+  .map((tileKey) => `  '${tileKey}': ${JSON.stringify(imagerySourcesByTile[tileKey])},`)
   .join('\n');
 
 await writeFile(

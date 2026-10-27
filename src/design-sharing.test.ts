@@ -1,6 +1,7 @@
 import { parseDesignParameters } from './design-settings';
 import {
   copyDesignLink,
+  hasDesignParameters,
   loadInitialDesign,
   readLockedSeed,
   replaceDesignUrl,
@@ -167,4 +168,11 @@ await test('a blocked address-bar update still provides the complete share link 
 
   assert.ok(typeof warning === 'object' && warning !== null && 'code' in warning);
   assert.equal(warning.code, 'URL_FAILED');
+});
+
+void test('only design parameters turn a visit into a design link', () => {
+  assert.equal(hasDesignParameters(new URLSearchParams('v=1')), true);
+  assert.equal(hasDesignParameters(new URLSearchParams('seed=234')), true);
+  assert.equal(hasDesignParameters(new URLSearchParams('')), false);
+  assert.equal(hasDesignParameters(new URLSearchParams('utm_source=newsletter')), false);
 });

@@ -238,6 +238,6 @@ void test('bundled tiles cover exactly the default location and exist on disk', 
   assert.deepEqual(requestedTileKeys.sort(), Object.keys(bundledTerrainTileSources).sort());
 
   for (const tileKey of requestedTileKeys) {
-    await access(`public/terrain-tiles/${tileKey}.png`);
+    await access(new URL(`../public/terrain-tiles/${tileKey}.png`, import.meta.url));
   }
 });
