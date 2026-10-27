@@ -22,7 +22,8 @@ export function createTerrainFramePreview(): {
   return {
     group,
     update(parts, previewScale, finish) {
-      const { color, roughness } = frameFinishes[finish];
+      const { color, roughness, opacity } = frameFinishes[finish];
+      const isTranslucent = opacity !== undefined;
 
       for (const mesh of meshes) {
         mesh.geometry.dispose();
@@ -50,14 +51,19 @@ export function createTerrainFramePreview(): {
         geometry.dispose();
         rendered.computeVertexNormals();
         const material = new THREE.MeshStandardMaterial({
-          color: new THREE.Color(color).offsetHSL(0, 0, -tierShadeStep * index),
+          color: new THREE.Color(color).offsetHSL(0, 0, isTranslucent ? 0 : -tierShadeStep * index),
           roughness,
           metalness: 0,
+          // Glass shows the landscape through every wall, so both faces draw and none occlude.
+          transparent: isTranslucent,
+          opacity: opacity ?? 1,
+          depthWrite: !isTranslucent,
+          side: isTranslucent ? THREE.DoubleSide : THREE.FrontSide,
         });
         const mesh = new THREE.Mesh(rendered, material);
 
         mesh.name = part.id;
-        mesh.castShadow = true;
+        mesh.castShadow = !isTranslucent;
         mesh.receiveShadow = true;
         meshes.push(mesh);
         group.add(mesh);
