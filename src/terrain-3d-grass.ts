@@ -1,76 +1,81 @@
 import * as THREE from 'three';
-import {
-  maximumGrassTufts,
-  placeGrass,
-  type GrassInstances,
-  type GrassSite,
-} from './grass-placement';
-import { terrain3dElevationScale } from './terrain-surface';
+import { createGrassCoverage, type GrassCoverageMap, type GrassSite } from './grass-coverage';
 import { defaultGrassStyle } from './constants/grass';
 import type { GrassStyle } from './types/grass';
 
 /** Everything a rebuild needs from the current terrain update. */
 export interface TerrainGrassInputs {
   site: GrassSite;
-  exaggeration: number;
-  /** Preview-unit height of terrain elevation zero, matching contour lines and roads. */
-  elevationOffset: number;
+  /** The rendered terrain surface; each shell is a copy of it lifted a little higher. */
+  surface: THREE.BufferGeometry;
 }
 
-/** Instanced grass tufts; colour, wind and length edits never re-place them. */
+/** A shell-textured grass carpet; colour, length, density and wind never rebuild its mask. */
 export interface TerrainGrassLayer {
   mesh: THREE.InstancedMesh;
   update(inputs: TerrainGrassInputs): void;
   setStyle(style: Readonly<GrassStyle>): void;
-  /** Morphs and terraced models cannot carry draped grass, so they hide it. */
+  /** Morphs and terraced models cannot carry grass, so they hide it. */
   setSuppressed(value: boolean): void;
   /** True while wind needs a continuous render loop. */
   isAnimated(): boolean;
   tick(timeMs: number): void;
+  /** The growth mask in use, for diagnostics and tests. */
+  getCoverage(): GrassCoverageMap | undefined;
 }
 
-// 7 blades × 3 segments is 42 triangles a tuft, so the 30,000-tuft cap stays near 1.3 M.
-const bladesPerTuft = 7;
-const bladeSegments = 3;
-/** Blades are this wide at the root, relative to their length, so they read at diorama scale. */
-const bladeWidthRatio = 0.14;
-/** Sinks roots slightly so tufts never hover over the bilinear-versus-mesh height gap. */
-const rootEmbedUnits = 0.0003;
+/** Stacked copies of the terrain; more shells give smoother blades at a linear fill cost. */
+export const grassShellCount = 20;
 
 export function createTerrainGrassLayer(): TerrainGrassLayer {
-  const geometry = createTuftGeometry();
-  const shades = new THREE.InstancedBufferAttribute(new Float32Array(maximumGrassTufts), 1);
-  const patches = new THREE.InstancedBufferAttribute(new Float32Array(maximumGrassTufts), 1);
-
-  geometry.setAttribute('grassShade', shades);
-  geometry.setAttribute('grassPatch', patches);
-
   const uniforms = {
+    grassMap: { value: null as THREE.Texture | null },
+    grassShellCount: { value: grassShellCount },
+    grassShellHeight: { value: 0 },
+    grassCellUnits: { value: 1 },
+    grassSource: { value: new THREE.Vector3(1, 0, 0) },
+    grassMaskScale: { value: new THREE.Vector2(1, 1) },
     grassBase: { value: new THREE.Color(defaultGrassStyle.baseColor) },
     grassTip: { value: new THREE.Color(defaultGrassStyle.tipColor) },
     grassDry: { value: new THREE.Color(defaultGrassStyle.dryColor) },
     grassVariation: { value: defaultGrassStyle.colorVariation as number },
     grassDryness: { value: defaultGrassStyle.dryness as number },
+    grassLengthVariation: { value: defaultGrassStyle.lengthVariation as number },
     grassWind: { value: defaultGrassStyle.wind as number },
     grassTime: { value: 0 },
   };
-  const material = createGrassMaterial(uniforms);
-  const mesh = new THREE.InstancedMesh(geometry, material, maximumGrassTufts);
+  const placeholder = new THREE.BufferGeometry();
+  const mesh = new THREE.InstancedMesh(placeholder, createGrassMaterial(uniforms), grassShellCount);
   let style: Readonly<GrassStyle> = { ...defaultGrassStyle };
   let inputs: TerrainGrassInputs | undefined;
-  let instances: GrassInstances | undefined;
+  let coverage: GrassCoverageMap | undefined;
+  let texture: THREE.DataTexture | undefined;
   let suppressed = false;
-  let placedKey: readonly unknown[] = [];
-  let posedKey: readonly unknown[] = [];
+  let coverageKey: readonly unknown[] = [];
 
-  mesh.count = 0;
   mesh.visible = false;
   mesh.receiveShadow = true;
-  // Instances span the whole model, so the tuft's own bounds would cull them wrongly.
+  // Shells cover the same ground as the terrain, which is never culled either.
   mesh.frustumCulled = false;
 
   const syncVisibility = () => {
-    mesh.visible = style.enabled && !suppressed && mesh.count > 0;
+    mesh.visible = style.enabled && !suppressed && texture !== undefined;
+  };
+
+  /** Uniforms that follow the crop and style without touching the mask. */
+  const syncShape = (site: GrassSite) => {
+    const scale = 2 / Math.max(site.width, site.height);
+    // Density is blades per square centimetre, so each blade owns a cell this many mm across.
+    const cellMm = 10 / Math.sqrt(Math.max(1, style.density));
+
+    uniforms.grassShellHeight.value = style.lengthMm * scale * site.frameUnitsPerMm;
+    uniforms.grassCellUnits.value = cellMm * site.frameUnitsPerMm;
+    uniforms.grassSource.value.set(
+      1 / scale,
+      site.width / 2 + site.originX,
+      site.height / 2 + site.originY,
+    );
+    uniforms.grassMaskScale.value.set(1 / (scale * site.width), 1 / (scale * site.height));
   };
 
   const rebuild = () => {
@@ -80,45 +85,38 @@ export function createTerrainGrassLayer(): TerrainGrassLayer {
       return;
     }
 
-    const { site } = inputs;
-    const placementKey: unknown[] = [
+    const { site, surface } = inputs;
+    const key: unknown[] = [
       site.field,
       site.width,
       site.height,
       site.shape,
       site.originX,
       site.originY,
-      site.frameUnitsPerMm,
       site.metersPerFieldUnit,
       site.metersPerFrameUnit,
       site.seaLevel,
       site.roads,
-      style.density,
       style.coverage,
       style.clumping,
       style.slopeLimitDegrees,
       style.altitudeLimit,
     ];
 
-    if (!instances || !sameKey(placementKey, placedKey)) {
-      instances = placeGrass(site, style);
-      placedKey = placementKey;
-      posedKey = [];
+    if (!texture || key.some((value, index) => value !== coverageKey[index])) {
+      coverage = createGrassCoverage(site, style);
+      texture?.dispose();
+      texture = new THREE.DataTexture(coverage.data, coverage.columns, coverage.rows);
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearFilter;
+      texture.needsUpdate = true;
+      uniforms.grassMap.value = texture;
+      coverageKey = key;
     }
 
-    const poseKey = [
-      instances,
-      inputs.exaggeration,
-      inputs.elevationOffset,
-      style.lengthMm,
-      style.lengthVariation,
-    ];
-
-    if (!sameKey(poseKey, posedKey)) {
-      poseTufts(mesh, shades, patches, instances, inputs, style);
-      posedKey = poseKey;
-    }
-
+    // The terrain owns the surface geometry; the shells only borrow it.
+    mesh.geometry = surface;
+    syncShape(site);
     syncVisibility();
   };
 
@@ -135,6 +133,7 @@ export function createTerrainGrassLayer(): TerrainGrassLayer {
       uniforms.grassDry.value.set(value.dryColor);
       uniforms.grassVariation.value = value.colorVariation;
       uniforms.grassDryness.value = value.dryness;
+      uniforms.grassLengthVariation.value = value.lengthVariation;
       uniforms.grassWind.value = value.wind;
       rebuild();
     },
@@ -148,120 +147,26 @@ export function createTerrainGrassLayer(): TerrainGrassLayer {
     tick(timeMs) {
       uniforms.grassTime.value = timeMs / 1000;
     },
+    getCoverage: () => coverage,
   };
 }
 
 // === HELPERS ===
 
-/** Writes one matrix per tuft: root on the draped terrain, random turn, length from the style. */
-function poseTufts(
-  mesh: THREE.InstancedMesh,
-  shades: THREE.InstancedBufferAttribute,
-  patches: THREE.InstancedBufferAttribute,
-  instances: GrassInstances,
-  inputs: TerrainGrassInputs,
-  style: Readonly<GrassStyle>,
-): void {
-  const { site, exaggeration, elevationOffset } = inputs;
-  const scale = 2 / Math.max(site.width, site.height);
-  const previewUnitsPerMm = scale * site.frameUnitsPerMm;
-  const matrix = new THREE.Matrix4();
-  const rotation = new THREE.Quaternion();
-  const up = new THREE.Vector3(0, 1, 0);
-  const position = new THREE.Vector3();
-  const size = new THREE.Vector3();
-
-  for (let index = 0; index < instances.count; index++) {
-    const length =
-      style.lengthMm *
-      Math.max(0.2, 1 + instances.lengthJitter[index] * style.lengthVariation * 0.7) *
-      previewUnitsPerMm;
-
-    position.set(
-      (instances.x[index] - site.width / 2) * scale,
-      instances.elevation[index] * terrain3dElevationScale * exaggeration +
-        elevationOffset -
-        rootEmbedUnits,
-      (instances.y[index] - site.height / 2) * scale,
-    );
-    rotation.setFromAxisAngle(up, instances.rotation[index]);
-    size.set(length, length, length);
-    mesh.setMatrixAt(index, matrix.compose(position, rotation, size));
-    shades.setX(index, instances.shade[index]);
-    patches.setX(index, instances.patch[index]);
-  }
-
-  mesh.count = instances.count;
-  mesh.instanceMatrix.needsUpdate = true;
-  shades.needsUpdate = true;
-  patches.needsUpdate = true;
-}
-
 /**
- * One tuft of tapered, outward-curving blades, 1 unit tall. Every normal points up, so blades
- * catch light like the ground beneath them instead of flickering as thin cards.
+ * Each shell is the terrain lifted by its share of the blade length. A fragment survives only
+ * where its cell's blade is taller than the shell and still wide enough at that height, so the
+ * stack reads as a dense pile of tapering blades. Where cells shrink below a pixel the blades
+ * widen into a continuous carpet instead of shimmering.
  */
-function createTuftGeometry(): THREE.BufferGeometry {
-  const positions: number[] = [];
-  const progress: number[] = [];
-  const indices: number[] = [];
-
-  for (let blade = 0; blade < bladesPerTuft; blade++) {
-    // Fixed, irregular spacing and heights: every tuft shares this shape and differs by rotation.
-    const angle = ((blade + 0.37 * Math.sin(blade * 2.3)) / bladesPerTuft) * Math.PI * 2;
-    const lean = 0.1 + 0.2 * ((blade * 0.618) % 1);
-    const bladeHeight = 0.65 + 0.35 * ((blade * 0.382 + 0.5) % 1);
-    const outward = { x: Math.cos(angle), z: Math.sin(angle) };
-    const across = { x: -outward.z, z: outward.x };
-    const rootOffset = 0.05;
-    const first = positions.length / 3;
-
-    for (let row = 0; row <= bladeSegments; row++) {
-      const t = row / bladeSegments;
-      const halfWidth = (bladeWidthRatio / 2) * (1 - t) ** 0.8;
-      const reach = rootOffset + lean * t ** 1.6;
-      const centreX = outward.x * reach;
-      const centreZ = outward.z * reach;
-      const y = t * bladeHeight;
-
-      positions.push(centreX - across.x * halfWidth, y, centreZ - across.z * halfWidth);
-      positions.push(centreX + across.x * halfWidth, y, centreZ + across.z * halfWidth);
-      progress.push(t, t);
-    }
-
-    for (let row = 0; row < bladeSegments; row++) {
-      const a = first + row * 2;
-
-      indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-    }
-  }
-
-  const geometry = new THREE.BufferGeometry();
-
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute(
-    'normal',
-    new THREE.Float32BufferAttribute(
-      Array.from({ length: positions.length }, (_, index) => (index % 3 === 1 ? 1 : 0)),
-      3,
-    ),
-  );
-  geometry.setAttribute('bladeProgress', new THREE.Float32BufferAttribute(progress, 1));
-  geometry.setIndex(indices);
-
-  return geometry;
-}
-
-/** Base-to-tip gradient, dry patches and per-tuft jitter; wind bends tips, never roots. */
 function createGrassMaterial(uniforms: Record<string, THREE.IUniform>): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial({
     color: '#ffffff',
-    roughness: 0.85,
+    roughness: 0.92,
     metalness: 0,
-    side: THREE.DoubleSide,
   });
 
-  material.customProgramCacheKey = () => 'topogra-grass-v2';
+  material.customProgramCacheKey = () => 'topogra-grass-shells-v1';
 
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -269,69 +174,95 @@ function createGrassMaterial(uniforms: Record<string, THREE.IUniform>): THREE.Me
       .replace(
         '#include <common>',
         `#include <common>
-        attribute float bladeProgress;
-        attribute float grassShade;
-        attribute float grassPatch;
+        uniform float grassShellCount;
+        uniform float grassShellHeight;
         uniform float grassTime;
         uniform float grassWind;
-        varying float vBladeProgress;
-        varying float vGrassShade;
-        varying float vGrassPatch;`,
+        varying float vGrassShell;
+        varying vec2 vGrassPlan;`,
       )
       .replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
-        vBladeProgress = bladeProgress;
-        vGrassShade = grassShade;
-        vGrassPatch = grassPatch;
-        // Neighbouring tufts share a gust phase, so the wind moves through the grass in waves.
-        vec2 grassRoot = vec2(instanceMatrix[3][0], instanceMatrix[3][2]);
-        float gust = sin(grassTime * 1.4 + grassRoot.x * 9.0 + grassRoot.y * 5.0) * 0.65
-          + sin(grassTime * 3.1 + grassRoot.x * 31.0) * 0.35;
-        float bend = grassWind * bladeProgress * bladeProgress * 0.45;
-        transformed.x += gust * bend;
-        transformed.z += gust * bend * 0.5;`,
+        vGrassShell = (float(gl_InstanceID) + 0.5) / grassShellCount;
+        vGrassPlan = transformed.xz;
+        transformed.y += vGrassShell * grassShellHeight;
+        // Neighbouring blades share a gust phase, so wind moves through the carpet in waves.
+        vec2 gust = vec2(
+          sin(grassTime * 1.4 + transformed.x * 9.0 + transformed.z * 5.0),
+          sin(grassTime * 1.1 + transformed.z * 7.0 - transformed.x * 3.0) * 0.5
+        );
+        transformed.xz += gust * grassWind * grassShellHeight * 0.4 * vGrassShell * vGrassShell;`,
       );
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
         `#include <common>
+        uniform sampler2D grassMap;
+        uniform float grassCellUnits;
+        uniform vec3 grassSource;
+        uniform vec2 grassMaskScale;
         uniform vec3 grassBase;
         uniform vec3 grassTip;
         uniform vec3 grassDry;
         uniform float grassVariation;
         uniform float grassDryness;
-        varying float vBladeProgress;
-        varying float vGrassShade;
-        varying float vGrassPatch;`,
+        uniform float grassLengthVariation;
+        varying float vGrassShell;
+        varying vec2 vGrassPlan;
+
+        float grassHash(vec2 p) {
+          vec3 q = fract(vec3(p.xyx) * 0.1031);
+          q += dot(q, q.yzx + 33.33);
+          return fract((q.x + q.y) * q.z);
+        }`,
       )
       .replace(
-        '#include <normal_fragment_begin>',
-        `#include <normal_fragment_begin>
-        // Both faces share the upward normal; the default flip would light every back face as if
-        // it faced the ground and turn tufts into dark specks.
-        normal = normalize(vNormal);`,
+        '#include <clipping_planes_fragment>',
+        `#include <clipping_planes_fragment>
+        vec4 grassMask = texture2D(grassMap, vGrassPlan * grassMaskScale + 0.5);
+        // Source-frame cells keep each blade in place when the crop moves.
+        vec2 grassCellPosition = (vGrassPlan * grassSource.x + grassSource.yz) / grassCellUnits;
+        vec2 grassCell = floor(grassCellPosition);
+        float grassFar = smoothstep(0.4, 1.4, length(fwidth(grassCellPosition)));
+        float grassLength = mix(
+          mix(1.0 - grassLengthVariation, 1.0, grassHash(grassCell)),
+          1.0 - grassLengthVariation * 0.5,
+          grassFar
+        );
+        // A firm edge keeps sparse fringes from stacking into rings on steep ground.
+        float bladeHeight = smoothstep(0.12, 0.55, grassMask.r) * grassLength;
+
+        if (vGrassShell > bladeHeight) discard;
+
+        float bladeProgress = vGrassShell / max(bladeHeight, 0.001);
+        float taper = 1.0 - bladeProgress;
+        float bladeRadius = mix(mix(0.1, 0.55, taper), 1.5, grassFar);
+        vec2 bladeCentre =
+          vec2(grassHash(grassCell + 17.31), grassHash(grassCell + 41.7)) * 0.5 + 0.25;
+
+        // The lowest shells are a solid mat, so no bare terrain shows between roots.
+        if (vGrassShell > 0.08 && distance(fract(grassCellPosition), bladeCentre) > bladeRadius) {
+          discard;
+        }`,
       )
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
-        vec3 grassColor = mix(grassBase, grassTip, smoothstep(0.0, 1.0, vBladeProgress));
+        vec3 grassColor = mix(grassBase, grassTip, smoothstep(0.0, 1.0, bladeProgress));
         // Patch noise clusters near its middle, so dryness spreads the threshold across that band.
         float dryEdge = mix(0.78, 0.22, grassDryness);
-        float dry = smoothstep(dryEdge - 0.06, dryEdge + 0.06, vGrassPatch) * step(0.001, grassDryness);
-        grassColor = mix(grassColor, grassDry * mix(0.75, 1.05, vBladeProgress), dry);
-        grassColor *= 1.0 + vGrassShade * grassVariation * 0.4;
-        // Roots sit in the shade of the tuft.
-        grassColor *= mix(0.72, 1.0, smoothstep(0.0, 0.45, vBladeProgress));
+        float dry =
+          smoothstep(dryEdge - 0.06, dryEdge + 0.06, grassMask.g) * step(0.001, grassDryness);
+        grassColor = mix(grassColor, grassDry * mix(0.8, 1.05, bladeProgress), dry);
+        grassColor *= 1.0 + (grassHash(grassCell + 7.7) - 0.5) * grassVariation * 0.7 * (1.0 - grassFar);
+        // Deep in the pile is shaded by the blades above it; short grass still has bright tips.
+        grassColor *= mix(0.55, 1.0, bladeProgress);
         diffuseColor.rgb = grassColor;`,
       );
   };
 
   return material;
-}
-
-function sameKey(a: readonly unknown[], b: readonly unknown[]): boolean {
-  return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
 /** Absent outside browsers, where tests run with motion allowed. */

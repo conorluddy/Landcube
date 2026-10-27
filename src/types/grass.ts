@@ -2,12 +2,12 @@ import type { grassPresets } from '../constants/grass';
 
 export type GrassPresetKey = keyof typeof grassPresets;
 
-/** Grass in the 3D preview; colour, length and wind never re-place tufts. */
+/** Grass in the 3D preview; colour, length, density and wind never regrow its coverage. */
 export interface GrassStyle {
   enabled: boolean;
   /** 'custom' once any colour or length setting is edited by hand. */
   preset: GrassPresetKey | 'custom';
-  /** Tufts per square centimetre of printed model where coverage is full. */
+  /** Blades per square centimetre of printed model where coverage is full. */
   density: number;
   /** Share of the ground in grass patches, 0 to 1. */
   coverage: number;
@@ -15,12 +15,12 @@ export interface GrassStyle {
   clumping: number;
   /** Typical blade length on the printed model. */
   lengthMm: number;
-  /** How far individual tufts stray from the typical length, 0 to 1. */
+  /** How far individual blades stray from the typical length, 0 to 1. */
   lengthVariation: number;
   baseColor: string;
   tipColor: string;
   dryColor: string;
-  /** Per-tuft brightness and hue jitter, 0 to 1. */
+  /** Per-blade brightness jitter, 0 to 1. */
   colorVariation: number;
   /** Share of patches turned to dry grass, 0 to 1. */
   dryness: number;

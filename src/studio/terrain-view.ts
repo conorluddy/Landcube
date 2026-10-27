@@ -7,7 +7,7 @@ import type { SeaLevelGeometry } from '../sea-level';
 import type { TerrainTerraceLevels } from '../terrain-terraces';
 import type { FloorPlace } from '../floor-geo';
 import type { RoadPath } from '../types/roads';
-import type { GrassGeography } from '../grass-placement';
+import type { GrassGeography } from '../grass-coverage';
 import { getAutoRotateSpeed, type TerrainViewPreset } from '../terrain-camera';
 
 interface StudioTerrainView {

@@ -974,7 +974,7 @@ const grassLookOptions = [
   { value: 'custom' as const, label: 'Custom' },
 ];
 
-/** Experimental instanced grass; colour, length and wind restyle without re-placing tufts. */
+/** Experimental shell-textured grass; colour, length, density and wind restyle without regrowing it. */
 function GrassGroup({ controller: c, state: s }: PanelProps): ReactNode {
   const grass = s.scene.grass;
   const off = !grass.enabled;
@@ -1064,9 +1064,9 @@ function GrassGroup({ controller: c, state: s }: PanelProps): ReactNode {
       <Range
         label="Density"
         value={grass.density}
-        min={0}
-        max={200}
-        step={5}
+        min={50}
+        max={5000}
+        step={50}
         suffix=" /cm²"
         disabled={off}
         onChange={(value) => {

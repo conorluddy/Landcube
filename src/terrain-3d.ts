@@ -33,7 +33,7 @@ import {
 import { createTerrainLineBuffers } from './terrain-3d-lines';
 import { createTerrainRoadLayer } from './terrain-3d-roads';
 import { createTerrainGrassLayer } from './terrain-3d-grass';
-import type { GrassGeography, GrassSite } from './grass-placement';
+import type { GrassGeography, GrassSite } from './grass-coverage';
 import type { GrassStyle } from './types/grass';
 import { defaultRoadStyle, roadClassWidthFactors, roadDetailClasses } from './constants/roads';
 import { noRoadPaths } from './road-ribbons';
@@ -448,13 +448,11 @@ export function createTerrain3d(
         seaLevel: number | undefined;
         roadPaths: readonly RoadPath[];
         geography: GrassGeography;
-        exaggeration: number;
-        elevationOffset: number;
       }
     | undefined;
   let grassRoads: { key: readonly unknown[]; roads: GrassSite['roads'] } = { key: [], roads: [] };
 
-  /** Re-places grass from the last terrain update and the current road style. */
+  /** Regrows grass from the last terrain update and the current road style. */
   const updateGrass = () => {
     if (!grassTerrain) {
       return;
@@ -501,8 +499,7 @@ export function createTerrain3d(
         roads: grassRoads.roads,
         ...geography,
       },
-      exaggeration: grassTerrain.exaggeration,
-      elevationOffset: grassTerrain.elevationOffset,
+      surface: surface.geometry,
     });
     updateLoop();
   };
@@ -1122,8 +1119,6 @@ export function createTerrain3d(
         seaLevel: seaLevel?.elevation,
         roadPaths,
         geography: grassGeography,
-        exaggeration,
-        elevationOffset,
       };
       updateGrass();
 
@@ -1289,7 +1284,7 @@ export function createTerrain3d(
 
       roadStyle = value;
       roads.setStyle(value);
-      // Grass keeps clear of drawn roads, so road edits can re-place it.
+      // Grass keeps clear of drawn roads, so road edits can regrow it.
       updateGrass();
 
       // Hidden roads change nothing on screen; skipping the frame keeps terrain loads quick.

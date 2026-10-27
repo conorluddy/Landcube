@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
-import { createTerrainGrassLayer, type TerrainGrassInputs } from './terrain-3d-grass';
+import {
+  createTerrainGrassLayer,
+  grassShellCount,
+  type TerrainGrassInputs,
+} from './terrain-3d-grass';
 import { defaultGrassStyle } from './constants/grass';
 
 const inputs: TerrainGrassInputs = {
@@ -24,67 +28,65 @@ const inputs: TerrainGrassInputs = {
     metersPerFrameUnit: 10,
     roads: [],
   },
-  exaggeration: 0.3,
-  elevationOffset: 0,
+  surface: new THREE.PlaneGeometry(2, 2, 4, 4).rotateX(-Math.PI / 2),
 };
 const enabled = { ...defaultGrassStyle, enabled: true, coverage: 1 };
 
-function tufts(layer: ReturnType<typeof createTerrainGrassLayer>) {
-  const matrix = new THREE.Matrix4();
-  const position = new THREE.Vector3();
-  const rotation = new THREE.Quaternion();
-  const size = new THREE.Vector3();
-
-  return Array.from({ length: layer.mesh.count }, (_, index) => {
-    layer.mesh.getMatrixAt(index, matrix);
-    matrix.decompose(position, rotation, size);
-
-    return { position: position.clone(), size: size.x };
-  });
-}
-
-void test('colour, dryness and wind restyle grass without moving or resizing a tuft', () => {
+void test('shells borrow the terrain surface instead of copying it', () => {
   const layer = createTerrainGrassLayer();
 
   layer.update(inputs);
   layer.setStyle(enabled);
-  const before = tufts(layer);
 
-  layer.setStyle({ ...enabled, baseColor: '#ff0000', dryness: 0.9, wind: 1, colorVariation: 1 });
-
-  assert.ok(before.length > 100);
-  assert.deepEqual(tufts(layer), before);
+  assert.equal(layer.mesh.geometry, inputs.surface);
+  assert.equal(layer.mesh.count, grassShellCount);
   assert.equal(layer.mesh.visible, true);
 });
 
-void test('blade length scales tufts in place', () => {
+void test('colour, length, density and wind restyle grass without regrowing it', () => {
   const layer = createTerrainGrassLayer();
 
   layer.update(inputs);
   layer.setStyle(enabled);
-  const before = tufts(layer);
+  const coverage = layer.getCoverage();
 
-  layer.setStyle({ ...enabled, lengthMm: enabled.lengthMm * 2 });
-  const after = tufts(layer);
-
-  assert.equal(after.length, before.length);
-  after.forEach((tuft, index) => {
-    assert.ok(tuft.position.distanceTo(before[index].position) < 1e-9);
-    assert.ok(Math.abs(tuft.size / before[index].size - 2) < 1e-6);
+  layer.setStyle({
+    ...enabled,
+    baseColor: '#ff0000',
+    dryness: 0.9,
+    wind: 1,
+    colorVariation: 1,
+    lengthMm: enabled.lengthMm * 2,
+    density: enabled.density / 2,
   });
+
+  assert.ok(coverage);
+  assert.equal(layer.getCoverage(), coverage);
 });
 
-void test('suppressed or disabled grass hides without discarding its tufts', () => {
+void test('coverage edits regrow the mask', () => {
   const layer = createTerrainGrassLayer();
 
   layer.update(inputs);
   layer.setStyle(enabled);
-  const count = layer.mesh.count;
+  const coverage = layer.getCoverage();
+
+  layer.setStyle({ ...enabled, coverage: 0.4 });
+
+  assert.notEqual(layer.getCoverage(), coverage);
+});
+
+void test('suppressed or disabled grass hides without discarding its mask', () => {
+  const layer = createTerrainGrassLayer();
+
+  layer.update(inputs);
+  layer.setStyle(enabled);
+  const coverage = layer.getCoverage();
 
   layer.setSuppressed(true);
   assert.equal(layer.mesh.visible, false);
   layer.setSuppressed(false);
   layer.setStyle({ ...enabled, enabled: false });
   assert.equal(layer.mesh.visible, false);
-  assert.equal(layer.mesh.count, count);
+  assert.equal(layer.getCoverage(), coverage);
 });

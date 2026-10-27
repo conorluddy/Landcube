@@ -9,7 +9,7 @@ export interface GrassSite {
   width: number;
   height: number;
   shape: TerrainCropShape;
-  /** The crop's offset in the source frame; candidates are anchored there so crops never reshuffle. */
+  /** The crop's offset in the source frame; patches are anchored there so crops never reshape them. */
   originX: number;
   originY: number;
   frameUnitsPerMm: number;
@@ -28,133 +28,83 @@ export type GrassGeography = Pick<
   'originX' | 'originY' | 'metersPerFieldUnit' | 'metersPerFrameUnit'
 >;
 
-/** One tuft per index; structure-of-arrays keeps tens of thousands of tufts cheap. */
-export interface GrassInstances {
-  count: number;
-  x: Float32Array;
-  y: Float32Array;
-  elevation: Float32Array;
-  rotation: Float32Array;
-  /** Per-tuft length jitter in [−1, 1], scaled by the style's length variation. */
-  lengthJitter: Float32Array;
-  /** Per-tuft colour jitter in [−1, 1]. */
-  shade: Float32Array;
-  /** Smooth patch noise in [0, 1]; the shader turns its high end into dry grass. */
-  patch: Float32Array;
+/** A growth texture over the model crop, sampled by the grass shader. */
+export interface GrassCoverageMap {
+  columns: number;
+  rows: number;
+  /**
+   * RGBA per texel: R is how strongly grass grows (0 bare to 255 full length), G is smooth patch
+   * noise the shader turns into dry grass. Row 0 is the crop's top (y = 0) edge.
+   */
+  data: Uint8Array;
 }
 
-type GrassPlacementStyle = Pick<
+type GrassCoverageStyle = Pick<
   GrassStyle,
-  'density' | 'coverage' | 'clumping' | 'slopeLimitDegrees' | 'altitudeLimit'
+  'coverage' | 'clumping' | 'slopeLimitDegrees' | 'altitudeLimit'
 >;
 
-/** Candidate spacing in source-frame units; finer cells only add rejected candidates. */
-export const grassCellUnits = 2;
-export const maximumGrassTufts = 30_000;
+/** Texels along the crop's longer side: about 0.3 mm on a 150 mm model, finer than any road. */
+export const grassCoverageResolution = 512;
 
 const grassSeed = 0x6a55;
 
 /**
- * Seeded, source-anchored tufts. Every candidate keeps its own rank, so raising density only adds
- * tufts and moving the crop only reveals or hides them; nothing already placed moves.
+ * Where grass grows and how long it gets. Patch noise is sampled in source-frame coordinates, so
+ * moving the crop reveals or hides patches without reshaping them, and raising coverage only grows
+ * grass where there was none.
  */
-export function placeGrass(site: GrassSite, style: GrassPlacementStyle): GrassInstances {
-  const instances = createInstances(maximumGrassTufts);
-  const cellAreaMm2 = (grassCellUnits / site.frameUnitsPerMm) ** 2;
-  // Density is tufts per square centimetre of printed model.
-  const requestedProbability = Math.min(1, (style.density / 100) * cellAreaMm2);
-  const cellCount =
-    Math.ceil(site.width / grassCellUnits) * Math.ceil(site.height / grassCellUnits);
-  // Thinning by rank keeps a stable, even subset; stopping at the cap would leave the far rows bare.
-  // 90% of the cap leaves room for chance, so the hard stop below never truncates the far rows.
-  const keepProbability =
-    requestedProbability *
-    Math.min(1, (maximumGrassTufts * 0.9) / (cellCount * requestedProbability));
-
-  if (keepProbability <= 0 || style.coverage <= 0) {
-    return instances;
-  }
-
+export function createGrassCoverage(
+  site: GrassSite,
+  style: GrassCoverageStyle,
+  resolution = grassCoverageResolution,
+): GrassCoverageMap {
+  const texelUnits = Math.max(site.width, site.height) / resolution;
+  const columns = Math.max(1, Math.round(site.width / texelUnits));
+  const rows = Math.max(1, Math.round(site.height / texelUnits));
+  const data = new Uint8Array(columns * rows * 4);
   const [minimum, maximum] = getFieldRange(site.field);
   const roads = createRoadIndex(site.roads);
   const patchScale = 0.004 + (1 - style.clumping) * 0.01;
   const patchSoftness = 0.04 + (1 - style.clumping) * 0.3;
-  const firstColumn = Math.floor(site.originX / grassCellUnits);
-  const firstRow = Math.floor(site.originY / grassCellUnits);
-  const lastColumn = Math.ceil((site.originX + site.width) / grassCellUnits);
-  const lastRow = Math.ceil((site.originY + site.height) / grassCellUnits);
+  // Noise spans 0..1, so the soft edge sits wholly above it at no coverage and below it at full.
+  const patchEdge = 1 + patchSoftness - style.coverage * (1 + 2 * patchSoftness);
 
-  for (let row = firstRow; row < lastRow; row++) {
-    for (
-      let column = firstColumn;
-      column < lastColumn && instances.count < maximumGrassTufts;
-      column++
-    ) {
-      const rank = hashCell(column, row, 1);
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      const x = ((column + 0.5) / columns) * site.width;
+      const y = ((row + 0.5) / rows) * site.height;
+      const sourceX = x + site.originX;
+      const sourceY = y + site.originY;
+      const offset = (row * columns + column) * 4;
 
-      // Cheap rejection first: most candidates lose to density before any terrain lookups.
-      if (rank >= keepProbability) {
-        continue;
-      }
+      data[offset + 1] = Math.round(fractalNoise(sourceX * 0.012, sourceY * 0.012, 23) * 255);
+      data[offset + 3] = 255;
 
-      const sourceX = (column + hashCell(column, row, 2)) * grassCellUnits;
-      const sourceY = (row + hashCell(column, row, 3)) * grassCellUnits;
-      const x = sourceX - site.originX;
-      const y = sourceY - site.originY;
-
-      if (!isInsideFootprint(x, y, site)) {
+      if (!isInsideFootprint(x, y, site) || roads.covers(x, y)) {
         continue;
       }
 
       const elevation = sampleHeightField(site.field, x, y);
-      const patch = fractalNoise(sourceX * patchScale, sourceY * patchScale, 11);
-      const coverage = smoothstep(
-        1 - style.coverage - patchSoftness,
-        1 - style.coverage + patchSoftness,
-        patch,
-      );
-      const weight =
-        coverage *
-        getSlopeWeight(site, x, y, style.slopeLimitDegrees) *
-        getAltitudeWeight(elevation, minimum, maximum, style.altitudeLimit);
 
-      if (
-        rank >= keepProbability * weight ||
-        (site.seaLevel !== undefined && elevation <= site.seaLevel) ||
-        roads.covers(x, y)
-      ) {
+      if (site.seaLevel !== undefined && elevation <= site.seaLevel) {
         continue;
       }
 
-      const index = instances.count++;
+      const patch = fractalNoise(sourceX * patchScale, sourceY * patchScale, 11);
+      const growth =
+        smoothstep(patchEdge - patchSoftness, patchEdge + patchSoftness, patch) *
+        getSlopeWeight(site, x, y, style.slopeLimitDegrees) *
+        getAltitudeWeight(elevation, minimum, maximum, style.altitudeLimit);
 
-      instances.x[index] = x;
-      instances.y[index] = y;
-      instances.elevation[index] = elevation;
-      instances.rotation[index] = hashCell(column, row, 4) * Math.PI * 2;
-      instances.lengthJitter[index] = hashCell(column, row, 5) * 2 - 1;
-      instances.shade[index] = hashCell(column, row, 6) * 2 - 1;
-      instances.patch[index] = fractalNoise(sourceX * 0.012, sourceY * 0.012, 23);
+      data[offset] = Math.round(growth * 255);
     }
   }
 
-  return instances;
+  return { columns, rows, data };
 }
 
 // === HELPERS ===
-
-function createInstances(capacity: number): GrassInstances {
-  return {
-    count: 0,
-    x: new Float32Array(capacity),
-    y: new Float32Array(capacity),
-    elevation: new Float32Array(capacity),
-    rotation: new Float32Array(capacity),
-    lengthJitter: new Float32Array(capacity),
-    shade: new Float32Array(capacity),
-    patch: new Float32Array(capacity),
-  };
-}
 
 function isInsideFootprint(x: number, y: number, site: GrassSite): boolean {
   if (site.shape === 'circle') {
@@ -208,7 +158,7 @@ function getFieldRange(field: HeightField): [number, number] {
   return [minimum, maximum];
 }
 
-/** Buckets road segments so each tuft checks only the roads near it. */
+/** Buckets road segments so each texel checks only the roads near it. */
 function createRoadIndex(roads: GrassSite['roads']): { covers: (x: number, y: number) => boolean } {
   const bucketUnits = 16;
   const buckets = new Map<

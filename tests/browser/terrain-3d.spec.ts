@@ -463,7 +463,7 @@ test('grass restyles without errors and never changes the printable STL', async 
   await page.getByLabel('Look', { exact: true }).selectOption('autumn');
   await page.getByLabel('Blade length', { exact: true }).fill('2');
   await expect(page.getByLabel('Look', { exact: true })).toHaveValue('custom');
-  await page.getByLabel('Density', { exact: true }).fill('80');
+  await page.getByLabel('Density', { exact: true }).fill('400');
   expect((await modelDownload(page)).equals(before)).toBe(true);
   expect(errors).toEqual([]);
 });

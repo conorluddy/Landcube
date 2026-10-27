@@ -7,7 +7,7 @@ export const grassPresets = {
     dryColor: '#c7b46a',
     colorVariation: 0.35,
     dryness: 0.15,
-    lengthMm: 1.4,
+    lengthMm: 0.7,
     lengthVariation: 0.4,
   },
   lush: {
@@ -17,7 +17,7 @@ export const grassPresets = {
     dryColor: '#9bb35a',
     colorVariation: 0.25,
     dryness: 0.05,
-    lengthMm: 1.1,
+    lengthMm: 0.55,
     lengthVariation: 0.3,
   },
   moorland: {
@@ -27,7 +27,7 @@ export const grassPresets = {
     dryColor: '#b98a5e',
     colorVariation: 0.45,
     dryness: 0.45,
-    lengthMm: 1.8,
+    lengthMm: 0.9,
     lengthVariation: 0.55,
   },
   alpine: {
@@ -37,7 +37,7 @@ export const grassPresets = {
     dryColor: '#b8ab7a',
     colorVariation: 0.3,
     dryness: 0.25,
-    lengthMm: 0.8,
+    lengthMm: 0.4,
     lengthVariation: 0.35,
   },
   autumn: {
@@ -47,7 +47,7 @@ export const grassPresets = {
     dryColor: '#a8592f',
     colorVariation: 0.5,
     dryness: 0.4,
-    lengthMm: 1.5,
+    lengthMm: 0.75,
     lengthVariation: 0.45,
   },
 } as const;
@@ -55,7 +55,7 @@ export const grassPresets = {
 export const defaultGrassStyle = {
   enabled: false,
   preset: 'meadow',
-  density: 160,
+  density: 800,
   coverage: 0.7,
   clumping: 0.5,
   slopeLimitDegrees: 35,
