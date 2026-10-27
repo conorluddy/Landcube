@@ -400,6 +400,17 @@ function Studio({
               Orbit
             </button>
           )}
+          <button
+            type="button"
+            aria-pressed={state.source.autoplay.enabled}
+            aria-label="Tour"
+            title={state.source.autoplay.enabled ? 'Pause tour' : 'Play tour'}
+            onClick={() => {
+              void c.autoplay({ enabled: !state.source.autoplay.enabled });
+            }}
+          >
+            {state.source.autoplay.enabled ? '❚❚ Tour' : '▶ Tour'}
+          </button>
         </div>
         <div className="studio-status">
           <span className="source-label">

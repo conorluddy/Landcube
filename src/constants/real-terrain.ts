@@ -551,7 +551,17 @@ export const realTerrainPresets = [
   },
 ] as const satisfies readonly RealTerrainPreset[];
 
-/** Native select groups; keep the flat preset list and its initial selection stable. */
+type RealTerrainPresetName = (typeof realTerrainPresets)[number]['name'];
+
+// `satisfies` fails the build if the preset is renamed or removed.
+const defaultRealTerrainPresetName = 'Errigal' satisfies RealTerrainPresetName;
+
+/** The browser studio opens on this place; the flat list order stays stable for menus and autoplay. */
+export const defaultRealTerrainPreset =
+  realTerrainPresets.find((preset) => preset.name === defaultRealTerrainPresetName) ??
+  realTerrainPresets[0];
+
+/** Native select groups; keep the flat preset list stable. */
 export const realTerrainPresetGroups = [
   ...new Set(realTerrainPresets.map((preset) => preset.country)),
 ]

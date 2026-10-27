@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
+import { access } from 'node:fs/promises';
 import test from 'node:test';
 import { validateDesignSettings } from './design-settings';
 import type { RealTerrain, TerrainTileLoader } from './real-terrain';
 import { decodeTerrariumElevation, loadRealTerrain } from './real-terrain';
 import { createOutputRenderer } from './export/image-export';
 import { engineConfiguration } from './constants/engine';
+import { bundledTerrainTileSources } from './constants/bundled-terrain-tiles';
 import {
+  defaultRealTerrainPreset,
   realTerrainBounds,
   realTerrainPresets,
   realTerrainSpanStopsKm,
@@ -211,5 +214,30 @@ void test('span slider stops ascend across the full allowed span range', () => {
 
   for (let index = 1; index < realTerrainSpanStopsKm.length; index++) {
     assert.ok(realTerrainSpanStopsKm[index] > realTerrainSpanStopsKm[index - 1]);
+  }
+});
+
+void test('studio opens on Errigal while the preset list keeps Wicklow first', () => {
+  assert.equal(defaultRealTerrainPreset.name, 'Errigal');
+  assert.equal(realTerrainPresets[0].name, 'Wicklow Mountains');
+});
+
+void test('bundled tiles cover exactly the default location and exist on disk', async () => {
+  const requestedTileKeys: string[] = [];
+  const { latitude, longitude, spanKm } = defaultRealTerrainPreset;
+
+  await loadRealTerrain(latitude, longitude, spanKm, (tileUrl) => {
+    requestedTileKeys.push(tileUrl.replace(/^.*\/terrarium\/|\.png$/g, ''));
+
+    return Promise.resolve({
+      pixels: new Uint8Array(terrainTilePixelCount),
+      imagerySources: '',
+    });
+  });
+
+  assert.deepEqual(requestedTileKeys.sort(), Object.keys(bundledTerrainTileSources).sort());
+
+  for (const tileKey of requestedTileKeys) {
+    await access(new URL(`../public/terrain-tiles/${tileKey}.png`, import.meta.url));
   }
 });

@@ -33,7 +33,11 @@ import {
   validateElevationGradient,
   type ElevationGradientSettings,
 } from '../terrain-elevation-gradient';
-import { realTerrainPresetGroups, realTerrainPresets } from '../constants/real-terrain';
+import {
+  defaultRealTerrainPreset,
+  realTerrainPresetGroups,
+  realTerrainPresets,
+} from '../constants/real-terrain';
 import { loadBrowserRealTerrain } from '../browser-real-terrain';
 import { validateRealContourInterval } from '../real-terrain-contours';
 import type { RealTerrain } from '../real-terrain';
@@ -210,16 +214,16 @@ export function createStudioController(
   actions: DesignControlActions,
   fetchRoads: typeof fetch = (...request) => fetch(...request),
 ): StudioController {
-  const first = realTerrainPresets[0];
+  const place = defaultRealTerrainPreset;
   const natural = terrainMaterialPresets.natural;
   let state: StudioState = {
     design: actions.getSettings(),
     source: {
       selected: 'generated',
-      place: `${first.latitude},${first.longitude}`,
-      latitude: first.latitude,
-      longitude: first.longitude,
-      spanKm: first.spanKm,
+      place: `${place.latitude},${place.longitude}`,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      spanKm: place.spanKm,
       maxDepth: 50,
       interval: 'auto',
       fixedInterval: 25,
@@ -238,7 +242,7 @@ export function createStudioController(
       surfaceMatch: false,
       surfaceColor: natural.land,
       gradient: copyElevationGradient({
-        enabled: false,
+        enabled: true,
         transition: 'soft',
         stops: elevationGradientPresets.paper.stops,
       }),
@@ -487,7 +491,7 @@ export function createStudioController(
         workspace({ view, activating: false });
       } catch {
         workspace({ view: '2d', activating: false });
-        notify('The 3D preview could not start. Your browser needs WebGL 2 support.');
+        notify('Showing 2D: the 3D preview needs WebGL 2, which this browser does not support.');
       }
     },
     scene(patch: Partial<SceneSettings>, custom = false) {
