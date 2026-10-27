@@ -26,6 +26,10 @@ export function createRoadNetworkLoader(fetchRoads: typeof fetch): RoadNetworkLo
       const cached = cache.get(key);
 
       if (cached) {
+        // Re-inserting marks the place as most recent, so eviction drops the least recently used.
+        cache.delete(key);
+        cache.set(key, cached);
+
         return { ok: true, data: cached };
       }
 

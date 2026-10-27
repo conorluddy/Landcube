@@ -56,6 +56,24 @@ void test('only the most recent places stay cached', async () => {
   assert.equal(downloads, 7, 'the oldest place was evicted');
 });
 
+void test('revisiting a cached place keeps it from being evicted next', async () => {
+  let downloads = 0;
+  const loader = createRoadNetworkLoader(() => {
+    downloads++;
+
+    return Promise.resolve(roadsResponse());
+  });
+
+  for (let index = 0; index < 5; index++) {
+    await loader.load(placement(-6 - index));
+  }
+
+  await loader.load(placement(-6));
+  await loader.load(placement(-20));
+  await loader.load(placement(-6));
+  assert.equal(downloads, 6, 'the revisited place survived the sixth place');
+});
+
 void test('a newer request supersedes and aborts the one in flight', async () => {
   const signals: AbortSignal[] = [];
   const loader = createRoadNetworkLoader((_url, init) => {

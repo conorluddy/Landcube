@@ -46,48 +46,12 @@ export async function loadMappedRoads(
   signal?: AbortSignal,
   now: () => Date = () => new Date(),
 ): Promise<Result<RoadNetwork>> {
-  let response: Response;
+  const request = createRequestSignal((overpassTimeoutSeconds + 5) * 1000, signal);
 
   try {
-    response = await fetchRoads(overpassEndpoint, {
-      method: 'POST',
-      body: new URLSearchParams({ data: createOverpassRoadQuery(bounds, detail) }),
-      signal: AbortSignal.any([
-        AbortSignal.timeout((overpassTimeoutSeconds + 5) * 1000),
-        ...(signal ? [signal] : []),
-      ]),
-    });
-  } catch (error) {
-    if (signal?.aborted === true) {
-      throw error;
-    }
-
-    return failure('Roads could not be downloaded. Check your connection and retry.', true);
-  }
-
-  if (!response.ok) {
-    return failure(
-      [429, 502, 503, 504].includes(response.status)
-        ? 'The OpenStreetMap road service is busy. Wait a minute and retry.'
-        : `The OpenStreetMap road service answered ${response.status}. Retry later.`,
-      true,
-    );
-  }
-
-  try {
-    const text = await readLimitedText(response, overpassMaximumResponseBytes);
-
-    if (text === undefined) {
-      return failure('This area has too many roads to draw. Choose a smaller area span.', false);
-    }
-
-    return parseOverpassRoads(JSON.parse(text), detail, now().toISOString());
-  } catch (error) {
-    if (signal?.aborted === true) {
-      throw error;
-    }
-
-    return failure('The road response was not valid JSON. Retry later.', true);
+    return await requestMappedRoads(bounds, detail, fetchRoads, request.signal, signal, now);
+  } finally {
+    request.release();
   }
 }
 
@@ -124,6 +88,90 @@ export function parseOverpassRoads(
 }
 
 // === HELPERS ===
+
+/** Downloads and parses one road query; `requestSignal` also covers the caller's timeout. */
+async function requestMappedRoads(
+  bounds: GeoBounds,
+  detail: RoadDetail,
+  fetchRoads: typeof fetch,
+  requestSignal: AbortSignal,
+  signal: AbortSignal | undefined,
+  now: () => Date,
+): Promise<Result<RoadNetwork>> {
+  let response: Response;
+
+  try {
+    response = await fetchRoads(overpassEndpoint, {
+      method: 'POST',
+      body: new URLSearchParams({ data: createOverpassRoadQuery(bounds, detail) }),
+      signal: requestSignal,
+    });
+  } catch (error) {
+    if (signal?.aborted === true) {
+      throw error;
+    }
+
+    return failure('Roads could not be downloaded. Check your connection and retry.', true);
+  }
+
+  if (!response.ok) {
+    return failure(
+      [429, 502, 503, 504].includes(response.status)
+        ? 'The OpenStreetMap road service is busy. Wait a minute and retry.'
+        : `The OpenStreetMap road service answered ${response.status}. Retry later.`,
+      true,
+    );
+  }
+
+  try {
+    const text = await readLimitedText(response, overpassMaximumResponseBytes);
+
+    if (text === undefined) {
+      return failure('This area has too many roads to draw. Choose a smaller area span.', false);
+    }
+
+    return parseOverpassRoads(JSON.parse(text), detail, now().toISOString());
+  } catch (error) {
+    if (signal?.aborted === true) {
+      throw error;
+    }
+
+    return failure('The road response was not valid JSON. Retry later.', true);
+  }
+}
+
+/**
+ * Aborts on the caller's signal or after `timeoutMs`, whichever comes first.
+ * Combined by hand because `AbortSignal.any` needs Safari 17.4 and Chrome 116.
+ */
+function createRequestSignal(
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): { signal: AbortSignal; release: () => void } {
+  const controller = new AbortController();
+
+  const forwardAbort = () => {
+    controller.abort(signal?.reason);
+  };
+
+  const timer = setTimeout(() => {
+    controller.abort(new DOMException('The road download timed out.', 'TimeoutError'));
+  }, timeoutMs);
+
+  if (signal?.aborted === true) {
+    forwardAbort();
+  } else {
+    signal?.addEventListener('abort', forwardAbort, { once: true });
+  }
+
+  return {
+    signal: controller.signal,
+    release() {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', forwardAbort);
+    },
+  };
+}
 
 /** West-to-east longitude ranges inside ±180° that together cover `west`…`east`. */
 function splitAtAntimeridian(west: number, east: number): [number, number][] {

@@ -99,6 +99,48 @@ void test('busy and unreachable road services return actionable errors instead o
   assert.equal(!offline.ok && offline.error.retryable, true);
 });
 
+void test('road downloads work without AbortSignal.any and forward the caller abort', async (t) => {
+  // Safari before 17.4 has no AbortSignal.any.
+  const descriptor = Object.getOwnPropertyDescriptor(AbortSignal, 'any');
+
+  Reflect.deleteProperty(AbortSignal, 'any');
+  t.after(() => {
+    if (descriptor) {
+      Object.defineProperty(AbortSignal, 'any', descriptor);
+    }
+  });
+  const caller = new AbortController();
+  let requestSignal: AbortSignal | undefined;
+  const result = await loadMappedRoads(
+    bounds,
+    'all',
+    (_url, init) => {
+      requestSignal = init?.signal ?? undefined;
+
+      return Promise.resolve(Response.json({ elements: [] }));
+    },
+    caller.signal,
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(requestSignal?.aborted, false);
+
+  const pending = loadMappedRoads(
+    bounds,
+    'all',
+    (_url, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('Aborted', 'AbortError'));
+        });
+      }),
+    caller.signal,
+  );
+
+  caller.abort();
+  await assert.rejects(pending, /Aborted/);
+});
+
 void test('road downloads post the query and record when they were fetched', async () => {
   let body = '';
   const result = await loadMappedRoads(
