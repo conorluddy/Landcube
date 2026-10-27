@@ -48,7 +48,7 @@ export const frameFinishes: Readonly<
   white: { label: 'White', color: '#ecebe6', roughness: 0.5 },
   black: { label: 'Black', color: '#222326', roughness: 0.45 },
   concrete: { label: 'Concrete', color: '#9a9893', roughness: 0.95 },
-  glass: { label: 'Clear glass', color: '#cfe6ea', roughness: 0.05, opacity: 0.28 },
+  glass: { label: 'Clear glass', color: '#b4dde2', roughness: 0.03, opacity: 0.32 },
 };
 
 export const defaultFrameStudioSettings: Readonly<FrameStudioSettings> = Object.freeze({
