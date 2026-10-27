@@ -173,7 +173,7 @@ export function FramePanel({ controller: c, state: s }: PanelProps): ReactNode {
         </Group>
       )}
       {assembly?.ok === false && <p role="alert">{assembly.error.message}</p>}
-      {settings.preset !== 'none' && <Hint>Download each part from Export → Frame STL.</Hint>}
+      {settings.preset !== 'none' && <Hint>Download each part from Export → STL.</Hint>}
     </>
   );
 }

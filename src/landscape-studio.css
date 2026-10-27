@@ -423,6 +423,11 @@ input[type='range']::-moz-range-thumb {
 .primary-button:hover {
   background: #e3ebd9;
 }
+.button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .text-button {
   color: #cbd4c1;
 }
