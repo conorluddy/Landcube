@@ -24,9 +24,11 @@ export interface FrameTier {
   part: 'join-below' | 'separate';
 }
 
-/** Measured from the floor top, where the model sits. */
+/** Measured from the floor top, where the model sits. `floor` is an absolute height. */
 export type FrameRimHeight =
-  { reference: 'model-base'; aboveMm: number } | { reference: 'model-top'; belowMm: number };
+  | { reference: 'model-base'; aboveMm: number }
+  | { reference: 'model-top'; belowMm: number }
+  | { reference: 'floor'; heightMm: number };
 
 /** The wall around the model's sides. It always joins the top tier. */
 export interface FrameSurround {
@@ -68,6 +70,8 @@ export interface FramePart {
   id: FramePartId;
   solid: TerrainSurfaceBuffers;
   printOrientation: FramePrintOrientation;
+  /** Bounding box in Y-up model space: x width, y height, z length. */
+  sizeMm: { x: number; y: number; z: number };
 }
 
 export interface FrameWarning {
@@ -79,6 +83,8 @@ export interface FrameWarning {
 export interface FrameAssembly {
   parts: readonly FramePart[];
   outerSizeMm: { x: number; y: number; z: number };
+  /** Where the model's base rests: the top of the tier stack. */
+  seatHeightMm: number;
   warnings: readonly FrameWarning[];
 }
 

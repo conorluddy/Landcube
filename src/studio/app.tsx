@@ -13,10 +13,19 @@ import {
 } from './panels';
 import { Button, Group, Hint, NumberField, Range, Select, Toggle } from './fields';
 import { ExportPanel } from './export-panel';
+import { FramePanel } from './frame-panel';
 import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
 
-const sections: InspectorSection[] = ['Terrain', 'Contours', 'Colour', 'Scene', 'Camera', 'Model'];
+const sections: InspectorSection[] = [
+  'Terrain',
+  'Contours',
+  'Colour',
+  'Scene',
+  'Camera',
+  'Model',
+  'Frame',
+];
 
 function Surface({
   title,
@@ -358,6 +367,7 @@ function Studio({
               {section === 'Scene' && <ScenePanel {...props} />}
               {section === 'Camera' && <CameraPanel {...props} />}
               {section === 'Model' && <ModelPanel {...props} cropPreview={cropPreview} />}
+              {section === 'Frame' && <FramePanel {...props} />}
             </section>
           ))}
         </div>
