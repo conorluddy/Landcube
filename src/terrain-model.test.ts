@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   createTerrainModel,
+  getFrameUnitsPerMm,
   cropTerrainModelField,
   defaultTerrainModelSettings,
   getSuggestedExaggeration,
@@ -186,4 +187,13 @@ void test('an off-center rectangular crop reports where it sits in the source fr
   assert.deepEqual([crop.x, crop.y, crop.width, crop.height], [15, 1.25, 15, 7.5]);
   assert.equal(crop.field.originX, field.originX - crop.x);
   assert.equal(crop.field.originY, field.originY - crop.y);
+});
+
+void test('frame units per millimetre span the longer side, or a circle diameter, across the model', () => {
+  assert.equal(getFrameUnitsPerMm(600, 300, { widthMm: 150, lengthMm: 100 }), 4);
+  assert.equal(getFrameUnitsPerMm(300, 600, { widthMm: 100, lengthMm: 150 }), 4);
+  assert.equal(
+    getFrameUnitsPerMm(400, 400, { widthMm: 100, lengthMm: 300, cropShape: 'circle' }),
+    4,
+  );
 });

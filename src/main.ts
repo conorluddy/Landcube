@@ -12,6 +12,8 @@ import type { RealTerrain } from './real-terrain';
 import { createFloorPlace } from './floor-geo';
 import { clipRoadsToCrop, noRoadPaths } from './road-ribbons';
 import type { RoadPath } from './types/roads';
+import type { GrassGeography } from './grass-coverage';
+import { generatedTerrainReliefMeters, generatedTerrainSpanMeters } from './constants/grass';
 import { findTerrainSummits } from './summit-markers';
 import { getRequiredElement } from './dom-elements';
 import './landscape-studio.css';
@@ -398,7 +400,29 @@ function updateTerrain3d(): void {
     getRealContourInterval(realTerrain),
     getTerrainTerraceLevels(settings, engineConfiguration, realTerrain),
     getCroppedRoadPaths(modelSourceFrame, modelCrop, dimensions.cropShape ?? 'rectangle'),
+    getGrassGeography(modelSourceFrame, modelCrop),
   );
+}
+
+/** Real scale and source anchoring for grass; generated terrain gets a nominal scale. */
+function getGrassGeography(
+  frame: { width: number; height: number },
+  crop: NonNullable<typeof modelCrop>,
+): GrassGeography {
+  const frameSize = Math.max(frame.width, frame.height);
+  const elevations = realTerrain?.elevations;
+  const spanKm = realTerrain?.spanKm;
+
+  return {
+    originX: crop.x,
+    originY: crop.y,
+    metersPerFieldUnit:
+      elevations?.metersPerUnit ??
+      generatedTerrainReliefMeters /
+        (engineConfiguration.elevationMax - engineConfiguration.elevationMin),
+    metersPerFrameUnit:
+      spanKm === undefined ? generatedTerrainSpanMeters / frameSize : (spanKm * 1000) / frameSize,
+  };
 }
 
 /** Projects the current road network into the model crop, reusing the last result when unchanged. */

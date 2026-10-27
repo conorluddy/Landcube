@@ -447,3 +447,27 @@ function syntheticWay(id: number, highway: string, tags: Record<string, string>)
     })),
   };
 }
+
+test('grass restyles without errors and never changes the printable STL', async ({ page }) => {
+  const errors: string[] = [];
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await loadLocation(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  const before = await modelDownload(page);
+  const canvas = page.locator('canvas.terrain-3d');
+  const bare = await canvas.screenshot();
+
+  await section(page, 'Scene');
+  await page.getByRole('switch', { name: 'Grass', exact: true }).check();
+  // The carpet must actually draw, not just restyle without errors.
+  await expect.poll(async () => (await canvas.screenshot()).equals(bare)).toBe(false);
+  await page.getByLabel('Look', { exact: true }).selectOption('autumn');
+  await page.getByLabel('Blade length', { exact: true }).fill('2');
+  await expect(page.getByLabel('Look', { exact: true })).toHaveValue('custom');
+  await page.getByLabel('Density', { exact: true }).fill('400');
+  expect((await modelDownload(page)).equals(before)).toBe(true);
+  expect(errors).toEqual([]);
+});

@@ -7,6 +7,7 @@ import type { SeaLevelGeometry } from '../sea-level';
 import type { TerrainTerraceLevels } from '../terrain-terraces';
 import type { FloorPlace } from '../floor-geo';
 import type { RoadPath } from '../types/roads';
+import type { GrassGeography } from '../grass-coverage';
 import { getAutoRotateSpeed, type TerrainViewPreset } from '../terrain-camera';
 
 interface StudioTerrainView {
@@ -34,6 +35,7 @@ interface StudioTerrainView {
     contourIntervalMeters?: number,
     terraceLevels?: TerrainTerraceLevels,
     roads?: readonly RoadPath[],
+    grassGeography?: GrassGeography,
   ) => void;
 }
 
@@ -127,6 +129,10 @@ export function createStudioTerrainView(
 
     if (differs('roads')) {
       view.setRoadStyle(scene.roads);
+    }
+
+    if (differs('grass')) {
+      view.setGrassStyle(scene.grass);
     }
 
     if (differs('rotationSeconds') || differs('rotationDirection')) {
@@ -225,6 +231,7 @@ export function createStudioTerrainView(
       contourIntervalMeters?: number,
       terraceLevels?: TerrainTerraceLevels,
       roads?: readonly RoadPath[],
+      grassGeography?: GrassGeography,
     ) {
       floorPlace = place;
       interval = contourIntervalMeters;
@@ -240,7 +247,17 @@ export function createStudioTerrainView(
           interval,
           scene.floorStyle,
         );
-        view.update(contours, width, height, settings, field, seaLevel, terraceLevels, roads);
+        view.update(
+          contours,
+          width,
+          height,
+          settings,
+          field,
+          seaLevel,
+          terraceLevels,
+          roads,
+          grassGeography,
+        );
       }
     },
   };

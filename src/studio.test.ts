@@ -7,6 +7,7 @@ import {
   type StudioEffects,
 } from './studio/controller';
 import { defaultRoadStyle } from './constants/roads';
+import { grassPresets } from './constants/grass';
 import {
   parseDesignParameters,
   serializeDesignParameters,
@@ -521,4 +522,24 @@ void test('frame errors the tab can explain name its controls', () => {
 
   assert.ok(assembly?.ok === false);
   assert.match(assembly.error.message, /Increase Overhang or reduce Edge size/);
+});
+
+void test('grass presets apply their look until a look value is set by hand', () => {
+  const { controller: c } = setup();
+
+  c.grass({ preset: 'autumn' });
+  assert.equal(c.getSnapshot().scene.grass.preset, 'autumn');
+  assert.equal(c.getSnapshot().scene.grass.tipColor, grassPresets.autumn.tipColor);
+
+  c.grass({ bladesPerSquareCm: 400, wind: 0 });
+  assert.equal(c.getSnapshot().scene.grass.preset, 'autumn');
+
+  c.grass({ lengthMm: 2 });
+  assert.equal(c.getSnapshot().scene.grass.preset, 'custom');
+  assert.equal(c.getSnapshot().scene.grass.tipColor, grassPresets.autumn.tipColor);
+
+  c.grass({ preset: 'alpine', lengthMm: 2 });
+  assert.equal(c.getSnapshot().scene.grass.preset, 'custom');
+  assert.equal(c.getSnapshot().scene.grass.lengthMm, 2);
+  assert.equal(c.getSnapshot().scene.grass.baseColor, grassPresets.alpine.baseColor);
 });
