@@ -6,8 +6,13 @@ import { PNG } from 'pngjs';
 export const appUrl = 'https://topogra.test/';
 export const terrainTileUrl = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/**';
 
+const analyticsUrl = 'https://www.googletagmanager.com/**';
+
 export async function serveStudio(page: Page, basePath = ''): Promise<void> {
   await routeTerrainTiles(page);
+  await page.route(analyticsUrl, (route) =>
+    route.fulfill({ body: '', contentType: 'text/javascript' }),
+  );
   await page.route(`${appUrl}**`, async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     const prefix = `/${basePath}`;
