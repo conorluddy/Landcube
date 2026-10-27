@@ -4,7 +4,7 @@ import {
   download,
   loadLocation,
   modelDownload,
-  openStudio,
+  openDefaultStudio,
   section,
   serveStudio,
   stlBounds,
@@ -17,10 +17,8 @@ test.beforeEach(async ({ page }) => {
   await serveStudio(page);
 });
 
-test('studio opens on Errigal in 3D without adding the location to the design link', async ({
-  page,
-}) => {
-  await openStudio(page, `${appUrl}?v=1&seed=123`);
+test('fresh visits open Errigal in 3D and reload to the same default', async ({ page }) => {
+  await openDefaultStudio(page);
   await expect(page.locator('canvas.terrain-3d')).toBeVisible();
   await expect(page.locator('#terrain')).toBeHidden();
   await expect(page.getByRole('button', { name: 'Coordinates', exact: true })).toHaveAttribute(
@@ -28,7 +26,25 @@ test('studio opens on Errigal in 3D without adding the location to the design li
     'true',
   );
   await expect(page.locator('#terrain-place')).toHaveValue('55.0343,-8.113');
-  expect(new URL(page.url()).searchParams.has('latitude')).toBe(false);
+  expect(new URL(page.url()).search).toBe('');
+  await page.reload();
+  await expect(page.getByRole('button', { name: '3D', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.locator('#terrain-place')).toHaveValue('55.0343,-8.113');
+});
+
+test('fresh visits without WebGL 2 show the default location in 2D', async ({ page }) => {
+  await page.route('**/assets/terrain-3d-*.js', (route) => route.abort());
+  await page.goto(appUrl);
+  await expect(page.getByRole('status').filter({ hasText: 'WebGL 2' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '2D', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible();
+  await expect(page.locator('#terrain')).toBeVisible();
 });
 
 test('view selection activates 3D directly and restores independent inspector sections', async ({
@@ -37,20 +53,17 @@ test('view selection activates 3D directly and restores independent inspector se
   const errors: string[] = [];
 
   page.on('pageerror', (error) => errors.push(error.message));
-  await openStudio(page, `${appUrl}?v=1&seed=123`);
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await section(page, 'Colour');
+  await page.getByRole('button', { name: '3D', exact: true }).click();
   await expect(page.locator('canvas.terrain-3d')).toBeVisible();
   await section(page, 'Scene');
   await page.getByLabel('Time of day').fill('2');
   await expect(page.locator('output[for="terrain-light-time"]')).toHaveText('02:00 · Night');
   await page.getByRole('switch', { name: 'Solid base', exact: true }).uncheck();
   await page.getByRole('button', { name: '2D', exact: true }).click();
-  await expect(page.locator('#terrain')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Model', exact: true })).toHaveCount(0);
-  await section(page, 'Colour');
-  await page.getByRole('button', { name: '3D', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Scene settings' })).toBeVisible();
-  await page.getByRole('button', { name: '2D', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Colour settings' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Model', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Scene settings' })).toBeVisible();
   await expect(page.getByLabel('Time of day')).toHaveValue('2');
@@ -297,41 +310,37 @@ test('3D terrain morphs between landscapes and settles on the destination', asyn
   const errors: string[] = [];
 
   page.on('pageerror', (error) => errors.push(error.message));
-  await openStudio(page, `${appUrl}?v=1&seed=123`);
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
   const canvas = page.locator('canvas.terrain-3d');
-  const settle = () =>
-    expect(canvas).toHaveAttribute('data-terrain-transition', 'settled', { timeout: 10_000 });
-
-  await settle();
   const transitions = await recordTerrainTransitions(page);
   // Software WebGL can spend a whole morph inside one frame, so count recorded morphs, never poll for one.
   const morphCount = async () =>
     (await transitions()).filter((state) => state === 'morphing').length;
+  const settle = () =>
+    expect(canvas).toHaveAttribute('data-terrain-transition', 'settled', { timeout: 10_000 });
 
-  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
+  await loadLocation(page);
   await page.screenshot({ path: test.info().outputPath('terrain-morph-mid.png') });
-  await expect.poll(morphCount).toBe(1);
   await settle();
   await page.screenshot({ path: test.info().outputPath('terrain-morph-settled.png') });
-  await loadLocation(page);
+  expect(await morphCount()).toBe(1);
+  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
   await expect.poll(morphCount).toBe(2);
   await settle();
-  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
-  await expect.poll(morphCount).toBe(3);
-  await settle();
   await page.getByRole('button', { name: 'New landscape', exact: true }).click();
   await page.getByRole('button', { name: 'New landscape', exact: true }).click();
-  await expect.poll(morphCount).toBeGreaterThan(3);
+  await expect.poll(morphCount).toBeGreaterThan(2);
   await settle();
   expect(errors).toEqual([]);
 });
 
 test('reduced motion swaps 3D terrain without morphing', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await openStudio(page, `${appUrl}?v=1&seed=123`);
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
   const transitions = await recordTerrainTransitions(page);
 
-  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
   await loadLocation(page);
   await page.getByRole('button', { name: 'Procedural', exact: true }).click();
   await page.getByRole('button', { name: 'New landscape', exact: true }).click();

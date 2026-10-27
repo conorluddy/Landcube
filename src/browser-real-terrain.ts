@@ -65,7 +65,14 @@ async function fetchTerrainTile(
   if (tileKey !== undefined && bundledSources !== undefined) {
     const bundledUrl = new URL(`terrain-tiles/${tileKey}.png`, document.baseURI).href;
 
-    return { response: await downloadTerrainTile(bundledUrl), imagerySources: bundledSources };
+    try {
+      return { response: await downloadTerrainTile(bundledUrl), imagerySources: bundledSources };
+    } catch (error) {
+      // A host that drops the bundled files still has the public tile service to fall back on.
+      console.warn(
+        JSON.stringify({ event: 'bundled_terrain_tile_failed', tileUrl, error: String(error) }),
+      );
+    }
   }
 
   const response = await fetchCachedTerrainTile(tileUrl);

@@ -551,14 +551,15 @@ export const realTerrainPresets = [
   },
 ] as const satisfies readonly RealTerrainPreset[];
 
-const errigalPreset = realTerrainPresets.find((preset) => preset.name === 'Errigal');
+type RealTerrainPresetName = (typeof realTerrainPresets)[number]['name'];
 
-if (!errigalPreset) {
-  throw new Error('The default real-terrain preset Errigal is missing from realTerrainPresets.');
-}
+// `satisfies` fails the build if the preset is renamed or removed.
+const defaultRealTerrainPresetName = 'Errigal' satisfies RealTerrainPresetName;
 
 /** The browser studio opens on this place; the flat list order stays stable for menus and autoplay. */
-export const defaultRealTerrainPreset = errigalPreset;
+export const defaultRealTerrainPreset =
+  realTerrainPresets.find((preset) => preset.name === defaultRealTerrainPresetName) ??
+  realTerrainPresets[0];
 
 /** Native select groups; keep the flat preset list stable. */
 export const realTerrainPresetGroups = [

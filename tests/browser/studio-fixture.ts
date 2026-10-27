@@ -77,23 +77,14 @@ export async function modelDownload(page: Page): Promise<Buffer> {
   return result.bytes;
 }
 
-/** Opens a design link once the studio has settled on its 3D default location. */
-export async function openStudio(page: Page, url: string): Promise<void> {
-  await page.goto(url);
+/** Opens the bare studio URL and waits for its 3D default location. */
+export async function openDefaultStudio(page: Page): Promise<void> {
+  await page.goto(appUrl);
   await expect(page.getByRole('button', { name: '3D', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
   await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible();
-}
-
-/** Returns to the 2D procedural sketch that design-link journeys edit. */
-export async function openProcedural2d(page: Page, url: string): Promise<void> {
-  await openStudio(page, url);
-  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
-  await page.getByRole('button', { name: '2D', exact: true }).click();
-  await expect(page.getByText('Procedural landscape')).toBeVisible();
-  await expect(page.locator('#terrain')).toBeVisible();
 }
 
 export async function loadLocation(page: Page): Promise<void> {

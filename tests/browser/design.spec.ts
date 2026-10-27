@@ -4,8 +4,7 @@ import {
   appUrl,
   download,
   loadLocation,
-  openProcedural2d,
-  openStudio,
+  openDefaultStudio,
   section,
   serveStudio,
   terrainTileUrl,
@@ -21,7 +20,7 @@ test('studio separates view, inspector and shortcuts while retaining settings', 
   const errors: string[] = [];
 
   page.on('pageerror', (error) => errors.push(error.message));
-  await openProcedural2d(page, `${appUrl}?v=1&seed=234`);
+  await page.goto(`${appUrl}?v=1&seed=234`);
   await expect(
     page.getByRole('navigation', { name: 'Editing section' }).getByRole('button'),
   ).toHaveText(['Terrain', 'Contours', 'Colour', 'Scene']);
@@ -59,7 +58,7 @@ test('copy style link and reopening preserve version-one settings and exclude se
       },
     });
   });
-  await openProcedural2d(page, `${appUrl}?v=1&seed=234&width=480&height=320`);
+  await page.goto(`${appUrl}?v=1&seed=234&width=480&height=320`);
   await page.getByRole('slider', { name: 'Terrain detail', exact: true }).fill('0.99');
   await section(page, 'Colour');
   await page.getByRole('button', { name: 'Paper', exact: true }).click();
@@ -78,7 +77,7 @@ test('copy style link and reopening preserve version-one settings and exclude se
   }
 
   expect(new URL(url).searchParams.get('v')).toBe('1');
-  await openProcedural2d(page, url);
+  await page.goto(url);
   await expect(page.getByRole('slider', { name: 'Terrain detail', exact: true })).toHaveValue(
     '0.99',
   );
@@ -94,7 +93,7 @@ test('copy style link and reopening preserve version-one settings and exclude se
 });
 
 test('SVG and PNG exports preserve settled dimensions and transparency', async ({ page }) => {
-  await openProcedural2d(page, `${appUrl}?v=1&seed=123&width=320&height=240&cursorEnabled=false`);
+  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240&cursorEnabled=false`);
   await page.getByRole('button', { name: 'Export ↗' }).click();
   const opaque = await download(page, 'Download SVG');
 
@@ -131,7 +130,7 @@ test('SVG and PNG exports preserve settled dimensions and transparency', async (
 test('output validation, size presets and extra-large opt-in remain consistent', async ({
   page,
 }) => {
-  await openProcedural2d(page, `${appUrl}?v=1&seed=1&width=320&height=240`);
+  await page.goto(`${appUrl}?v=1&seed=1&width=320&height=240`);
   await page.getByRole('button', { name: 'Export ↗' }).click();
   await page.getByLabel('Width', { exact: true }).fill('0');
   await page.getByLabel('Width', { exact: true }).press('Tab');
@@ -158,7 +157,7 @@ test('mobile shell, clipboard fallback and dialog focus remain usable', async ({
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
   });
-  await openProcedural2d(page, `${appUrl}?v=1&seed=123&lineColor=invalid`);
+  await page.goto(`${appUrl}?v=1&seed=123&lineColor=invalid`);
   await expect(page.getByRole('status').filter({ hasText: 'lineColor' })).toBeVisible();
   const inspector = page.getByRole('complementary', { name: 'Landscape controls' });
   const bounds = await inspector.boundingBox();
@@ -180,10 +179,10 @@ test('mobile shell, clipboard fallback and dialog focus remain usable', async ({
 test('seed lock persists, palette randomization and scoped reset preserve output', async ({
   page,
 }) => {
-  await openProcedural2d(page, `${appUrl}?v=1&seed=456&width=480&height=320`);
+  await page.goto(`${appUrl}?v=1&seed=456&width=480&height=320`);
   await page.getByRole('switch', { name: 'Lock seed' }).check();
   await expect(page.getByRole('button', { name: 'New landscape' })).toBeDisabled();
-  await openProcedural2d(page, page.url());
+  await page.reload();
   await expect(page.getByRole('switch', { name: 'Lock seed' })).toBeChecked();
   await section(page, 'Colour');
   const background = await page.getByLabel('Canvas color').inputValue();
@@ -200,7 +199,7 @@ test('seed lock persists, palette randomization and scoped reset preserve output
 test('real terrain interval, overlays and failed loading retain the current landscape', async ({
   page,
 }) => {
-  await openProcedural2d(page, `${appUrl}?v=1&seed=123&width=320&height=240`);
+  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
   await loadLocation(page);
   await section(page, 'Contours');
   await expect(page.getByRole('slider', { name: 'Density' })).toHaveCount(0);
@@ -236,7 +235,7 @@ test('real terrain interval, overlays and failed loading retain the current land
 test('real terrain switches back instantly and revisited places load from the tile cache', async ({
   page,
 }) => {
-  await openProcedural2d(page, `${appUrl}?v=1&seed=123&width=320&height=240`);
+  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
   await loadLocation(page);
   let tileRequests = 0;
 
@@ -260,7 +259,7 @@ test('real terrain switches back instantly and revisited places load from the ti
 test('coordinates edited before switching away load fresh terrain instead of restoring', async ({
   page,
 }) => {
-  await openProcedural2d(page, `${appUrl}?v=1&seed=123&width=320&height=240`);
+  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
   await loadLocation(page);
   await page.getByLabel('Latitude', { exact: true }).fill('10');
   await page.getByLabel('Latitude', { exact: true }).press('Tab');
@@ -269,24 +268,12 @@ test('coordinates edited before switching away load fresh terrain instead of res
   await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible();
 });
 
-test('startup location loads from bundled tiles without downloads', async ({ page }) => {
-  const tileRequests: string[] = [];
-
-  page.on('request', (request) => {
-    if (request.url().includes('/terrarium/')) {
-      tileRequests.push(request.url());
-    }
-  });
-  await page.route(terrainTileUrl, (route) => route.abort());
-  await openStudio(page, `${appUrl}?v=1&seed=123&width=320&height=240`);
-  expect(tileRequests).toEqual([]);
-  await expect(page.locator('.attribution')).toContainText('Copernicus');
-});
-
 test('coordinates retries after a failed first load', async ({ page }) => {
   const abortTiles = (route: Route) => route.abort();
 
-  await openStudio(page, `${appUrl}?v=1&seed=123&width=320&height=240`);
+  // The default location is bundled, so move off it to reach the tile service.
+  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
+  await loadLocation(page);
   await page.getByLabel('Latitude', { exact: true }).fill('10');
   await page.getByLabel('Latitude', { exact: true }).press('Tab');
   await page.getByRole('button', { name: 'Procedural', exact: true }).click();
@@ -297,8 +284,38 @@ test('coordinates retries after a failed first load', async ({ page }) => {
   await loadLocation(page);
 });
 
+test('design links open the 2D procedural design they encode', async ({ page }) => {
+  await page.goto(`${appUrl}?v=1&seed=234`);
+  await expect(page.getByRole('button', { name: '2D', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByRole('button', { name: 'Procedural', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.locator('#seed-value')).toHaveText('234');
+  await expect(page.locator('#terrain')).toBeVisible();
+});
+
+test('fresh visits load the default location from bundled tiles without downloads', async ({
+  page,
+}) => {
+  const tileRequests: string[] = [];
+
+  page.on('request', (request) => {
+    if (request.url().includes('/terrarium/')) {
+      tileRequests.push(request.url());
+    }
+  });
+  await page.route(terrainTileUrl, (route) => route.abort());
+  await openDefaultStudio(page);
+  expect(tileRequests).toEqual([]);
+  await expect(page.locator('.attribution')).toContainText('Copernicus');
+});
+
 test('footer tour button plays and pauses autoplay', async ({ page }) => {
-  await openStudio(page, `${appUrl}?v=1&seed=123&width=320&height=240`);
+  await openDefaultStudio(page);
   await page.getByRole('button', { name: 'Play tour', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pause tour', exact: true })).toHaveAttribute(
     'aria-pressed',
@@ -314,7 +331,7 @@ test('footer tour button plays and pauses autoplay', async ({ page }) => {
 test('failed preview decoding retains the last image and obsolete previews cannot replace newer output', async ({
   page,
 }) => {
-  await openProcedural2d(page, `${appUrl}?v=1&seed=123&width=320&height=240`);
+  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
   await page.getByRole('button', { name: 'Export ↗' }).click();
   const preview = page.getByAltText('Settled landscape export preview');
 

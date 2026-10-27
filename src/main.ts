@@ -29,6 +29,7 @@ import {
 } from './design-settings';
 import {
   copyDesignLink,
+  hasDesignParameters,
   loadInitialDesign,
   readLockedSeed,
   replaceDesignUrl,
@@ -67,6 +68,7 @@ try {
   };
 }
 
+const opensDesignLink = hasDesignParameters(new URLSearchParams(location.search));
 const initialDesignResult = loadInitialDesign(
   new URLSearchParams(location.search),
   { width: innerWidth, height: innerHeight },
@@ -534,11 +536,16 @@ width = Math.max(1, viewport.clientWidth);
 height = Math.max(1, viewport.clientHeight);
 baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
 applyPageStyle();
-synchronizeDesignUrl();
 renderCurrentLandscape();
-// The studio opens on the default real location in 3D; both stay session-only, so links are unchanged.
-void controls.selectView('3d');
-void controls.useCoordinates();
+
+// Design links open the 2D design they encode. A fresh visit opens the default real location in 3D
+// and leaves the address bare until the design is edited, so reloading returns to that default.
+if (opensDesignLink) {
+  synchronizeDesignUrl();
+} else {
+  void openDefaultLocation();
+}
+
 requestAnimationFrame(() => {
   console.info(
     JSON.stringify({
@@ -551,6 +558,12 @@ requestAnimationFrame(() => {
     }),
   );
 });
+
+/** Starts 3D first so the default location builds straight into the 3D scene. */
+async function openDefaultLocation(): Promise<void> {
+  await controls.selectView('3d');
+  await controls.useCoordinates();
+}
 
 /** Keeps the active geographic patch centered as the viewport changes. */
 function sampleLoadedTerrain(x: number, y: number): number {
