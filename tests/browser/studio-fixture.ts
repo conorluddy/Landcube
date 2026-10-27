@@ -77,14 +77,20 @@ export async function modelDownload(page: Page): Promise<Buffer> {
   return result.bytes;
 }
 
+/** Startup lazy-loads 3D, then decodes the default location; software WebGL on CI is slow. */
+const defaultStudioStartupMs = 20_000;
+
 /** Opens the bare studio URL and waits for its 3D default location. */
 export async function openDefaultStudio(page: Page): Promise<void> {
   await page.goto(appUrl);
   await expect(page.getByRole('button', { name: '3D', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
+    { timeout: defaultStudioStartupMs },
   );
-  await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible({
+    timeout: defaultStudioStartupMs,
+  });
 }
 
 export async function loadLocation(page: Page): Promise<void> {

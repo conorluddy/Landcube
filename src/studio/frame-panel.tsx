@@ -1,14 +1,12 @@
 import type { ReactNode } from 'react';
 import {
+  frameFinishKeys,
   frameFinishes,
   frameStudioPresets,
+  isPedestalPreset,
   pedestalRecessDepthMm,
 } from '../frame/frame-studio-settings';
-import type {
-  FrameFinish,
-  FrameStudioPreset,
-  FrameStudioSettings,
-} from '../frame/frame-studio-settings';
+import type { FrameStudioPreset, FrameStudioSettings } from '../frame/frame-studio-settings';
 import { Group, Hint, Range, Toggle } from './fields';
 import type { PanelProps } from './panels';
 
@@ -23,6 +21,7 @@ const edgeShapeProfiles: Record<EdgeShape, string> = {
   ogee: 'M4 20V4h8q4 0 4 4t4 4v8z',
   step: 'M4 20V4h8v4h4v4h4v8z',
 };
+const edgeShapes: readonly EdgeShape[] = ['square', 'chamfer', 'cove', 'round', 'ogee', 'step'];
 
 /** Picks a printable frame preset and its key dimensions; parts download from Export. */
 export function FramePanel({ controller: c, state: s }: PanelProps): ReactNode {
@@ -51,18 +50,21 @@ export function FramePanel({ controller: c, state: s }: PanelProps): ReactNode {
         </div>
         {settings.preset !== 'none' && (
           <div role="group" aria-label="Frame finish" className="frame-choices">
-            {Object.entries(frameFinishes).map(([value, { label, color }]) => (
+            {frameFinishKeys.map((finish) => (
               <button
                 type="button"
-                key={value}
-                aria-pressed={settings.finish === value}
-                title={label}
+                key={finish}
+                aria-pressed={settings.finish === finish}
+                title={frameFinishes[finish].label}
                 onClick={() => {
-                  c.frame({ finish: value as FrameFinish });
+                  c.frame({ finish });
                 }}
               >
-                <span className="preset-swatch" style={{ background: color }} />
-                {label}
+                <span
+                  className="preset-swatch"
+                  style={{ background: frameFinishes[finish].color }}
+                />
+                {frameFinishes[finish].label}
               </button>
             ))}
           </div>
@@ -70,7 +72,7 @@ export function FramePanel({ controller: c, state: s }: PanelProps): ReactNode {
         {settings.preset === 'none' && (
           <Hint>Add a tray or pedestal printed separately to fit this model.</Hint>
         )}
-        {settings.preset.includes('pedestal') && (
+        {isPedestalPreset(settings.preset) && (
           <Hint>The model sits in a {pedestalRecessDepthMm} mm locating recess on top.</Hint>
         )}
       </Group>
@@ -131,17 +133,17 @@ export function FramePanel({ controller: c, state: s }: PanelProps): ReactNode {
       {settings.preset !== 'none' && (
         <Group title="Edge">
           <div role="group" aria-label="Edge shape" className="frame-choices edge-choices">
-            {Object.entries(edgeShapeProfiles).map(([shape, profile]) => (
+            {edgeShapes.map((shape) => (
               <button
                 type="button"
                 key={shape}
                 aria-pressed={settings.edgeShape === shape}
                 onClick={() => {
-                  c.frame({ edgeShape: shape as EdgeShape });
+                  c.frame({ edgeShape: shape });
                 }}
               >
                 <svg className="frame-thumbnail" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d={profile} fill="currentColor" />
+                  <path d={edgeShapeProfiles[shape]} fill="currentColor" />
                 </svg>
                 {shape[0].toUpperCase() + shape.slice(1)}
               </button>

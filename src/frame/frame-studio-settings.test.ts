@@ -7,6 +7,7 @@ import { createFrameAssembly } from './frame-assembly';
 import {
   createStudioFrame,
   defaultFrameStudioSettings,
+  explainFrameStudioError,
   frameStudioPresets,
   type FrameStudioSettings,
 } from './frame-studio-settings';
@@ -74,3 +75,46 @@ void test('a tray on a plinth is wider than the tray by half a border per side',
   assert.ok(Math.abs(plinth.outerSizeMm.x - tray.outerSizeMm.x - 10) < 1e-9);
   assert.equal(plinth.seatHeightMm, 8);
 });
+
+void test('the tab explains the frame constraints its controls can break', () => {
+  const pedestal = { ...defaultFrameStudioSettings, preset: 'pedestal' as const };
+
+  assert.match(
+    explainFrameStudioError({ ...pedestal, edgeShape: 'chamfer', edgeSizeMm: 9.5 }) ?? '',
+    /Increase Stand height or reduce Edge size/,
+  );
+  assert.match(
+    explainFrameStudioError({
+      ...pedestal,
+      borderWidthMm: 5,
+      edgeShape: 'chamfer',
+      edgeSizeMm: 4.5,
+    }) ?? '',
+    /Increase Overhang or reduce Edge size/,
+  );
+  assert.match(
+    explainFrameStudioError({
+      ...pedestal,
+      standHeightMm: 3,
+      edgeShape: 'cove',
+      edgeSizeMm: 2.5,
+      hasFloatingToe: true,
+    }) ?? '',
+    /turn off Floating toe/,
+  );
+  assert.equal(explainFrameStudioError(pedestal), undefined);
+  assert.equal(
+    explainFrameStudioError({
+      ...defaultFrameStudioSettings,
+      preset: 'tray',
+      hasFloatingToe: true,
+    }),
+    undefined,
+  );
+});
+
+for (const rimAboveBaseMm of [-2, 50]) {
+  void test(`a tray rim ${rimAboveBaseMm} mm above the model base is printable`, () => {
+    assert.ok(build({ preset: 'tray', rimAboveBaseMm }).parts.length > 0);
+  });
+}

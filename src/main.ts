@@ -165,7 +165,8 @@ controls.connect({
   downloadFrameStl: (part) => {
     downloadBlob(
       new Blob([createBinaryStl(part.solid, `Topogra ${part.id}`)], { type: 'model/stl' }),
-      `topogra-${settings.seed}-${part.id}.stl`,
+      // Size in the name keeps parts for different frames apart in one downloads folder.
+      `topogra-${settings.seed}-${part.id}-${Math.round(part.sizeMm.x)}x${Math.round(part.sizeMm.z)}mm.stl`,
     );
   },
   downloadStl: () => {

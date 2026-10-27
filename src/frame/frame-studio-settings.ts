@@ -1,4 +1,4 @@
-import { defaultTrayFloorThicknessMm } from '../constants/frame';
+import { defaultTrayFloorThicknessMm, minimumFrameWallMm } from '../constants/frame';
 import type { FrameEdge, FrameEdgeShape, FrameSettings, FrameTier } from '../types/frame';
 
 export type FrameStudioPreset =
@@ -22,6 +22,14 @@ export interface FrameStudioSettings {
   hasFloatingToe: boolean;
   finish: FrameFinish;
 }
+
+export const frameFinishKeys: readonly FrameFinish[] = [
+  'light-wood',
+  'dark-wood',
+  'white',
+  'black',
+  'concrete',
+];
 
 export const frameStudioPresets: readonly { value: FrameStudioPreset; label: string }[] = [
   { value: 'none', label: 'None' },
@@ -60,6 +68,37 @@ export const floatingToeMm = 2;
 export const pedestalRecessDepthMm = 1.5;
 
 // === PUBLIC API ===
+
+/** Pedestal presets hold the model in a locating recess instead of a tray wall. */
+export function isPedestalPreset(preset: FrameStudioPreset): boolean {
+  return preset === 'pedestal' || preset === 'stacked-pedestal';
+}
+
+/**
+ * Explains a failed assembly in the Frame tab's own control names, for the constraints the
+ * tab can break. Undefined leaves the composer's message, which names the failing part.
+ */
+export function explainFrameStudioError(settings: FrameStudioSettings): string | undefined {
+  const edgeSizeMm = settings.edgeShape === 'square' ? 0 : settings.edgeSizeMm;
+  const bottomTierHeightMm = getBottomTierHeightMm(settings);
+
+  if (edgeSizeMm > bottomTierHeightMm) {
+    return `Edge size ${formatMm(edgeSizeMm)} mm is taller than the ${formatMm(bottomTierHeightMm)} mm stand face it cuts. Increase Stand height or reduce Edge size.`;
+  }
+
+  if (
+    isPedestalPreset(settings.preset) &&
+    settings.borderWidthMm - edgeSizeMm < minimumFrameWallMm
+  ) {
+    return `The recess wall is ${formatMm(settings.borderWidthMm - edgeSizeMm)} mm: Overhang minus Edge size must be at least ${minimumFrameWallMm} mm. Increase Overhang or reduce Edge size.`;
+  }
+
+  if (settings.hasFloatingToe && bottomTierHeightMm - edgeSizeMm < floatingToeMm) {
+    return `The ${floatingToeMm} mm floating toe needs a straight wall at least as tall. Increase Stand height, reduce Edge size or turn off Floating toe.`;
+  }
+
+  return undefined;
+}
 
 /**
  * Expands the tab's controls into composable frame settings. `none` gives no tiers, so the
@@ -128,6 +167,25 @@ export function createStudioFrame(settings: FrameStudioSettings): FrameSettings 
 }
 
 // === HELPERS ===
+
+/** Full height of the tier the toe cuts into; the caller subtracts its top edge. */
+function getBottomTierHeightMm(settings: FrameStudioSettings): number {
+  switch (settings.preset) {
+    case 'none':
+    case 'tray':
+      // The tray wall rises straight from its floor, so the toe always has room.
+      return Infinity;
+    case 'stacked-pedestal':
+      return settings.standHeightMm / 2;
+    case 'pedestal':
+    case 'tray-on-plinth':
+      return settings.standHeightMm;
+  }
+}
+
+function formatMm(valueMm: number): string {
+  return String(Math.round(valueMm * 100) / 100);
+}
 
 function createEdge(settings: FrameStudioSettings): FrameEdge {
   return settings.edgeShape === 'square'

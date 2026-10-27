@@ -17,18 +17,20 @@ export function createTerrainFramePreview(): {
   update(parts: readonly FramePart[], previewScale: number, finish: FrameFinish): void;
 } {
   const group = new THREE.Group();
+  let meshes: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>[] = [];
 
   return {
     group,
     update(parts, previewScale, finish) {
       const { color, roughness } = frameFinishes[finish];
 
-      for (const mesh of group.children as THREE.Mesh[]) {
+      for (const mesh of meshes) {
         mesh.geometry.dispose();
-        (mesh.material as THREE.Material).dispose();
+        mesh.material.dispose();
       }
 
       group.clear();
+      meshes = [];
 
       for (const [index, part] of parts.entries()) {
         const geometry = new THREE.BufferGeometry();
@@ -57,6 +59,7 @@ export function createTerrainFramePreview(): {
         mesh.name = part.id;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        meshes.push(mesh);
         group.add(mesh);
       }
     },

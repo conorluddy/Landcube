@@ -50,6 +50,7 @@ import { createFrameAssembly } from '../frame/frame-assembly';
 import {
   createStudioFrame,
   defaultFrameStudioSettings,
+  explainFrameStudioError,
   type FrameStudioSettings,
 } from '../frame/frame-studio-settings';
 import type { FrameAssembly, FramePart, FramePartId } from '../types/frame';
@@ -307,17 +308,25 @@ export function createStudioController(actions: DesignControlActions): StudioCon
     publish();
   };
 
-  /** Frames fit the model, so any model, height or frame edit rebuilds the assembly. */
+  /** Frames fit the model, so any model, height or frame shape edit rebuilds the assembly. */
   const rebuildFrame = () => {
     const height = state.metrics.height;
-    const assembly =
+    const { settings, assembly: previous } = state.frame;
+
+    // No frame stays empty whatever the model does, so skip the preview round trip.
+    if (settings.preset === 'none' && previous?.ok === true && previous.data.parts.length === 0) {
+      return;
+    }
+
+    const built =
       height === undefined
         ? undefined
-        : createFrameAssembly(
-            state.model.dimensions,
-            height,
-            createStudioFrame(state.frame.settings),
-          );
+        : createFrameAssembly(state.model.dimensions, height, createStudioFrame(settings));
+    const explanation = built?.ok === false ? explainFrameStudioError(settings) : undefined;
+    const assembly: Result<FrameAssembly> | undefined =
+      built?.ok === false && explanation !== undefined
+        ? { ok: false, error: { ...built.error, message: explanation } }
+        : built;
 
     state = { ...state, frame: { ...state.frame, assembly } };
     effects?.frameChanged();
@@ -559,8 +568,9 @@ export function createStudioController(actions: DesignControlActions): StudioCon
       }
 
       state = { ...state, model: next };
-      effects?.modelChanged();
+      // Rebuild first so the model redraw already shows the matching frame.
       rebuildFrame();
+      effects?.modelChanged();
       publish();
 
       return true;
@@ -573,7 +583,14 @@ export function createStudioController(actions: DesignControlActions): StudioCon
         ...state,
         frame: { ...state.frame, settings: { ...state.frame.settings, ...patch } },
       };
-      rebuildFrame();
+
+      // Finish is preview colour only; the parts keep their shape.
+      if (Object.keys(patch).every((key) => key === 'finish')) {
+        effects?.frameChanged();
+      } else {
+        rebuildFrame();
+      }
+
       publish();
     },
     downloadFrameStl(partId: FramePartId) {

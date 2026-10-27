@@ -377,7 +377,13 @@ export function ExportPanel({
       )}
       {s.workspace.view === '3d' && s.frame.settings.preset !== 'none' && (
         <Group title="Frame STL">
-          {s.frame.assembly?.ok === false && <p role="alert">{s.frame.assembly.error.message}</p>}
+          {/* The Frame tab owns the alert; repeating it here would announce it twice. */}
+          {s.frame.assembly?.ok === false && (
+            <Hint>Fix the frame in the Frame tab: {s.frame.assembly.error.message}</Hint>
+          )}
+          {s.frame.assembly === undefined && (
+            <Hint>Frame parts appear once the 3D model has finished building.</Hint>
+          )}
           {(s.frame.assembly?.ok === true ? s.frame.assembly.data.parts : []).map((part) => (
             <div key={part.id}>
               <Hint>
@@ -393,11 +399,6 @@ export function ExportPanel({
               </Button>
             </div>
           ))}
-          {s.frame.assembly?.ok !== true && (
-            <Button disabled onClick={() => undefined}>
-              Download frame STL
-            </Button>
-          )}
         </Group>
       )}
     </>

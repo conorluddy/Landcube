@@ -311,3 +311,46 @@ void test('an unprintable frame keeps its error and blocks part downloads', () =
   c.downloadFrameStl('frame');
   assert.match(c.getSnapshot().status, /Frame part frame is not available/);
 });
+
+void test('a finish change recolours the preview without rebuilding the parts', () => {
+  const { controller: c, effects } = setup();
+  let frameChanges = 0;
+
+  effects.frameChanged = () => {
+    frameChanges++;
+  };
+
+  c.metrics(24);
+  c.frame({ preset: 'tray' });
+  const tray = c.getSnapshot().frame.assembly;
+
+  c.frame({ finish: 'white' });
+  assert.equal(c.getSnapshot().frame.assembly, tray);
+  assert.equal(frameChanges, 3);
+});
+
+void test('removing a frame empties the assembly so the model drops back to the floor', () => {
+  const { controller: c } = setup();
+
+  c.metrics(24);
+  c.frame({ preset: 'pedestal' });
+  assert.ok(c.getSnapshot().frame.assembly?.ok === true);
+
+  c.frame({ preset: 'none' });
+  const none = c.getSnapshot().frame.assembly;
+
+  assert.ok(none?.ok === true);
+  assert.deepEqual(none.data.parts, []);
+  assert.equal(none.data.seatHeightMm, 0);
+});
+
+void test('frame errors the tab can explain name its controls', () => {
+  const { controller: c } = setup();
+
+  c.metrics(24);
+  c.frame({ preset: 'pedestal', borderWidthMm: 5, edgeShape: 'chamfer', edgeSizeMm: 4.5 });
+  const assembly = c.getSnapshot().frame.assembly;
+
+  assert.ok(assembly?.ok === false);
+  assert.match(assembly.error.message, /Increase Overhang or reduce Edge size/);
+});
