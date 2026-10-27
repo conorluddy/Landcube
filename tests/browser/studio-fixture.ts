@@ -26,7 +26,9 @@ export async function serveStudio(page: Page, basePath = ''): Promise<void> {
         ? 'text/javascript'
         : filename.endsWith('.css')
           ? 'text/css'
-          : 'text/html',
+          : filename.endsWith('.png')
+            ? 'image/png'
+            : 'text/html',
     });
   });
 }
@@ -123,7 +125,7 @@ export function stlBounds(bytes: Buffer): number[][] {
   return bounds;
 }
 
-/** The studio loads a real location on start, so every page gets offline, deterministic tiles. */
+/** Locations beyond the bundled default download tiles; serve them offline and deterministically. */
 async function routeTerrainTiles(page: Page): Promise<void> {
   const tile = new PNG({ width: 256, height: 256 });
 

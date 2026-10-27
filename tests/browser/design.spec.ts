@@ -5,6 +5,7 @@ import {
   download,
   loadLocation,
   openProcedural2d,
+  openStudio,
   section,
   serveStudio,
   terrainTileUrl,
@@ -268,14 +269,46 @@ test('coordinates edited before switching away load fresh terrain instead of res
   await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible();
 });
 
-test('coordinates retries after the startup location fails to load', async ({ page }) => {
+test('startup location loads from bundled tiles without downloads', async ({ page }) => {
+  const tileRequests: string[] = [];
+
+  page.on('request', (request) => {
+    if (request.url().includes('/terrarium/')) {
+      tileRequests.push(request.url());
+    }
+  });
+  await page.route(terrainTileUrl, (route) => route.abort());
+  await openStudio(page, `${appUrl}?v=1&seed=123&width=320&height=240`);
+  expect(tileRequests).toEqual([]);
+  await expect(page.locator('.attribution')).toContainText('Copernicus');
+});
+
+test('coordinates retries after a failed first load', async ({ page }) => {
   const abortTiles = (route: Route) => route.abort();
 
+  await openStudio(page, `${appUrl}?v=1&seed=123&width=320&height=240`);
+  await page.getByLabel('Latitude', { exact: true }).fill('10');
+  await page.getByLabel('Latitude', { exact: true }).press('Tab');
+  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
   await page.route(terrainTileUrl, abortTiles);
-  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
+  await page.getByRole('button', { name: 'Coordinates', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'download failed' })).toBeVisible();
   await page.unroute(terrainTileUrl, abortTiles);
   await loadLocation(page);
+});
+
+test('footer tour button plays and pauses autoplay', async ({ page }) => {
+  await openStudio(page, `${appUrl}?v=1&seed=123&width=320&height=240`);
+  await page.getByRole('button', { name: 'Play tour', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Pause tour', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await section(page, 'Terrain');
+  await expect(page.getByRole('switch', { name: 'Tour preset locations' })).toBeChecked();
+  await page.getByRole('button', { name: 'Pause tour', exact: true }).click();
+  await expect(page.getByRole('switch', { name: 'Tour preset locations' })).not.toBeChecked();
+  await expect(page.getByRole('button', { name: 'Play tour', exact: true })).toBeVisible();
 });
 
 test('failed preview decoding retains the last image and obsolete previews cannot replace newer output', async ({

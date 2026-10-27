@@ -209,6 +209,7 @@ function stubBrowserTileDecoding(t: TestContext): void {
   Object.assign(globalThis, {
     createImageBitmap: () => Promise.resolve({ close: () => undefined }),
     document: {
+      baseURI: 'https://topogra.test/',
       createElement: () => ({
         getContext: () => ({ drawImage: () => undefined, getImageData: () => ({ data: pixels }) }),
       }),
