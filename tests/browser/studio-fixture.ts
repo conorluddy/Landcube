@@ -4,8 +4,10 @@ import { resolve } from 'node:path';
 import { PNG } from 'pngjs';
 
 export const appUrl = 'https://topogra.test/';
+export const terrainTileUrl = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/**';
 
 export async function serveStudio(page: Page, basePath = ''): Promise<void> {
+  await routeTerrainTiles(page);
   await page.route(`${appUrl}**`, async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     const prefix = `/${basePath}`;
@@ -73,32 +75,30 @@ export async function modelDownload(page: Page): Promise<Buffer> {
   return result.bytes;
 }
 
-export async function loadLocation(page: Page): Promise<void> {
-  const tile = new PNG({ width: 256, height: 256 });
-
-  for (let y = 0; y < 256; y++) {
-    for (let x = 0; x < 256; x++) {
-      const encoded = Math.round(
-        (Math.sin(x / 35) * 400 + Math.cos(y / 45) * 300 + 500 + 32768) * 256,
-      );
-      const offset = (y * 256 + x) * 4;
-
-      tile.data[offset] = encoded >> 16;
-      tile.data[offset + 1] = (encoded >> 8) & 255;
-      tile.data[offset + 2] = encoded & 255;
-      tile.data[offset + 3] = 255;
-    }
-  }
-
-  await page.route('https://s3.amazonaws.com/elevation-tiles-prod/terrarium/**', (route) =>
-    route.fulfill({
-      body: PNG.sync.write(tile),
-      contentType: 'image/png',
-      headers: { 'access-control-allow-origin': '*' },
-    }),
+/** Opens a design link once the studio has settled on its 3D default location. */
+export async function openStudio(page: Page, url: string): Promise<void> {
+  await page.goto(url);
+  await expect(page.getByRole('button', { name: '3D', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
   );
-  await page.getByRole('button', { name: 'Coordinates', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible();
+}
+
+/** Returns to the 2D procedural sketch that design-link journeys edit. */
+export async function openProcedural2d(page: Page, url: string): Promise<void> {
+  await openStudio(page, url);
+  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await expect(page.getByText('Procedural landscape')).toBeVisible();
+  await expect(page.locator('#terrain')).toBeVisible();
+}
+
+export async function loadLocation(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Coordinates', exact: true }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: /Real terrain (loaded|restored)/ }),
+  ).toBeVisible();
 }
 
 export function stlBounds(bytes: Buffer): number[][] {
@@ -121,4 +121,33 @@ export function stlBounds(bytes: Buffer): number[][] {
   }
 
   return bounds;
+}
+
+/** The studio loads a real location on start, so every page gets offline, deterministic tiles. */
+async function routeTerrainTiles(page: Page): Promise<void> {
+  const tile = new PNG({ width: 256, height: 256 });
+
+  for (let y = 0; y < 256; y++) {
+    for (let x = 0; x < 256; x++) {
+      const encoded = Math.round(
+        (Math.sin(x / 35) * 400 + Math.cos(y / 45) * 300 + 500 + 32768) * 256,
+      );
+      const offset = (y * 256 + x) * 4;
+
+      tile.data[offset] = encoded >> 16;
+      tile.data[offset + 1] = (encoded >> 8) & 255;
+      tile.data[offset + 2] = encoded & 255;
+      tile.data[offset + 3] = 255;
+    }
+  }
+
+  const body = PNG.sync.write(tile);
+
+  await page.route(terrainTileUrl, (route) =>
+    route.fulfill({
+      body,
+      contentType: 'image/png',
+      headers: { 'access-control-allow-origin': '*' },
+    }),
+  );
 }

@@ -33,7 +33,11 @@ import {
   validateElevationGradient,
   type ElevationGradientSettings,
 } from '../terrain-elevation-gradient';
-import { realTerrainPresetGroups, realTerrainPresets } from '../constants/real-terrain';
+import {
+  defaultRealTerrainPreset,
+  realTerrainPresetGroups,
+  realTerrainPresets,
+} from '../constants/real-terrain';
 import { loadBrowserRealTerrain } from '../browser-real-terrain';
 import { validateRealContourInterval } from '../real-terrain-contours';
 import type { RealTerrain } from '../real-terrain';
@@ -189,16 +193,16 @@ const daylightFrameMs = 50;
 
 /** Session state is independent of controls, rendering and version-one URL serialization. */
 export function createStudioController(actions: DesignControlActions): StudioController {
-  const first = realTerrainPresets[0];
+  const place = defaultRealTerrainPreset;
   const natural = terrainMaterialPresets.natural;
   let state: StudioState = {
     design: actions.getSettings(),
     source: {
       selected: 'generated',
-      place: `${first.latitude},${first.longitude}`,
-      latitude: first.latitude,
-      longitude: first.longitude,
-      spanKm: first.spanKm,
+      place: `${place.latitude},${place.longitude}`,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      spanKm: place.spanKm,
       maxDepth: 50,
       interval: 'auto',
       fixedInterval: 25,

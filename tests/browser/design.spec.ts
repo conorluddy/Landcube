@@ -1,6 +1,14 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Route } from '@playwright/test';
 import { PNG } from 'pngjs';
-import { appUrl, download, loadLocation, section, serveStudio } from './studio-fixture';
+import {
+  appUrl,
+  download,
+  loadLocation,
+  openProcedural2d,
+  section,
+  serveStudio,
+  terrainTileUrl,
+} from './studio-fixture';
 
 test.beforeEach(async ({ page }) => {
   await serveStudio(page);
@@ -12,7 +20,7 @@ test('studio separates view, inspector and shortcuts while retaining settings', 
   const errors: string[] = [];
 
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto(`${appUrl}?v=1&seed=234`);
+  await openProcedural2d(page, `${appUrl}?v=1&seed=234`);
   await expect(
     page.getByRole('navigation', { name: 'Editing section' }).getByRole('button'),
   ).toHaveText(['Terrain', 'Contours', 'Colour', 'Scene']);
@@ -50,7 +58,7 @@ test('copy style link and reopening preserve version-one settings and exclude se
       },
     });
   });
-  await page.goto(`${appUrl}?v=1&seed=234&width=480&height=320`);
+  await openProcedural2d(page, `${appUrl}?v=1&seed=234&width=480&height=320`);
   await page.getByRole('slider', { name: 'Terrain detail', exact: true }).fill('0.99');
   await section(page, 'Colour');
   await page.getByRole('button', { name: 'Paper', exact: true }).click();
@@ -69,7 +77,7 @@ test('copy style link and reopening preserve version-one settings and exclude se
   }
 
   expect(new URL(url).searchParams.get('v')).toBe('1');
-  await page.goto(url);
+  await openProcedural2d(page, url);
   await expect(page.getByRole('slider', { name: 'Terrain detail', exact: true })).toHaveValue(
     '0.99',
   );
@@ -85,7 +93,7 @@ test('copy style link and reopening preserve version-one settings and exclude se
 });
 
 test('SVG and PNG exports preserve settled dimensions and transparency', async ({ page }) => {
-  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240&cursorEnabled=false`);
+  await openProcedural2d(page, `${appUrl}?v=1&seed=123&width=320&height=240&cursorEnabled=false`);
   await page.getByRole('button', { name: 'Export ↗' }).click();
   const opaque = await download(page, 'Download SVG');
 
@@ -122,7 +130,7 @@ test('SVG and PNG exports preserve settled dimensions and transparency', async (
 test('output validation, size presets and extra-large opt-in remain consistent', async ({
   page,
 }) => {
-  await page.goto(`${appUrl}?v=1&seed=1&width=320&height=240`);
+  await openProcedural2d(page, `${appUrl}?v=1&seed=1&width=320&height=240`);
   await page.getByRole('button', { name: 'Export ↗' }).click();
   await page.getByLabel('Width', { exact: true }).fill('0');
   await page.getByLabel('Width', { exact: true }).press('Tab');
@@ -149,7 +157,7 @@ test('mobile shell, clipboard fallback and dialog focus remain usable', async ({
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
   });
-  await page.goto(`${appUrl}?v=1&seed=123&lineColor=invalid`);
+  await openProcedural2d(page, `${appUrl}?v=1&seed=123&lineColor=invalid`);
   await expect(page.getByRole('status').filter({ hasText: 'lineColor' })).toBeVisible();
   const inspector = page.getByRole('complementary', { name: 'Landscape controls' });
   const bounds = await inspector.boundingBox();
@@ -171,10 +179,10 @@ test('mobile shell, clipboard fallback and dialog focus remain usable', async ({
 test('seed lock persists, palette randomization and scoped reset preserve output', async ({
   page,
 }) => {
-  await page.goto(`${appUrl}?v=1&seed=456&width=480&height=320`);
+  await openProcedural2d(page, `${appUrl}?v=1&seed=456&width=480&height=320`);
   await page.getByRole('switch', { name: 'Lock seed' }).check();
   await expect(page.getByRole('button', { name: 'New landscape' })).toBeDisabled();
-  await page.reload();
+  await openProcedural2d(page, page.url());
   await expect(page.getByRole('switch', { name: 'Lock seed' })).toBeChecked();
   await section(page, 'Colour');
   const background = await page.getByLabel('Canvas color').inputValue();
@@ -191,7 +199,7 @@ test('seed lock persists, palette randomization and scoped reset preserve output
 test('real terrain interval, overlays and failed loading retain the current landscape', async ({
   page,
 }) => {
-  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
+  await openProcedural2d(page, `${appUrl}?v=1&seed=123&width=320&height=240`);
   await loadLocation(page);
   await section(page, 'Contours');
   await expect(page.getByRole('slider', { name: 'Density' })).toHaveCount(0);
@@ -209,9 +217,7 @@ test('real terrain interval, overlays and failed loading retain the current land
   expect(original.bytes.toString()).toContain('<metadata>Produced using Copernicus');
   expect(original.bytes.toString()).toContain('grid');
   await page.getByRole('button', { name: 'Close Export' }).click();
-  await page.route('https://s3.amazonaws.com/elevation-tiles-prod/terrarium/**', (route) =>
-    route.abort(),
-  );
+  await page.route(terrainTileUrl, (route) => route.abort());
   await section(page, 'Terrain');
   await page.getByLabel('Latitude', { exact: true }).fill('10');
   await page.getByLabel('Latitude', { exact: true }).press('Tab');
@@ -229,7 +235,7 @@ test('real terrain interval, overlays and failed loading retain the current land
 test('real terrain switches back instantly and revisited places load from the tile cache', async ({
   page,
 }) => {
-  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
+  await openProcedural2d(page, `${appUrl}?v=1&seed=123&width=320&height=240`);
   await loadLocation(page);
   let tileRequests = 0;
 
@@ -253,7 +259,7 @@ test('real terrain switches back instantly and revisited places load from the ti
 test('coordinates edited before switching away load fresh terrain instead of restoring', async ({
   page,
 }) => {
-  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
+  await openProcedural2d(page, `${appUrl}?v=1&seed=123&width=320&height=240`);
   await loadLocation(page);
   await page.getByLabel('Latitude', { exact: true }).fill('10');
   await page.getByLabel('Latitude', { exact: true }).press('Tab');
@@ -262,21 +268,20 @@ test('coordinates edited before switching away load fresh terrain instead of res
   await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible();
 });
 
-test('coordinates retries after a failed first load', async ({ page }) => {
+test('coordinates retries after the startup location fails to load', async ({ page }) => {
+  const abortTiles = (route: Route) => route.abort();
+
+  await page.route(terrainTileUrl, abortTiles);
   await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
-  await page.route('https://s3.amazonaws.com/elevation-tiles-prod/terrarium/**', (route) =>
-    route.abort(),
-  );
-  await page.getByRole('button', { name: 'Coordinates', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'download failed' })).toBeVisible();
-  await page.unroute('https://s3.amazonaws.com/elevation-tiles-prod/terrarium/**');
+  await page.unroute(terrainTileUrl, abortTiles);
   await loadLocation(page);
 });
 
 test('failed preview decoding retains the last image and obsolete previews cannot replace newer output', async ({
   page,
 }) => {
-  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
+  await openProcedural2d(page, `${appUrl}?v=1&seed=123&width=320&height=240`);
   await page.getByRole('button', { name: 'Export ↗' }).click();
   const preview = page.getByAltText('Settled landscape export preview');
 

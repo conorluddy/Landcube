@@ -536,6 +536,9 @@ baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
 applyPageStyle();
 synchronizeDesignUrl();
 renderCurrentLandscape();
+// The studio opens on the default real location in 3D; both stay session-only, so links are unchanged.
+void controls.selectView('3d');
+void controls.useCoordinates();
 requestAnimationFrame(() => {
   console.info(
     JSON.stringify({

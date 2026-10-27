@@ -551,7 +551,16 @@ export const realTerrainPresets = [
   },
 ] as const satisfies readonly RealTerrainPreset[];
 
-/** Native select groups; keep the flat preset list and its initial selection stable. */
+const errigalPreset = realTerrainPresets.find((preset) => preset.name === 'Errigal');
+
+if (!errigalPreset) {
+  throw new Error('The default real-terrain preset Errigal is missing from realTerrainPresets.');
+}
+
+/** The browser studio opens on this place; the flat list order stays stable for menus and autoplay. */
+export const defaultRealTerrainPreset = errigalPreset;
+
+/** Native select groups; keep the flat preset list stable. */
 export const realTerrainPresetGroups = [
   ...new Set(realTerrainPresets.map((preset) => preset.country)),
 ]

@@ -4,6 +4,7 @@ import {
   download,
   loadLocation,
   modelDownload,
+  openStudio,
   section,
   serveStudio,
   stlBounds,
@@ -16,23 +17,40 @@ test.beforeEach(async ({ page }) => {
   await serveStudio(page);
 });
 
+test('studio opens on Errigal in 3D without adding the location to the design link', async ({
+  page,
+}) => {
+  await openStudio(page, `${appUrl}?v=1&seed=123`);
+  await expect(page.locator('canvas.terrain-3d')).toBeVisible();
+  await expect(page.locator('#terrain')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Coordinates', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.locator('#terrain-place')).toHaveValue('55.0343,-8.113');
+  expect(new URL(page.url()).searchParams.has('latitude')).toBe(false);
+});
+
 test('view selection activates 3D directly and restores independent inspector sections', async ({
   page,
 }) => {
   const errors: string[] = [];
 
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto(`${appUrl}?v=1&seed=123`);
-  await section(page, 'Colour');
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await openStudio(page, `${appUrl}?v=1&seed=123`);
   await expect(page.locator('canvas.terrain-3d')).toBeVisible();
   await section(page, 'Scene');
   await page.getByLabel('Time of day').fill('2');
   await expect(page.locator('output[for="terrain-light-time"]')).toHaveText('02:00 · Night');
   await page.getByRole('switch', { name: 'Solid base', exact: true }).uncheck();
   await page.getByRole('button', { name: '2D', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Colour settings' })).toBeVisible();
+  await expect(page.locator('#terrain')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Model', exact: true })).toHaveCount(0);
+  await section(page, 'Colour');
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Scene settings' })).toBeVisible();
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Colour settings' })).toBeVisible();
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Scene settings' })).toBeVisible();
   await expect(page.getByLabel('Time of day')).toHaveValue('2');
@@ -279,37 +297,41 @@ test('3D terrain morphs between landscapes and settles on the destination', asyn
   const errors: string[] = [];
 
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await openStudio(page, `${appUrl}?v=1&seed=123`);
   const canvas = page.locator('canvas.terrain-3d');
+  const settle = () =>
+    expect(canvas).toHaveAttribute('data-terrain-transition', 'settled', { timeout: 10_000 });
+
+  await settle();
   const transitions = await recordTerrainTransitions(page);
   // Software WebGL can spend a whole morph inside one frame, so count recorded morphs, never poll for one.
   const morphCount = async () =>
     (await transitions()).filter((state) => state === 'morphing').length;
-  const settle = () =>
-    expect(canvas).toHaveAttribute('data-terrain-transition', 'settled', { timeout: 10_000 });
 
-  await loadLocation(page);
+  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
   await page.screenshot({ path: test.info().outputPath('terrain-morph-mid.png') });
+  await expect.poll(morphCount).toBe(1);
   await settle();
   await page.screenshot({ path: test.info().outputPath('terrain-morph-settled.png') });
-  expect(await morphCount()).toBe(1);
-  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
+  await loadLocation(page);
   await expect.poll(morphCount).toBe(2);
+  await settle();
+  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
+  await expect.poll(morphCount).toBe(3);
   await settle();
   await page.getByRole('button', { name: 'New landscape', exact: true }).click();
   await page.getByRole('button', { name: 'New landscape', exact: true }).click();
-  await expect.poll(morphCount).toBeGreaterThan(2);
+  await expect.poll(morphCount).toBeGreaterThan(3);
   await settle();
   expect(errors).toEqual([]);
 });
 
 test('reduced motion swaps 3D terrain without morphing', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await openStudio(page, `${appUrl}?v=1&seed=123`);
   const transitions = await recordTerrainTransitions(page);
 
+  await page.getByRole('button', { name: 'Procedural', exact: true }).click();
   await loadLocation(page);
   await page.getByRole('button', { name: 'Procedural', exact: true }).click();
   await page.getByRole('button', { name: 'New landscape', exact: true }).click();
