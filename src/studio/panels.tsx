@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import type { StudioController, StudioState } from './controller';
 import {
   Button,
@@ -971,6 +971,7 @@ const roadDetailOptions: readonly { value: RoadDetail; label: string }[] = [
 
 /** Mapped OSM roads draped over real terrain; fetched once per location when first enabled. */
 function RoadsGroup({ controller: c, state: s }: PanelProps): ReactNode {
+  const statusRef = useRef<HTMLParagraphElement>(null);
   const style = s.scene.roads;
   const isTerraced = s.model.dimensions.terrainShape === 'terraced';
   const network = s.roads.network;
@@ -1049,12 +1050,14 @@ function RoadsGroup({ controller: c, state: s }: PanelProps): ReactNode {
         }}
       />
       {/* Always mounted, so screen readers announce download progress and failures. */}
-      <p role="status" className="export-hint">
+      <p ref={statusRef} role="status" className="export-hint" tabIndex={-1}>
         {status}
       </p>
       {style.enabled && s.roads.canRetry && (
         <Button
           onClick={() => {
+            // Retrying unmounts this button, so keyboard focus moves to the status it updates.
+            statusRef.current?.focus();
             c.retryRoads();
           }}
         >
@@ -1065,7 +1068,12 @@ function RoadsGroup({ controller: c, state: s }: PanelProps): ReactNode {
         Experimental. Width is on the printed model; auto width is {roadWidthMmPerModelKm} mm per km
         of model area. Tunnels and bridges are hidden. Session-only and omitted from STL.
       </Hint>
-      <a href={roadAttributionUrl} target="_blank" rel="noreferrer">
+      <a
+        href={roadAttributionUrl}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`${roadAttribution} (opens in a new tab)`}
+      >
         {roadAttribution} ↗
       </a>
     </Group>

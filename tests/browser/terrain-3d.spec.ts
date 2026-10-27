@@ -412,7 +412,9 @@ test('mapped roads retry after a busy service, restyle without refetching and cr
   await expect(page.getByRole('status').filter({ hasText: 'busy' })).toBeVisible();
   await page.getByLabel('Road width').fill('1.5');
   expect(queries).toHaveLength(1);
-  await page.getByRole('button', { name: 'Retry download', exact: true }).click();
+  await page.getByRole('button', { name: 'Retry download', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('status').filter({ hasText: /mapped road/ })).toBeFocused();
   await expect(page.getByText('1 mapped road · 1 bridge and 0 tunnels hidden.')).toBeVisible();
   await page.getByLabel('Detail').selectOption('tracks');
   await expect(page.getByText('2 mapped roads · 1 bridge and 0 tunnels hidden.')).toBeVisible();

@@ -441,7 +441,13 @@ function Studio({
             </span>
           )}
           {areRoadsDrawn(state) && (
-            <a className="attribution" href={roadAttributionUrl} target="_blank" rel="noreferrer">
+            <a
+              className="attribution"
+              href={roadAttributionUrl}
+              target="_blank"
+              rel="noreferrer"
+              title="Opens in a new tab"
+            >
               {state.roads.network?.attribution}
             </a>
           )}
