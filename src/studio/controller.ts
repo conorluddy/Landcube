@@ -50,6 +50,7 @@ import { defaultRoadStyle, roadDetailClasses, roadSpanLimitsKm } from '../consta
 import { operationErrorCodes } from '../constants/operations';
 import type { RoadNetwork, RoadStyle } from '../types/roads';
 import { createRoadNetworkLoader, getRoadPlacementKey } from './road-loader';
+import { getSuggestedRoadWidthMm } from '../road-ribbons';
 
 export type StudioView = '2d' | '3d';
 export type InspectorSection = 'Terrain' | 'Contours' | 'Colour' | 'Scene' | 'Camera' | 'Model';
@@ -137,7 +138,8 @@ export interface StudioState {
   seedLocked: boolean;
   status: string;
   manualLink: string;
-  metrics: { height?: number; layerHeight?: number };
+  /** Measured from the rendered model; `spanKm` is its longer geographic side. */
+  metrics: { height?: number; layerHeight?: number; spanKm?: number };
 }
 export interface StudioEffects {
   /** Location and source changes morph the 3D terrain; interval and hatching edits cut. */
@@ -190,6 +192,8 @@ export interface StudioController {
   model: (patch: Partial<StudioState['model']>) => boolean;
   dimensions: (patch: Partial<TerrainModelSettings>) => boolean;
   metrics: (height: number, layerHeight?: number) => void;
+  /** Reports the model's longer geographic side; auto road width follows it. */
+  modelSpan: (spanKm: number | undefined) => void;
   source: (patch: Partial<TerrainSourceState>) => void;
   useGenerated: () => void;
   /** Switches to real terrain, opening its location controls and loading the selected place. */
@@ -620,8 +624,24 @@ export function createStudioController(
         return;
       }
 
-      state = { ...state, metrics: { height, layerHeight } };
+      state = { ...state, metrics: { ...state.metrics, height, layerHeight } };
       publish();
+    },
+    modelSpan(spanKm: number | undefined) {
+      if (state.metrics.spanKm === spanKm) {
+        return;
+      }
+
+      state = { ...state, metrics: { ...state.metrics, spanKm } };
+      const roads = state.scene.roads;
+      const suggestedWidthMm = getAutoRoadWidthMm(roads, spanKm);
+
+      // Hidden roads pick up their width when enabled, so terrain loads never restyle them.
+      if (roads.enabled && suggestedWidthMm !== undefined && suggestedWidthMm !== roads.widthMm) {
+        controller.scene({ roads: { ...roads, widthMm: suggestedWidthMm } });
+      } else {
+        publish();
+      }
     },
     async autoplay(patch) {
       const wasEnabled = state.source.autoplay.enabled;
@@ -793,7 +813,10 @@ export function createStudioController(
       }
     },
     roads(patch: Partial<RoadStyle>) {
-      controller.scene({ roads: { ...state.scene.roads, ...patch } });
+      const merged = { ...state.scene.roads, ...patch };
+      const suggestedWidthMm = getAutoRoadWidthMm(merged, state.metrics.spanKm);
+
+      controller.scene({ roads: { ...merged, widthMm: suggestedWidthMm ?? merged.widthMm } });
 
       if (state.scene.roads.enabled) {
         void loadRoads();
@@ -858,6 +881,13 @@ function getSourceFieldsKey(source: TerrainSourceState): string {
     source.elevationFloor,
     source.maxDepth,
   ]);
+}
+
+/** The width auto mode asks for, or undefined while the user's own width applies. */
+function getAutoRoadWidthMm(style: RoadStyle, modelSpanKm: number | undefined): number | undefined {
+  return style.autoWidth && modelSpanKm !== undefined
+    ? getSuggestedRoadWidthMm(modelSpanKm)
+    : undefined;
 }
 
 /** Real terrain with a location and span can carry roads; generated terrain cannot. */

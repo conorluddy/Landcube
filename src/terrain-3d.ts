@@ -1172,8 +1172,14 @@ export function createTerrain3d(
       draw();
     },
     setRoadStyle(value: Readonly<RoadStyle>) {
+      const wasVisible = roads.mesh.visible;
+
       roads.setStyle(value);
-      draw();
+
+      // Hidden roads change nothing on screen; skipping the frame keeps terrain loads quick.
+      if (wasVisible || roads.mesh.visible) {
+        draw();
+      }
     },
     setContourEngraving(value: ContourEngravingSettings) {
       contourTreatment = value.treatment;

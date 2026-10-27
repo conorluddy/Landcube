@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { clipRoadsToCrop, createRoadRibbonBuffers } from './road-ribbons';
+import { clipRoadsToCrop, createRoadRibbonBuffers, getSuggestedRoadWidthMm } from './road-ribbons';
 import { projectToRealTerrainFrame } from './real-terrain-projection';
 import { sampleHeightField, terrain3dElevationScale } from './terrain-surface';
 import type { HeightField } from './types/terrain';
@@ -222,4 +222,12 @@ void test('circular crops clip roads and keep ribbon edges on the disc', () => {
   for (let offset = 0; offset < positions.length; offset += 3) {
     assert.ok(Math.hypot(positions[offset], positions[offset + 2]) <= 1 + 1e-6);
   }
+});
+
+void test('suggested road width is 0.1 mm per model kilometre within the slider range', () => {
+  assert.equal(getSuggestedRoadWidthMm(5.09), 0.5);
+  assert.equal(getSuggestedRoadWidthMm(12), 1.2);
+  assert.equal(getSuggestedRoadWidthMm(25), 2.5);
+  assert.equal(getSuggestedRoadWidthMm(0.4), 0.1);
+  assert.equal(getSuggestedRoadWidthMm(100), 3);
 });

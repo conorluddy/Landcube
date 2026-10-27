@@ -1,4 +1,9 @@
-import { roadClassWidthFactors, roadDetailClasses } from './constants/roads';
+import {
+  roadClassWidthFactors,
+  roadDetailClasses,
+  roadWidthMmLimits,
+  roadWidthMmPerModelKm,
+} from './constants/roads';
 import { projectToRealTerrainFrame, type FramePoint } from './real-terrain-projection';
 import type { RealTerrain } from './real-terrain';
 import { clipCircleSegment, type TerrainCropShape } from './terrain-crop';
@@ -107,6 +112,14 @@ export function createRoadRibbonBuffers(
   }
 
   return { positions: new Float32Array(positions), indices: new Uint32Array(indices) };
+}
+
+/** Secondary-road width for a model covering `modelSpanKm` on its longer side, on the slider's steps. */
+export function getSuggestedRoadWidthMm(modelSpanKm: number): number {
+  const { minimum, maximum, step } = roadWidthMmLimits;
+  const widthMm = Math.round((modelSpanKm * roadWidthMmPerModelKm) / step) * step;
+
+  return Number(Math.min(maximum, Math.max(minimum, widthMm)).toFixed(2));
 }
 
 // === HELPERS ===

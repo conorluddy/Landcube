@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createRoadRibbonBuffers } from './road-ribbons';
+import { createTerrainRoadMaterial } from './terrain-road-material';
 import { defaultRoadStyle } from './constants/roads';
 import type { TerrainModelSettings } from './terrain-model';
 import type { HeightField } from './types/terrain';
@@ -30,14 +31,8 @@ export interface TerrainRoadLayer {
 }
 
 export function createTerrainRoadLayer(): TerrainRoadLayer {
-  const material = new THREE.MeshStandardMaterial({
-    color: defaultRoadStyle.color,
-    roughness: 0.9,
-    metalness: 0,
-    polygonOffset: true,
-    polygonOffsetFactor: -1,
-    polygonOffsetUnits: -1,
-  });
+  const asphalt = createTerrainRoadMaterial(defaultRoadStyle.color);
+  const material = asphalt.material;
   const mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
   let style: Readonly<RoadStyle> = { ...defaultRoadStyle };
   let inputs: TerrainRoadInputs | undefined;
@@ -111,6 +106,7 @@ export function createTerrainRoadLayer(): TerrainRoadLayer {
     setStyle(value) {
       style = value;
       material.color.set(value.color);
+      asphalt.setTexture(value.texture);
       rebuild();
     },
     setSuppressed(value) {

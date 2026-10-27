@@ -372,6 +372,10 @@ function updateTerrain3d(): void {
     realTerrain,
   );
 
+  const place = createFloorPlace(realTerrain, modelCrop, modelSourceFrame);
+
+  // Before the update, so an auto road width change rebuilds with this terrain.
+  controls.modelSpan(place ? Math.max(place.widthKm, place.lengthKm) : undefined);
   terrain3d.update(
     croppedContours,
     modelCrop.width,
@@ -380,7 +384,7 @@ function updateTerrain3d(): void {
     modelCrop.field,
     croppedSea,
     realTerrain?.attribution,
-    createFloorPlace(realTerrain, modelCrop, modelSourceFrame),
+    place,
     getRealContourInterval(realTerrain),
     getTerrainTerraceLevels(settings, engineConfiguration, realTerrain),
     getCroppedRoadPaths(modelSourceFrame, modelCrop, dimensions.cropShape ?? 'rectangle'),

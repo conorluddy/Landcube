@@ -31,6 +31,10 @@ export interface RoadStyle {
   color: string;
   /** Width of a secondary road on the printed model; other classes scale from it. */
   widthMm: number;
+  /** Follows the model's geographic size until the width is edited. */
+  autoWidth: boolean;
+  /** Asphalt grit and wear, 0 (flat) to 1. */
+  texture: number;
 }
 
 /** A road run in source-frame units, already clipped to the model crop. */

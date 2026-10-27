@@ -311,6 +311,24 @@ void test('a failed road download keeps the terrain and explains how to recover'
   assert.match(c.getSnapshot().roads.status, /busy/);
 });
 
+void test('auto road width follows the model area until the width is edited', () => {
+  const { controller: c } = setup();
+
+  c.modelSpan(5.09);
+  assert.equal(c.getSnapshot().scene.roads.widthMm, 0.6, 'hidden roads keep their width');
+  c.roads({ enabled: true });
+  assert.equal(c.getSnapshot().scene.roads.widthMm, 0.5);
+  c.modelSpan(20);
+  assert.equal(c.getSnapshot().scene.roads.widthMm, 2);
+
+  c.roads({ widthMm: 0.8, autoWidth: false });
+  c.modelSpan(5.09);
+  assert.equal(c.getSnapshot().scene.roads.widthMm, 0.8);
+
+  c.roads({ autoWidth: true });
+  assert.equal(c.getSnapshot().scene.roads.widthMm, 0.5);
+});
+
 function roadElement(id: number) {
   return {
     type: 'way',

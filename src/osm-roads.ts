@@ -62,7 +62,7 @@ export async function loadMappedRoads(
 
   if (!response.ok) {
     return failure(
-      response.status === 429 || response.status === 504
+      [429, 502, 503, 504].includes(response.status)
         ? 'The OpenStreetMap road service is busy. Wait a minute and retry.'
         : `The OpenStreetMap road service answered ${response.status}. Retry later.`,
       true,

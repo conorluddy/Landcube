@@ -89,7 +89,7 @@ void test('a malformed response fails with a retryable map-data error', () => {
 
 void test('busy and unreachable road services return actionable errors instead of throwing', async () => {
   const busy = await loadMappedRoads(bounds, 'all', () =>
-    Promise.resolve(new Response('', { status: 429 })),
+    Promise.resolve(new Response('', { status: 502 })),
   );
   const offline = await loadMappedRoads(bounds, 'all', () =>
     Promise.reject(new TypeError('Failed to fetch')),

@@ -1,11 +1,7 @@
 import * as THREE from 'three';
 
-/** Object-space textures stay attached to the cut model, without UV seams or image downloads. */
-const naturalShader = /* glsl */ `
-  varying vec3 naturalPosition;
-  varying vec3 naturalNormal;
-  varying float naturalDepth;
-
+/** Seeded-by-position value noise shared by the procedural terrain and road materials. */
+export const earthNoiseShader = /* glsl */ `
   float earthHash(vec3 p) {
     p = fract(p * 0.1031);
     p += dot(p, p.yzx + 33.33);
@@ -27,6 +23,14 @@ const naturalShader = /* glsl */ `
     return earthNoise(p) * 0.57 + earthNoise(p * 2.03 + 7.1) * 0.28
       + earthNoise(p * 4.11 + 13.4) * 0.15;
   }
+`;
+
+/** Object-space textures stay attached to the cut model, without UV seams or image downloads. */
+const naturalShader = /* glsl */ `
+  varying vec3 naturalPosition;
+  varying vec3 naturalNormal;
+  varying float naturalDepth;
+${earthNoiseShader}
 
   vec3 earthColor(vec3 srgb) {
     return pow(srgb, vec3(2.2));

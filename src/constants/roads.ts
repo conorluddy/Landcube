@@ -58,6 +58,11 @@ export const defaultRoadStyle = {
   detail: 'all',
   color: '#8a8a8a',
   widthMm: 0.6,
+  autoWidth: true,
+  texture: 0.5,
 } as const;
 
 export const roadWidthMmLimits = { minimum: 0.1, maximum: 3, step: 0.05 } as const;
+
+/** Auto width: 0.5 mm reads well on a 5 km model, so wider areas get proportionally bolder roads. */
+export const roadWidthMmPerModelKm = 0.1;

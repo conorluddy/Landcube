@@ -38,7 +38,7 @@ import {
 import { getTerrainWaterColor } from '../terrain-water';
 import type { DesignSettings } from '../types/design';
 import type { RoadDetail } from '../types/roads';
-import { roadAttribution, roadWidthMmLimits } from '../constants/roads';
+import { roadAttribution, roadWidthMmLimits, roadWidthMmPerModelKm } from '../constants/roads';
 import { describeRoadNetwork } from './controller';
 
 export interface PanelProps {
@@ -1016,13 +1016,34 @@ function RoadsGroup({ controller: c, state: s }: PanelProps): ReactNode {
         suffix=" mm"
         disabled={!style.enabled}
         onChange={(value) => {
-          c.roads({ widthMm: value });
+          c.roads({ widthMm: value, autoWidth: false });
+        }}
+      />
+      <Toggle
+        label="Auto width for area"
+        value={style.autoWidth}
+        disabled={!style.enabled}
+        onChange={(value) => {
+          c.roads({ autoWidth: value });
+        }}
+      />
+      <Range
+        label="Road texture"
+        value={style.texture * 100}
+        min={0}
+        max={100}
+        step={1}
+        suffix="%"
+        disabled={!style.enabled}
+        onChange={(value) => {
+          c.roads({ texture: value / 100 });
         }}
       />
       {status && <Hint>{status}</Hint>}
       <Hint>
-        Experimental. Width is on the printed model, so roads read at any scale. Tunnels and bridges
-        are hidden. Session-only and omitted from STL. {roadAttribution}.
+        Experimental. Width is on the printed model; auto width is {roadWidthMmPerModelKm} mm per km
+        of model area. Tunnels and bridges are hidden. Session-only and omitted from STL.{' '}
+        {roadAttribution}.
       </Hint>
     </Group>
   );
