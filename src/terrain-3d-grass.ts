@@ -4,14 +4,14 @@ import {
   surveyGrassGround,
   type GrassCoverageMap,
   type GrassGround,
-  type GrassSite,
 } from './grass-coverage';
+import type { DecorationSite } from './decoration-field';
 import { defaultGrassStyle } from './constants/grass';
 import type { GrassStyle } from './types/grass';
 
 /** Everything a rebuild needs from the current terrain update. */
 export interface TerrainGrassInputs {
-  site: GrassSite;
+  site: DecorationSite;
   /** The rendered terrain surface; each shell is a copy of it lifted a little higher. */
   surface: THREE.BufferGeometry;
 }
@@ -75,7 +75,7 @@ export function createTerrainGrassLayer(): TerrainGrassLayer {
   };
 
   /** Uniforms that follow the crop and style without touching the mask. */
-  const syncShape = (site: GrassSite) => {
+  const syncShape = (site: DecorationSite) => {
     const scale = 2 / Math.max(site.width, site.height);
     // Density is blades per square centimetre, so each blade owns a cell this many mm across.
     const cellMm = 10 / Math.sqrt(Math.max(1, style.bladesPerSquareCm));

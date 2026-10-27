@@ -7,7 +7,7 @@ import type { SeaLevelGeometry } from '../sea-level';
 import type { TerrainTerraceLevels } from '../terrain-terraces';
 import type { FloorPlace } from '../floor-geo';
 import type { RoadPath } from '../types/roads';
-import type { GrassGeography } from '../grass-coverage';
+import type { DecorationGeography } from '../decoration-field';
 import { getAutoRotateSpeed, type TerrainViewPreset } from '../terrain-camera';
 
 interface StudioTerrainView {
@@ -35,7 +35,7 @@ interface StudioTerrainView {
     contourIntervalMeters?: number,
     terraceLevels?: TerrainTerraceLevels,
     roads?: readonly RoadPath[],
-    grassGeography?: GrassGeography,
+    decorationGeography?: DecorationGeography,
   ) => void;
 }
 
@@ -231,7 +231,7 @@ export function createStudioTerrainView(
       contourIntervalMeters?: number,
       terraceLevels?: TerrainTerraceLevels,
       roads?: readonly RoadPath[],
-      grassGeography?: GrassGeography,
+      decorationGeography?: DecorationGeography,
     ) {
       floorPlace = place;
       interval = contourIntervalMeters;
@@ -256,7 +256,7 @@ export function createStudioTerrainView(
           seaLevel,
           terraceLevels,
           roads,
-          grassGeography,
+          decorationGeography,
         );
       }
     },

@@ -33,7 +33,11 @@ import {
 import { createTerrainLineBuffers } from './terrain-3d-lines';
 import { createTerrainRoadLayer } from './terrain-3d-roads';
 import { createTerrainGrassLayer } from './terrain-3d-grass';
-import { getGrassRoads, type GrassGeography, type GrassSite } from './grass-coverage';
+import {
+  getDecorationRoads,
+  type DecorationGeography,
+  type DecorationSite,
+} from './decoration-field';
 import type { GrassStyle } from './types/grass';
 import { defaultRoadStyle } from './constants/roads';
 import { noRoadPaths } from './road-ribbons';
@@ -88,7 +92,7 @@ export interface Terrain3d {
     seaLevel?: SeaLevelGeometry,
     terraceLevels?: TerrainTerraceLevels,
     roads?: readonly RoadPath[],
-    grassGeography?: GrassGeography,
+    decorationGeography?: DecorationGeography,
   ): void;
   setVisible(value: boolean): void;
   /** Pass false when a terrain update follows, so the new height morphs with it. */
@@ -448,10 +452,13 @@ export function createTerrain3d(
         height: number;
         seaLevel: number | undefined;
         roadPaths: readonly RoadPath[];
-        geography: GrassGeography;
+        geography: DecorationGeography;
       }
     | undefined;
-  let grassRoads: { key: readonly unknown[]; roads: GrassSite['roads'] } = { key: [], roads: [] };
+  let grassRoads: { key: readonly unknown[]; roads: DecorationSite['roads'] } = {
+    key: [],
+    roads: [],
+  };
 
   /** Regrows grass from the last terrain update and the current road style. */
   const updateGrass = () => {
@@ -473,7 +480,10 @@ export function createTerrain3d(
 
     // A stable road list keeps grass from resurveying the ground on unrelated updates.
     if (roadKey.some((value, index) => value !== grassRoads.key[index])) {
-      grassRoads = { key: roadKey, roads: getGrassRoads(roadPaths, roadStyle, frameUnitsPerMm) };
+      grassRoads = {
+        key: roadKey,
+        roads: getDecorationRoads(roadPaths, roadStyle, frameUnitsPerMm),
+      };
     }
 
     grass.update({
@@ -935,7 +945,7 @@ export function createTerrain3d(
       seaLevel?: SeaLevelGeometry,
       terraceLevels?: TerrainTerraceLevels,
       roadPaths: readonly RoadPath[] = noRoadPaths,
-      grassGeography?: GrassGeography,
+      decorationGeography?: DecorationGeography,
     ) {
       lastUpdate = [
         contours,
@@ -946,7 +956,7 @@ export function createTerrain3d(
         seaLevel,
         terraceLevels,
         roadPaths,
-        grassGeography,
+        decorationGeography,
       ];
       // Terrace levels follow the contour interval but only shape terraced models.
       const morphKey = JSON.stringify([
@@ -1115,13 +1125,13 @@ export function createTerrain3d(
         exaggeration,
         elevationOffset,
       });
-      grassTerrain = grassGeography && {
+      grassTerrain = decorationGeography && {
         field,
         width,
         height,
         seaLevel: seaLevel?.elevation,
         roadPaths,
-        geography: grassGeography,
+        geography: decorationGeography,
       };
       updateGrass();
 
