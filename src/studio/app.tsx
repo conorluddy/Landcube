@@ -446,7 +446,7 @@ function Studio({
               href={roadAttributionUrl}
               target="_blank"
               rel="noreferrer"
-              title="Opens in a new tab"
+              aria-label={`${state.roads.network?.attribution ?? ''} (opens in a new tab)`}
             >
               {state.roads.network?.attribution}
             </a>

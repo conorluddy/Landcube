@@ -133,14 +133,10 @@ async function requestMappedRoads(
     );
   }
 
+  let text: string | undefined;
+
   try {
-    const text = await readLimitedText(response, overpassMaximumResponseBytes);
-
-    if (text === undefined) {
-      return failure('This area has too many roads to draw. Choose a smaller area span.', false);
-    }
-
-    return parseOverpassRoads(JSON.parse(text), detail, now().toISOString());
+    text = await readLimitedText(response, overpassMaximumResponseBytes);
   } catch (error) {
     if (signal?.aborted === true) {
       throw error;
@@ -149,8 +145,22 @@ async function requestMappedRoads(
     // Only the request's own timeout aborts it here, since the caller's abort rethrows above.
     return requestSignal.aborted
       ? timedOut()
-      : failure('The road response was not valid JSON. Retry later.', true);
+      : failure('The road download was interrupted. Check your connection and retry.', true);
   }
+
+  if (text === undefined) {
+    return failure('This area has too many roads to draw. Choose a smaller area span.', false);
+  }
+
+  let json: unknown;
+
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return failure('The road response was not valid JSON. Retry later.', true);
+  }
+
+  return parseOverpassRoads(json, detail, now().toISOString());
 }
 
 /** West-to-east longitude ranges inside ±180° that together cover `west`…`east`. */

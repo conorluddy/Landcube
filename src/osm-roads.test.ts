@@ -194,6 +194,26 @@ void test('a response that stalls mid-body reports a timeout, not invalid JSON',
   assert.equal(result.error.retryable, true);
 });
 
+void test('a connection that drops mid-body reports an interruption, and bad JSON stays distinct', async () => {
+  const dropped = await loadMappedRoads(bounds, 'all', () => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"elements": ['));
+        controller.error(new TypeError('network error'));
+      },
+    });
+
+    return Promise.resolve(new Response(body));
+  });
+  const malformed = await loadMappedRoads(bounds, 'all', () =>
+    Promise.resolve(new Response('{"elements": [')),
+  );
+
+  assert.ok(!dropped.ok && !malformed.ok);
+  assert.match(dropped.error.message, /interrupted/);
+  assert.match(malformed.error.message, /not valid JSON/);
+});
+
 void test('road downloads post the query and record when they were fetched', async () => {
   let body = '';
   const result = await loadMappedRoads(
