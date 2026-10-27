@@ -38,7 +38,12 @@ import {
 import { getTerrainWaterColor } from '../terrain-water';
 import type { DesignSettings } from '../types/design';
 import type { RoadDetail } from '../types/roads';
-import { roadAttribution, roadWidthMmLimits, roadWidthMmPerModelKm } from '../constants/roads';
+import {
+  roadAttribution,
+  roadAttributionUrl,
+  roadWidthMmLimits,
+  roadWidthMmPerModelKm,
+} from '../constants/roads';
 import { describeRoadNetwork } from './controller';
 
 export interface PanelProps {
@@ -1058,9 +1063,11 @@ function RoadsGroup({ controller: c, state: s }: PanelProps): ReactNode {
       )}
       <Hint>
         Experimental. Width is on the printed model; auto width is {roadWidthMmPerModelKm} mm per km
-        of model area. Tunnels and bridges are hidden. Session-only and omitted from STL.{' '}
-        {roadAttribution}.
+        of model area. Tunnels and bridges are hidden. Session-only and omitted from STL.
       </Hint>
+      <a href={roadAttributionUrl} target="_blank" rel="noreferrer">
+        {roadAttribution} ↗
+      </a>
     </Group>
   );
 }

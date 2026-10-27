@@ -398,11 +398,11 @@ void test('road status counts only the tunnels and bridges within the drawn deta
 
   assert.equal(
     describeRoadNetwork(network, { ...defaultRoadStyle, detail: 'major' }),
-    '1 mapped roads.',
+    '1 mapped road.',
   );
   assert.equal(
     describeRoadNetwork(network, { ...defaultRoadStyle, detail: 'tracks' }),
-    '1 mapped roads · 1 bridges and 0 tunnels hidden.',
+    '1 mapped road · 1 bridge and 0 tunnels hidden.',
   );
 });
 

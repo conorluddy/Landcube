@@ -56,6 +56,8 @@ export const overpassMaximumResponseBytes = 20 * 1024 * 1024;
 /** Places whose road networks stay cached; autoplay tours would otherwise keep every one. */
 export const cachedRoadNetworkLimit = 5;
 export const roadAttribution = 'Roads © OpenStreetMap contributors';
+/** OSM asks web credits to link here. */
+export const roadAttributionUrl = 'https://www.openstreetmap.org/copyright';
 
 export const defaultRoadStyle = {
   enabled: false,

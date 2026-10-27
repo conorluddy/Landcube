@@ -1022,10 +1022,12 @@ export function describeRoadNetwork(network: RoadNetwork, style: RoadStyle): str
   // Only omissions within the drawn classes; a hidden track bridge is irrelevant to major roads.
   const hidden = network.omitted.filter((omission) => classes.includes(omission.roadClass));
   const bridges = hidden.filter((omission) => omission.kind === 'bridge').length;
-  const parts = [`${drawn.toLocaleString('en')} mapped roads`];
+  const parts = [countOf(drawn, 'mapped road')];
 
   if (hidden.length > 0) {
-    parts.push(`${bridges} bridges and ${hidden.length - bridges} tunnels hidden`);
+    parts.push(
+      `${countOf(bridges, 'bridge')} and ${countOf(hidden.length - bridges, 'tunnel')} hidden`,
+    );
   }
 
   if (network.detail === 'major' && style.detail !== 'major') {
@@ -1033,6 +1035,11 @@ export function describeRoadNetwork(network: RoadNetwork, style: RoadStyle): str
   }
 
   return `${parts.join(' · ')}.`;
+}
+
+/** "1 bridge", "2 bridges", "1,204 mapped roads". */
+function countOf(count: number, noun: string): string {
+  return `${count.toLocaleString('en')} ${noun}${count === 1 ? '' : 's'}`;
 }
 
 /** Unknown places (typed coordinates, generated terrain) keep the current gradient. */

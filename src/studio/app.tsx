@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
+import { roadAttributionUrl } from '../constants/roads';
 import {
   areRoadsDrawn,
   threeDOnlySections,
@@ -440,7 +441,9 @@ function Studio({
             </span>
           )}
           {areRoadsDrawn(state) && (
-            <span className="attribution">{state.roads.network?.attribution}</span>
+            <a className="attribution" href={roadAttributionUrl} target="_blank" rel="noreferrer">
+              {state.roads.network?.attribution}
+            </a>
           )}
         </div>
         <a
