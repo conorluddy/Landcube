@@ -56,7 +56,11 @@ void test('tunnels and bridges are counted and left out of drawn roads', () => {
     result.data.roads.map((road) => road.id),
     [1, 4],
   );
-  assert.deepEqual(result.data.omitted, { tunnels: 2, bridges: 1 });
+  assert.deepEqual(result.data.omitted, [
+    { roadClass: 'primary', kind: 'tunnel' },
+    { roadClass: 'secondary', kind: 'bridge' },
+    { roadClass: 'residential', kind: 'tunnel' },
+  ]);
   assert.match(result.data.attribution, /OpenStreetMap contributors/);
 });
 

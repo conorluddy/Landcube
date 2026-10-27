@@ -10,7 +10,7 @@ import { encodeTerrainStill } from './export/still-export';
 import { createBinaryStl } from './export/stl-export';
 import type { RealTerrain } from './real-terrain';
 import { createFloorPlace } from './floor-geo';
-import { clipRoadsToCrop } from './road-ribbons';
+import { clipRoadsToCrop, noRoadPaths } from './road-ribbons';
 import type { RoadPath } from './types/roads';
 import { findTerrainSummits } from './summit-markers';
 import { getRequiredElement } from './dom-elements';
@@ -383,7 +383,8 @@ function updateTerrain3d(): void {
 
   const place = createFloorPlace(realTerrain, modelCrop, modelSourceFrame);
 
-  // Before the update, so an auto road width change rebuilds with this terrain.
+  // Before the update, so the update builds roads at the new auto width. A width change also
+  // rebuilds once on the previous terrain; that costs one ribbon pass per place load.
   controls.modelSpan(place ? Math.max(place.widthKm, place.lengthKm) : undefined);
   terrain3d.update(
     croppedContours,
@@ -405,14 +406,14 @@ function getCroppedRoadPaths(
   frame: { width: number; height: number },
   crop: NonNullable<typeof modelCrop>,
   shape: 'rectangle' | 'circle',
-): RoadPath[] {
+): readonly RoadPath[] {
   const { roads } = controls.getSnapshot();
   const location = realTerrain?.location;
   const spanKm = realTerrain?.spanKm;
 
   // Disabled roads still project, so switching them back on needs no terrain update.
   if (!roads.network || !location || spanKm === undefined) {
-    return [];
+    return noRoadPaths;
   }
 
   const key = [roads.network, location, spanKm, frame, crop, shape];

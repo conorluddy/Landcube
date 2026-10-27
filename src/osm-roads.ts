@@ -75,7 +75,7 @@ export function parseOverpassRoads(
   }
 
   const roads: MappedRoad[] = [];
-  const omitted = { tunnels: 0, bridges: 0 };
+  const omitted: RoadNetwork['omitted'] = [];
 
   for (const element of response.elements) {
     const road = readRoadElement(element);
@@ -86,10 +86,8 @@ export function parseOverpassRoads(
 
     if (road.kind === 'road') {
       roads.push(road.road);
-    } else if (road.kind === 'tunnel') {
-      omitted.tunnels++;
     } else {
-      omitted.bridges++;
+      omitted.push({ roadClass: road.roadClass, kind: road.kind });
     }
   }
 
@@ -245,7 +243,8 @@ async function readLimitedText(
   return new TextDecoder().decode(bytes);
 }
 
-type ParsedRoadElement = { kind: 'tunnel' | 'bridge' } | { kind: 'road'; road: MappedRoad };
+type ParsedRoadElement =
+  { kind: 'tunnel' | 'bridge'; roadClass: RoadClass } | { kind: 'road'; road: MappedRoad };
 
 function readRoadElement(element: unknown): ParsedRoadElement | undefined {
   if (!isRecord(element) || element.type !== 'way' || typeof element.id !== 'number') {
@@ -260,11 +259,11 @@ function readRoadElement(element: unknown): ParsedRoadElement | undefined {
   }
 
   if (isTagSet(tags.tunnel) || tags.covered === 'yes') {
-    return { kind: 'tunnel' };
+    return { kind: 'tunnel', roadClass };
   }
 
   if (isTagSet(tags.bridge)) {
-    return { kind: 'bridge' };
+    return { kind: 'bridge', roadClass };
   }
 
   const points = element.geometry.flatMap((point) =>

@@ -992,8 +992,12 @@ function RoadsGroup({ controller: c, state: s }: PanelProps): ReactNode {
       <Select
         id="roadDetail"
         label="Detail"
-        value={style.detail}
-        options={roadDetailOptions}
+        value={network?.detail === 'major' ? 'major' : style.detail}
+        options={
+          network?.detail === 'major'
+            ? roadDetailOptions.filter((option) => option.value === 'major')
+            : roadDetailOptions
+        }
         disabled={!style.enabled}
         onChange={(value) => {
           c.roads({ detail: value });

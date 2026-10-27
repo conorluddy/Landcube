@@ -1019,11 +1019,13 @@ export function getSceneCredits(
 export function describeRoadNetwork(network: RoadNetwork, style: RoadStyle): string {
   const classes: readonly string[] = roadDetailClasses[style.detail];
   const drawn = network.roads.filter((road) => classes.includes(road.roadClass)).length;
-  const hidden = network.omitted.tunnels + network.omitted.bridges;
+  // Only omissions within the drawn classes; a hidden track bridge is irrelevant to major roads.
+  const hidden = network.omitted.filter((omission) => classes.includes(omission.roadClass));
+  const bridges = hidden.filter((omission) => omission.kind === 'bridge').length;
   const parts = [`${drawn.toLocaleString('en')} mapped roads`];
 
-  if (hidden > 0) {
-    parts.push(`${network.omitted.bridges} bridges and ${network.omitted.tunnels} tunnels hidden`);
+  if (hidden.length > 0) {
+    parts.push(`${bridges} bridges and ${hidden.length - bridges} tunnels hidden`);
   }
 
   if (network.detail === 'major' && style.detail !== 'major') {

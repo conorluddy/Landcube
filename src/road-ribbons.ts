@@ -24,6 +24,9 @@ interface SourceCrop {
   height: number;
 }
 
+/** Shared so updates without roads keep one identity and never rebuild empty geometry. */
+export const noRoadPaths: readonly RoadPath[] = Object.freeze([]);
+
 /** Miters longer than this many half-widths are clamped, so sharp bends cannot spike. */
 const maximumMiterScale = 2;
 

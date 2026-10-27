@@ -32,6 +32,7 @@ import {
 } from './terrain-lighting';
 import { createTerrainLineBuffers } from './terrain-3d-lines';
 import { createTerrainRoadLayer } from './terrain-3d-roads';
+import { noRoadPaths } from './road-ribbons';
 import {
   baseTerrainFovDegrees,
   defaultTerrainCameraSettings,
@@ -857,7 +858,7 @@ export function createTerrain3d(
       field: HeightField,
       seaLevel?: SeaLevelGeometry,
       terraceLevels?: TerrainTerraceLevels,
-      roadPaths: readonly RoadPath[] = [],
+      roadPaths: readonly RoadPath[] = noRoadPaths,
     ) {
       lastUpdate = [contours, width, height, settings, field, seaLevel, terraceLevels, roadPaths];
       // Terrace levels follow the contour interval but only shape terraced models.

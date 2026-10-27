@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
-import { createStudioController, getSceneCredits, type StudioEffects } from './studio/controller';
+import {
+  createStudioController,
+  describeRoadNetwork,
+  getSceneCredits,
+  type StudioEffects,
+} from './studio/controller';
+import { defaultRoadStyle } from './constants/roads';
 import {
   parseDesignParameters,
   serializeDesignParameters,
@@ -379,6 +385,25 @@ void test('stills credit OpenStreetMap only while roads are drawn', async (t) =>
   c.dimensions({ terrainShape: 'smooth' });
   await c.selectView('2d');
   assert.deepEqual(credits(), ['EU-DEM'], 'the 2D view draws no roads');
+});
+
+void test('road status counts only the tunnels and bridges within the drawn detail', () => {
+  const network = {
+    roads: [{ id: 1, roadClass: 'primary' as const, points: [] }],
+    omitted: [{ roadClass: 'track' as const, kind: 'bridge' as const }],
+    detail: 'tracks' as const,
+    fetchedAt: '',
+    attribution: '',
+  };
+
+  assert.equal(
+    describeRoadNetwork(network, { ...defaultRoadStyle, detail: 'major' }),
+    '1 mapped roads.',
+  );
+  assert.equal(
+    describeRoadNetwork(network, { ...defaultRoadStyle, detail: 'tracks' }),
+    '1 mapped roads · 1 bridges and 0 tunnels hidden.',
+  );
 });
 
 function roadElement(id: number) {

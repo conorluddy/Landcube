@@ -16,8 +16,8 @@ export interface MappedRoad {
 /** A fetched road network plus what was left out and where it came from. */
 export interface RoadNetwork {
   roads: MappedRoad[];
-  /** Tunnels and bridges are hidden until they have their own geometry. */
-  omitted: { tunnels: number; bridges: number };
+  /** Tunnels and bridges are hidden until they have their own geometry; one entry per way. */
+  omitted: { roadClass: RoadClass; kind: 'tunnel' | 'bridge' }[];
   /** The finest detail this network was fetched with. */
   detail: RoadDetail;
   fetchedAt: string;
