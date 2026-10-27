@@ -62,7 +62,6 @@ export function validateTerrainModelSettings(settings: TerrainModelSettings): vo
   }
 }
 
-/** A translated view of the original field keeps crops centered and lossless. */
 /** Crop units per printed millimetre: the crop's longer side, or a circle's diameter, spans the model. */
 export function getFrameUnitsPerMm(
   width: number,
@@ -74,6 +73,7 @@ export function getFrameUnitsPerMm(
     : Math.max(width, height) / Math.max(settings.widthMm, settings.lengthMm);
 }
 
+/** A translated view of the original field keeps crops centered and lossless. */
 export function cropTerrainModelField(
   field: HeightField,
   width: number,
