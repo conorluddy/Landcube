@@ -15,7 +15,7 @@ Topogra creates topographic artwork from generated landscapes or real-world elev
 - **Ready-to-use exports.** Download standalone SVG or PNG files with custom dimensions, transparent backgrounds, and 1× or 2× PNG resolution.
 - **Reproducible designs.** Reuse a seed, share a browser design link, or save a versioned CLI configuration for later generation.
 
-No account or backend is needed. Generated landscapes run offline once the web app has loaded; real terrain downloads public elevation tiles without an API key.
+No account or backend is needed. The hosted web app loads Google Analytics, which receives page views (site address without any design-link query string) along with the standard browser details Google collects, such as IP address, user agent, referrer and screen size. Generated landscapes run offline once the web app has loaded; real terrain downloads public elevation tiles without an API key.
 
 ## Use the web app
 
