@@ -38,6 +38,8 @@ import {
 import { getTerrainWaterColor } from '../terrain-water';
 import type { DesignSettings } from '../types/design';
 import type { RoadDetail } from '../types/roads';
+import type { GrassPresetKey } from '../types/grass';
+import { grassPresets } from '../constants/grass';
 import {
   roadAttribution,
   roadAttributionUrl,
@@ -735,6 +737,7 @@ export function ScenePanel({ controller: c, state: s }: PanelProps): ReactNode {
         />
         <Hint>Visibility affects the preview. STL always includes terrain and a solid base.</Hint>
       </Group>
+      <GrassGroup controller={c} state={s} />
       <Group title="Ground">
         <Toggle
           label="Studio floor"
@@ -960,6 +963,139 @@ export function OverlaysPanel({ controller: c, state: s }: PanelProps): ReactNod
         </Group>
       )}
     </>
+  );
+}
+
+const grassLookOptions = [
+  ...Object.entries(grassPresets).map(([value, preset]) => ({
+    value: value as GrassPresetKey,
+    label: preset.label,
+  })),
+  { value: 'custom' as const, label: 'Custom' },
+];
+
+/** Experimental instanced grass; colour, length and wind restyle without re-placing tufts. */
+function GrassGroup({ controller: c, state: s }: PanelProps): ReactNode {
+  const grass = s.scene.grass;
+  const off = !grass.enabled;
+  const percent = (
+    label: string,
+    key:
+      | 'coverage'
+      | 'clumping'
+      | 'lengthVariation'
+      | 'colorVariation'
+      | 'dryness'
+      | 'altitudeLimit'
+      | 'wind',
+  ) => (
+    <Range
+      label={label}
+      value={Math.round(grass[key] * 100)}
+      min={0}
+      max={100}
+      step={1}
+      suffix="%"
+      disabled={off}
+      onChange={(value) => {
+        c.grass({ [key]: value / 100 });
+      }}
+    />
+  );
+
+  return (
+    <Group title="Grass">
+      <Toggle
+        label="Grass"
+        value={grass.enabled}
+        onChange={(value) => {
+          c.grass({ enabled: value });
+        }}
+      />
+      <Select
+        id="grassLook"
+        label="Look"
+        value={grass.preset}
+        options={grassLookOptions}
+        disabled={off}
+        onChange={(value) => {
+          c.grass({ preset: value });
+        }}
+      />
+      <Range
+        label="Blade length"
+        value={grass.lengthMm}
+        min={0.2}
+        max={4}
+        step={0.05}
+        suffix=" mm"
+        disabled={off}
+        onChange={(value) => {
+          c.grass({ lengthMm: value });
+        }}
+      />
+      {percent('Length variation', 'lengthVariation')}
+      <Color
+        label="Base colour"
+        value={grass.baseColor}
+        disabled={off}
+        onChange={(value) => {
+          c.grass({ baseColor: value });
+        }}
+      />
+      <Color
+        label="Tip colour"
+        value={grass.tipColor}
+        disabled={off}
+        onChange={(value) => {
+          c.grass({ tipColor: value });
+        }}
+      />
+      <Color
+        label="Dry colour"
+        value={grass.dryColor}
+        disabled={off}
+        onChange={(value) => {
+          c.grass({ dryColor: value });
+        }}
+      />
+      {percent('Colour variation', 'colorVariation')}
+      {percent('Dry patches', 'dryness')}
+      <Range
+        label="Density"
+        value={grass.density}
+        min={0}
+        max={200}
+        step={5}
+        suffix=" /cm²"
+        disabled={off}
+        onChange={(value) => {
+          c.grass({ density: value });
+        }}
+      />
+      {percent('Coverage', 'coverage')}
+      {percent('Clumping', 'clumping')}
+      <Range
+        label="Slope limit"
+        value={grass.slopeLimitDegrees}
+        min={10}
+        max={60}
+        step={1}
+        suffix="°"
+        disabled={off}
+        onChange={(value) => {
+          c.grass({ slopeLimitDegrees: value });
+        }}
+      />
+      {percent('Altitude limit', 'altitudeLimit')}
+      {percent('Wind', 'wind')}
+      <Hint>
+        Experimental. Length and density are on the printed model. Grass avoids drawn roads, the
+        sea, slopes steeper than the limit on the real ground, and the top of the relief above the
+        altitude limit. Wind pauses with reduced motion. Hidden on terraced models; session-only and
+        omitted from STL and 2D exports.
+      </Hint>
+    </Group>
   );
 }
 

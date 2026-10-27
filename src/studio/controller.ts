@@ -50,6 +50,8 @@ import { defaultRoadStyle, roadDetailClasses, roadSpanLimitsKm } from '../consta
 import { operationErrorCodes } from '../constants/operations';
 import type { RoadNetwork, RoadStyle } from '../types/roads';
 import { createRoadNetworkLoader, getRoadPlacementKey } from './road-loader';
+import { defaultGrassStyle, grassPresets } from '../constants/grass';
+import type { GrassStyle } from '../types/grass';
 import { getSuggestedRoadWidthMm } from '../road-ribbons';
 import { createFrameAssembly } from '../frame/frame-assembly';
 import {
@@ -98,6 +100,7 @@ export interface SceneSettings {
   rotationSeconds: number;
   rotationDirection: TurntableDirection;
   roads: RoadStyle;
+  grass: GrassStyle;
 }
 /** Mapped roads for the loaded real terrain; never part of design links. */
 export interface RoadNetworkState {
@@ -223,6 +226,8 @@ export interface StudioController {
   roads: (patch: Partial<RoadStyle>) => void;
   /** Downloads roads again after a retryable failure. */
   retryRoads: () => void;
+  /** Edits grass; picking a preset applies its look, and hand-editing the look makes it custom. */
+  grass: (patch: Partial<GrassStyle>) => void;
   interval: (value: 'auto' | number) => boolean;
   hatching: (value: boolean) => void;
   resetCamera: () => void;
@@ -292,6 +297,7 @@ export function createStudioController(
       rotationSeconds: defaultRotationSeconds,
       rotationDirection: 'counterclockwise',
       roads: { ...defaultRoadStyle },
+      grass: { ...defaultGrassStyle },
     },
     roads: { sourceKey: '', loading: false, status: '', canRetry: false },
     model: {
@@ -899,6 +905,25 @@ export function createStudioController(
         }
       }
     },
+    grass(patch: Partial<GrassStyle>) {
+      const preset =
+        patch.preset === undefined || patch.preset === 'custom'
+          ? undefined
+          : grassPresets[patch.preset];
+      const editsLook = grassLookKeys.some((key) => key in patch);
+      const look: Partial<GrassStyle> = preset
+        ? Object.fromEntries(grassLookKeys.map((key) => [key, preset[key]]))
+        : {};
+
+      controller.scene({
+        grass: {
+          ...state.scene.grass,
+          ...look,
+          ...patch,
+          ...(editsLook && preset === undefined ? { preset: 'custom' as const } : {}),
+        },
+      });
+    },
     roads(patch: Partial<RoadStyle>) {
       const wasEnabled = state.scene.roads.enabled;
       const merged = { ...state.scene.roads, ...patch };
@@ -983,6 +1008,17 @@ function getAutoRoadWidthMm(style: RoadStyle, modelSpanKm: number | undefined): 
     ? getSuggestedRoadWidthMm(modelSpanKm)
     : undefined;
 }
+
+/** Settings a grass preset owns; editing any of them by hand makes the look custom. */
+const grassLookKeys = [
+  'baseColor',
+  'tipColor',
+  'dryColor',
+  'colorVariation',
+  'dryness',
+  'lengthMm',
+  'lengthVariation',
+] as const satisfies readonly (keyof GrassStyle)[];
 
 /** Real terrain with a location and span can carry roads; generated terrain cannot. */
 function getRoadPlacement(

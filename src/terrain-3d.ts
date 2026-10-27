@@ -32,6 +32,10 @@ import {
 } from './terrain-lighting';
 import { createTerrainLineBuffers } from './terrain-3d-lines';
 import { createTerrainRoadLayer } from './terrain-3d-roads';
+import { createTerrainGrassLayer } from './terrain-3d-grass';
+import type { GrassGeography, GrassSite } from './grass-placement';
+import type { GrassStyle } from './types/grass';
+import { defaultRoadStyle, roadClassWidthFactors, roadDetailClasses } from './constants/roads';
 import { noRoadPaths } from './road-ribbons';
 import {
   baseTerrainFovDegrees,
@@ -83,6 +87,7 @@ export interface Terrain3d {
     seaLevel?: SeaLevelGeometry,
     terraceLevels?: TerrainTerraceLevels,
     roads?: readonly RoadPath[],
+    grassGeography?: GrassGeography,
   ): void;
   setVisible(value: boolean): void;
   /** Pass false when a terrain update follows, so the new height morphs with it. */
@@ -110,6 +115,7 @@ export interface Terrain3d {
   setWaterColor(value: string | undefined): void;
   setContours(value: boolean): void;
   setRoadStyle(value: Readonly<RoadStyle>): void;
+  setGrassStyle(value: Readonly<GrassStyle>): void;
   setContourEngraving(value: ContourEngravingSettings): void;
   setSurfaceColor(value: string | undefined): void;
   setRotating(value: boolean): void;
@@ -432,8 +438,76 @@ export function createTerrain3d(
   const landscape = new THREE.Group();
 
   const roads = createTerrainRoadLayer();
+  const grass = createTerrainGrassLayer();
+  let roadStyle: Readonly<RoadStyle> = defaultRoadStyle;
+  let grassTerrain:
+    | {
+        field: HeightField;
+        width: number;
+        height: number;
+        seaLevel: number | undefined;
+        roadPaths: readonly RoadPath[];
+        geography: GrassGeography;
+        exaggeration: number;
+        elevationOffset: number;
+      }
+    | undefined;
+  let grassRoads: { key: readonly unknown[]; roads: GrassSite['roads'] } = { key: [], roads: [] };
 
-  landscape.add(surface, base, contourLayer, roads.mesh, sea, waterSides);
+  /** Re-places grass from the last terrain update and the current road style. */
+  const updateGrass = () => {
+    if (!grassTerrain) {
+      return;
+    }
+
+    const { field, width, height, seaLevel, roadPaths, geography } = grassTerrain;
+    const frameUnitsPerMm =
+      modelSettings.cropShape === 'circle'
+        ? width / modelSettings.widthMm
+        : Math.max(width, height) / Math.max(modelSettings.widthMm, modelSettings.lengthMm);
+    const roadKey = [
+      roadPaths,
+      roadStyle.enabled,
+      roadStyle.detail,
+      roadStyle.widthMm,
+      frameUnitsPerMm,
+    ];
+
+    if (roadKey.some((value, index) => value !== grassRoads.key[index])) {
+      const classes: readonly string[] = roadDetailClasses[roadStyle.detail];
+
+      grassRoads = {
+        key: roadKey,
+        roads: roadStyle.enabled
+          ? roadPaths
+              .filter((path) => classes.includes(path.roadClass))
+              .map((path) => ({
+                points: path.points,
+                halfWidth:
+                  (roadStyle.widthMm * roadClassWidthFactors[path.roadClass] * frameUnitsPerMm) / 2,
+              }))
+          : [],
+      };
+    }
+
+    grass.update({
+      site: {
+        field,
+        width,
+        height,
+        shape: modelSettings.cropShape ?? 'rectangle',
+        frameUnitsPerMm,
+        seaLevel,
+        roads: grassRoads.roads,
+        ...geography,
+      },
+      exaggeration: grassTerrain.exaggeration,
+      elevationOffset: grassTerrain.elevationOffset,
+    });
+    updateLoop();
+  };
+
+  landscape.add(surface, base, contourLayer, roads.mesh, grass.mesh, sea, waterSides);
   scene.add(landscape);
   const framePreview = createTerrainFramePreview(renderer);
 
@@ -674,7 +748,7 @@ export function createTerrain3d(
 
   const updateLoop = () => {
     renderer.setAnimationLoop(
-      visible && (rotating || transition !== undefined) && !document.hidden
+      visible && (rotating || transition !== undefined || grass.isAnimated()) && !document.hidden
         ? () => {
             const now = performance.now();
 
@@ -683,6 +757,7 @@ export function createTerrain3d(
             }
 
             previousTime = now;
+            grass.tick(now);
             advanceTransition(now);
             draw();
           }
@@ -700,6 +775,7 @@ export function createTerrain3d(
     syncContourTreatment();
     syncWater();
     roads.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
+    grass.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
   };
 
   const applyPendingMapGrid = () => {
@@ -859,8 +935,19 @@ export function createTerrain3d(
       seaLevel?: SeaLevelGeometry,
       terraceLevels?: TerrainTerraceLevels,
       roadPaths: readonly RoadPath[] = noRoadPaths,
+      grassGeography?: GrassGeography,
     ) {
-      lastUpdate = [contours, width, height, settings, field, seaLevel, terraceLevels, roadPaths];
+      lastUpdate = [
+        contours,
+        width,
+        height,
+        settings,
+        field,
+        seaLevel,
+        terraceLevels,
+        roadPaths,
+        grassGeography,
+      ];
       // Terrace levels follow the contour interval but only shape terraced models.
       const morphKey = JSON.stringify([
         width,
@@ -1028,6 +1115,17 @@ export function createTerrain3d(
         exaggeration,
         elevationOffset,
       });
+      grassTerrain = grassGeography && {
+        field,
+        width,
+        height,
+        seaLevel: seaLevel?.elevation,
+        roadPaths,
+        geography: grassGeography,
+        exaggeration,
+        elevationOffset,
+      };
+      updateGrass();
 
       const scale = 2 / Math.max(width, height);
 
@@ -1187,12 +1285,25 @@ export function createTerrain3d(
       draw();
     },
     setRoadStyle(value: Readonly<RoadStyle>) {
-      const wasVisible = roads.mesh.visible;
+      const wasVisible = roads.mesh.visible || grass.mesh.visible;
 
+      roadStyle = value;
       roads.setStyle(value);
+      // Grass keeps clear of drawn roads, so road edits can re-place it.
+      updateGrass();
 
       // Hidden roads change nothing on screen; skipping the frame keeps terrain loads quick.
-      if (wasVisible || roads.mesh.visible) {
+      if (wasVisible || roads.mesh.visible || grass.mesh.visible) {
+        draw();
+      }
+    },
+    setGrassStyle(value: Readonly<GrassStyle>) {
+      const wasVisible = grass.mesh.visible;
+
+      grass.setStyle(value);
+      updateLoop();
+
+      if (wasVisible || grass.mesh.visible) {
         draw();
       }
     },
