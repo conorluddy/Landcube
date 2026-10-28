@@ -56,6 +56,31 @@ void test('every placed rock is drawn once, across the shape bank', () => {
   assert.equal(layer.group.visible, true);
 });
 
+void test('instance buffers grow with dense coverage and retain room for every shape', () => {
+  const layer = createTerrainRockLayer();
+
+  for (const child of layer.group.children) {
+    assert.equal((child as THREE.InstancedMesh).instanceMatrix.count, 0);
+  }
+
+  layer.update(inputs);
+
+  for (const density of [8, 160, 400, 8]) {
+    layer.setStyle({ ...defaultRockStyle, enabled: true, rocksPerSquareCm: density });
+    const placed = layer.getInstances();
+
+    assert.ok(placed);
+    assert.equal(positions(layer).length, placed.count);
+
+    for (const child of layer.group.children) {
+      const mesh = child as THREE.InstancedMesh;
+
+      assert.ok(mesh.instanceMatrix.count >= mesh.count);
+      assert.equal(mesh.instanceColor?.count, mesh.instanceMatrix.count);
+    }
+  }
+});
+
 void test('colour and shape edits keep every rock where it is', () => {
   const layer = createTerrainRockLayer();
 

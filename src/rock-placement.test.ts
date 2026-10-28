@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { placeRocks, rockShapeCount, type RockInstances } from './rock-placement';
+import { placeRocks, rockShapeCount, maximumRocks, type RockInstances } from './rock-placement';
 import { defaultRockStyle } from './constants/rocks';
 import type { DecorationSite } from './decoration-field';
 import type { HeightField } from './types/terrain';
@@ -155,4 +155,54 @@ void test('slope preference gathers rocks on steep ground', () => {
   const gentle = placeRocks(createSite({ field: createField(0.00087) }), preferring);
 
   assert.ok(steep.count > gentle.count * 1.5, `${steep.count} steep vs ${gentle.count} gentle`);
+});
+
+void test('default scree is dense, sub-millimetre and reproducible', () => {
+  const site = createSite();
+  const sparse = placeRocks(site, { ...defaultRockStyle, rocksPerSquareCm: 8 });
+  const dense = placeRocks(site, defaultRockStyle);
+
+  assert.ok(dense.count > sparse.count * 15, `${dense.count} dense vs ${sparse.count} sparse`);
+  assert.ok(dense.count > 6000, 'dense scree exceeds the old boulder budget');
+  assert.ok(dense.sizeMm.slice(0, dense.count).every((size) => size < 1));
+  assert.deepEqual(placeRocks(site, defaultRockStyle), dense);
+});
+
+void test('raising scree density preserves existing stones up to the rendering budget', () => {
+  const site = createSite();
+  const sparse = placeRocks(site, defaultRockStyle);
+  const dense = placeRocks(site, { ...defaultRockStyle, rocksPerSquareCm: 400 });
+  const stones = new Map(
+    Array.from({ length: dense.count }, (_, index) => [
+      `${dense.x[index]},${dense.y[index]}`,
+      dense.sizeMm[index],
+    ]),
+  );
+
+  assert.ok(dense.count > sparse.count);
+  assert.ok(dense.count <= maximumRocks);
+
+  for (let index = 0; index < sparse.count; index++) {
+    assert.equal(stones.get(`${sparse.x[index]},${sparse.y[index]}`), sparse.sizeMm[index]);
+  }
+});
+
+void test('scree piles up at the foot of a cliff, not on open ground beyond it', () => {
+  // A plateau drops at 45° from x = 200 to x = 260, onto flat ground that runs east.
+  const columns = 101;
+  const cliff: HeightField = {
+    ...createField(0),
+    values: Float64Array.from({ length: columns * columns }, (_, index) => {
+      const x = (index % columns) * 5;
+
+      return Math.min(0.6, Math.max(0, (260 - x) * 0.01));
+    }),
+  };
+  const rocks = placeRocks(createSite({ field: cliff }), { ...style, clustering: 0 });
+  const countBetween = (from: number, to: number) =>
+    Array.from(rocks.x.subarray(0, rocks.count)).filter((x) => x >= from && x < to).length;
+  const foot = countBetween(265, 325);
+  const beyond = countBetween(420, 480);
+
+  assert.ok(foot > beyond * 2, `${foot} at the foot vs ${beyond} beyond`);
 });

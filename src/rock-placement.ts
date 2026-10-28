@@ -7,6 +7,7 @@ import {
   smoothstep,
   type DecorationSite,
 } from './decoration-field';
+import { computeScreeDeposits } from './scree-deposits';
 import { sampleHeightField } from './terrain-surface';
 import type { RockStyle } from './types/rocks';
 
@@ -33,10 +34,10 @@ type RockPlacementStyle = Pick<
 
 /** Distinct rock shapes; each rock picks one, so the bank never repeats in an obvious pattern. */
 export const rockShapeCount = 6;
-export const maximumRocks = 6000;
+export const maximumRocks = 60000;
 
-/** One candidate per printed square millimetre: far finer than any useful rock density. */
-const candidateCellMm = 1;
+/** Fine enough for dense scree without saturating the candidates in cluster cores. */
+const candidateCellMm = 0.25;
 /** Boulder fields about 15 mm across on the printed model. */
 const clustersPerMm = 0.06;
 // Salts keep rocks independent of grass, which uses the low salts.
@@ -62,6 +63,11 @@ export function placeRocks(site: DecorationSite, style: RockPlacementStyle): Roc
   }
 
   const [minimum, maximum] = getFieldRange(site.field);
+  const deposits = computeScreeDeposits(
+    site.field,
+    site.metersPerFieldUnit,
+    site.metersPerFrameUnit,
+  );
   // Roads clear the largest rock's radius too, so no boulder overhangs the asphalt.
   const largestRadiusUnits = (style.maximumSizeMm / 2) * site.frameUnitsPerMm;
   const roads = createRoadIndex(
@@ -80,8 +86,8 @@ export function placeRocks(site: DecorationSite, style: RockPlacementStyle): Roc
     ) {
       const rank = hashCell(column, row, rockSalt);
 
-      // Cheap rejection first: no weight exceeds 3.6, so these candidates lose whatever the ground.
-      if (rank >= keepProbability * 3.6) {
+      // Cheap rejection first: no weight exceeds 9.4, so these candidates lose whatever the ground.
+      if (rank >= keepProbability * 9.4) {
         continue;
       }
 
@@ -100,9 +106,10 @@ export function placeRocks(site: DecorationSite, style: RockPlacementStyle): Roc
         0.78,
         fractalNoise(sourceXMm * clustersPerMm, sourceYMm * clustersPerMm, rockSalt + 3),
       );
+      const scree = sampleHeightField(deposits, x, y);
       const weight =
         getClusterWeight(core, style.clustering) *
-        getHabitatWeight(getSlopeDegrees(site, x, y), style.slopePreference) *
+        getHabitatWeight(getSlopeDegrees(site, x, y), scree, style.slopePreference) *
         getAltitudeWeight(elevation, minimum, maximum);
 
       if (
@@ -113,8 +120,9 @@ export function placeRocks(site: DecorationSite, style: RockPlacementStyle): Roc
         continue;
       }
 
-      // Most rocks are small; boulder sizes come mainly from cluster cores.
-      const sizeExponent = 3.2 - 1.9 * core * style.clustering;
+      // Most rocks are small; boulders come from cluster cores and the toes of scree aprons.
+      const sizeExponent =
+        3.2 - 1.9 * Math.max(core * style.clustering, scree * style.slopePreference * 0.7);
       const sizeFraction = hashCell(column, row, rockSalt + 4) ** sizeExponent;
       const index = instances.count++;
 
@@ -152,11 +160,15 @@ function getClusterWeight(core: number, clustering: number): number {
   return 1 + clustering * (0.12 + 2.6 * core - 1);
 }
 
-/** Rocks gather on steep ground and thin out on cliffs too sheer to hold them. */
-function getHabitatWeight(slopeDegrees: number, slopePreference: number): number {
+/**
+ * Rocks gather on steep ground and pile up where scree settles below it, so the foot of a cliff
+ * can be rockier than its face. Cliffs too sheer to hold rock thin out.
+ */
+function getHabitatWeight(slopeDegrees: number, scree: number, slopePreference: number): number {
   const steep = 0.15 + 0.85 * smoothstep(12, 38, slopeDegrees);
+  const ground = Math.max(steep, 0.15 + 2.5 * scree);
 
-  return (1 + slopePreference * (steep - 1)) * (1 - smoothstep(58, 70, slopeDegrees));
+  return (1 + slopePreference * (ground - 1)) * (1 - smoothstep(58, 70, slopeDegrees));
 }
 
 /** Summits are a little rockier than valley floors. */

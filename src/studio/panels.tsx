@@ -1270,9 +1270,9 @@ function RocksGroup({ controller: c, state: s }: PanelProps): ReactNode {
     <Range
       label={label}
       value={rocks[key]}
-      min={0.2}
+      min={0.02}
       max={8}
-      step={0.1}
+      step={0.02}
       suffix=" mm"
       disabled={off}
       onChange={(value) => {
@@ -1324,8 +1324,8 @@ function RocksGroup({ controller: c, state: s }: PanelProps): ReactNode {
         label="Rock density"
         value={rocks.rocksPerSquareCm}
         min={0}
-        max={30}
-        step={0.5}
+        max={400}
+        step={1}
         suffix=" /cm²"
         disabled={off}
         onChange={(value) => {
@@ -1338,9 +1338,10 @@ function RocksGroup({ controller: c, state: s }: PanelProps): ReactNode {
       {percent('Slope preference', 'slopePreference')}
       {percent('Embedding', 'embedding')}
       <Hint>
-        Experimental. Sizes and density are on the printed model. Rocks gather into boulder fields,
-        favour steep ground and keep off drawn roads and the sea; grass leaves bare ground beneath
-        them. Hidden on terraced models; session-only and omitted from STL and 2D exports.
+        Experimental. Sizes and density are on the printed model. Small stones form dense scree;
+        increase the sizes for boulder fields. Rocks favour steep ground and keep off drawn roads
+        and the sea; grass leaves bare ground beneath them. Hidden on terraced models; session-only
+        and omitted from STL and 2D exports.
       </Hint>
     </Group>
   );

@@ -490,7 +490,9 @@ test('rocks draw, restyle without errors and never change the printable STL', as
   await page.getByLabel('Rock type', { exact: true }).selectOption('slate');
   await page.getByLabel('Angularity', { exact: true }).fill('20');
   await expect(page.getByLabel('Rock type', { exact: true })).toHaveValue('custom');
-  await page.getByLabel('Rock density', { exact: true }).fill('20');
+  await page.getByLabel('Smallest rock', { exact: true }).fill('0.04');
+  await page.getByLabel('Largest rock', { exact: true }).fill('0.4');
+  await page.getByLabel('Rock density', { exact: true }).fill('400');
   await page.getByRole('switch', { name: 'Grass', exact: true }).check();
   expect((await modelDownload(page)).equals(before)).toBe(true);
   expect(errors).toEqual([]);

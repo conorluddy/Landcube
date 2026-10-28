@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { placeRocks, rockShapeCount, maximumRocks, type RockInstances } from './rock-placement';
+import { placeRocks, rockShapeCount, type RockInstances } from './rock-placement';
 import { createRockShape } from './rock-shapes';
 import { sampleHeightField, terrain3dElevationScale } from './terrain-surface';
 import { defaultRockStyle } from './constants/rocks';
@@ -33,13 +33,13 @@ export function createTerrainRockLayer(): TerrainRockLayer {
   const accent = { value: new THREE.Color(defaultRockStyle.accentColor) };
   const material = createRockMaterial(accent);
   const meshes = Array.from({ length: rockShapeCount }, () => {
-    const mesh = new THREE.InstancedMesh(new THREE.BufferGeometry(), material, maximumRocks);
+    const mesh = new THREE.InstancedMesh(new THREE.BufferGeometry(), material, 0);
 
     mesh.count = 0;
     mesh.castShadow = mesh.receiveShadow = true;
     // Instances span the whole model, so the shape's own bounds would cull them wrongly.
     mesh.frustumCulled = false;
-    mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(maximumRocks * 3), 3);
+    mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(0), 3);
 
     return mesh;
   });
@@ -90,6 +90,7 @@ export function createTerrainRockLayer(): TerrainRockLayer {
 
     if (!instances || !sameKey(placementKey, placedKey)) {
       instances = placeRocks(site, style);
+      reserveRockBuffers(meshes, instances);
       placedKey = placementKey;
     }
 
@@ -150,6 +151,29 @@ export function createTerrainRockLayer(): TerrainRockLayer {
 
 // === HELPERS ===
 
+/** Allocate only the rocks each shape draws; disabled rocks need no instance buffers. */
+function reserveRockBuffers(meshes: THREE.InstancedMesh[], instances: RockInstances): void {
+  const counts = meshes.map(() => 0);
+
+  for (let index = 0; index < instances.count; index++) {
+    counts[instances.shape[index]]++;
+  }
+
+  meshes.forEach((mesh, shape) => {
+    if (counts[shape] <= mesh.instanceMatrix.count) {
+      return;
+    }
+
+    // Release the old GPU attributes before replacing buffers that have already been uploaded.
+    mesh.dispose();
+    mesh.instanceMatrix = new THREE.InstancedBufferAttribute(
+      new Float32Array(counts[shape] * 16),
+      16,
+    );
+    mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(counts[shape] * 3), 3);
+  });
+}
+
 /**
  * Sits each rock on the draped terrain, leaning partway into the slope and sunk by the embedding
  * share of its height. The downhill edge would float on steep ground, so slopes sink rocks a
@@ -170,6 +194,7 @@ function poseRocks(
   const up = new THREE.Vector3(0, 1, 0);
   const normal = new THREE.Vector3();
   const lean = new THREE.Quaternion();
+  const upright = new THREE.Quaternion();
   const turn = new THREE.Quaternion();
   const position = new THREE.Vector3();
   const size = new THREE.Vector3();
@@ -192,7 +217,7 @@ function poseRocks(
     const steepness = Math.min(1, Math.hypot(gradientX, gradientZ));
 
     normal.set(-gradientX, 1, -gradientZ).normalize();
-    lean.setFromUnitVectors(up, normal).slerp(new THREE.Quaternion(), 1 - slopeAlignment);
+    lean.setFromUnitVectors(up, normal).slerp(upright, 1 - slopeAlignment);
     turn.setFromAxisAngle(up, instances.yaw[index]);
     position.set(
       (x - site.width / 2) * scale,

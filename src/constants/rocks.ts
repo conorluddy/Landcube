@@ -59,9 +59,9 @@ export const rockPresets = {
 export const defaultRockStyle = {
   enabled: false,
   preset: 'granite',
-  rocksPerSquareCm: 8,
-  minimumSizeMm: 0.4,
-  maximumSizeMm: 3,
+  rocksPerSquareCm: 160,
+  minimumSizeMm: 0.08,
+  maximumSizeMm: 0.6,
   clustering: 0.75,
   embedding: 0.3,
   slopePreference: 0.6,
