@@ -22,11 +22,20 @@ export interface FloorPlace {
 
 const kilometersPerDegreeLatitude = 111.32;
 
-/** Locates a crop of a square real-terrain source; undefined without a location or a usable span. */
+/**
+ * Locates a crop of a square real-terrain source; undefined without a location or a usable span.
+ * The name comes from a preset, else from `namedPlaces` such as the browser's searched places.
+ */
 export function createFloorPlace(
   source: Pick<RealTerrain, 'location' | 'spanKm'> | undefined,
   crop: { x: number; y: number; width: number; height: number },
   frame: { width: number; height: number },
+  namedPlaces: readonly {
+    name: string;
+    region: string;
+    latitude: number;
+    longitude: number;
+  }[] = [],
 ): FloorPlace | undefined {
   const location = source?.location;
   const spanKm = source?.spanKm;
@@ -47,15 +56,15 @@ export function createFloorPlace(
   const lengthKm = crop.height * kilometersPerUnit;
   const latitude = location.latitude - offsetSouthKm / kilometersPerDegreeLatitude;
   const longitude = location.longitude + offsetEastKm / kilometersPerDegreeLongitude(latitude);
-  const preset = realTerrainPresets.find(
-    (candidate) =>
-      Math.abs(candidate.latitude - location.latitude) < 1e-4 &&
-      Math.abs(candidate.longitude - location.longitude) < 1e-4,
-  );
+  const isAtSourceCenter = (candidate: { latitude: number; longitude: number }) =>
+    Math.abs(candidate.latitude - location.latitude) < 1e-4 &&
+    Math.abs(candidate.longitude - location.longitude) < 1e-4;
+  const preset = realTerrainPresets.find(isAtSourceCenter);
+  const namedPlace = preset ? undefined : namedPlaces.find(isAtSourceCenter);
 
   return {
-    name: preset?.name,
-    region: preset?.country,
+    name: preset?.name ?? namedPlace?.name,
+    region: preset?.country ?? (namedPlace?.region === '' ? undefined : namedPlace?.region),
     latitude,
     longitude,
     widthKm,

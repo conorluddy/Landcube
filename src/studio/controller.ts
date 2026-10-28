@@ -50,6 +50,15 @@ import { defaultRoadStyle, roadDetailClasses, roadSpanLimitsKm } from '../consta
 import { operationErrorCodes } from '../constants/operations';
 import type { RoadNetwork, RoadStyle } from '../types/roads';
 import { createRoadNetworkLoader, getRoadPlacementKey } from './road-loader';
+import { createPlaceSearcher } from './place-searcher';
+import type { PlaceMatch } from '../place-search';
+import {
+  addSavedPlace,
+  isSameSavedPlace,
+  readSavedPlaces,
+  writeSavedPlaces,
+  type SavedPlace,
+} from '../saved-places';
 import { defaultGrassStyle, grassPresets } from '../constants/grass';
 import type { GrassStyle } from '../types/grass';
 import { getSuggestedRoadWidthMm } from '../road-ribbons';
@@ -156,6 +165,8 @@ export interface StudioState {
   manualLink: string;
   /** Measured from the rendered model; `spanKm` is its longer geographic side. */
   metrics: { height?: number; layerHeight?: number; spanKm?: number };
+  /** Searched places that loaded, most recent first; kept in browser storage. */
+  savedPlaces: SavedPlace[];
 }
 export interface StudioEffects {
   /** Location and source changes morph the 3D terrain; interval and hatching edits cut. */
@@ -226,6 +237,10 @@ export interface StudioController {
   roads: (patch: Partial<RoadStyle>) => void;
   /** Downloads roads again after a retryable failure. */
   retryRoads: () => void;
+  /** Resolves undefined when a newer search superseded this one. */
+  searchPlaces: (query: string) => Promise<Result<PlaceMatch[]> | undefined>;
+  /** Loads a search match; once its terrain loads it is saved and listed before the presets. */
+  loadSearchedPlace: (match: PlaceMatch) => Promise<void>;
   /** Edits grass; picking a preset applies its look, and hand-editing the look makes it custom. */
   grass: (patch: Partial<GrassStyle>) => void;
   interval: (value: 'auto' | number) => boolean;
@@ -241,9 +256,13 @@ const daylightFrameMs = 50;
 /** Session state is independent of controls, rendering and version-one URL serialization. */
 export function createStudioController(
   actions: DesignControlActions,
+  // Roads and place search share one fetch so tests can fake the network once.
   fetchRoads: typeof fetch = (...request) => fetch(...request),
+  placeStorage?: Pick<Storage, 'getItem' | 'setItem'>,
 ): StudioController {
   const place = defaultRealTerrainPreset;
+  // Unreadable storage leaves the menu with presets only; saving later reports the problem.
+  const savedPlacesResult = placeStorage ? readSavedPlaces(placeStorage) : undefined;
   const natural = terrainMaterialPresets.natural;
   let state: StudioState = {
     design: actions.getSettings(),
@@ -319,9 +338,12 @@ export function createStudioController(
     status: '',
     manualLink: '',
     metrics: {},
+    savedPlaces: savedPlacesResult?.ok === true ? savedPlacesResult.data : [],
   };
   let effects: StudioEffects | undefined;
   let requestVersion = 0;
+  // Saved once its terrain loads, so a failed or superseded load never lists the place.
+  let pendingSearchedPlace: SavedPlace | undefined;
   // Procedural mode parks the last real terrain so switching back is instant.
   let autoplayTimer: ReturnType<typeof setTimeout> | undefined;
   let daylightTimer: ReturnType<typeof setInterval> | undefined;
@@ -329,6 +351,27 @@ export function createStudioController(
   let loadedFieldsKey = '';
   const listeners = new Set<() => void>();
   const roadLoader = createRoadNetworkLoader(fetchRoads);
+
+  const saveSearchedPlace = (location: { latitude: number; longitude: number }) => {
+    const place = pendingSearchedPlace;
+
+    pendingSearchedPlace = undefined;
+
+    if (!place || !isSameSavedPlace(place, location)) {
+      return;
+    }
+
+    const savedPlaces = addSavedPlace(state.savedPlaces, place);
+    const written = placeStorage ? writeSavedPlaces(placeStorage, savedPlaces) : undefined;
+
+    state = { ...state, savedPlaces };
+
+    if (written?.ok === false) {
+      controller.notify(written.error.message);
+    }
+  };
+
+  const placeSearcher = createPlaceSearcher(fetchRoads);
 
   const publish = () => {
     for (const listener of listeners) {
@@ -880,6 +923,7 @@ export function createStudioController(
         }
 
         loadedFieldsKey = getSourceFieldsKey(source);
+        saveSearchedPlace(source);
         applySource(
           {
             ...terrain,
@@ -941,6 +985,23 @@ export function createStudioController(
       if (state.scene.roads.enabled && state.roads.canRetry) {
         void loadRoads();
       }
+    },
+    searchPlaces(query) {
+      return placeSearcher.search(query);
+    },
+    async loadSearchedPlace(match) {
+      pendingSearchedPlace = {
+        name: match.name,
+        region: match.detail,
+        latitude: match.latitude,
+        longitude: match.longitude,
+      };
+      controller.source({
+        place: `${match.latitude},${match.longitude}`,
+        latitude: match.latitude,
+        longitude: match.longitude,
+      });
+      await controller.loadTerrain();
     },
     interval(value: 'auto' | number) {
       try {
