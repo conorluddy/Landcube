@@ -6,4 +6,5 @@ export const operationErrorCodes = {
   clipboardFailed: 'CLIPBOARD_FAILED',
   exportFailed: 'EXPORT_FAILED',
   mapDataFailed: 'MAP_DATA_FAILED',
+  placeSearchFailed: 'PLACE_SEARCH_FAILED',
 } as const;

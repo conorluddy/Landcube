@@ -47,7 +47,11 @@ export async function loadMappedRoads(
   signal?: AbortSignal,
   now: () => Date = () => new Date(),
 ): Promise<Result<RoadNetwork>> {
-  const request = createRequestSignal((overpassTimeoutSeconds + 5) * 1000, signal);
+  const request = createRequestSignal(
+    (overpassTimeoutSeconds + 5) * 1000,
+    signal,
+    'The road download timed out.',
+  );
 
   try {
     return await requestMappedRoads(bounds, detail, fetchRoads, request.signal, signal, now);

@@ -1,5 +1,6 @@
 import { useRef, type ReactNode } from 'react';
 import type { StudioController, StudioState } from './controller';
+import { PlaceSearchField } from './place-search-field';
 import {
   Button,
   Color,
@@ -161,6 +162,7 @@ export function TerrainPanel({ controller: c, state: s }: PanelProps): ReactNode
         </Group>
       ) : (
         <Group title="Real location">
+          <PlaceSearchField controller={c} />
           <label className="field-row">
             <span>Location</span>
             <select

@@ -50,6 +50,8 @@ import { defaultRoadStyle, roadDetailClasses, roadSpanLimitsKm } from '../consta
 import { operationErrorCodes } from '../constants/operations';
 import type { RoadNetwork, RoadStyle } from '../types/roads';
 import { createRoadNetworkLoader, getRoadPlacementKey } from './road-loader';
+import { createPlaceSearcher } from './place-searcher';
+import type { PlaceMatch } from '../place-search';
 import { defaultGrassStyle, grassPresets } from '../constants/grass';
 import type { GrassStyle } from '../types/grass';
 import { getSuggestedRoadWidthMm } from '../road-ribbons';
@@ -226,6 +228,8 @@ export interface StudioController {
   roads: (patch: Partial<RoadStyle>) => void;
   /** Downloads roads again after a retryable failure. */
   retryRoads: () => void;
+  /** Resolves undefined when a newer search superseded this one. */
+  searchPlaces: (query: string) => Promise<Result<PlaceMatch[]> | undefined>;
   /** Edits grass; picking a preset applies its look, and hand-editing the look makes it custom. */
   grass: (patch: Partial<GrassStyle>) => void;
   interval: (value: 'auto' | number) => boolean;
@@ -241,6 +245,7 @@ const daylightFrameMs = 50;
 /** Session state is independent of controls, rendering and version-one URL serialization. */
 export function createStudioController(
   actions: DesignControlActions,
+  // Roads and place search share one fetch so tests can fake the network once.
   fetchRoads: typeof fetch = (...request) => fetch(...request),
 ): StudioController {
   const place = defaultRealTerrainPreset;
@@ -329,6 +334,7 @@ export function createStudioController(
   let loadedFieldsKey = '';
   const listeners = new Set<() => void>();
   const roadLoader = createRoadNetworkLoader(fetchRoads);
+  const placeSearcher = createPlaceSearcher(fetchRoads);
 
   const publish = () => {
     for (const listener of listeners) {
@@ -941,6 +947,9 @@ export function createStudioController(
       if (state.scene.roads.enabled && state.roads.canRetry) {
         void loadRoads();
       }
+    },
+    searchPlaces(query) {
+      return placeSearcher.search(query);
     },
     interval(value: 'auto' | number) {
       try {

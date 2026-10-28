@@ -8,6 +8,7 @@
 export function createRequestSignal(
   timeoutMs: number,
   signal: AbortSignal | undefined,
+  timeoutMessage = 'The download timed out.',
 ): { signal: AbortSignal; release: () => void } {
   const controller = new AbortController();
 
@@ -16,7 +17,7 @@ export function createRequestSignal(
   };
 
   const timer = setTimeout(() => {
-    controller.abort(new DOMException('The road download timed out.', 'TimeoutError'));
+    controller.abort(new DOMException(timeoutMessage, 'TimeoutError'));
   }, timeoutMs);
 
   if (signal?.aborted === true) {
