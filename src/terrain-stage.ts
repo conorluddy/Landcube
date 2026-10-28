@@ -102,8 +102,11 @@ export function createTerrainStage(): {
   group.add(shadow);
 
   const mapGrid = createTerrainMapGrid();
+  // The model is built in its crop's frame; turning the floor back keeps overlays pointing north.
+  const northFloor = new THREE.Group();
 
-  group.add(mapGrid.mesh);
+  northFloor.add(mapGrid.mesh);
+  group.add(northFloor);
   let gridEnabled = false;
   let floorPlace: FloorPlace | undefined;
   let contourInterval: number | undefined;
@@ -111,10 +114,17 @@ export function createTerrainStage(): {
   let stageSize = { width: 2, length: 2, circular: false, background: defaultTerrainGroundColor };
 
   const updateGrid = () => {
+    const rotationRadians = floorPlace?.rotationRadians ?? 0;
+    const cos = Math.abs(Math.cos(rotationRadians));
+    const sin = Math.abs(Math.sin(rotationRadians));
+    // A round model looks the same at any angle, so its floor keeps the disc footprint.
+    const isRotatedBox = !stageSize.circular && rotationRadians !== 0;
+
+    northFloor.rotation.y = rotationRadians;
     mapGrid.mesh.visible = gridEnabled && floorPlace !== undefined;
     mapGrid.update(
-      stageSize.width,
-      stageSize.length,
+      isRotatedBox ? stageSize.width * cos + stageSize.length * sin : stageSize.width,
+      isRotatedBox ? stageSize.width * sin + stageSize.length * cos : stageSize.length,
       stageSize.circular,
       stageSize.background,
       floorPlace,

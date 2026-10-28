@@ -64,6 +64,7 @@ import {
   type TerrainModelSettings,
   type TerrainModel,
 } from './terrain-model';
+import { getCropFootprint } from './terrain-crop';
 import { createBinaryStl } from './export/stl-export';
 import type { HeightField } from './types/terrain';
 import { seaLevelHatchSpacing, seaLevelHatchOpacity } from './constants/sea-level';
@@ -481,7 +482,12 @@ export function createTerrain3d(
         field,
         width,
         height,
-        shape: modelSettings.cropShape ?? 'rectangle',
+        footprint: getCropFootprint(
+          modelSettings.cropShape,
+          modelSettings.cropPolygon,
+          width,
+          height,
+        ),
         frameUnitsPerMm,
         seaLevel,
         roads: grassRoads.roads,
@@ -1133,7 +1139,7 @@ export function createTerrain3d(
         width,
         height,
         settings,
-        modelSettings.cropShape,
+        getCropFootprint(modelSettings.cropShape, modelSettings.cropPolygon, width, height),
       );
 
       for (const buffers of Object.values(lineBuffers)) {

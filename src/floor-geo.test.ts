@@ -5,6 +5,7 @@ import {
   createFloorPlace,
   formatDecimal,
   formatDms,
+  formatModelSize,
   graticuleValues,
   latitudeFraction,
   pickGraticuleStep,
@@ -110,4 +111,19 @@ void test('sources without a location or a usable span have no floor place', () 
   }
 
   assert.equal(createFloorPlace(asoSource, { ...crop, width: 0 }, sourceFrame), undefined);
+});
+
+void test('a rotated crop widens the north-aligned floor sheet but keeps the model size', () => {
+  const source = { location: { latitude: 0, longitude: 0 }, spanKm: 10 };
+  const frame = { width: 100, height: 100 };
+  const crop = { x: 25, y: 25, width: 50, height: 50, rotationRadians: Math.PI / 4 };
+  const place = createFloorPlace(source, crop, frame);
+  const round = createFloorPlace(source, crop, frame, true);
+
+  assert.ok(place && round);
+  assert.ok(Math.abs(place.widthKm - 5 * Math.SQRT2) < 1e-9);
+  assert.deepEqual(place.modelSizeKm, { widthKm: 5, lengthKm: 5 });
+  assert.equal(formatModelSize(place), '5 × 5 km');
+  assert.equal(round.widthKm, 5);
+  assert.equal(round.rotationRadians, Math.PI / 4);
 });

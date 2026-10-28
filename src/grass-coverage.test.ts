@@ -33,7 +33,7 @@ function createSite(overrides: Partial<GrassSite> = {}): GrassSite {
     field: createField(),
     width: 500,
     height: 500,
-    shape: 'rectangle',
+    footprint: { shape: 'rectangle', width: 500, height: 500 },
     originX: 0,
     originY: 0,
     frameUnitsPerMm: 4,
@@ -150,7 +150,7 @@ void test('raising coverage only adds grass, never removes it', () => {
 });
 
 void test('circular crops grow nothing outside the circle', () => {
-  const site = createSite({ shape: 'circle' });
+  const site = createSite({ footprint: { shape: 'circle', width: 500, height: 500 } });
   const map = grow(site, style, resolution);
 
   assert.equal(growthAt(map, site, 2, 2), 0);
@@ -202,6 +202,7 @@ void test('patches are sized in printed millimetres, whatever window size the fr
     field: createField(0.001, 201, 201),
     width: 1000,
     height: 1000,
+    footprint: { shape: 'rectangle', width: 1000, height: 1000 },
     frameUnitsPerMm: 8,
   });
   const patchy = { ...style, coverage: 0.5 };

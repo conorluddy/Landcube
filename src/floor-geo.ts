@@ -15,9 +15,14 @@ export interface FloorPlace {
   region?: string;
   latitude: number;
   longitude: number;
+  /** North-aligned extent of the floor sheet; wider than the model when the crop is rotated. */
   widthKm: number;
   lengthKm: number;
   bounds: GeoBounds;
+  /** Clockwise turn of the model from north; floor overlays turn back by this to point north. */
+  rotationRadians?: number;
+  /** The model's own size, present only when it differs from the floor sheet. */
+  modelSizeKm?: { widthKm: number; lengthKm: number };
 }
 
 const kilometersPerDegreeLatitude = 111.32;
@@ -25,8 +30,9 @@ const kilometersPerDegreeLatitude = 111.32;
 /** Locates a crop of a square real-terrain source; undefined without a location or a usable span. */
 export function createFloorPlace(
   source: Pick<RealTerrain, 'location' | 'spanKm'> | undefined,
-  crop: { x: number; y: number; width: number; height: number },
+  crop: { x: number; y: number; width: number; height: number; rotationRadians?: number },
   frame: { width: number; height: number },
+  isRound = false,
 ): FloorPlace | undefined {
   const location = source?.location;
   const spanKm = source?.spanKm;
@@ -43,8 +49,14 @@ export function createFloorPlace(
   const kilometersPerUnit = spanKm / Math.max(frame.width, frame.height);
   const offsetEastKm = (crop.x + crop.width / 2 - frame.width / 2) * kilometersPerUnit;
   const offsetSouthKm = (crop.y + crop.height / 2 - frame.height / 2) * kilometersPerUnit;
-  const widthKm = crop.width * kilometersPerUnit;
-  const lengthKm = crop.height * kilometersPerUnit;
+  const modelWidthKm = crop.width * kilometersPerUnit;
+  const modelLengthKm = crop.height * kilometersPerUnit;
+  const rotationRadians = crop.rotationRadians ?? 0;
+  // A disc covers the same ground at any angle; boxes need their north-aligned bounding box.
+  const cos = isRound ? 1 : Math.abs(Math.cos(rotationRadians));
+  const sin = isRound ? 0 : Math.abs(Math.sin(rotationRadians));
+  const widthKm = modelWidthKm * cos + modelLengthKm * sin;
+  const lengthKm = modelWidthKm * sin + modelLengthKm * cos;
   const latitude = location.latitude - offsetSouthKm / kilometersPerDegreeLatitude;
   const longitude = location.longitude + offsetEastKm / kilometersPerDegreeLongitude(latitude);
   const preset = realTerrainPresets.find(
@@ -61,6 +73,10 @@ export function createFloorPlace(
     widthKm,
     lengthKm,
     bounds: boundsFromCenter(latitude, longitude, widthKm, lengthKm),
+    ...(rotationRadians !== 0 ? { rotationRadians } : {}),
+    ...(widthKm !== modelWidthKm || lengthKm !== modelLengthKm
+      ? { modelSizeKm: { widthKm: modelWidthKm, lengthKm: modelLengthKm } }
+      : {}),
   };
 }
 
@@ -174,14 +190,16 @@ export function formatDecimalPair(place: FloorPlace): string {
 
 /** "25 × 12.5 km". */
 export function formatModelSize(place: FloorPlace): string {
-  return `${formatKm(place.widthKm)} × ${formatKm(place.lengthKm)} km`;
+  const { widthKm, lengthKm } = place.modelSizeKm ?? place;
+
+  return `${formatKm(widthKm)} × ${formatKm(lengthKm)} km`;
 }
 
 /** Square and circular models print one distance: "25 KM". */
 export function formatModelSpan(place: FloorPlace): string {
-  return place.widthKm === place.lengthKm
-    ? `${formatKm(place.widthKm)} KM`
-    : formatModelSize(place).toUpperCase();
+  const { widthKm, lengthKm } = place.modelSizeKm ?? place;
+
+  return widthKm === lengthKm ? `${formatKm(widthKm)} KM` : formatModelSize(place).toUpperCase();
 }
 
 // === HELPERS ===

@@ -20,7 +20,7 @@ const inputs: TerrainGrassInputs = {
     },
     width: 200,
     height: 200,
-    shape: 'rectangle',
+    footprint: { shape: 'rectangle', width: 200, height: 200 },
     originX: 0,
     originY: 0,
     frameUnitsPerMm: 2,

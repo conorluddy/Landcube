@@ -1,5 +1,6 @@
 import { cropTerrainModelField } from './terrain-model';
 import type { HeightField } from './types/terrain';
+import { getCropFootprint, type CropFootprint } from './terrain-crop';
 import { createSeaLevelGeometry, type SeaLevelGeometry } from './sea-level';
 import { createStudioTerrainView } from './studio/terrain-view';
 import { createStudioController, getSceneCredits } from './studio/controller';
@@ -180,7 +181,7 @@ controls.connect({
       new Blob([terrain3d.getStl()], { type: 'model/stl' }),
       model.cropShape === 'circle'
         ? `topogra-${settings.seed}-circle-${model.widthMm}mm.stl`
-        : `topogra-${settings.seed}-${model.widthMm}x${model.lengthMm}mm.stl`,
+        : `topogra-${settings.seed}-${model.cropShape === 'polygon' ? 'polygon-' : ''}${model.widthMm}x${model.lengthMm}mm.stl`,
     );
   },
   roadsChanged: updateTerrain3d,
@@ -362,7 +363,13 @@ function updateTerrain3d(): void {
   );
   const dimensions = controls.getSnapshot().model.dimensions;
   const crop = controls.getSnapshot().model.crop;
-  const key = JSON.stringify([dimensions.widthMm, dimensions.lengthMm, dimensions.cropShape, crop]);
+  const key = JSON.stringify([
+    dimensions.widthMm,
+    dimensions.lengthMm,
+    dimensions.cropShape,
+    dimensions.cropPolygon,
+    crop,
+  ]);
 
   if (!modelCrop || key !== modelCropKey) {
     modelCrop = cropTerrainModelField(
@@ -383,11 +390,18 @@ function updateTerrain3d(): void {
     realTerrain,
   );
 
-  const place = createFloorPlace(realTerrain, modelCrop, modelSourceFrame);
+  const place = createFloorPlace(
+    realTerrain,
+    modelCrop,
+    modelSourceFrame,
+    dimensions.cropShape === 'circle',
+  );
 
   // Before the update, so the update builds roads at the new auto width. A width change also
   // rebuilds once on the previous terrain; that costs one ribbon pass per place load.
-  controls.modelSpan(place ? Math.max(place.widthKm, place.lengthKm) : undefined);
+  const modelSizeKm = place?.modelSizeKm ?? place;
+
+  controls.modelSpan(modelSizeKm ? Math.max(modelSizeKm.widthKm, modelSizeKm.lengthKm) : undefined);
   terrain3d.update(
     croppedContours,
     modelCrop.width,
@@ -399,7 +413,16 @@ function updateTerrain3d(): void {
     place,
     getRealContourInterval(realTerrain),
     getTerrainTerraceLevels(settings, engineConfiguration, realTerrain),
-    getCroppedRoadPaths(modelSourceFrame, modelCrop, dimensions.cropShape ?? 'rectangle'),
+    getCroppedRoadPaths(
+      modelSourceFrame,
+      modelCrop,
+      getCropFootprint(
+        dimensions.cropShape,
+        dimensions.cropPolygon,
+        modelCrop.width,
+        modelCrop.height,
+      ),
+    ),
     getGrassGeography(modelSourceFrame, modelCrop),
   );
 }
@@ -429,7 +452,7 @@ function getGrassGeography(
 function getCroppedRoadPaths(
   frame: { width: number; height: number },
   crop: NonNullable<typeof modelCrop>,
-  shape: 'rectangle' | 'circle',
+  footprint: CropFootprint,
 ): readonly RoadPath[] {
   const { roads } = controls.getSnapshot();
   const location = realTerrain?.location;
@@ -440,12 +463,12 @@ function getCroppedRoadPaths(
     return noRoadPaths;
   }
 
-  const key = [roads.network, location, spanKm, frame, crop, shape];
+  const key = [roads.network, location, spanKm, frame, crop, JSON.stringify(footprint)];
 
   if (key.some((value, index) => value !== roadPaths.key[index])) {
     roadPaths = {
       key,
-      paths: clipRoadsToCrop(roads.network.roads, { location, spanKm }, frame, crop, shape),
+      paths: clipRoadsToCrop(roads.network.roads, { location, spanKm }, frame, crop, footprint),
     };
   }
 

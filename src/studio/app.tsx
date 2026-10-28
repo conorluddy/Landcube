@@ -151,6 +151,22 @@ function ModelPanel({
 
   return (
     <>
+      <Group title="Height">
+        <Toggle
+          label="Auto height for location"
+          value={model.autoExaggeration}
+          onChange={(value) => c.model({ autoExaggeration: value })}
+        />
+        <Range
+          label="Height exaggeration"
+          value={model.exaggeration}
+          min={0}
+          max={1}
+          step={0.05}
+          suffix="×"
+          onChange={(value) => c.model({ exaggeration: value, autoExaggeration: false })}
+        />
+      </Group>
       <div ref={host} />
       <Group title="Model dimensions">
         <div className="control-grid">
@@ -189,20 +205,6 @@ function ModelPanel({
           value={model.dimensions.terrainShape ?? 'smooth'}
           options={['smooth', 'terraced']}
           onChange={(value) => c.dimensions({ terrainShape: value })}
-        />
-        <Toggle
-          label="Auto height for location"
-          value={model.autoExaggeration}
-          onChange={(value) => c.model({ autoExaggeration: value })}
-        />
-        <Range
-          label="Height exaggeration"
-          value={model.exaggeration}
-          min={0}
-          max={1}
-          step={0.05}
-          suffix="×"
-          onChange={(value) => c.model({ exaggeration: value, autoExaggeration: false })}
         />
         {model.dimensions.terrainShape === 'terraced' && (
           <Hint>

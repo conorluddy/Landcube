@@ -9,6 +9,7 @@ import {
   validateTerrainModelSettings,
 } from './terrain-model';
 import { createBinaryStl, validatePrintableSolid } from './export/stl-export';
+import { createRegularCropPolygon } from './terrain-crop';
 import type { HeightField } from './types/terrain';
 
 void test('suggested height lifts flat wide places and calms steep crops', () => {
@@ -196,4 +197,68 @@ void test('frame units per millimetre span the longer side, or a circle diameter
     getFrameUnitsPerMm(400, 400, { widthMm: 100, lengthMm: 300, cropShape: 'circle' }),
     4,
   );
+});
+
+for (const [cropShape, cropPolygon] of [
+  ['polygon', createRegularCropPolygon(3)],
+  ['polygon', undefined],
+  [
+    'polygon',
+    [
+      { x: 0.1, y: 0 },
+      { x: 0.5, y: 0.4 },
+      { x: 1, y: 0.2 },
+      { x: 0.6, y: 1 },
+      { x: 0, y: 0.9 },
+    ],
+  ],
+] as const) {
+  for (const rotationDegrees of [0, 30]) {
+    void test(`${cropShape} crop at ${rotationDegrees}° exports a watertight solid`, () => {
+      const settings = { ...defaultTerrainModelSettings, cropShape, cropPolygon };
+      const crop = cropTerrainModelField(field, 30, 20, settings, {
+        centerX: 0.5,
+        centerY: 0.5,
+        size: 0.8,
+        rotationDegrees,
+      });
+      const model = createTerrainModel(crop.field, crop.width, crop.height, settings, 0.3);
+
+      validatePrintableSolid(model.solid);
+
+      for (let index = 0; index < model.surface.positions.length; index += 3) {
+        assert.ok(Math.abs(model.surface.positions[index]) <= 75.00001);
+        assert.ok(Math.abs(model.surface.positions[index + 2]) <= 75.00001);
+      }
+    });
+  }
+}
+
+void test('a rotated crop keeps its whole frame inside the source', () => {
+  const crop = cropTerrainModelField(field, 30, 20, defaultTerrainModelSettings, {
+    centerX: 0,
+    centerY: 0,
+    size: 1,
+    rotationDegrees: 45,
+  });
+  const reach = Math.hypot(crop.width, crop.height) / 2;
+
+  assert.ok(crop.x + crop.width / 2 - reach >= -1e-9);
+  assert.ok(crop.y + crop.height / 2 - reach >= -1e-9);
+  assert.ok(crop.y + crop.height / 2 + reach <= 20 + 1e-9);
+  assert.equal(crop.rotationRadians, Math.PI / 4);
+});
+
+void test('polygon crops that fold past their center are rejected', () => {
+  assert.throws(() => {
+    validateTerrainModelSettings({
+      ...defaultTerrainModelSettings,
+      cropShape: 'polygon',
+      cropPolygon: [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 0.6, y: 0.4 },
+      ],
+    });
+  });
 });

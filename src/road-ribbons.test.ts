@@ -8,6 +8,8 @@ import type { MappedRoad, RoadPath } from './types/roads';
 
 const placement = { location: { latitude: 53, longitude: -6.4 }, spanKm: 10 };
 const sourceFrame = { width: 100, height: 100 };
+const square = { shape: 'rectangle', width: 100, height: 100 } as const;
+const circle = { shape: 'circle', width: 100, height: 100 } as const;
 
 /** A tilted plane, so heights differ across a ribbon's width as well as along it. */
 const field: HeightField = {
@@ -39,7 +41,7 @@ function geographicRoad(id: number, points: [x: number, y: number][]): MappedRoa
 }
 
 void test('roads leaving and re-entering a crop become separate runs', () => {
-  const crop = { x: 25, y: 25, width: 50, height: 50 };
+  const crop = { x: 25, y: 25, width: 50, height: 50, rotationRadians: 0 };
   const road = geographicRoad(1, [
     [30, 50],
     [60, 50],
@@ -48,7 +50,11 @@ void test('roads leaving and re-entering a crop become separate runs', () => {
     [60, 60],
     [40, 60],
   ]);
-  const paths = clipRoadsToCrop([road], placement, sourceFrame, crop, 'rectangle');
+  const paths = clipRoadsToCrop([road], placement, sourceFrame, crop, {
+    shape: 'rectangle',
+    width: 50,
+    height: 50,
+  });
 
   assert.equal(paths.length, 2);
 
@@ -84,7 +90,7 @@ void test('separate roads never share a ribbon across the gap between them', () 
     100,
     { detail: 'all', widthMm: 1 },
     1,
-    'rectangle',
+    square,
   );
   const firstRoadVertices = 6;
 
@@ -116,7 +122,7 @@ void test('ribbon edges follow the terrain height at their own position and face
     100,
     { detail: 'all', widthMm: 4 },
     1,
-    'rectangle',
+    square,
   );
   const scale = 2 / 100;
 
@@ -159,7 +165,7 @@ void test('ribbon width follows the model millimetres and the road class', () =>
       100,
       { detail: 'tracks', widthMm },
       2,
-      'rectangle',
+      square,
     );
 
     return Math.abs(positions[5] - positions[2]) / (2 / 100);
@@ -188,7 +194,7 @@ void test('detail filters classes without needing a refetch', () => {
     },
   ];
   const count = (detail: 'major' | 'tracks') =>
-    createRoadRibbonBuffers(paths, field, 100, 100, { detail, widthMm: 1 }, 1, 'rectangle').indices
+    createRoadRibbonBuffers(paths, field, 100, 100, { detail, widthMm: 1 }, 1, square).indices
       .length;
 
   assert.ok(count('tracks') > count('major'));
@@ -204,8 +210,8 @@ void test('circular crops clip roads and keep ribbon edges on the disc', () => {
     [road],
     placement,
     sourceFrame,
-    { x: 0, y: 0, width: 100, height: 100 },
-    'circle',
+    { x: 0, y: 0, width: 100, height: 100, rotationRadians: 0 },
+    circle,
   );
   const { positions } = createRoadRibbonBuffers(
     paths,
@@ -214,7 +220,7 @@ void test('circular crops clip roads and keep ribbon edges on the disc', () => {
     100,
     { detail: 'all', widthMm: 6 },
     1,
-    'circle',
+    circle,
   );
 
   assert.equal(paths.length, 1);
@@ -249,7 +255,7 @@ void test('a right-angle bend keeps the full ribbon width on both legs', () => {
     100,
     { detail: 'all', widthMm: 4 },
     1,
-    'rectangle',
+    square,
   );
   const scale = 2 / 100;
   const vertex = (index: number) => ({

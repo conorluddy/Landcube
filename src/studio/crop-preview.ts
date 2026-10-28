@@ -1,5 +1,6 @@
 import { mountTerrainCropControls } from '../terrain-crop-controls';
 import type { StudioController } from './controller';
+import type { TerrainModelSettings } from '../terrain-model';
 
 export interface CropPreview {
   attach: (container: HTMLElement) => () => void;
@@ -16,13 +17,19 @@ export function createCropPreview(controller: StudioController): CropPreview {
       widget = mountTerrainCropControls(
         container,
         () => controller.getSnapshot().model.dimensions,
-        (shape) => {
+        (shape, polygon, ratio) => {
           const crop = widget?.getCrop();
+          const dimensions = controller.getSnapshot().model.dimensions;
 
           if (crop) {
             controller.model({
               crop,
-              dimensions: { ...controller.getSnapshot().model.dimensions, cropShape: shape },
+              dimensions: {
+                ...dimensions,
+                ...(ratio === undefined ? {} : getReshapedDimensions(dimensions, ratio)),
+                cropShape: shape,
+                cropPolygon: polygon,
+              },
             });
           }
         },
@@ -43,4 +50,17 @@ export function createCropPreview(controller: StudioController): CropPreview {
       widget?.update(...args);
     },
   };
+}
+
+/** Keeps the longer printed side and derives the other from the crop's width ÷ length. */
+function getReshapedDimensions(
+  dimensions: TerrainModelSettings,
+  ratio: number,
+): Pick<TerrainModelSettings, 'widthMm' | 'lengthMm'> {
+  const longerMm = Math.max(dimensions.widthMm, dimensions.lengthMm);
+  const shorterMm = (value: number) => Math.max(1, Math.round(value * 10) / 10);
+
+  return ratio >= 1
+    ? { widthMm: longerMm, lengthMm: shorterMm(longerMm / ratio) }
+    : { widthMm: shorterMm(longerMm * ratio), lengthMm: longerMm };
 }
