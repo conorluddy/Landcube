@@ -111,3 +111,22 @@ void test('sources without a location or a usable span have no floor place', () 
 
   assert.equal(createFloorPlace(asoSource, { ...crop, width: 0 }, sourceFrame), undefined);
 });
+
+void test('a searched place at the source center names the floor', () => {
+  const place = createFloorPlace(
+    { location: { latitude: 56.7969, longitude: -5.0035 }, spanKm: 10 },
+    { x: 0, y: 0, width: 20, height: 20 },
+    { width: 20, height: 20 },
+    [
+      {
+        name: 'Ben Nevis',
+        region: 'Scotland, United Kingdom',
+        latitude: 56.7969,
+        longitude: -5.0035,
+      },
+    ],
+  );
+
+  assert.equal(place?.name, 'Ben Nevis');
+  assert.equal(place.region, 'Scotland, United Kingdom');
+});

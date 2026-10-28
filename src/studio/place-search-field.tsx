@@ -13,7 +13,7 @@ type SearchState =
   | { kind: 'results'; places: PlaceMatch[] }
   | { kind: 'failed'; message: string };
 
-/** Autocompleting place search; choosing a match moves real terrain there and loads it. */
+/** Autocompleting place search; choosing a match loads its terrain and saves it to the menu. */
 export function PlaceSearchField({ controller }: { controller: StudioController }): ReactNode {
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState<SearchState>({ kind: 'idle' });
@@ -63,8 +63,7 @@ export function PlaceSearchField({ controller }: { controller: StudioController 
     chosenQuery.current = place.name;
     setQuery(place.name);
     setSearch({ kind: 'idle' });
-    controller.source({ latitude: place.latitude, longitude: place.longitude });
-    void controller.loadTerrain();
+    void controller.loadSearchedPlace(place);
   };
 
   return (

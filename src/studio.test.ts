@@ -14,7 +14,7 @@ import {
   validateDesignSettings,
 } from './design-settings';
 
-function setup(fetchRoads?: typeof fetch) {
+function setup(fetchRoads?: typeof fetch, placeStorage?: Pick<Storage, 'getItem' | 'setItem'>) {
   const initial = parseDesignParameters(new URLSearchParams('v=1&seed=123&width=480&height=320'));
 
   assert.ok(initial.ok);
@@ -62,6 +62,7 @@ function setup(fetchRoads?: typeof fetch) {
       copyLink: () => Promise.resolve({ ok: true, data: undefined }),
     },
     fetchRoads,
+    placeStorage,
   );
 
   controller.connect(effects);
@@ -224,6 +225,38 @@ void test('default location loads bundled tiles and credits only their recorded 
   assert.ok(requestedUrls.every((url) => url.startsWith('https://topogra.test/terrain-tiles/')));
   assert.match(c.getSnapshot().source.terrain?.attribution ?? '', /Copernicus/);
   assert.doesNotMatch(c.getSnapshot().source.terrain?.attribution ?? '', /Geological Survey/);
+});
+
+void test('a searched place is saved and listed once its terrain loads', async (t) => {
+  const items = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => items.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      items.set(key, value);
+    },
+  };
+  const { controller: c } = setup(undefined, storage);
+  const match = {
+    name: 'Ben Nevis',
+    detail: 'Scotland, United Kingdom',
+    latitude: 56.7969,
+    longitude: -5.0035,
+    provider: 'photon' as const,
+  };
+
+  stubBrowserTileDecoding(t);
+  await c.loadSearchedPlace(match);
+
+  const saved = {
+    name: 'Ben Nevis',
+    region: 'Scotland, United Kingdom',
+    latitude: 56.7969,
+    longitude: -5.0035,
+  };
+
+  assert.deepEqual(c.getSnapshot().savedPlaces, [saved]);
+  assert.equal(c.getSnapshot().source.place, '56.7969,-5.0035');
+  assert.deepEqual(setup(undefined, storage).controller.getSnapshot().savedPlaces, [saved]);
 });
 
 void test('bundled tiles served as HTML fall back to the public tile service', async (t) => {

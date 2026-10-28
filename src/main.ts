@@ -110,37 +110,47 @@ let designUrlDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingChange: DesignChangeKind | undefined;
 let settingsUpdateFrameIdentifier: number | undefined;
 
-const controls = createStudioController({
-  getSettings: () => settings,
-  updateSettings,
-  newLandscape: () => {
-    if (!realTerrain) {
-      requestTerrainTransition();
-    }
-
-    updateSettings({ ...settings, seed: generateRandomSeed() });
-  },
-  isSeedLocked: storedSeedResult.ok && storedSeedResult.data === settings.seed,
-  lockSeed: (isLocked) => {
-    try {
-      const result = saveLockedSeed(localStorage, isLocked ? settings.seed : null);
-
-      if (!result.ok) {
-        logOperationError(result.error);
-        controls.notify(result.error.message);
+const controls = createStudioController(
+  {
+    getSettings: () => settings,
+    updateSettings,
+    newLandscape: () => {
+      if (!realTerrain) {
+        requestTerrainTransition();
       }
-    } catch {
-      controls.notify('Browser storage is unavailable. Use Copy link to save this design.');
-      logOperationError({
-        code: operationErrorCodes.storageFailed,
-        message: 'Browser storage access failed',
-        retryable: true,
-      });
-    }
+
+      updateSettings({ ...settings, seed: generateRandomSeed() });
+    },
+    isSeedLocked: storedSeedResult.ok && storedSeedResult.data === settings.seed,
+    lockSeed: (isLocked) => {
+      try {
+        const result = saveLockedSeed(localStorage, isLocked ? settings.seed : null);
+
+        if (!result.ok) {
+          logOperationError(result.error);
+          controls.notify(result.error.message);
+        }
+      } catch {
+        controls.notify('Browser storage is unavailable. Use Copy link to save this design.');
+        logOperationError({
+          code: operationErrorCodes.storageFailed,
+          message: 'Browser storage access failed',
+          retryable: true,
+        });
+      }
+    },
+    getShareUrl: synchronizeDesignUrl,
+    copyLink: (url) => copyDesignLink(url, navigator.clipboard),
   },
-  getShareUrl: synchronizeDesignUrl,
-  copyLink: (url) => copyDesignLink(url, navigator.clipboard),
-});
+  undefined,
+  // Reads `localStorage` per call: touching it can throw when storage is blocked.
+  {
+    getItem: (key) => localStorage.getItem(key),
+    setItem: (key, value) => {
+      localStorage.setItem(key, value);
+    },
+  },
+);
 const outputRenderer = createOutputRenderer(engineConfiguration, () => realTerrain);
 const cropPreview = createCropPreview(controls);
 const terrain3d = createStudioTerrainView(controls, () => {
@@ -383,7 +393,12 @@ function updateTerrain3d(): void {
     realTerrain,
   );
 
-  const place = createFloorPlace(realTerrain, modelCrop, modelSourceFrame);
+  const place = createFloorPlace(
+    realTerrain,
+    modelCrop,
+    modelSourceFrame,
+    controls.getSnapshot().savedPlaces,
+  );
 
   // Before the update, so the update builds roads at the new auto width. A width change also
   // rebuilds once on the previous terrain; that costs one ribbon pass per place load.
