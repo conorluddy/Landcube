@@ -107,7 +107,7 @@ export function createTerrainGrassLayer(): TerrainGrassLayer {
       site.field,
       site.width,
       site.height,
-      site.shape,
+      JSON.stringify(site.footprint),
       site.originX,
       site.originY,
       site.frameUnitsPerMm,

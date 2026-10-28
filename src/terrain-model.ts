@@ -1,7 +1,11 @@
 import {
   createCircularTerrainSurface,
+  createOutlineTerrainSurface,
   defaultTerrainCrop,
+  getCropFootprint,
   getTerrainCropBounds,
+  isStarShapedCropPolygon,
+  type CropPoint,
   type TerrainCropSettings,
   type TerrainCropShape,
 } from './terrain-crop';
@@ -10,7 +14,11 @@ import {
   type TerracedTerrainBuffers,
   type TerrainTerraceLevels,
 } from './terrain-terraces';
-import { createTerrainSurfaceBuffers, terrain3dElevationScale } from './terrain-surface';
+import {
+  createTerrainSurfaceBuffers,
+  sampleHeightField,
+  terrain3dElevationScale,
+} from './terrain-surface';
 import type { TerrainSurfaceBuffers } from './terrain-surface';
 import type { HeightField } from './types/terrain';
 
@@ -19,6 +27,8 @@ export interface TerrainModelSettings {
   lengthMm: number;
   baseThicknessMm: number;
   cropShape?: TerrainCropShape;
+  /** Polygon crop corners in the crop box's normalized coordinates; must surround its center. */
+  cropPolygon?: readonly CropPoint[];
   terrainShape?: 'smooth' | 'terraced';
 }
 
@@ -47,6 +57,12 @@ export function validateTerrainModelSettings(settings: TerrainModelSettings): vo
     throw new Error('Terrain shape must be Smooth or Terraced.');
   }
 
+  if (settings.cropPolygon !== undefined && !isStarShapedCropPolygon(settings.cropPolygon)) {
+    throw new Error(
+      'Polygon crop corners must stay inside the crop and every edge must face its center. Reset the polygon and retry.',
+    );
+  }
+
   for (const value of [settings.widthMm, settings.lengthMm]) {
     if (!Number.isFinite(value) || value < 1 || value > 1000) {
       throw new Error('Model width and length must be between 1 and 1000 mm.');
@@ -73,25 +89,44 @@ export function getFrameUnitsPerMm(
     : Math.max(width, height) / Math.max(settings.widthMm, settings.lengthMm);
 }
 
-/** A translated view of the original field keeps crops centered and lossless. */
+export interface TerrainModelCrop {
+  field: HeightField;
+  /** Top-left of the unrotated crop box in the source frame. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Clockwise turn of the crop box about its center. */
+  rotationRadians: number;
+}
+
+/**
+ * Unrotated crops are a translated view of the original field, keeping them centered and
+ * lossless. Rotated crops resample the source at its own spacing in the crop's frame.
+ */
 export function cropTerrainModelField(
   field: HeightField,
   width: number,
   height: number,
   settings: TerrainModelSettings,
   crop: TerrainCropSettings = defaultTerrainCrop,
-): { field: HeightField; x: number; y: number; width: number; height: number } {
+): TerrainModelCrop {
   validateTerrainModelSettings(settings);
-  const ratio = settings.cropShape === 'circle' ? 1 : settings.widthMm / settings.lengthMm;
-  const bounds = getTerrainCropBounds(width, height, ratio, crop);
+  const isRound = settings.cropShape === 'circle';
+  const ratio = isRound ? 1 : settings.widthMm / settings.lengthMm;
+  const bounds = getTerrainCropBounds(width, height, ratio, crop, isRound);
+  const rotationRadians = ((bounds.crop.rotationDegrees ?? 0) * Math.PI) / 180;
+  const box = { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
 
-  return {
-    field: { ...field, originX: field.originX - bounds.x, originY: field.originY - bounds.y },
-    x: bounds.x,
-    y: bounds.y,
-    width: bounds.width,
-    height: bounds.height,
-  };
+  if (rotationRadians === 0) {
+    return {
+      field: { ...field, originX: field.originX - bounds.x, originY: field.originY - bounds.y },
+      ...box,
+      rotationRadians,
+    };
+  }
+
+  return { field: resampleRotatedField(field, box, rotationRadians), ...box, rotationRadians };
 }
 
 /**
@@ -125,10 +160,13 @@ export function createTerrainModel(
     throw new Error('Height exaggeration must be between 0 and 1.');
   }
 
+  const footprint = getCropFootprint(settings.cropShape, settings.cropPolygon, width, height);
   const sampled =
     settings.cropShape === 'circle'
       ? createCircularTerrainSurface(field, width)
-      : createTerrainSurfaceBuffers(field, width, height);
+      : footprint.outline
+        ? createOutlineTerrainSurface(field, { ...footprint, outline: footprint.outline })
+        : createTerrainSurfaceBuffers(field, width, height);
   const mmPerUnit =
     (settings.cropShape === 'circle'
       ? settings.widthMm
@@ -229,4 +267,37 @@ export function createTerrainModel(
     elevationScaleMm,
     ...(settings.terrainShape === 'terraced' ? { layerHeightMm: 0 } : {}),
   };
+}
+
+// === HELPERS ===
+
+/** Samples the source on a grid aligned with the rotated crop, one cell beyond each edge. */
+function resampleRotatedField(
+  source: HeightField,
+  box: { x: number; y: number; width: number; height: number },
+  rotationRadians: number,
+): HeightField {
+  const spacing = source.spacing;
+  const columns = Math.ceil(box.width / spacing) + 3;
+  const rows = Math.ceil(box.height / spacing) + 3;
+  const values = new Float64Array(columns * rows);
+  const cos = Math.cos(rotationRadians);
+  const sin = Math.sin(rotationRadians);
+  const centerX = box.x + box.width / 2;
+  const centerY = box.y + box.height / 2;
+
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      const localX = (column - 1) * spacing - box.width / 2;
+      const localY = (row - 1) * spacing - box.height / 2;
+
+      values[row * columns + column] = sampleHeightField(
+        source,
+        centerX + localX * cos - localY * sin,
+        centerY + localX * sin + localY * cos,
+      );
+    }
+  }
+
+  return { columns, rows, originX: -spacing, originY: -spacing, spacing, values };
 }

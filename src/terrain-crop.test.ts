@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { clipCirclePolygon, clipCircleSegment, getTerrainCropBounds } from './terrain-crop';
+import {
+  clampToCropFootprint,
+  clipCirclePolygon,
+  clipCircleSegment,
+  clipFootprintSegment,
+  getCropFootprint,
+  getTerrainCropBounds,
+  isInsideCropFootprint,
+  normalizeRotationDegrees,
+  sourceToCropPoint,
+} from './terrain-crop';
 
 void test('selection is constrained to the source, including resize limits', () => {
   const bounds = getTerrainCropBounds(1000, 800, 1, { centerX: -1, centerY: 3, size: 0.5 });
@@ -49,4 +59,36 @@ void test('contours and water are confined to the circular footprint', () => {
     ),
     [],
   );
+});
+
+void test('segments crossing a notched polygon split into the pieces on the model', () => {
+  const footprint = getCropFootprint(
+    'polygon',
+    [
+      { x: 0, y: 0 },
+      { x: 0.5, y: 0.4 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+    ],
+    10,
+    10,
+  );
+  const pieces = clipFootprintSegment({ x: -1, y: 2 }, { x: 11, y: 2 }, footprint);
+
+  assert.equal(pieces.length, 2);
+  assert.ok(Math.abs(pieces[0][0].x) < 1e-9);
+  assert.ok(Math.abs(pieces[1][1].x - 10) < 1e-9);
+  assert.ok(!isInsideCropFootprint({ x: 5, y: 2 }, footprint));
+  assert.ok(isInsideCropFootprint({ x: 5, y: 6 }, footprint));
+  assert.deepEqual(clampToCropFootprint({ x: 5, y: 12 }, footprint), { x: 5, y: 10 });
+});
+
+void test('crop points follow a rotated frame back to its unrotated box', () => {
+  const crop = { x: 0, y: 0, width: 10, height: 10, rotationRadians: Math.PI / 2 };
+  const point = sourceToCropPoint(crop, { x: 5, y: 0 });
+
+  assert.ok(Math.abs(point.x) < 1e-9 && Math.abs(point.y - 5) < 1e-9);
+  assert.equal(normalizeRotationDegrees(540), 180);
+  assert.equal(normalizeRotationDegrees(-190), 170);
 });

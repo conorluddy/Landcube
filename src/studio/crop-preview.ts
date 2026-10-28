@@ -16,13 +16,17 @@ export function createCropPreview(controller: StudioController): CropPreview {
       widget = mountTerrainCropControls(
         container,
         () => controller.getSnapshot().model.dimensions,
-        (shape) => {
+        (shape, polygon) => {
           const crop = widget?.getCrop();
 
           if (crop) {
             controller.model({
               crop,
-              dimensions: { ...controller.getSnapshot().model.dimensions, cropShape: shape },
+              dimensions: {
+                ...controller.getSnapshot().model.dimensions,
+                cropShape: shape,
+                cropPolygon: polygon,
+              },
             });
           }
         },

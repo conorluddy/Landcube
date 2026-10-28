@@ -6,8 +6,13 @@ import {
 } from './constants/roads';
 import { projectToRealTerrainFrame, type FramePoint } from './real-terrain-projection';
 import type { RealTerrain } from './real-terrain';
-import { clipCircleSegment, type TerrainCropShape } from './terrain-crop';
-import { clipTerrainSegment, sampleHeightField, terrain3dElevationScale } from './terrain-surface';
+import {
+  clampToCropFootprint,
+  clipFootprintSegment,
+  sourceToCropPoint,
+  type CropFootprint,
+} from './terrain-crop';
+import { sampleHeightField, terrain3dElevationScale } from './terrain-surface';
 import type { HeightField } from './types/terrain';
 import type { MappedRoad, RoadPath, RoadStyle } from './types/roads';
 
@@ -22,6 +27,7 @@ interface SourceCrop {
   y: number;
   width: number;
   height: number;
+  rotationRadians: number;
 }
 
 /** Shared so updates without roads keep one identity and never rebuild empty geometry. */
@@ -36,7 +42,7 @@ export function clipRoadsToCrop(
   placement: Required<Pick<RealTerrain, 'location' | 'spanKm'>>,
   sourceFrame: { width: number; height: number },
   crop: SourceCrop,
-  shape: TerrainCropShape,
+  footprint: CropFootprint,
 ): RoadPath[] {
   const paths: RoadPath[] = [];
 
@@ -44,10 +50,10 @@ export function clipRoadsToCrop(
     const points = road.points.map(({ latitude, longitude }) => {
       const point = projectToRealTerrainFrame(placement, latitude, longitude, sourceFrame);
 
-      return { x: point.x - crop.x, y: point.y - crop.y };
+      return sourceToCropPoint(crop, point);
     });
 
-    for (const run of clipPolyline(points, crop.width, crop.height, shape)) {
+    for (const run of clipPolyline(points, footprint)) {
       paths.push({ roadClass: road.roadClass, points: run });
     }
   }
@@ -75,13 +81,12 @@ export function createRoadRibbonBuffers(
   height: number,
   style: Pick<RoadStyle, 'detail' | 'widthMm'>,
   frameUnitsPerMm: number,
-  shape: TerrainCropShape,
+  footprint: CropFootprint,
 ): RoadRibbonBuffers {
   const classes: readonly string[] = roadDetailClasses[style.detail];
   const positions: number[] = [];
   const indices: number[] = [];
   const scale = 2 / Math.max(width, height);
-  const clamp = createFootprintClamp(width, height, shape);
 
   for (const path of paths) {
     if (!classes.includes(path.roadClass)) {
@@ -101,10 +106,10 @@ export function createRoadRibbonBuffers(
       const offset = getMiterOffset(points, index, halfWidth);
 
       for (const side of [1, -1]) {
-        const edge = clamp({
-          x: points[index].x + offset.x * side,
-          y: points[index].y + offset.y * side,
-        });
+        const edge = clampToCropFootprint(
+          { x: points[index].x + offset.x * side, y: points[index].y + offset.y * side },
+          footprint,
+        );
 
         positions.push(
           (edge.x - width / 2) * scale,
@@ -137,12 +142,7 @@ export function getSuggestedRoadWidthMm(modelSpanKm: number): number {
 // === HELPERS ===
 
 /** Consecutive segments that stay inside the footprint share one run; leaving it ends the run. */
-function clipPolyline(
-  points: readonly FramePoint[],
-  width: number,
-  height: number,
-  shape: TerrainCropShape,
-): FramePoint[][] {
+function clipPolyline(points: readonly FramePoint[], footprint: CropFootprint): FramePoint[][] {
   const runs: FramePoint[][] = [];
   let current: FramePoint[] | undefined;
 
@@ -154,26 +154,25 @@ function clipPolyline(
       continue;
     }
 
-    const segment =
-      shape === 'circle' ? clipCircleSegment(a, b, width) : clipTerrainSegment(a, b, width, height);
+    const segments = clipFootprintSegment(a, b, footprint);
 
-    if (!segment) {
+    if (segments.length === 0) {
       current = undefined;
       continue;
     }
 
-    const [start, end] = segment;
+    for (const [start, end] of segments) {
+      // Clipping returns the original endpoint exactly when it is inside the footprint.
+      if (!current || start.x !== a.x || start.y !== a.y) {
+        current = [start];
+        runs.push(current);
+      }
 
-    // Clipping returns the original endpoint exactly when it is inside the footprint.
-    if (!current || start.x !== a.x || start.y !== a.y) {
-      current = [start];
-      runs.push(current);
-    }
+      current.push(end);
 
-    current.push(end);
-
-    if (end.x !== b.x || end.y !== b.y) {
-      current = undefined;
+      if (end.x !== b.x || end.y !== b.y) {
+        current = undefined;
+      }
     }
   }
 
@@ -226,31 +225,4 @@ function getSegmentNormal(a: FramePoint, b: FramePoint): FramePoint {
   const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
 
   return { x: -(b.y - a.y) / length, y: (b.x - a.x) / length };
-}
-
-/** Keeps ribbon edges on the model so roads at the crop edge never overhang the base. */
-function createFootprintClamp(
-  width: number,
-  height: number,
-  shape: TerrainCropShape,
-): (point: FramePoint) => FramePoint {
-  if (shape === 'circle') {
-    const radius = width / 2;
-
-    return (point) => {
-      const distance = Math.hypot(point.x - radius, point.y - radius);
-
-      return distance <= radius
-        ? point
-        : {
-            x: radius + ((point.x - radius) * radius) / distance,
-            y: radius + ((point.y - radius) * radius) / distance,
-          };
-    };
-  }
-
-  return (point) => ({
-    x: Math.max(0, Math.min(width, point.x)),
-    y: Math.max(0, Math.min(height, point.y)),
-  });
 }

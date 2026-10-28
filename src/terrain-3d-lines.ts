@@ -1,6 +1,6 @@
-import { clipCircleSegment, type TerrainCropShape } from './terrain-crop';
+import { clipFootprintSegment, type CropFootprint } from './terrain-crop';
 import { getContourStyle, type ContourStyle } from './contour-style';
-import { clipTerrainSegment, terrain3dElevationScale } from './terrain-surface';
+import { terrain3dElevationScale } from './terrain-surface';
 import type { Contour } from './types/contours';
 import type { DesignSettings } from './types/design';
 
@@ -16,7 +16,7 @@ export function createTerrainLineBuffers(
   width: number,
   height: number,
   settings: Readonly<DesignSettings>,
-  shape: TerrainCropShape = 'rectangle',
+  footprint: CropFootprint = { shape: 'rectangle', width, height },
 ): Record<ContourStyle, TerrainLineBuffers> {
   const groups: Record<ContourStyle, TerrainLineBuffers> = {
     ordinary: { positions: [], distanceStarts: [], distanceEnds: [] },
@@ -43,12 +43,8 @@ export function createTerrainLineBuffers(
       for (let index = 0; index < count - (path.closed ? 0 : 1); index++) {
         const a = path.points[index];
         const b = path.points[(index + 1) % count];
-        const segment =
-          shape === 'circle'
-            ? clipCircleSegment(a, b, width)
-            : clipTerrainSegment(a, b, width, height);
 
-        if (segment) {
+        for (const segment of clipFootprintSegment(a, b, footprint)) {
           group.distanceStarts.push(distance + Math.hypot(segment[0].x - a.x, segment[0].y - a.y));
           group.distanceEnds.push(distance + Math.hypot(segment[1].x - a.x, segment[1].y - a.y));
 

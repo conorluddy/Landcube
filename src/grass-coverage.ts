@@ -1,7 +1,7 @@
 import { getRoadHalfWidth } from './road-ribbons';
 import { sampleHeightField } from './terrain-surface';
 import { roadDetailClasses } from './constants/roads';
-import type { TerrainCropShape } from './terrain-crop';
+import { isInsideCropFootprint, type CropFootprint } from './terrain-crop';
 import type { HeightField } from './types/terrain';
 import type { GrassStyle } from './types/grass';
 import type { RoadPath, RoadStyle } from './types/roads';
@@ -11,7 +11,7 @@ export interface GrassSite {
   field: HeightField;
   width: number;
   height: number;
-  shape: TerrainCropShape;
+  footprint: CropFootprint;
   /** The crop's offset in the source frame; patches are anchored there so crops never reshape them. */
   originX: number;
   originY: number;
@@ -151,7 +151,7 @@ export function surveyGrassGround(
       const elevation = elevations[index];
 
       if (
-        !isInsideFootprint(x, y, site) ||
+        !isInsideCropFootprint({ x, y }, site.footprint) ||
         (site.seaLevel !== undefined && elevation <= site.seaLevel) ||
         roads.covers(x, y)
       ) {
@@ -205,16 +205,6 @@ export function createGrassCoverage(
 }
 
 // === HELPERS ===
-
-function isInsideFootprint(x: number, y: number, site: GrassSite): boolean {
-  if (site.shape === 'circle') {
-    const radius = site.width / 2;
-
-    return Math.hypot(x - radius, y - radius) <= radius;
-  }
-
-  return x >= 0 && x <= site.width && y >= 0 && y <= site.height;
-}
 
 /** The real, unexaggerated slope from neighbouring texels, so exaggeration never moves grass. */
 function getSlopeDegrees(

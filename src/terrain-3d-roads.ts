@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createRoadRibbonBuffers } from './road-ribbons';
 import { createTerrainRoadMaterial } from './terrain-road-material';
 import { defaultRoadStyle } from './constants/roads';
+import { getCropFootprint } from './terrain-crop';
 import { getFrameUnitsPerMm, type TerrainModelSettings } from './terrain-model';
 import type { HeightField } from './types/terrain';
 import type { RoadPath, RoadStyle } from './types/roads';
@@ -75,7 +76,7 @@ export function createTerrainRoadLayer(): TerrainRoadLayer {
       height,
       style,
       frameUnitsPerMm,
-      modelSettings.cropShape ?? 'rectangle',
+      getCropFootprint(modelSettings.cropShape, modelSettings.cropPolygon, width, height),
     );
 
     for (let offset = 1; offset < buffers.positions.length; offset += 3) {

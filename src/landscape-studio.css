@@ -565,6 +565,12 @@ input[type='range']::-moz-range-thumb {
 .terrain-crop-preview [data-crop-handle] {
   cursor: nwse-resize;
 }
+.terrain-crop-preview [data-crop-vertex] {
+  cursor: crosshair;
+}
+.terrain-crop-preview [data-crop-rotate] {
+  cursor: grab;
+}
 .terrain-crop-preview .crop-north {
   fill: #fff;
   stroke: #202326;
