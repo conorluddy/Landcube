@@ -565,6 +565,16 @@ input[type='range']::-moz-range-thumb {
 .terrain-crop-preview [data-crop-handle] {
   cursor: nwse-resize;
 }
+.crop-sides-stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.crop-sides-stepper output {
+  min-width: 2ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 .crop-polygon-help {
   margin: -8px 0 16px;
   padding-left: 18px;

@@ -181,7 +181,7 @@ controls.connect({
       new Blob([terrain3d.getStl()], { type: 'model/stl' }),
       model.cropShape === 'circle'
         ? `topogra-${settings.seed}-circle-${model.widthMm}mm.stl`
-        : `topogra-${settings.seed}-${model.cropShape === 'triangle' || model.cropShape === 'polygon' ? `${model.cropShape}-` : ''}${model.widthMm}x${model.lengthMm}mm.stl`,
+        : `topogra-${settings.seed}-${model.cropShape === 'polygon' ? 'polygon-' : ''}${model.widthMm}x${model.lengthMm}mm.stl`,
     );
   },
   roadsChanged: updateTerrain3d,

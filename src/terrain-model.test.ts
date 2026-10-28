@@ -9,6 +9,7 @@ import {
   validateTerrainModelSettings,
 } from './terrain-model';
 import { createBinaryStl, validatePrintableSolid } from './export/stl-export';
+import { createRegularCropPolygon } from './terrain-crop';
 import type { HeightField } from './types/terrain';
 
 void test('suggested height lifts flat wide places and calms steep crops', () => {
@@ -199,7 +200,7 @@ void test('frame units per millimetre span the longer side, or a circle diameter
 });
 
 for (const [cropShape, cropPolygon] of [
-  ['triangle', undefined],
+  ['polygon', createRegularCropPolygon(3)],
   ['polygon', undefined],
   [
     'polygon',

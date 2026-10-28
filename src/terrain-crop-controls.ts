@@ -1,6 +1,9 @@
 import { extractContours } from './contour-extraction';
 import {
+  addCropPolygonCorner,
+  cropPolygonSideLimits,
   defaultCropPolygon,
+  removeCropPolygonCorner,
   defaultTerrainCrop,
   getCropFootprint,
   getRotatedExtent,
@@ -49,7 +52,8 @@ export function mountTerrainCropControls(
   ): void;
 } {
   container.innerHTML = `<fieldset><legend>Crop</legend>
-    <div class="select-row"><label for="terrain-crop-shape">Crop shape</label><select id="terrain-crop-shape" data-crop-shape><option value="rectangle">Rectangle</option><option value="circle">Circle</option><option value="triangle">Triangle</option><option value="polygon">Poly</option></select></div>
+    <div class="select-row"><label for="terrain-crop-shape">Crop shape</label><select id="terrain-crop-shape" data-crop-shape><option value="rectangle">Rectangle</option><option value="circle">Circle</option><option value="polygon">Poly</option></select></div>
+    <div class="select-row" data-crop-sides-row hidden><span id="terrain-crop-sides-label">Sides</span><div class="crop-sides-stepper" role="group" aria-labelledby="terrain-crop-sides-label"><button type="button" class="text-button" data-crop-sides-down aria-label="Fewer sides">−</button><output data-crop-sides aria-live="polite">6</output><button type="button" class="text-button" data-crop-sides-up aria-label="More sides">+</button></div></div>
     <svg class="terrain-crop-preview" role="img" aria-label="Terrain crop preview. Drag inside to move; drag a corner to resize; drag the top handle to rotate. Arrow keys move, plus and minus resize, square brackets rotate." tabindex="0" data-crop-preview>
       <image data-crop-image></image>
       <path data-crop-mask fill="#000" fill-opacity="0.65" fill-rule="evenodd" pointer-events="none"></path>
@@ -216,6 +220,15 @@ export function mountTerrainCropControls(
         : `Drag the crop to move it, a handle to resize, or the top knob to rotate (Shift snaps to 15°). Preview and STL use the selected area.${isRound() ? ' Circle size in millimeters is set by Diameter below.' : ''}`;
     getRequiredElement(container, '[data-crop-polygon-help]', HTMLUListElement).hidden =
       shape !== 'polygon';
+    getRequiredElement(container, '[data-crop-sides-row]', HTMLDivElement).hidden =
+      shape !== 'polygon';
+    getRequiredElement(container, '[data-crop-sides]', HTMLOutputElement).value = String(
+      polygon.length,
+    );
+    getRequiredElement(container, '[data-crop-sides-down]', HTMLButtonElement).disabled =
+      polygon.length <= cropPolygonSideLimits.minimum;
+    getRequiredElement(container, '[data-crop-sides-up]', HTMLButtonElement).disabled =
+      polygon.length >= cropPolygonSideLimits.maximum;
     svg.setAttribute('data-crop-center', `${crop.centerX},${crop.centerY}`);
     svg.setAttribute('data-crop-shape', shape);
   };
@@ -247,6 +260,25 @@ export function mountTerrainCropControls(
     setRotation(rotationSlider.valueAsNumber);
     scheduleChange();
   });
+  // Stepping keeps hand-made edits: a new corner splits an edge, and the least-felt corner goes.
+  getRequiredElement(container, '[data-crop-sides-up]', HTMLButtonElement).addEventListener(
+    'click',
+    () => {
+      if (polygon.length < cropPolygonSideLimits.maximum) {
+        tryPolygon(addCropPolygonCorner(polygon));
+      }
+    },
+  );
+  getRequiredElement(container, '[data-crop-sides-down]', HTMLButtonElement).addEventListener(
+    'click',
+    () => {
+      const fewer = removeCropPolygonCorner(polygon);
+
+      if (fewer) {
+        tryPolygon(fewer);
+      }
+    },
+  );
   getRequiredElement(container, '[data-crop-reset]', HTMLButtonElement).addEventListener(
     'click',
     () => {

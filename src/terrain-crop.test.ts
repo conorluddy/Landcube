@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  addCropPolygonCorner,
   clampToCropFootprint,
+  createRegularCropPolygon,
+  isStarShapedCropPolygon,
+  removeCropPolygonCorner,
   clipCirclePolygon,
   clipCircleSegment,
   clipFootprintSegment,
@@ -91,4 +95,29 @@ void test('crop points follow a rotated frame back to its unrotated box', () => 
   assert.ok(Math.abs(point.x) < 1e-9 && Math.abs(point.y - 5) < 1e-9);
   assert.equal(normalizeRotationDegrees(540), 180);
   assert.equal(normalizeRotationDegrees(-190), 170);
+});
+
+void test('even polygons fill the crop box and stay printable at every side count', () => {
+  for (let sides = 3; sides <= 12; sides++) {
+    const polygon = createRegularCropPolygon(sides);
+
+    assert.equal(polygon.length, sides);
+    assert.ok(isStarShapedCropPolygon(polygon));
+    assert.ok(Math.abs(Math.min(...polygon.map((p) => p.x))) < 1e-9);
+    assert.ok(Math.abs(Math.max(...polygon.map((p) => p.y)) - 1) < 1e-9);
+  }
+});
+
+void test('stepping sides keeps edits: adding splits an edge, removing drops the flattest corner', () => {
+  const square = [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 },
+    { x: 1, y: 1 },
+    { x: 0, y: 1 },
+  ];
+  const five = addCropPolygonCorner(square);
+
+  assert.deepEqual(five[1], { x: 0.5, y: 0 });
+  assert.deepEqual(removeCropPolygonCorner(five), square);
+  assert.equal(removeCropPolygonCorner(createRegularCropPolygon(3)), undefined);
 });

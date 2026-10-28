@@ -4,7 +4,7 @@ import type { HeightField } from './types/terrain';
 
 export const terrainCircleSegments = 512;
 
-export type TerrainCropShape = 'rectangle' | 'circle' | 'triangle' | 'polygon';
+export type TerrainCropShape = 'rectangle' | 'circle' | 'polygon';
 export interface CropPoint {
   x: number;
   y: number;
@@ -29,21 +29,81 @@ export const defaultTerrainCrop: Readonly<TerrainCropSettings> = Object.freeze({
   size: 1,
 });
 
-/** Corners of the triangle crop, in the crop box's normalized coordinates. */
-export const triangleCropOutline: readonly CropPoint[] = Object.freeze([
-  { x: 0.5, y: 0 },
-  { x: 1, y: 1 },
-  { x: 0, y: 1 },
-]);
+export const cropPolygonSideLimits = Object.freeze({ minimum: 3, maximum: 12 });
+
+/**
+ * An even polygon with a corner pointing north, stretched to fill the crop box so no side of
+ * the print is wasted. Every corner stays in view of the center, so it is always printable.
+ */
+export function createRegularCropPolygon(sides: number): CropPoint[] {
+  const count = Math.round(
+    Math.max(cropPolygonSideLimits.minimum, Math.min(cropPolygonSideLimits.maximum, sides)),
+  );
+  const points = Array.from({ length: count }, (_, index) => {
+    const angle = (index / count) * Math.PI * 2 - Math.PI / 2;
+
+    return { x: Math.cos(angle), y: Math.sin(angle) };
+  });
+  const [left, right] = [Math.min(...points.map((p) => p.x)), Math.max(...points.map((p) => p.x))];
+  const [top, bottom] = [Math.min(...points.map((p) => p.y)), Math.max(...points.map((p) => p.y))];
+
+  return points.map((p) => ({ x: (p.x - left) / (right - left), y: (p.y - top) / (bottom - top) }));
+}
 
 /** The editable polygon starts as a hexagon so there is something obvious to drag. */
-export const defaultCropPolygon: readonly CropPoint[] = Object.freeze(
-  Array.from({ length: 6 }, (_, index) => {
-    const angle = ((index * 60 - 90) * Math.PI) / 180;
+export const defaultCropPolygon: readonly CropPoint[] = Object.freeze(createRegularCropPolygon(6));
 
-    return { x: 0.5 + Math.cos(angle) / 2, y: 0.5 + Math.sin(angle) / 2 };
-  }),
-);
+/** Splits the longest edge, so a new corner never changes the outline until it is dragged. */
+export function addCropPolygonCorner(polygon: readonly CropPoint[]): CropPoint[] {
+  let longest = 0;
+  let longestLength = -1;
+
+  polygon.forEach((a, index) => {
+    const b = polygon[(index + 1) % polygon.length];
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+
+    if (length > longestLength) {
+      longest = index;
+      longestLength = length;
+    }
+  });
+  const a = polygon[longest];
+  const b = polygon[(longest + 1) % polygon.length];
+
+  return [
+    ...polygon.slice(0, longest + 1),
+    { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+    ...polygon.slice(longest + 1),
+  ];
+}
+
+/**
+ * Removes the corner whose loss changes the outline least, among those that leave a printable
+ * polygon. Undefined at the minimum side count or when no corner can go.
+ */
+export function removeCropPolygonCorner(polygon: readonly CropPoint[]): CropPoint[] | undefined {
+  if (polygon.length <= cropPolygonSideLimits.minimum) {
+    return undefined;
+  }
+
+  let best: { area: number; polygon: CropPoint[] } | undefined;
+
+  polygon.forEach((corner, index) => {
+    const previous = polygon[(index + polygon.length - 1) % polygon.length];
+    const next = polygon[(index + 1) % polygon.length];
+    const area = Math.abs(
+      (corner.x - previous.x) * (next.y - previous.y) -
+        (corner.y - previous.y) * (next.x - previous.x),
+    );
+    const candidate = polygon.filter((_, i) => i !== index);
+
+    if ((!best || area < best.area) && isStarShapedCropPolygon(candidate)) {
+      best = { area, polygon: candidate };
+    }
+  });
+
+  return best?.polygon;
+}
 
 /**
  * Size is a fraction of the largest crop that fits, with its center constrained to the source.
@@ -122,12 +182,7 @@ export function getCropFootprint(
   height: number,
 ): CropFootprint {
   const resolved = shape ?? 'rectangle';
-  const normalized =
-    resolved === 'triangle'
-      ? triangleCropOutline
-      : resolved === 'polygon'
-        ? (polygon ?? defaultCropPolygon)
-        : undefined;
+  const normalized = resolved === 'polygon' ? (polygon ?? defaultCropPolygon) : undefined;
 
   if (!normalized) {
     return { shape: resolved, width, height };
