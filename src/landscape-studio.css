@@ -572,6 +572,14 @@ input[type='range']::-moz-range-thumb {
 .crop-polygon-help li + li {
   margin-top: 2px;
 }
+.terrain-crop-preview [data-crop-side='left'],
+.terrain-crop-preview [data-crop-side='right'] {
+  cursor: ew-resize;
+}
+.terrain-crop-preview [data-crop-side='top'],
+.terrain-crop-preview [data-crop-side='bottom'] {
+  cursor: ns-resize;
+}
 .terrain-crop-preview [data-crop-vertex] {
   cursor: crosshair;
 }

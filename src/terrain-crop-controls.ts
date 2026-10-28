@@ -14,13 +14,15 @@ import {
 } from './terrain-crop';
 import { getRequiredElement } from './dom-elements';
 import { sampleHeightField } from './terrain-surface';
-import type { TerrainModelSettings } from './terrain-model';
+import { defaultTerrainModelSettings, type TerrainModelSettings } from './terrain-model';
 import type { HeightField } from './types/terrain';
 import type { DesignSettings } from './types/design';
 
+type CropSide = 'left' | 'right' | 'top' | 'bottom';
 type CropDrag =
   | { kind: 'move'; x: number; y: number; crop: TerrainCropSettings }
   | { kind: 'resize'; crop: TerrainCropSettings }
+  | { kind: 'side'; side: CropSide; crop: TerrainCropSettings; width: number; height: number }
   | { kind: 'rotate'; crop: TerrainCropSettings }
   | { kind: 'vertex'; index: number };
 
@@ -28,7 +30,12 @@ type CropDrag =
 export function mountTerrainCropControls(
   container: HTMLElement,
   getModel: () => TerrainModelSettings,
-  changed: (shape: TerrainCropShape, polygon: readonly CropPoint[] | undefined) => void,
+  /** `ratio` is a new width ÷ length when side handles or a reset reshaped the rectangle. */
+  changed: (
+    shape: TerrainCropShape,
+    polygon: readonly CropPoint[] | undefined,
+    ratio: number | undefined,
+  ) => void,
   getSelection: () => TerrainCropSettings = () => defaultTerrainCrop,
 ): {
   getCrop(): TerrainCropSettings;
@@ -80,7 +87,16 @@ export function mountTerrainCropControls(
   let drag: CropDrag | undefined;
 
   const isRound = () => shape === 'circle';
-  const ratio = () => (isRound() ? 1 : getModel().widthMm / getModel().lengthMm);
+  // Side drags reshape the crop before the model's dimensions catch up.
+  let ratioOverride: number | undefined;
+  let hasFittedSource = false;
+  const ratio = () => (isRound() ? 1 : (ratioOverride ?? getModel().widthMm / getModel().lengthMm));
+
+  const fitToSource = () => {
+    ratioOverride = width / height;
+    crop = { ...defaultTerrainCrop };
+  };
+
   const bounds = () => getTerrainCropBounds(width, height, ratio(), crop, isRound());
   const radians = () => ((crop.rotationDegrees ?? 0) * Math.PI) / 180;
 
@@ -143,6 +159,15 @@ export function mountTerrainCropControls(
       : shape === 'polygon'
         ? polygon.map((p) => toSource(box, { x: p.x * box.width, y: p.y * box.height }))
         : corners;
+    const sides: [CropSide, CropPoint][] =
+      shape === 'rectangle'
+        ? [
+            ['top', { x: box.width / 2, y: 0 }],
+            ['right', { x: box.width, y: box.height / 2 }],
+            ['bottom', { x: box.width / 2, y: box.height }],
+            ['left', { x: 0, y: box.height / 2 }],
+          ]
+        : [];
     const matrix = svg.getScreenCTM();
     const pixelScale = Math.max(matrix ? Math.hypot(matrix.a, matrix.b) : 320 / width, 0.0001);
     const handleRadius = 6 / pixelScale;
@@ -152,12 +177,20 @@ export function mountTerrainCropControls(
     north.setAttribute('y', String(20 / pixelScale));
     north.setAttribute('font-size', String(12 / pixelScale));
 
-    handlesGroup.innerHTML = handles
-      .map(
-        (p, index) =>
-          `<circle ${shape === 'polygon' ? `data-crop-vertex="${index}"` : 'data-crop-handle'} cx="${p.x}" cy="${p.y}" r="${handleRadius}" fill="currentColor" stroke="#202326" stroke-width="1" vector-effect="non-scaling-stroke"/>`,
-      )
-      .join('');
+    handlesGroup.innerHTML =
+      handles
+        .map(
+          (p, index) =>
+            `<circle ${shape === 'polygon' ? `data-crop-vertex="${index}"` : 'data-crop-handle'} cx="${p.x}" cy="${p.y}" r="${handleRadius}" fill="currentColor" stroke="#202326" stroke-width="1" vector-effect="non-scaling-stroke"/>`,
+        )
+        .join('') +
+      sides
+        .map(([side, local]) => {
+          const p = toSource(box, local);
+
+          return `<rect data-crop-side="${side}" x="${p.x - handleRadius * 0.8}" y="${p.y - handleRadius * 0.8}" width="${handleRadius * 1.6}" height="${handleRadius * 1.6}" transform="rotate(${crop.rotationDegrees ?? 0} ${p.x} ${p.y})" fill="currentColor" stroke="#202326" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+        })
+        .join('');
     const armBase = toSource(box, { x: box.width / 2, y: 0 });
     const armTip = toSource(box, { x: box.width / 2, y: -22 / pixelScale });
     const arm = getRequiredElement(container, '[data-crop-rotate-arm]', SVGElement);
@@ -192,7 +225,7 @@ export function mountTerrainCropControls(
 
     pendingFrame ??= requestAnimationFrame(() => {
       pendingFrame = undefined;
-      changed(shape, shape === 'polygon' ? polygon : undefined);
+      changed(shape, shape === 'polygon' ? polygon : undefined, ratioOverride);
     });
   };
 
@@ -219,6 +252,11 @@ export function mountTerrainCropControls(
     () => {
       crop = { ...defaultTerrainCrop };
       polygon = defaultCropPolygon;
+
+      if (shape === 'rectangle') {
+        fitToSource();
+      }
+
       scheduleChange();
     },
   );
@@ -270,11 +308,14 @@ export function mountTerrainCropControls(
           getCropFootprint(shape, polygon, box.width, box.height),
         );
     const vertex = target?.getAttribute('data-crop-vertex');
+    const side = target?.getAttribute('data-crop-side') as CropSide | null | undefined;
 
     if (target === rotateHandle) {
       drag = { kind: 'rotate', crop: { ...crop } };
     } else if (vertex !== null && vertex !== undefined) {
       drag = { kind: 'vertex', index: Number(vertex) };
+    } else if (side !== null && side !== undefined) {
+      drag = { kind: 'side', side, crop: { ...crop }, width: box.width, height: box.height };
     } else if (target?.hasAttribute('data-crop-handle') === true) {
       drag = { kind: 'resize', crop: { ...crop } };
     } else if (inside) {
@@ -298,6 +339,13 @@ export function mountTerrainCropControls(
       const index = drag.index;
 
       tryPolygon(polygon.map((p, i) => (i === index ? toNormalized(position) : p)));
+
+      return;
+    }
+
+    if (drag.kind === 'side') {
+      resizeSide(drag, position);
+      scheduleChange();
 
       return;
     }
@@ -344,6 +392,38 @@ export function mountTerrainCropControls(
 
     scheduleChange();
   });
+
+  /** Moves one side while the opposite side stays put, reshaping the rectangle. */
+  const resizeSide = (start: Extract<CropDrag, { kind: 'side' }>, position: CropPoint) => {
+    const cx = start.crop.centerX * width;
+    const cy = start.crop.centerY * height;
+    const local = toLocal(cx, cy, position);
+    const isHorizontal = start.side === 'left' || start.side === 'right';
+    const sign = start.side === 'right' || start.side === 'bottom' ? 1 : -1;
+    const startSpan = isHorizontal ? start.width : start.height;
+    const minimumSpan = Math.min(width, height) * 0.05;
+    const span = Math.max(minimumSpan, (isHorizontal ? local.x : local.y) * sign + startSpan / 2);
+    const shift = ((span - startSpan) / 2) * sign;
+    const cos = Math.cos(radians());
+    const sin = Math.sin(radians());
+    const nextWidth = isHorizontal ? span : start.width;
+    const nextHeight = isHorizontal ? start.height : span;
+    const centerX = cx + (isHorizontal ? shift * cos : -shift * sin);
+    const centerY = cy + (isHorizontal ? shift * sin : shift * cos);
+    const nextRatio = nextWidth / nextHeight;
+    const full = getTerrainCropBounds(width, height, nextRatio, {
+      ...start.crop,
+      size: 1,
+    });
+
+    ratioOverride = nextRatio;
+    crop = {
+      ...start.crop,
+      centerX: centerX / width,
+      centerY: centerY / height,
+      size: Math.min(1, nextWidth / full.width),
+    };
+  };
 
   const endDrag = () => {
     drag = undefined;
@@ -443,6 +523,27 @@ export function mountTerrainCropControls(
       crop = { ...getSelection() };
       select.value = shape;
       svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+      // The model has caught up with any reshape unless one is still waiting to be sent.
+      if (pendingFrame === undefined) {
+        ratioOverride = undefined;
+      }
+
+      // A fresh project's rectangle starts as the whole source rather than a square inside it.
+      if (!hasFittedSource) {
+        hasFittedSource = true;
+        const isUntouched =
+          shape === 'rectangle' &&
+          JSON.stringify(crop) === JSON.stringify(defaultTerrainCrop) &&
+          model.widthMm === defaultTerrainModelSettings.widthMm &&
+          model.lengthMm === defaultTerrainModelSettings.lengthMm;
+
+        if (isUntouched) {
+          fitToSource();
+          scheduleChange();
+        }
+      }
+
       const key = JSON.stringify([
         sourceWidth,
         sourceHeight,
