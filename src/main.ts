@@ -390,11 +390,18 @@ function updateTerrain3d(): void {
     realTerrain,
   );
 
-  const place = createFloorPlace(realTerrain, modelCrop, modelSourceFrame);
+  const place = createFloorPlace(
+    realTerrain,
+    modelCrop,
+    modelSourceFrame,
+    dimensions.cropShape === 'circle',
+  );
 
   // Before the update, so the update builds roads at the new auto width. A width change also
   // rebuilds once on the previous terrain; that costs one ribbon pass per place load.
-  controls.modelSpan(place ? Math.max(place.widthKm, place.lengthKm) : undefined);
+  const modelSizeKm = place?.modelSizeKm ?? place;
+
+  controls.modelSpan(modelSizeKm ? Math.max(modelSizeKm.widthKm, modelSizeKm.lengthKm) : undefined);
   terrain3d.update(
     croppedContours,
     modelCrop.width,
