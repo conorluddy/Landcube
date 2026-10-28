@@ -52,6 +52,12 @@ export function mountTerrainCropControls(
       <circle data-crop-rotate fill="#202326" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke"></circle>
       <text x="12" y="20" class="crop-north" pointer-events="none">N ↑</text>
     </svg>
+    <ul class="export-hint crop-polygon-help" data-crop-polygon-help hidden>
+      <li><strong>Move a corner:</strong> drag it</li>
+      <li><strong>Add a corner:</strong> double-click an edge</li>
+      <li><strong>Delete a corner:</strong> double-click it (at least three stay)</li>
+      <li>Every edge must face the center; edits that fold past it are skipped.</li>
+    </ul>
     <label class="range-control" for="terrain-crop-size"><span>Crop size</span><output for="terrain-crop-size" data-crop-size-value>100%</output><input id="terrain-crop-size" type="range" data-crop-size min="10" max="100" step="1" value="100"></label>
     <label class="range-control" for="terrain-crop-rotation"><span>Rotation</span><output for="terrain-crop-rotation" data-crop-rotation-value>0°</output><input id="terrain-crop-rotation" type="range" data-crop-rotation min="-180" max="180" step="1" value="0"></label>
     <button type="button" class="text-button" data-crop-reset>Reset crop</button>
@@ -173,8 +179,10 @@ export function mountTerrainCropControls(
       `${degrees}°`;
     getRequiredElement(container, '[data-crop-hint]', HTMLParagraphElement).textContent =
       shape === 'polygon'
-        ? 'Drag a corner to reshape. Double-click an edge to add a corner, or a corner to remove it. Every edge must face the center. Drag inside to move; use Crop size to resize.'
+        ? 'Drag inside to move, the top knob to rotate, or use Crop size to resize. Preview and STL use the selected area.'
         : `Drag the crop to move it, a handle to resize, or the top knob to rotate (Shift snaps to 15°). Preview and STL use the selected area.${isRound() ? ' Circle size in millimeters is set by Diameter below.' : ''}`;
+    getRequiredElement(container, '[data-crop-polygon-help]', HTMLUListElement).hidden =
+      shape !== 'polygon';
     svg.setAttribute('data-crop-center', `${crop.centerX},${crop.centerY}`);
     svg.setAttribute('data-crop-shape', shape);
   };

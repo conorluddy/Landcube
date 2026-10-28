@@ -565,6 +565,13 @@ input[type='range']::-moz-range-thumb {
 .terrain-crop-preview [data-crop-handle] {
   cursor: nwse-resize;
 }
+.crop-polygon-help {
+  margin: -8px 0 16px;
+  padding-left: 18px;
+}
+.crop-polygon-help li + li {
+  margin-top: 2px;
+}
 .terrain-crop-preview [data-crop-vertex] {
   cursor: crosshair;
 }
