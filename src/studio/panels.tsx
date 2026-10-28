@@ -172,8 +172,18 @@ export function TerrainPanel({ controller: c, state: s }: PanelProps): ReactNode
                 const preset = realTerrainPresets.find(
                   (place) => `${place.latitude},${place.longitude}` === event.target.value,
                 );
+                const searched = s.savedPlaces.find(
+                  (place) => `${place.latitude},${place.longitude}` === event.target.value,
+                );
 
-                if (preset) {
+                // Searched places keep the current span; they were found by name, not framed.
+                if (searched) {
+                  c.source({
+                    place: event.target.value,
+                    latitude: searched.latitude,
+                    longitude: searched.longitude,
+                  });
+                } else if (preset) {
                   c.source({
                     place: event.target.value,
                     latitude: preset.latitude,
@@ -183,6 +193,18 @@ export function TerrainPanel({ controller: c, state: s }: PanelProps): ReactNode
                 }
               }}
             >
+              {s.savedPlaces.length > 0 && (
+                <optgroup label="Searched">
+                  {s.savedPlaces.map((place) => (
+                    <option
+                      key={`${place.latitude},${place.longitude}`}
+                      value={`${place.latitude},${place.longitude}`}
+                    >
+                      {place.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
               {realTerrainPresetGroups.map((group) => (
                 <optgroup label={group.country} key={group.country}>
                   {group.locations.map((place) => (
