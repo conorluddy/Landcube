@@ -52,6 +52,8 @@ import type { RoadNetwork, RoadStyle } from '../types/roads';
 import { createRoadNetworkLoader, getRoadPlacementKey } from './road-loader';
 import { defaultGrassStyle, grassPresets } from '../constants/grass';
 import type { GrassStyle } from '../types/grass';
+import { defaultRockStyle, rockPresets } from '../constants/rocks';
+import type { RockStyle } from '../types/rocks';
 import { getSuggestedRoadWidthMm } from '../road-ribbons';
 import { createFrameAssembly } from '../frame/frame-assembly';
 import {
@@ -101,6 +103,7 @@ export interface SceneSettings {
   rotationDirection: TurntableDirection;
   roads: RoadStyle;
   grass: GrassStyle;
+  rocks: RockStyle;
 }
 /** Mapped roads for the loaded real terrain; never part of design links. */
 export interface RoadNetworkState {
@@ -228,6 +231,8 @@ export interface StudioController {
   retryRoads: () => void;
   /** Edits grass; picking a preset applies its look, and hand-editing the look makes it custom. */
   grass: (patch: Partial<GrassStyle>) => void;
+  /** Edits rocks; picking a preset applies its look, and hand-editing the look makes it custom. */
+  rocks: (patch: Partial<RockStyle>) => void;
   interval: (value: 'auto' | number) => boolean;
   hatching: (value: boolean) => void;
   resetCamera: () => void;
@@ -298,6 +303,7 @@ export function createStudioController(
       rotationDirection: 'counterclockwise',
       roads: { ...defaultRoadStyle },
       grass: { ...defaultGrassStyle },
+      rocks: { ...defaultRockStyle },
     },
     roads: { sourceKey: '', loading: false, status: '', canRetry: false },
     model: {
@@ -925,6 +931,27 @@ export function createStudioController(
         },
       });
     },
+    rocks(patch: Partial<RockStyle>) {
+      const preset =
+        patch.preset === undefined || patch.preset === 'custom'
+          ? undefined
+          : rockPresets[patch.preset];
+      const editsLook = rockLookKeys.some((key) => key in patch);
+      const look: Partial<RockStyle> = preset
+        ? Object.fromEntries(rockLookKeys.map((key) => [key, preset[key]]))
+        : {};
+      const merged = { ...state.scene.rocks, ...look, ...patch };
+
+      controller.scene({
+        rocks: {
+          ...merged,
+          // The size range never inverts, whichever end was dragged past the other.
+          maximumSizeMm: Math.max(merged.minimumSizeMm, merged.maximumSizeMm),
+          // Hand-set look values override any preset in the same patch.
+          ...(editsLook ? { preset: 'custom' as const } : {}),
+        },
+      });
+    },
     roads(patch: Partial<RoadStyle>) {
       const wasEnabled = state.scene.roads.enabled;
       const merged = { ...state.scene.roads, ...patch };
@@ -1020,6 +1047,16 @@ const grassLookKeys = [
   'lengthMm',
   'lengthVariation',
 ] as const satisfies readonly (keyof GrassStyle)[];
+
+/** Settings a rock preset owns; editing any of them by hand makes the look custom. */
+const rockLookKeys = [
+  'baseColor',
+  'accentColor',
+  'colorVariation',
+  'angularity',
+  'flattening',
+  'elongation',
+] as const satisfies readonly (keyof RockStyle)[];
 
 /** Real terrain with a location and span can carry roads; generated terrain cannot. */
 function getRoadPlacement(

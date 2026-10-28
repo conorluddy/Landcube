@@ -40,6 +40,8 @@ import type { DesignSettings } from '../types/design';
 import type { RoadDetail } from '../types/roads';
 import type { GrassPresetKey } from '../types/grass';
 import { grassPresets } from '../constants/grass';
+import type { RockPresetKey } from '../types/rocks';
+import { rockPresets } from '../constants/rocks';
 import {
   roadAttribution,
   roadAttributionUrl,
@@ -738,6 +740,7 @@ export function ScenePanel({ controller: c, state: s }: PanelProps): ReactNode {
         <Hint>Visibility affects the preview. STL always includes terrain and a solid base.</Hint>
       </Group>
       <GrassGroup controller={c} state={s} />
+      <RocksGroup controller={c} state={s} />
       <Group title="Ground">
         <Toggle
           label="Studio floor"
@@ -1224,5 +1227,122 @@ function getNearestSpanStopIndex(spanKm: number): number {
         ? index
         : nearest,
     0,
+  );
+}
+
+const rockLookOptions = [
+  ...Object.entries(rockPresets).map(([value, preset]) => ({
+    value: value as RockPresetKey,
+    label: preset.label,
+  })),
+  { value: 'custom' as const, label: 'Custom' },
+];
+
+/** Experimental instanced rocks; colour restyles in place and shape edits keep every rock where it is. */
+function RocksGroup({ controller: c, state: s }: PanelProps): ReactNode {
+  const rocks = s.scene.rocks;
+  const off = !rocks.enabled;
+  const percent = (
+    label: string,
+    key:
+      | 'angularity'
+      | 'flattening'
+      | 'elongation'
+      | 'clustering'
+      | 'embedding'
+      | 'slopePreference'
+      | 'colorVariation',
+  ) => (
+    <Range
+      label={label}
+      value={Math.round(rocks[key] * 100)}
+      min={0}
+      max={100}
+      step={1}
+      suffix="%"
+      disabled={off}
+      onChange={(value) => {
+        c.rocks({ [key]: value / 100 });
+      }}
+    />
+  );
+  const size = (label: string, key: 'minimumSizeMm' | 'maximumSizeMm') => (
+    <Range
+      label={label}
+      value={rocks[key]}
+      min={0.02}
+      max={8}
+      step={0.02}
+      suffix=" mm"
+      disabled={off}
+      onChange={(value) => {
+        c.rocks({ [key]: value });
+      }}
+    />
+  );
+
+  return (
+    <Group title="Rocks">
+      <Toggle
+        label="Rocks"
+        value={rocks.enabled}
+        onChange={(value) => {
+          c.rocks({ enabled: value });
+        }}
+      />
+      <Select
+        id="rockLook"
+        label="Rock type"
+        value={rocks.preset}
+        options={rockLookOptions}
+        disabled={off}
+        onChange={(value) => {
+          c.rocks({ preset: value });
+        }}
+      />
+      <Color
+        label="Rock colour"
+        value={rocks.baseColor}
+        disabled={off}
+        onChange={(value) => {
+          c.rocks({ baseColor: value });
+        }}
+      />
+      <Color
+        label="Weathering colour"
+        value={rocks.accentColor}
+        disabled={off}
+        onChange={(value) => {
+          c.rocks({ accentColor: value });
+        }}
+      />
+      {percent('Rock shading', 'colorVariation')}
+      {percent('Angularity', 'angularity')}
+      {percent('Flattening', 'flattening')}
+      {percent('Elongation', 'elongation')}
+      <Range
+        label="Rock density"
+        value={rocks.rocksPerSquareCm}
+        min={0}
+        max={400}
+        step={1}
+        suffix=" /cm²"
+        disabled={off}
+        onChange={(value) => {
+          c.rocks({ rocksPerSquareCm: value });
+        }}
+      />
+      {size('Smallest rock', 'minimumSizeMm')}
+      {size('Largest rock', 'maximumSizeMm')}
+      {percent('Clustering', 'clustering')}
+      {percent('Slope preference', 'slopePreference')}
+      {percent('Embedding', 'embedding')}
+      <Hint>
+        Experimental. Sizes and density are on the printed model. Small stones form dense scree;
+        increase the sizes for boulder fields. Rocks favour steep ground and keep off drawn roads
+        and the sea; grass leaves bare ground beneath them. Hidden on terraced models; session-only
+        and omitted from STL and 2D exports.
+      </Hint>
+    </Group>
   );
 }

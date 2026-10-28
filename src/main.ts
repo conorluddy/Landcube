@@ -12,7 +12,7 @@ import type { RealTerrain } from './real-terrain';
 import { createFloorPlace } from './floor-geo';
 import { clipRoadsToCrop, noRoadPaths } from './road-ribbons';
 import type { RoadPath } from './types/roads';
-import type { GrassGeography } from './grass-coverage';
+import type { DecorationGeography } from './decoration-field';
 import { generatedTerrainReliefMeters, generatedTerrainSpanMeters } from './constants/grass';
 import { findTerrainSummits } from './summit-markers';
 import { getRequiredElement } from './dom-elements';
@@ -400,15 +400,15 @@ function updateTerrain3d(): void {
     getRealContourInterval(realTerrain),
     getTerrainTerraceLevels(settings, engineConfiguration, realTerrain),
     getCroppedRoadPaths(modelSourceFrame, modelCrop, dimensions.cropShape ?? 'rectangle'),
-    getGrassGeography(modelSourceFrame, modelCrop),
+    getDecorationGeography(modelSourceFrame, modelCrop),
   );
 }
 
 /** Real scale and source anchoring for grass; generated terrain gets a nominal scale. */
-function getGrassGeography(
+function getDecorationGeography(
   frame: { width: number; height: number },
   crop: NonNullable<typeof modelCrop>,
-): GrassGeography {
+): DecorationGeography {
   const frameSize = Math.max(frame.width, frame.height);
   const elevations = realTerrain?.elevations;
   const spanKm = realTerrain?.spanKm;

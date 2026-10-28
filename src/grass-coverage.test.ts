@@ -1,12 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-  createGrassCoverage,
-  getGrassRoads,
-  surveyGrassGround,
-  type GrassCoverageMap,
-  type GrassSite,
-} from './grass-coverage';
+import { createGrassCoverage, surveyGrassGround, type GrassCoverageMap } from './grass-coverage';
+import { getDecorationRoads, type DecorationSite } from './decoration-field';
 import { defaultGrassStyle } from './constants/grass';
 import { defaultRoadStyle } from './constants/roads';
 import { getRoadHalfWidth } from './road-ribbons';
@@ -28,7 +23,7 @@ function createField(slopePerUnit = 0.002, columns = 101, rows = 101): HeightFie
   };
 }
 
-function createSite(overrides: Partial<GrassSite> = {}): GrassSite {
+function createSite(overrides: Partial<DecorationSite> = {}): DecorationSite {
   return {
     field: createField(),
     width: 500,
@@ -48,12 +43,16 @@ const style = { ...defaultGrassStyle, coverage: 1, altitudeLimit: 1 };
 // 5 frame units a texel keeps crop offsets on texel centres, so cropped maps line up exactly.
 const resolution = 100;
 
-function grow(site: GrassSite, coverageStyle: GrassStyle, resolution: number): GrassCoverageMap {
+function grow(
+  site: DecorationSite,
+  coverageStyle: GrassStyle,
+  resolution: number,
+): GrassCoverageMap {
   return createGrassCoverage(surveyGrassGround(site, resolution), coverageStyle);
 }
 
 /** Growth (0..255) at a crop point, read from the texel containing it. */
-function growthAt(map: GrassCoverageMap, site: GrassSite, x: number, y: number): number {
+function growthAt(map: GrassCoverageMap, site: DecorationSite, x: number, y: number): number {
   const column = Math.min(map.columns - 1, Math.floor((x / site.width) * map.columns));
   const row = Math.min(map.rows - 1, Math.floor((y / site.height) * map.rows));
 
@@ -186,14 +185,14 @@ void test('grass clears exactly the drawn roads: their classes and widths, none 
     },
   ];
   const style = { ...defaultRoadStyle, enabled: true, widthMm: 1 };
-  const major = getGrassRoads(paths, { ...style, detail: 'major' }, 4);
+  const major = getDecorationRoads(paths, { ...style, detail: 'major' }, 4);
 
   assert.deepEqual(
     major.map((road) => road.halfWidth),
     [getRoadHalfWidth('primary', 1, 4)],
   );
-  assert.equal(getGrassRoads(paths, { ...style, detail: 'tracks' }, 4).length, 2);
-  assert.deepEqual(getGrassRoads(paths, { ...style, enabled: false }, 4), []);
+  assert.equal(getDecorationRoads(paths, { ...style, detail: 'tracks' }, 4).length, 2);
+  assert.deepEqual(getDecorationRoads(paths, { ...style, enabled: false }, 4), []);
 });
 
 void test('patches are sized in printed millimetres, whatever window size the frame came from', () => {
