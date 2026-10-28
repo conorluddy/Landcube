@@ -35,6 +35,10 @@ test('a tray downloads at the model size plus border and clearance, leaving the 
   await page.getByRole('button', { name: '3D', exact: true }).click();
   const before = await modelDownload(page);
 
+  // A fresh rectangle crop fills the source, so the model's length follows the window's shape.
+  await section(page, 'Model');
+  const lengthMm = Number(await page.getByLabel('Length (Y, mm)').inputValue());
+
   await section(page, 'Frame');
   await page
     .getByRole('group', { name: 'Frame style' })
@@ -46,9 +50,11 @@ test('a tray downloads at the model size plus border and clearance, leaving the 
   const header = 'Topogra frame | units: millimeters | Z up';
 
   expect(frame.bytes.subarray(0, header.length).toString()).toBe(header);
-  expect(frame.filename).toMatch(/-frame-171x171mm\.stl$/);
+  expect(frame.filename).toMatch(
+    new RegExp(`-frame-171x${String(Math.round(lengthMm + 20.6))}mm\\.stl$`),
+  );
   expect(bounds[0][1] - bounds[0][0]).toBeCloseTo(170.6, 3);
-  expect(bounds[1][1] - bounds[1][0]).toBeCloseTo(170.6, 3);
+  expect(bounds[1][1] - bounds[1][0]).toBeCloseTo(lengthMm + 20.6, 3);
   expect((await modelDownload(page)).equals(before)).toBe(true);
 });
 
