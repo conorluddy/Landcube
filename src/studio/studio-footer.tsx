@@ -1,9 +1,11 @@
-import type { ReactNode, Ref } from 'react';
+import { useSyncExternalStore, type ReactNode, type Ref } from 'react';
 import { roadAttributionUrl } from '../constants/roads';
 import { BarGroup, FloatingBar } from '../ui/floating-bar';
 import { Button } from '../ui/button';
+import { IconButton } from '../ui/icon-button';
 import { SignalMark } from '../ui/signal-mark';
 import { areRoadsDrawn, type StudioController, type StudioState } from './controller';
+import { applyTheme, currentTheme, subscribeToTheme } from './theme';
 
 /**
  * Phone status line inside the bottom sheet's peek row: live status, then the "Data sources"
@@ -122,6 +124,7 @@ export function StudioFooter({
           </a>
         )}
         <DataSources state={state} />
+        <ThemeToggle />
         <a
           className="studio-github"
           href="https://github.com/conorluddy/Topogra"
@@ -136,6 +139,25 @@ export function StudioFooter({
 }
 
 // === HELPERS ===
+
+/** Dark/light switch; the theme lives on `<html>` (see `theme.ts`), so the button re-reads it on change. */
+function ThemeToggle(): ReactNode {
+  const theme = useSyncExternalStore(subscribeToTheme, () =>
+    currentTheme(document.documentElement),
+  );
+  const isLight = theme === 'light';
+
+  return (
+    <IconButton
+      glyph={isLight ? '●' : '○'}
+      label={isLight ? 'Switch to dark theme' : 'Switch to light theme'}
+      isActive={isLight}
+      onClick={() => {
+        applyTheme(isLight ? 'dark' : 'light', document.documentElement, localStorage);
+      }}
+    />
+  );
+}
 
 /** Credits behind a disclosure; only shown on phones (see `.mobile-attribution` CSS). */
 function DataSources({ state }: { state: StudioState }): ReactNode {

@@ -30,3 +30,9 @@ body {
   padding: var(--lc-s-6);
   background: var(--lc-ink-0);
 }
+
+/* Light theme specimens stand on the light map ground so glass reads as it does over a light canvas. */
+[data-theme='light'] body,
+[data-theme='light'] .specimens article {
+  background: var(--lc-canvas);
+}

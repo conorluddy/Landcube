@@ -22,6 +22,7 @@ import {
   locateViewportPoint,
   type ModelPlacement,
 } from './studio/hud-location';
+import { applyTheme, currentTheme, readTheme, subscribeToTheme } from './studio/theme';
 import './ui/ui.css';
 import './landscape-studio.css';
 import { designChangePriority, versionOneDesignDefaults } from './constants/design';
@@ -60,6 +61,12 @@ const millisecondsPerSecond = 1000;
 const maximumCursorFrameElapsedMs = 100;
 const cursorPositionSettlingTolerancePixels = 0.5;
 const cursorStrengthSettlingTolerance = 0.002;
+
+try {
+  applyTheme(readTheme(localStorage), document.documentElement, localStorage);
+} catch {
+  // Blocked storage: stay on the dark default; the footer toggle still works for this visit.
+}
 
 /** Restores startup settings before sampling the first landscape. */
 const startupStartedAtMs = performance.now();
@@ -331,7 +338,18 @@ function synchronizeDesignUrl(): string {
 /** Keeps the page backdrop and browser theme aligned with the design. */
 function applyPageStyle(): void {
   document.documentElement.style.backgroundColor = settings.background;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', settings.background);
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', readBrowserChromeColor(settings.background));
+}
+
+/** The canvas fills the viewport, so the design background tints the browser; the light theme tints it light. */
+function readBrowserChromeColor(designBackground: string): string {
+  if (currentTheme(document.documentElement) !== 'light') {
+    return designBackground;
+  }
+
+  return getComputedStyle(document.documentElement).getPropertyValue('--lc-theme-color').trim();
 }
 
 /** Renders the current cursor influence over cached base terrain. */
@@ -743,6 +761,7 @@ width = Math.max(1, viewport.clientWidth);
 height = Math.max(1, viewport.clientHeight);
 baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
 applyPageStyle();
+subscribeToTheme(applyPageStyle);
 renderCurrentLandscape();
 
 // Design links open the 2D design they encode. A fresh visit opens the default real location in 3D
