@@ -1,0 +1,75 @@
+/* C-05 ControlGroup: hidden legend names the fieldset; GroupHeader draws the title; rows 12px apart. */
+.lc-group {
+  min-width: 0;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.lc-group__legend,
+.lc-group__visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The pin sits in the header line, so it shrinks to the switch-row height. */
+.lc-group .lc-group-header__trailing .lc-icon-button {
+  width: var(--lc-h-xs);
+  height: var(--lc-h-xs);
+  font-size: var(--lc-fs-body);
+}
+
+.lc-group__rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-6);
+  min-width: 0;
+}
+
+.lc-group__row {
+  min-width: 0;
+}
+
+.lc-group__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-s-3);
+  min-width: 0;
+}
+
+.lc-group__hint {
+  margin: 0;
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-hint);
+  line-height: 17px;
+}
+
+.lc-group__link {
+  display: inline-flex;
+  gap: var(--lc-s-2);
+  align-self: flex-start;
+  max-width: 100%;
+  color: var(--lc-text-secondary);
+  font-family: var(--lc-font-mono);
+  font-size: 9.5px;
+  letter-spacing: var(--lc-track-label);
+  line-height: 14px;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.lc-group__link:hover,
+[data-force-state='hover'] .lc-group__link {
+  color: var(--lc-text-primary);
+}
+
+.lc-group__link-glyph {
+  flex: none;
+}

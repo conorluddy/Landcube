@@ -1,0 +1,58 @@
+/* C-06 StatusMessage: signal mark, then a mono code over the Geist text. Whole-pixel leading. */
+.lc-status-message {
+  display: flex;
+  gap: var(--lc-s-4);
+  align-items: flex-start;
+  min-width: 0;
+  padding: 9px var(--lc-s-5);
+  border: 1px solid var(--lc-line-subtle);
+  border-radius: var(--lc-r-control);
+  background: var(--lc-fill-field);
+}
+
+/* An always-mounted region with nothing to say takes no visible space but stays focusable. */
+.lc-status-message:empty {
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+/* Sized to the first text line so square and rotated diamond marks centre on it. */
+.lc-status-message__mark {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 16px;
+}
+
+.lc-status-message__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-1);
+  min-width: 0;
+}
+
+.lc-status-message__code {
+  color: var(--lc-text-strong);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-label);
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+.lc-status-message__text {
+  color: var(--lc-text-body);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-value);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+@media (forced-colors: active) {
+  .lc-status-message:not(:empty) {
+    border-color: CanvasText;
+  }
+}
