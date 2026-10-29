@@ -42,6 +42,7 @@ function buildContourDensityGroup(
     return {
       id: 'contour-density',
       title: 'Contour density',
+      isPinnable: true,
       rows: [designRangeRow(controller, state, 'contourCount', 'Density')],
     };
   }
@@ -49,6 +50,7 @@ function buildContourDensityGroup(
   return {
     id: 'contour-density',
     title: 'Contour interval',
+    isPinnable: true,
     rows: [
       selectRow('terrain-contour-mode', {
         label: 'Interval mode',
@@ -84,6 +86,7 @@ function buildContourAppearanceGroup(
   return {
     id: 'contour-appearance',
     title: 'Contour appearance',
+    isPinnable: true,
     rows: [
       colourRow('lineColor', {
         label: 'Contour color',
@@ -105,6 +108,7 @@ function buildIndexContoursGroup(
   return {
     id: 'index-contours',
     title: 'Index contours',
+    isPinnable: true,
     rows: [
       selectRow('indexStyle', {
         label: 'Index style',
@@ -131,6 +135,7 @@ function buildContours3dGroup(
   return {
     id: 'contours-3d',
     title: '3D contours',
+    isPinnable: true,
     rows: [
       toggleRow('contours-3d-lines', {
         label: 'Contour lines',

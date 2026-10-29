@@ -74,6 +74,12 @@ import {
 import type { FrameAssembly, FramePart, FramePartId } from '../types/frame';
 import type { ExportJob } from '../ui/job-list';
 import type { SheetSnap } from '../ui/sheet-handle';
+import {
+  cascadePosition,
+  nextZIndex,
+  type PanelPosition,
+  type PinnedGroupPlacement,
+} from '../ui/layout-manager';
 
 export type StudioView = '2d' | '3d';
 export type InspectorSection =
@@ -171,6 +177,8 @@ export interface StudioState {
     exporting: boolean;
     /** Phone bottom-sheet height. Session-only: never serialized into links. */
     sheetSnap: SheetSnap;
+    /** Control groups floating outside the inspector (desktop). Session-only: never serialized. */
+    pinnedGroups: readonly PinnedGroupPlacement[];
   };
   seedLocked: boolean;
   status: string;
@@ -219,6 +227,14 @@ export interface StudioController {
   sync: () => void;
   notify: (message: string) => void;
   workspace: (patch: Partial<StudioState['workspace']>) => void;
+  /** Floats a group in a cascaded panel on top of the others; pinning twice is a no-op. */
+  pinGroup: (id: string) => void;
+  /** Returns a pinned group to its section; docking an unpinned group is a no-op. */
+  dockGroup: (id: string) => void;
+  /** Places a pinned panel; the caller has already snapped and clamped `position`. */
+  moveGroup: (id: string, position: PanelPosition) => void;
+  /** Brings a pinned panel above the others. */
+  raiseGroup: (id: string) => void;
   dismissManualLink: () => void;
   design: (patch: Partial<DesignSettings>) => boolean;
   newLandscape: () => void;
@@ -368,6 +384,7 @@ export function createStudioController(
       popover: null,
       exporting: false,
       sheetSnap: 'half',
+      pinnedGroups: [],
     },
     seedLocked: actions.isSeedLocked,
     status: '',
@@ -424,6 +441,20 @@ export function createStudioController(
   const workspace = (patch: Partial<StudioState['workspace']>) => {
     state = { ...state, workspace: { ...state.workspace, ...patch } };
     publish();
+  };
+
+  const updatePinnedGroup = (
+    id: string,
+    update: (pinned: PinnedGroupPlacement) => PinnedGroupPlacement,
+  ) => {
+    const { pinnedGroups } = state.workspace;
+    const nextPinnedGroups = pinnedGroups.map((pinned) =>
+      pinned.id === id ? update(pinned) : pinned,
+    );
+
+    if (nextPinnedGroups.some((pinned, index) => pinned !== pinnedGroups[index])) {
+      workspace({ pinnedGroups: nextPinnedGroups });
+    }
   };
 
   const findFramePart = (partId: FramePartId): FramePart | undefined => {
@@ -606,6 +637,43 @@ export function createStudioController(
     sync,
     notify,
     workspace,
+    pinGroup(id: string) {
+      const { pinnedGroups } = state.workspace;
+
+      if (pinnedGroups.some((pinned) => pinned.id === id)) {
+        return;
+      }
+
+      workspace({
+        pinnedGroups: [
+          ...pinnedGroups,
+          { id, position: cascadePosition(pinnedGroups.length), zIndex: nextZIndex(pinnedGroups) },
+        ],
+      });
+    },
+    dockGroup(id: string) {
+      const { pinnedGroups } = state.workspace;
+
+      if (pinnedGroups.some((pinned) => pinned.id === id)) {
+        workspace({ pinnedGroups: pinnedGroups.filter((pinned) => pinned.id !== id) });
+      }
+    },
+    moveGroup(id: string, position: PanelPosition) {
+      updatePinnedGroup(id, (pinned) =>
+        pinned.position.xPx === position.xPx && pinned.position.yPx === position.yPx
+          ? pinned
+          : { ...pinned, position },
+      );
+    },
+    raiseGroup(id: string) {
+      const { pinnedGroups } = state.workspace;
+
+      updatePinnedGroup(id, (pinned) =>
+        pinnedGroups.every((other) => other === pinned || other.zIndex < pinned.zIndex)
+          ? pinned
+          : { ...pinned, zIndex: nextZIndex(pinnedGroups) },
+      );
+    },
     dismissManualLink() {
       state = { ...state, manualLink: '' };
       publish();

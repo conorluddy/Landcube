@@ -40,6 +40,7 @@ export function buildGrassGroup(
   return {
     id: 'grass',
     title: 'Grass',
+    isPinnable: true,
     rows: [
       toggleRow('grass-enabled', {
         label: 'Grass',

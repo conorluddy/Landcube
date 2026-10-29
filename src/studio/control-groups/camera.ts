@@ -52,6 +52,7 @@ export function buildOrbitGroup(
   return {
     id: 'orbit',
     title: 'Orbit',
+    isPinnable: true,
     rows: [
       {
         kind: 'buttons',
@@ -127,6 +128,7 @@ function buildLensGroup(controller: StudioController, state: StudioState): Contr
   return {
     id: 'lens',
     title: 'Lens',
+    isPinnable: true,
     rows: [
       segmentedRow('camera-projection', {
         label: 'Projection',
@@ -170,6 +172,7 @@ function buildFocusGroup(controller: StudioController, state: StudioState): Cont
   return {
     id: 'focus',
     title: 'Focus',
+    isPinnable: true,
     rows: [
       segmentedRow('camera-focus-effect', {
         label: 'Effect',
@@ -253,6 +256,7 @@ function buildExposureGroup(
   return {
     id: 'exposure',
     title: 'Exposure',
+    isPinnable: true,
     rows: [
       {
         kind: 'range',

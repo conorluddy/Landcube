@@ -107,7 +107,7 @@ test('view selection activates 3D directly and restores independent inspector se
   await page.getByRole('button', { name: 'Tilt-shift', exact: true }).click();
   await page.getByLabel('Band width').fill('40');
   await expect(page.locator('output[for="camera-tiltShiftWidth"]')).toHaveText('40%');
-  await page.getByLabel('Exposure').fill('0.5');
+  await page.getByLabel('Exposure', { exact: true }).fill('0.5');
   await expect(page.locator('output[for="camera-exposure"]')).toHaveText('+0.5 EV');
   await page.getByRole('button', { name: 'Reset camera settings' }).click();
   await expect(page.locator('output[for="camera-focal-length"]')).toHaveText('35 mm');
