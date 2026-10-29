@@ -1,0 +1,47 @@
+/* P-20 ReadoutGrid / ReadoutCell: label over value, two columns, hairline rows. */
+.lc-readout-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.lc-readout-cell {
+  min-width: 0;
+  padding: var(--lc-s-4) var(--lc-s-5) var(--lc-s-4) 0;
+  border-bottom: 1px solid var(--lc-line-subtle);
+  font-family: var(--lc-font-mono);
+}
+
+.lc-readout-cell__label {
+  margin: 0 0 var(--lc-s-2);
+  overflow: hidden;
+  color: var(--lc-text-quiet);
+  font-size: var(--lc-fs-micro);
+  letter-spacing: var(--lc-track-label);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lc-readout-cell__value {
+  margin: 0;
+  overflow: hidden;
+  color: var(--lc-text-primary);
+  font-size: var(--lc-fs-value);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-readout-cell__value[data-tabular='true'] {
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-readout-cell__unit {
+  color: var(--lc-text-quiet);
+}
+
+@media (forced-colors: active) {
+  .lc-readout-cell {
+    border-bottom-color: CanvasText;
+  }
+}

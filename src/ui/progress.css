@@ -1,0 +1,51 @@
+/* P-18 Progress: 2px bar. Track uses --lc-line-panel (nearest token to the 0.08 white spec). */
+.lc-progress {
+  position: relative;
+  width: 100%;
+  height: 2px;
+  overflow: hidden;
+  background: var(--lc-line-panel);
+}
+
+.lc-progress__fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--lc-bone);
+  transform: scaleX(var(--lc-progress-fraction));
+  transform-origin: left;
+}
+
+/* Indeterminate is undesigned in the handoff. Assumption: a sliding 30% segment. */
+.lc-progress[data-indeterminate='true'] .lc-progress__fill {
+  width: 30%;
+  transform: none;
+  animation: lc-progress-slide 1.4s var(--lc-ease) infinite;
+}
+
+@keyframes lc-progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(334%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-progress[data-indeterminate='true'] .lc-progress__fill {
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-progress {
+    outline: 1px solid CanvasText;
+  }
+
+  .lc-progress__fill {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+}
