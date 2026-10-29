@@ -171,6 +171,8 @@ export interface StudioState {
     exporting: boolean;
     /** Phone bottom-sheet height. Session-only: never serialized into links. */
     sheetSnap: SheetSnap;
+    /** The open command palette and its query; null while closed. */
+    palette: { query: string } | null;
   };
   seedLocked: boolean;
   status: string;
@@ -368,6 +370,7 @@ export function createStudioController(
       popover: null,
       exporting: false,
       sheetSnap: 'half',
+      palette: null,
     },
     seedLocked: actions.isSeedLocked,
     status: '',

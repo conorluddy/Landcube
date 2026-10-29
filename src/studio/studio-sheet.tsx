@@ -87,7 +87,7 @@ export function StudioSheet({
 
 /**
  * Phone map controls (P-04 in a mobile FloatingBar) down the right edge: reset the 3D camera,
- * Overlays, and Orbit in 3D. Hidden while the sheet is full (CSS on `[data-sheet-snap]`).
+ * Overlays, the command palette, and Orbit in 3D. Hidden while the sheet is full (CSS on `[data-sheet-snap]`).
  */
 export function StudioMapControls({
   controller: c,
@@ -116,6 +116,15 @@ export function StudioMapControls({
         isExpanded={workspace.popover === 'Overlays'}
         onClick={() => {
           c.workspace({ popover: workspace.popover === 'Overlays' ? null : 'Overlays' });
+        }}
+      />
+      <IconButton
+        glyph="⌘"
+        label="Command palette"
+        hasPopup="dialog"
+        isExpanded={workspace.palette !== null}
+        onClick={() => {
+          c.workspace({ palette: { query: '' } });
         }}
       />
       {is3d && (

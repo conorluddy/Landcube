@@ -18,6 +18,8 @@ import { buildFrameGroups } from './control-groups/frame';
 import { buildModelGroups } from './control-groups/model';
 import { buildTerrainGroups } from './control-groups/terrain';
 import { getGroupCode, studioSections } from './sections';
+import { CommandPaletteHost, isCommandPaletteShortcut } from './command-palette-host';
+import { commandPaletteDialogClassName } from '../ui/command-palette';
 import { StudioHeader } from './studio-header';
 import { StudioFooter } from './studio-footer';
 import { StudioMapControls, StudioSheet } from './studio-sheet';
@@ -37,6 +39,7 @@ function Surface({
   children,
   modal = false,
   isGlass = false,
+  bareClassName,
 }: {
   title: string;
   close: () => void;
@@ -44,6 +47,8 @@ function Surface({
   modal?: boolean;
   /** Hosts the content in a GlassPanel instead of the legacy dialog chrome (migrated popovers). */
   isGlass?: boolean;
+  /** Renders the children with no heading, in a dialog with this class; they bring their own panel. */
+  bareClassName?: string;
 }): ReactNode {
   const ref = useRef<HTMLDialogElement>(null);
   const closeRef = useRef(close);
@@ -94,9 +99,10 @@ function Surface({
     <dialog
       ref={ref}
       className={
-        isGlass
+        bareClassName ??
+        (isGlass
           ? `lc-popover${modal ? ' lc-popover--modal' : ''}`
-          : `legacy-controls ${modal ? 'studio-dialog' : 'studio-popover'}`
+          : `legacy-controls ${modal ? 'studio-dialog' : 'studio-popover'}`)
       }
       data-ui-surface
       aria-label={title}
@@ -130,7 +136,9 @@ function Surface({
         }
       }}
     >
-      {isGlass ? (
+      {bareClassName !== undefined ? (
+        children
+      ) : isGlass ? (
         <GlassPanel padding="none" className="lc-popover__panel">
           <div className="lc-popover__heading">
             <h2 className="lc-popover__title">{title}</h2>
@@ -197,6 +205,25 @@ function Studio({
       document.removeEventListener('keydown', escape);
     };
   }, [c, state.workspace, isPhoneViewport]);
+  useEffect(() => {
+    const openPalette = (event: KeyboardEvent) => {
+      if (!isCommandPaletteShortcut(event)) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (c.getSnapshot().workspace.palette === null) {
+        c.workspace({ palette: { query: '' } });
+      }
+    };
+
+    document.addEventListener('keydown', openPalette);
+
+    return () => {
+      document.removeEventListener('keydown', openPalette);
+    };
+  }, [c]);
   const props = { controller: c, state };
 
   return (
@@ -274,6 +301,18 @@ function Studio({
           }}
         >
           <ExportPanel {...props} renderer={renderer} />
+        </Surface>
+      )}
+      {state.workspace.palette !== null && (
+        <Surface
+          modal
+          bareClassName={commandPaletteDialogClassName}
+          title="Command palette"
+          close={() => {
+            c.workspace({ palette: null });
+          }}
+        >
+          <CommandPaletteHost controller={c} state={state} isMobile={isPhoneViewport} />
         </Surface>
       )}
       {state.manualLink !== '' && (
