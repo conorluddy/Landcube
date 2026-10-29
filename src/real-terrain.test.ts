@@ -49,7 +49,7 @@ const unusedTileLoader: TerrainTileLoader = () =>
 void test('invalid geographic bounds fail before requesting tiles', async () => {
   await assert.rejects(loadRealTerrain(90, 0, 25, unusedTileLoader), /latitude/);
   await assert.rejects(loadRealTerrain(53, NaN, 25, unusedTileLoader), /longitude/);
-  await assert.rejects(loadRealTerrain(53, -6, 0, unusedTileLoader), /2–200/);
+  await assert.rejects(loadRealTerrain(53, -6, 0, unusedTileLoader), /2–800/);
 });
 
 void test('fixture-backed terrain uses decoded pixels, normalized sampling, and source attribution', async () => {

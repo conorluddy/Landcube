@@ -57,20 +57,20 @@ export function getRealTerrainSourceBounds(placement: RealTerrainPlacement): Geo
   const centerY = getMercatorY(location.latitude);
 
   return {
-    north: getLatitude(centerY - halfSpan),
-    south: getLatitude(centerY + halfSpan),
-    west: getLongitude(centerX - halfSpan),
-    east: getLongitude(centerX + halfSpan),
+    north: getMercatorLatitude(centerY - halfSpan),
+    south: getMercatorLatitude(centerY + halfSpan),
+    west: getMercatorLongitude(centerX - halfSpan),
+    east: getMercatorLongitude(centerX + halfSpan),
   };
 }
 
-// === HELPERS ===
-
-function getLatitude(mercatorY: number): number {
+/** Inverse of `getMercatorY`. */
+export function getMercatorLatitude(mercatorY: number): number {
   return (Math.atan(Math.sinh(Math.PI * (1 - 2 * mercatorY))) * 180) / Math.PI;
 }
 
-function getLongitude(mercatorX: number): number {
+/** Inverse of `getMercatorX`; values past the world edge run beyond ±180°. */
+export function getMercatorLongitude(mercatorX: number): number {
   return mercatorX * 360 - 180;
 }
 

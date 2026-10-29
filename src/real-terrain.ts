@@ -1,5 +1,5 @@
 import type { RealContourInterval } from './real-terrain-contours';
-import { realTerrainBounds } from './constants/real-terrain';
+import { realTerrainBounds, realTerrainBoundsMessage } from './constants/real-terrain';
 import { getMercatorSpanFraction, getMercatorX, getMercatorY } from './real-terrain-projection';
 import { preprocessElevations } from './elevation-preprocessing';
 
@@ -55,9 +55,7 @@ export async function loadRealTerrain(
     spanKm < realTerrainBounds.minimumSpanKm ||
     spanKm > realTerrainBounds.maximumSpanKm
   ) {
-    throw new Error(
-      'Use latitude −85 to 85, longitude −180 to 180, and an area width of 2–200 km.',
-    );
+    throw new Error(realTerrainBoundsMessage);
   }
 
   if (

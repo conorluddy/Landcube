@@ -1,5 +1,12 @@
 import { realTerrainPresets } from './constants/real-terrain';
 import type { RealTerrain } from './real-terrain';
+import {
+  getMercatorLatitude,
+  getMercatorLongitude,
+  getMercatorSpanFraction,
+  getMercatorX,
+  getMercatorY,
+} from './real-terrain-projection';
 
 /** Geographic edges of the printed model, in decimal degrees. */
 export interface GeoBounds {
@@ -19,8 +26,6 @@ export interface FloorPlace {
   lengthKm: number;
   bounds: GeoBounds;
 }
-
-const kilometersPerDegreeLatitude = 111.32;
 
 /**
  * Locates a crop of a square real-terrain source; undefined without a location or a usable span.
@@ -49,13 +54,20 @@ export function createFloorPlace(
     return undefined;
   }
 
-  const kilometersPerUnit = spanKm / Math.max(frame.width, frame.height);
-  const offsetEastKm = (crop.x + crop.width / 2 - frame.width / 2) * kilometersPerUnit;
-  const offsetSouthKm = (crop.y + crop.height / 2 - frame.height / 2) * kilometersPerUnit;
+  const frameSize = Math.max(frame.width, frame.height);
+  const kilometersPerUnit = spanKm / frameSize;
+  // Mercator units per frame unit, so country-scale crops land where the terrain was sampled.
+  const mercatorPerUnit = getMercatorSpanFraction(location.latitude, spanKm) / frameSize;
+  const centerX =
+    getMercatorX(location.longitude) +
+    (crop.x + crop.width / 2 - frame.width / 2) * mercatorPerUnit;
+  const centerY =
+    getMercatorY(location.latitude) +
+    (crop.y + crop.height / 2 - frame.height / 2) * mercatorPerUnit;
   const widthKm = crop.width * kilometersPerUnit;
   const lengthKm = crop.height * kilometersPerUnit;
-  const latitude = location.latitude - offsetSouthKm / kilometersPerDegreeLatitude;
-  const longitude = location.longitude + offsetEastKm / kilometersPerDegreeLongitude(latitude);
+  const latitude = getMercatorLatitude(centerY);
+  const longitude = getMercatorLongitude(centerX);
   const isAtSourceCenter = (candidate: { latitude: number; longitude: number }) =>
     Math.abs(candidate.latitude - location.latitude) < 1e-4 &&
     Math.abs(candidate.longitude - location.longitude) < 1e-4;
@@ -69,26 +81,30 @@ export function createFloorPlace(
     longitude,
     widthKm,
     lengthKm,
-    bounds: boundsFromCenter(latitude, longitude, widthKm, lengthKm),
+    bounds: getMercatorBounds(
+      centerX,
+      centerY,
+      (crop.width / 2) * mercatorPerUnit,
+      (crop.height / 2) * mercatorPerUnit,
+    ),
   };
 }
 
-/** Approximate bounds; accurate to label precision across the 200 km maximum real-terrain span. */
+/** Web Mercator bounds of a frame centred here, scaled like a real-terrain source at that latitude. */
 export function boundsFromCenter(
   latitude: number,
   longitude: number,
   widthKm: number,
   lengthKm: number,
 ): GeoBounds {
-  const halfLatitude = lengthKm / 2 / kilometersPerDegreeLatitude;
-  const halfLongitude = widthKm / 2 / kilometersPerDegreeLongitude(latitude);
+  const mercatorPerKm = getMercatorSpanFraction(latitude, 1);
 
-  return {
-    north: latitude + halfLatitude,
-    south: latitude - halfLatitude,
-    west: longitude - halfLongitude,
-    east: longitude + halfLongitude,
-  };
+  return getMercatorBounds(
+    getMercatorX(longitude),
+    getMercatorY(latitude),
+    (widthKm / 2) * mercatorPerKm,
+    (lengthKm / 2) * mercatorPerKm,
+  );
 }
 
 /** 32.8842, 'lat' → "32°53′03″N"; with `minutes` precision → "32°53′N". */
@@ -137,7 +153,10 @@ export function graticuleValues(min: number, max: number, step: number): number[
 
 /** Position of a latitude within the model: 0 at the north edge, 1 at the south edge. */
 export function latitudeFraction(bounds: GeoBounds, latitude: number): number {
-  return (bounds.north - latitude) / (bounds.north - bounds.south);
+  // Mercator spacing matches the sampled terrain, which matters across country-scale spans.
+  const north = getMercatorY(bounds.north);
+
+  return (getMercatorY(latitude) - north) / (getMercatorY(bounds.south) - north);
 }
 
 /** Position of a longitude within the model: 0 at the west edge, 1 at the east edge. */
@@ -200,8 +219,18 @@ const graticuleStepsDegrees = [1, 2, 3, 5, 10, 15, 20, 30, 60, 120, 300, 600].ma
   (minutes) => minutes / 60,
 );
 
-function kilometersPerDegreeLongitude(latitude: number): number {
-  return kilometersPerDegreeLatitude * Math.cos((latitude * Math.PI) / 180);
+function getMercatorBounds(
+  centerX: number,
+  centerY: number,
+  halfWidth: number,
+  halfLength: number,
+): GeoBounds {
+  return {
+    north: getMercatorLatitude(centerY - halfLength),
+    south: getMercatorLatitude(centerY + halfLength),
+    west: getMercatorLongitude(centerX - halfWidth),
+    east: getMercatorLongitude(centerX + halfWidth),
+  };
 }
 
 function wrapLongitude(longitude: number): number {

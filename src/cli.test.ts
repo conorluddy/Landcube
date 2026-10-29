@@ -291,7 +291,7 @@ void test('negative numeric arguments accept separate and equals forms', async (
   ]) {
     await assert.rejects(
       runCommand(['generate', '--terrain', 'real', ...coordinates, '--span-km', '0']),
-      (error: Error) => error.message.includes('area width of 2–200'),
+      (error: Error) => error.message.includes('area width of 2–800'),
     );
   }
 

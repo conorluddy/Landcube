@@ -9,7 +9,11 @@ import { designNumberConstraints, versionOneDesignDefaults } from './constants/d
 import { engineConfiguration } from './constants/engine';
 import { outputSizePresetGroups } from './constants/export';
 import { designPalettePresets } from './constants/palettes';
-import { realTerrainBounds, realTerrainPresets } from './constants/real-terrain';
+import {
+  realTerrainBounds,
+  realTerrainBoundsMessage,
+  realTerrainPresets,
+} from './constants/real-terrain';
 import { getDesignUrl, parseDesignParameters, validateDesignSettings } from './design-settings';
 import { createOutputRenderer } from './export/image-export';
 import { createNodeExportFile } from './export/node-image-export';
@@ -607,9 +611,7 @@ function validateTerrainConfig(terrain: TerrainConfig): void {
     terrain.spanKm < realTerrainBounds.minimumSpanKm ||
     terrain.spanKm > realTerrainBounds.maximumSpanKm
   ) {
-    throw new Error(
-      'Use latitude −85 to 85, longitude −180 to 180, and an area width of 2–200 km.',
-    );
+    throw new Error(realTerrainBoundsMessage);
   }
 }
 
