@@ -4,11 +4,13 @@ import { flushSync } from 'react-dom';
 import { InspectorPanel } from '../ui/inspector-panel';
 import { threeDOnlySections, type StudioController, type InspectorSection } from './controller';
 import { CameraPanel, OrbitPanel } from './camera-panel';
-import { ColourPanel, ContoursPanel, OverlaysPanel, ScenePanel, type PanelProps } from './panels';
+import { OverlaysPanel, ScenePanel, type PanelProps } from './panels';
 import { Button, Group, Hint, NumberField, Range, Select, Toggle } from './fields';
 import { ExportPanel } from './export-panel';
 import { FramePanel } from './frame-panel';
 import { ControlGroup } from '../ui/control-group';
+import { buildColourGroups } from './control-groups/colour';
+import { buildContourGroups } from './control-groups/contours';
 import { buildTerrainGroups } from './control-groups/terrain';
 import { getGroupCode, studioSections } from './sections';
 import { StudioHeader } from './studio-header';
@@ -350,9 +352,13 @@ function renderSectionBody(
         <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
       ));
     case 'Contours':
-      return legacyControls(<ContoursPanel {...props} />);
+      return buildContourGroups(props.controller, props.state).map((group) => (
+        <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
+      ));
     case 'Colour':
-      return legacyControls(<ColourPanel {...props} />);
+      return buildColourGroups(props.controller, props.state).map((group) => (
+        <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
+      ));
     case 'Camera':
       return legacyControls(<CameraPanel {...props} />);
     case 'Scene':
