@@ -7,6 +7,8 @@ import type { ControlGroupDefinition } from '../../ui/control-rows';
 import type { StudioController, StudioState } from '../controller';
 import { buildColourGroups } from './colour';
 import { buildContourGroups } from './contours';
+import { buildOverlayPopoverGroups } from './overlays';
+import { buildSceneGroups } from './scene';
 import { buildTerrainGroups } from './terrain';
 
 /**
@@ -23,4 +25,6 @@ export const controlGroupBuilders: readonly ControlGroupBuilder[] = [
   buildTerrainGroups,
   buildContourGroups,
   buildColourGroups,
+  buildSceneGroups,
+  buildOverlayPopoverGroups,
 ];

@@ -4,13 +4,17 @@ import { flushSync } from 'react-dom';
 import { InspectorPanel } from '../ui/inspector-panel';
 import { threeDOnlySections, type StudioController, type InspectorSection } from './controller';
 import { CameraPanel, OrbitPanel } from './camera-panel';
-import { OverlaysPanel, ScenePanel, type PanelProps } from './panels';
+import type { PanelProps } from './panels';
 import { Button, Group, Hint, NumberField, Range, Select, Toggle } from './fields';
 import { ExportPanel } from './export-panel';
 import { FramePanel } from './frame-panel';
 import { ControlGroup } from '../ui/control-group';
+import { GlassPanel } from '../ui/glass-panel';
+import { IconButton } from '../ui/icon-button';
 import { buildColourGroups } from './control-groups/colour';
 import { buildContourGroups } from './control-groups/contours';
+import { buildOverlayPopoverGroups } from './control-groups/overlays';
+import { buildSceneGroups } from './control-groups/scene';
 import { buildTerrainGroups } from './control-groups/terrain';
 import { getGroupCode, studioSections } from './sections';
 import { StudioHeader } from './studio-header';
@@ -27,11 +31,14 @@ function Surface({
   close,
   children,
   modal = false,
+  isGlass = false,
 }: {
   title: string;
   close: () => void;
   children: ReactNode;
   modal?: boolean;
+  /** Hosts the content in a GlassPanel instead of the legacy dialog chrome (migrated popovers). */
+  isGlass?: boolean;
 }): ReactNode {
   const ref = useRef<HTMLDialogElement>(null);
   const closeRef = useRef(close);
@@ -81,7 +88,9 @@ function Surface({
   return (
     <dialog
       ref={ref}
-      className={`legacy-controls ${modal ? 'studio-dialog' : 'studio-popover'}`}
+      className={
+        isGlass ? 'lc-popover' : `legacy-controls ${modal ? 'studio-dialog' : 'studio-popover'}`
+      }
       data-ui-surface
       aria-label={title}
       onCancel={(event) => {
@@ -114,13 +123,25 @@ function Surface({
         }
       }}
     >
-      <div className="surface-heading">
-        <h2>{title}</h2>
-        <button type="button" aria-label={`Close ${title}`} onClick={close}>
-          ×
-        </button>
-      </div>
-      <div className="surface-body">{children}</div>
+      {isGlass ? (
+        <GlassPanel padding="none" className="lc-popover__panel">
+          <div className="lc-popover__heading">
+            <h2 className="lc-popover__title">{title}</h2>
+            <IconButton glyph="×" label={`Close ${title}`} onClick={close} />
+          </div>
+          <div className="lc-popover__body">{children}</div>
+        </GlassPanel>
+      ) : (
+        <>
+          <div className="surface-heading">
+            <h2>{title}</h2>
+            <button type="button" aria-label={`Close ${title}`} onClick={close}>
+              ×
+            </button>
+          </div>
+          <div className="surface-body">{children}</div>
+        </>
+      )}
     </dialog>
   );
 }
@@ -282,12 +303,15 @@ function Studio({
       {state.workspace.popover !== null && (
         <Surface
           title={state.workspace.popover}
+          isGlass={state.workspace.popover === 'Overlays'}
           close={() => {
             c.workspace({ popover: null });
           }}
         >
           {state.workspace.popover === 'Overlays' ? (
-            <OverlaysPanel {...props} />
+            buildOverlayPopoverGroups(c, state).map((group) => (
+              <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
+            ))
           ) : (
             <OrbitPanel {...props} />
           )}
@@ -362,7 +386,9 @@ function renderSectionBody(
     case 'Camera':
       return legacyControls(<CameraPanel {...props} />);
     case 'Scene':
-      return legacyControls(<ScenePanel {...props} />);
+      return buildSceneGroups(props.controller, props.state).map((group) => (
+        <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
+      ));
     case 'Model':
       return legacyControls(<ModelPanel {...props} cropPreview={cropPreview} />);
     case 'Frame':
