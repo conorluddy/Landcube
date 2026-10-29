@@ -1,9 +1,10 @@
 @import './tokens.css';
+/* fonts (#2/#3) */
+@import './fonts.css';
 @import './base.css';
 
-/* fonts (#2/#3) */
-
 /* #4 static primitives */
+@import './tag.css';
 
 /* #5 selection primitives */
 

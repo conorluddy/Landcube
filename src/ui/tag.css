@@ -1,0 +1,38 @@
+/* P-16 Tag: Mono caps label that never wraps. */
+.lc-tag {
+  display: inline-block;
+  max-width: 100%;
+  padding: var(--lc-s-1) 5px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--lc-r-inner);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  line-height: 1.2;
+  letter-spacing: var(--lc-track-ui);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lc-tag[data-variant='outlineBone'] {
+  border-color: var(--lc-bone);
+  color: var(--lc-bone);
+}
+
+.lc-tag[data-variant='outlineMuted'] {
+  border-color: var(--lc-line-strong);
+  color: var(--lc-text-tertiary);
+}
+
+.lc-tag[data-variant='solidBone'],
+.lc-tag[data-variant='fileType'] {
+  background: var(--lc-bone);
+  color: var(--lc-text-on-bone);
+}
+
+@media (forced-colors: active) {
+  .lc-tag {
+    border-color: CanvasText;
+  }
+}
