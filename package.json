@@ -30,7 +30,6 @@
     "lint:fix": "npm run lint -- --fix",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "ci:local": "npm run format:check && npm run lint && npm test && npm run build && playwright test --reporter=list && npm run test:package",
     "check:source": "npm run lint && npm run format:check && npm test && tsc --noEmit",
     "check": "npm run check:source && npm run build && npm run test:package",
     "prepack": "npm run build:cli",
