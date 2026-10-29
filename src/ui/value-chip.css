@@ -1,0 +1,70 @@
+/* P-13 ValueChip: pressed state follows the choice tile. */
+.lc-value-chip {
+  max-width: 100%;
+  padding: var(--lc-s-5) var(--lc-s-6);
+  overflow: hidden;
+  border: 1px solid var(--lc-line);
+  border-radius: var(--lc-r-panel);
+  background: transparent;
+  color: var(--lc-text-secondary);
+  cursor: pointer;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-ui);
+  line-height: 14px;
+  text-overflow: ellipsis;
+  transition:
+    background var(--lc-dur-fast) var(--lc-ease),
+    border-color var(--lc-dur-fast) var(--lc-ease);
+  white-space: nowrap;
+}
+
+.lc-value-chip[aria-pressed='true'] {
+  border-color: var(--lc-bone);
+  background: var(--lc-fill-selected);
+  color: var(--lc-text-primary);
+}
+
+.lc-value-chip:hover:not(:disabled),
+[data-force-state='hover'] .lc-value-chip:not([aria-pressed='true']) {
+  border-color: var(--lc-line-hover);
+}
+
+.lc-value-chip:focus-visible,
+[data-force-state='focus'] .lc-value-chip {
+  outline: 2px solid var(--lc-line-focus);
+  outline-offset: 2px;
+}
+
+.lc-value-chip:active:not(:disabled),
+[data-force-state='active'] .lc-value-chip:not([aria-pressed='true']) {
+  background: var(--lc-fill-hover);
+  color: var(--lc-text-primary);
+}
+
+.lc-value-chip:disabled {
+  color: var(--lc-text-disabled);
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-value-chip {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-value-chip {
+    border-color: ButtonText;
+  }
+
+  .lc-value-chip[aria-pressed='true'] {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  .lc-value-chip:disabled {
+    border-color: GrayText;
+    color: GrayText;
+  }
+}
