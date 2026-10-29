@@ -1,0 +1,45 @@
+/* Footer popover (Overlays): a dialog shell positioned above the footer, hosting a GlassPanel. */
+.lc-popover {
+  position: fixed;
+  inset: auto auto calc(60px + env(safe-area-inset-bottom)) var(--lc-s-6);
+  z-index: 5;
+  width: min(340px, calc(100vw - 32px));
+  max-height: calc(100dvh - 116px);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  background: transparent;
+  color: inherit;
+}
+
+.lc-popover__panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  max-height: inherit;
+}
+
+.lc-popover__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--lc-s-4) var(--lc-s-4) var(--lc-s-4) var(--lc-s-9);
+  border-bottom: 1px solid var(--lc-line-subtle);
+}
+
+.lc-popover__title {
+  margin: 0;
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-lead);
+  font-weight: 400;
+}
+
+.lc-popover__body {
+  min-height: 0;
+  max-height: calc(100dvh - 190px);
+  padding: var(--lc-s-8) var(--lc-s-9) var(--lc-s-9);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
