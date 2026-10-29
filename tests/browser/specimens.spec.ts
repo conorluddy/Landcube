@@ -12,6 +12,8 @@ const mediaModes: MediaMode[] = [
   { suffix: '-forced-colors', media: { forcedColors: 'active' } },
 ];
 
+// Screenshot baselines are generated on macOS and checked by the pre-commit hook; CI renders differently, so it skips them.
+test.skip(() => Boolean(process.env.CI), 'Screenshot baselines are local-only (macOS).');
 test.beforeEach(async ({ page }) => {
   await serveSpecimens(page);
 });
