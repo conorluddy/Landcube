@@ -17,6 +17,7 @@ import type { GrassGeography } from './grass-coverage';
 import { generatedTerrainReliefMeters, generatedTerrainSpanMeters } from './constants/grass';
 import { findTerrainSummits } from './summit-markers';
 import { getRequiredElement } from './dom-elements';
+import './ui/ui.css';
 import './landscape-studio.css';
 import { designChangePriority, versionOneDesignDefaults } from './constants/design';
 import { engineConfiguration } from './constants/engine';

@@ -93,7 +93,7 @@ function Surface({
   return (
     <dialog
       ref={ref}
-      className={modal ? 'studio-dialog' : 'studio-popover'}
+      className={`legacy-controls ${modal ? 'studio-dialog' : 'studio-popover'}`}
       aria-label={title}
       onCancel={(event) => {
         event.preventDefault();
@@ -262,7 +262,7 @@ function Studio({
 
   return (
     <div className={`studio-shell${state.workspace.collapsed ? ' inspector-collapsed' : ''}`}>
-      <header className="studio-header">
+      <header className="studio-header legacy-controls">
         <div className="studio-brand">
           <span aria-hidden="true">≋</span>
           <h1>
@@ -339,7 +339,7 @@ function Studio({
       />
       <aside
         id="studio-inspector"
-        className="studio-inspector control-panel"
+        className="studio-inspector control-panel legacy-controls"
         aria-label="Landscape controls"
         hidden={state.workspace.collapsed}
       >
@@ -385,7 +385,7 @@ function Studio({
           ))}
         </div>
       </aside>
-      <footer className="studio-footer">
+      <footer className="studio-footer legacy-controls">
         <div className="viewport-tools">
           <button
             type="button"
