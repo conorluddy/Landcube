@@ -1,0 +1,114 @@
+/* P-12 ChoiceTiles: grid of single-choice tiles; labels wrap, tiles grow with content. */
+.lc-choice-tiles {
+  display: grid;
+  gap: var(--lc-s-2);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.lc-choice-tiles[data-columns='5'] {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.lc-choice-tiles[data-columns='6'] {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.lc-choice-tiles__tile {
+  display: flex;
+  gap: var(--lc-s-3);
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 32px;
+  padding: var(--lc-s-3) var(--lc-s-4);
+  border: 1px solid var(--lc-line);
+  border-radius: var(--lc-r-control);
+  background: transparent;
+  color: var(--lc-text-secondary);
+  cursor: pointer;
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-hint);
+  line-height: 14px;
+  text-align: center;
+  transition:
+    background var(--lc-dur-fast) var(--lc-ease),
+    border-color var(--lc-dur-fast) var(--lc-ease);
+}
+
+.lc-choice-tiles__tile:has(.lc-choice-tiles__thumbnail) {
+  flex-direction: column;
+}
+
+.lc-choice-tiles__thumbnail {
+  display: flex;
+  justify-content: center;
+  max-width: 100%;
+}
+
+.lc-choice-tiles__swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--lc-tile-swatch-border, var(--lc-line-strong));
+  background: var(--lc-tile-swatch);
+}
+
+.lc-choice-tiles__label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.lc-choice-tiles__tile[aria-pressed='true'] {
+  border-color: var(--lc-bone);
+  background: var(--lc-fill-selected);
+  color: var(--lc-text-primary);
+}
+
+.lc-choice-tiles__tile:hover:not(:disabled),
+[data-force-state='hover'] .lc-choice-tiles__tile:not([aria-pressed='true']) {
+  border-color: var(--lc-line-hover);
+}
+
+.lc-choice-tiles__tile:focus-visible,
+[data-force-state='focus'] .lc-choice-tiles__tile:first-child {
+  outline: 2px solid var(--lc-line-focus);
+  outline-offset: 2px;
+}
+
+.lc-choice-tiles__tile:active:not(:disabled),
+[data-force-state='active'] .lc-choice-tiles__tile:not([aria-pressed='true']) {
+  background: var(--lc-fill-hover);
+  color: var(--lc-text-primary);
+}
+
+.lc-choice-tiles__tile:disabled {
+  color: var(--lc-text-disabled);
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-choice-tiles__tile {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-choice-tiles__tile {
+    border-color: ButtonText;
+  }
+
+  .lc-choice-tiles__tile[aria-pressed='true'] {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  .lc-choice-tiles__tile:disabled {
+    border-color: GrayText;
+    color: GrayText;
+  }
+
+  .lc-choice-tiles__swatch {
+    forced-color-adjust: none;
+  }
+}

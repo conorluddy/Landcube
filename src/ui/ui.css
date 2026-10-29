@@ -16,6 +16,12 @@
 @import './brand-lockup.css';
 
 /* #5 selection primitives */
+@import './segmented.css';
+@import './switch.css';
+@import './checkbox.css';
+@import './choice-tiles.css';
+@import './value-chip.css';
+@import './select.css';
 
 /* #6 field primitives */
 @import './ruler-slider.css';
