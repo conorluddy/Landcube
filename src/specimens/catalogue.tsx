@@ -1,11 +1,17 @@
 import type { Specimen } from '../ui/specimens';
 import { specimenKey } from '../ui/specimens';
 
-// Later components add `src/ui/<name>.specimens.tsx`; no edit needed here.
-const modules = import.meta.glob<{ default: Specimen[] }>('../ui/*.specimens.tsx', {
+// Later components add `src/ui/<name>.specimens.tsx` (or `overlays/`); no edit needed here.
+// Overlays come last so their sections never shift the layout, and screenshots, of earlier ones.
+const primitiveModules = import.meta.glob<{ default: Specimen[] }>('../ui/*.specimens.tsx', {
   eager: true,
 });
-const allSpecimens = Object.values(modules).flatMap((module) => module.default);
+const overlayModules = import.meta.glob<{ default: Specimen[] }>('../ui/overlays/*.specimens.tsx', {
+  eager: true,
+});
+const allSpecimens = [...Object.values(primitiveModules), ...Object.values(overlayModules)].flatMap(
+  (module) => module.default,
+);
 const forceableStates = ['hover', 'focus', 'active'];
 
 export function Catalogue({ only }: { only: string | null }): React.JSX.Element {

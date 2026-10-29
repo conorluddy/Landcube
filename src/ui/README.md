@@ -17,6 +17,10 @@ LANDCU.BE design-system components. Each is a React component plus a CSS file, a
 - Glass surfaces carry `data-ui-surface` (the cursor hit-test in `src/main.ts` ignores them). `[data-motion='active']` on an ancestor swaps blur for alpha while the 3D camera moves (`base.css`).
 - Cover disabled, long label, empty value, narrow width, `prefers-reduced-motion` and `forced-colors` in specimens and tests.
 
+## Canvas overlays
+
+`overlays/` holds the HUD (O-01 HudFrame, O-02/03 Crosshair + CoordinateTip, O-07 ScaleBar + Compass, C-07 ReadoutCard) with the same file set per component. Overlays are `pointer-events: none` and never carry `data-ui-surface`; only the glass ReadoutCard takes the pointer. `HudLayer` (`[data-hud]`) positions them over the viewport through slots (`pointer`, `frame`, `instruments`, `readout`) and sets `--lc-hud-mark` / `--lc-hud-hairline` from `data-canvas-tone`. Later map overlays (crop, measure, wipe, route) belong in the `pointer` slot or a new slot there.
+
 ## Forced states
 
 A specimen with `state: 'hover' | 'focus' | 'active'` renders inside an `<article data-force-state="...">`. Give each pseudo-class rule a twin:

@@ -1,0 +1,40 @@
+/* O-03 CoordinateTip: tip glass, Mono 9.5px, one coordinate per line. Not a UI surface. */
+.lc-coordinate-tip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-1);
+  width: max-content;
+  padding: 5px 7px;
+  border: 1px solid var(--lc-line);
+  background: var(--lc-glass-tip);
+  -webkit-backdrop-filter: blur(var(--lc-blur-sm));
+  backdrop-filter: blur(var(--lc-blur-sm));
+  color: var(--lc-text-strong);
+  font-family: var(--lc-font-mono);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--lc-track-coord);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+[data-motion='active'] .lc-coordinate-tip {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .lc-coordinate-tip {
+    background: var(--lc-glass-sheet);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-coordinate-tip {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+}

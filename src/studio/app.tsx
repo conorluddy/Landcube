@@ -20,6 +20,8 @@ import { buildTerrainGroups } from './control-groups/terrain';
 import { getGroupCode, studioSections } from './sections';
 import { StudioHeader } from './studio-header';
 import { StudioFooter } from './studio-footer';
+import { StudioHud } from './studio-hud';
+import type { HudStore } from './hud-store';
 import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
 
@@ -152,11 +154,13 @@ function Studio({
   terrain,
   renderer,
   cropPreview,
+  hud,
 }: {
   controller: StudioController;
   terrain: SVGSVGElement;
   renderer: OutputRenderer;
   cropPreview: CropPreview;
+  hud: HudStore;
 }): ReactNode {
   const state = useSyncExternalStore(c.subscribe, c.getSnapshot);
   const viewport = useRef<HTMLDivElement>(null);
@@ -199,6 +203,7 @@ function Studio({
         ref={viewport}
         aria-label={`${state.workspace.view.toUpperCase()} landscape viewport`}
       />
+      <StudioHud state={state} hud={hud} />
       <InspectorPanel
         id={inspectorId}
         label="Landscape controls"
@@ -341,6 +346,7 @@ export function mountStudio(
   terrain: SVGSVGElement,
   renderer: OutputRenderer,
   cropPreview: CropPreview,
+  hud: HudStore,
 ): void {
   const root = document.createElement('div');
 
@@ -353,6 +359,7 @@ export function mountStudio(
         terrain={terrain}
         renderer={renderer}
         cropPreview={cropPreview}
+        hud={hud}
       />,
     );
   });

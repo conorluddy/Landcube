@@ -46,6 +46,7 @@ import {
   getOrthographicHalfHeight,
   getVerticalFovDegrees,
   terrainViewPresets,
+  type CameraPose,
   type TerrainCameraSettings,
   type TerrainViewPreset,
 } from './terrain-camera';
@@ -131,6 +132,9 @@ export interface Terrain3d {
   /** Morphs the next rebuilt landscape from the current one instead of cutting to it. */
   requestTransition(): void;
   reset(): void;
+  getCameraPose(): CameraPose;
+  /** The terrain point under a viewport position, as fractions across the model (0,0 = north-west). */
+  getSurfaceFractionAt(clientX: number, clientY: number): { x: number; y: number } | undefined;
 }
 
 type GradientRange = readonly [minimum: number, maximum: number];
@@ -148,6 +152,8 @@ interface RunningTerrainTransition {
 
 export function createTerrain3d(
   onModel: (heightMm: number, layerHeightMm?: number) => void = () => undefined,
+  /** Runs after every drawn frame, so camera readouts can follow orbits, presets and the turntable. */
+  onDraw: () => void = () => undefined,
 ): Terrain3d {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
 
@@ -532,6 +538,7 @@ export function createTerrain3d(
   const draw = () => {
     if (visible && !document.hidden) {
       render();
+      onDraw();
     }
   };
 
@@ -1470,6 +1477,42 @@ export function createTerrain3d(
       }
 
       return frame;
+    },
+    getCameraPose() {
+      const orbit = new THREE.Spherical().setFromVector3(
+        camera.position.clone().sub(controls.target),
+      );
+
+      // North is -z, so a camera at azimuth theta looks along bearing -theta.
+      return {
+        azimuthDegrees: THREE.MathUtils.euclideanModulo(
+          -THREE.MathUtils.radToDeg(orbit.theta),
+          360,
+        ),
+        elevationDegrees: 90 - THREE.MathUtils.radToDeg(orbit.phi),
+        fovDegrees: perspectiveCamera.fov,
+      };
+    },
+    getSurfaceFractionAt(clientX, clientY) {
+      const point = getTerrainPointAt(clientX, clientY);
+
+      // Rebuilds replace the geometry, and morphs keep its footprint, so one box per geometry holds.
+      if (!surface.geometry.boundingBox) {
+        surface.geometry.computeBoundingBox();
+      }
+
+      const bounds = surface.geometry.boundingBox;
+
+      if (!point || !bounds || bounds.isEmpty()) {
+        return undefined;
+      }
+
+      const local = surface.worldToLocal(point.clone());
+
+      return {
+        x: THREE.MathUtils.clamp((local.x - bounds.min.x) / (bounds.max.x - bounds.min.x), 0, 1),
+        y: THREE.MathUtils.clamp((local.z - bounds.min.z) / (bounds.max.z - bounds.min.z), 0, 1),
+      };
     },
     pickFocus() {
       const canvas = renderer.domElement;

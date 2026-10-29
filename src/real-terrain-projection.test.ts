@@ -5,6 +5,7 @@ import {
   getMercatorX,
   getMercatorY,
   getRealTerrainSourceBounds,
+  locateRealTerrainFramePoint,
   projectToRealTerrainFrame,
 } from './real-terrain-projection';
 
@@ -92,4 +93,23 @@ void test('points across the antimeridian stay beside a date-line source', () =>
   const east = projectToRealTerrainFrame(pacific, -17, -179.95, frame);
 
   assert.ok(east.x > frame.width / 2 && east.x < frame.width, `x was ${east.x}`);
+});
+
+void test('locating a frame point inverts the projection, so the HUD reads the sampled place', () => {
+  const point = projectToRealTerrainFrame(placement, 53.07, -6.33, frame);
+  const located = locateRealTerrainFramePoint(placement, point, frame);
+
+  assert.ok(Math.abs(located.latitude - 53.07) < 1e-9);
+  assert.ok(Math.abs(located.longitude - -6.33) < 1e-9);
+});
+
+void test('the frame centre locates to the source location', () => {
+  const located = locateRealTerrainFramePoint(
+    placement,
+    { x: frame.width / 2, y: frame.height / 2 },
+    frame,
+  );
+
+  assert.ok(Math.abs(located.latitude - placement.location.latitude) < 1e-9);
+  assert.ok(Math.abs(located.longitude - placement.location.longitude) < 1e-9);
 });

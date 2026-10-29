@@ -1,0 +1,45 @@
+/* O-07 ScaleBar: four alternating segments, 4px tall with a bone border, ticks in Mono 8.5px. */
+.lc-scale-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: var(--lc-scale-bar-length, 100%);
+  max-width: 100%;
+  pointer-events: none;
+}
+
+.lc-scale-bar__segments {
+  height: 4px;
+  border: 1px solid var(--lc-bone);
+  background: linear-gradient(
+    90deg,
+    var(--lc-bone) 0 25%,
+    transparent 25% 50%,
+    var(--lc-bone) 50% 75%,
+    transparent 75%
+  );
+}
+
+.lc-scale-bar__ticks {
+  display: flex;
+  justify-content: space-between;
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-micro);
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+@media (forced-colors: active) {
+  .lc-scale-bar__segments {
+    border-color: CanvasText;
+    background: linear-gradient(
+      90deg,
+      CanvasText 0 25%,
+      Canvas 25% 50%,
+      CanvasText 50% 75%,
+      Canvas 75%
+    );
+  }
+}

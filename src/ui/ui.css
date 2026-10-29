@@ -45,6 +45,13 @@
 
 /* #14 overlays */
 @import './popover.css';
+@import './overlays/hud-layer.css';
+@import './overlays/hud-frame.css';
+@import './overlays/crosshair.css';
+@import './overlays/coordinate-tip.css';
+@import './overlays/scale-bar.css';
+@import './overlays/compass.css';
+@import './overlays/readout-card.css';
 
 /* #15 faults */
 

@@ -19,6 +19,17 @@ export interface TerrainCameraSettings {
   focusFollowsTarget: boolean;
 }
 
+/**
+ * Where the 3D camera looks from, for HUD readouts. Azimuth is the compass bearing of the view
+ * direction (0 = looking north, 90 = east); elevation is the angle above the ground plane.
+ */
+export interface CameraPose {
+  azimuthDegrees: number;
+  elevationDegrees: number;
+  /** Vertical field of view of the lens; orthographic views report the lens they frame with. */
+  fovDegrees: number;
+}
+
 /** Session-only lens settings; 35 mm on full frame sits closest to the original 40° view. */
 export const defaultTerrainCameraSettings: Readonly<TerrainCameraSettings> = Object.freeze({
   projection: 'perspective',

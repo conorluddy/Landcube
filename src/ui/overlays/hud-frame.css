@@ -1,0 +1,77 @@
+/* O-01 HudFrame: 18px corner brackets, a 6px top tick ruler (every 24px) and Mono 9px readouts. */
+.lc-hud-frame {
+  position: absolute;
+  inset: 0;
+  color: var(--lc-hud-mark, var(--lc-ink-3));
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-ui);
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.lc-hud-frame__corner {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 0 solid currentcolor;
+}
+
+.lc-hud-frame__corner[data-corner='top-left'] {
+  top: 0;
+  left: 0;
+  border-top-width: 1px;
+  border-left-width: 1px;
+}
+
+.lc-hud-frame__corner[data-corner='top-right'] {
+  top: 0;
+  right: 0;
+  border-top-width: 1px;
+  border-right-width: 1px;
+}
+
+.lc-hud-frame__corner[data-corner='bottom-left'] {
+  bottom: 0;
+  left: 0;
+  border-bottom-width: 1px;
+  border-left-width: 1px;
+}
+
+.lc-hud-frame__corner[data-corner='bottom-right'] {
+  right: 0;
+  bottom: 0;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+}
+
+.lc-hud-frame__ruler {
+  position: absolute;
+  top: var(--lc-s-4);
+  right: 28px;
+  left: 28px;
+  height: 6px;
+  background: repeating-linear-gradient(90deg, currentcolor 0 1px, transparent 1px 24px);
+  opacity: 0.55;
+}
+
+.lc-hud-frame__readouts {
+  position: absolute;
+  top: 20px;
+  left: 28px;
+  display: flex;
+  gap: var(--lc-s-9);
+}
+
+.lc-hud-frame__trailing {
+  position: absolute;
+  top: 20px;
+  right: 28px;
+}
+
+@media (forced-colors: active) {
+  .lc-hud-frame {
+    color: CanvasText;
+  }
+}
