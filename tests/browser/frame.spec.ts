@@ -25,7 +25,12 @@ test('the Frame tab shows only in 3D', async ({ page }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
   await expect(navigation(page).getByRole('button', { name: 'Frame', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '3D', exact: true }).click();
-  await expect(navigation(page).getByRole('button', { name: 'Frame', exact: true })).toBeVisible();
+  // Lazy 3D startup can exceed the default assertion timeout with software WebGL on CI.
+  await expect(navigation(page).getByRole('button', { name: 'Frame', exact: true })).toBeVisible({
+    timeout: 20_000,
+  });
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await expect(navigation(page).getByRole('button', { name: 'Frame', exact: true })).toHaveCount(0);
 });
 
 test('a tray downloads at the model size plus border and clearance, leaving the model STL unchanged', async ({
