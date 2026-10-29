@@ -8,6 +8,9 @@ export interface IconButtonProps {
   isActive?: boolean;
   onClick: () => void;
   disabled?: boolean;
+  /** For a button that opens a popover; pair with `isExpanded`. */
+  hasPopup?: 'dialog';
+  isExpanded?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }
 
@@ -18,6 +21,8 @@ export function IconButton({
   isActive,
   onClick,
   disabled = false,
+  hasPopup,
+  isExpanded,
   ref,
 }: IconButtonProps): React.JSX.Element {
   return (
@@ -28,6 +33,8 @@ export function IconButton({
       data-ui-surface
       aria-label={label}
       aria-pressed={isActive}
+      aria-haspopup={hasPopup}
+      aria-expanded={isExpanded}
       disabled={disabled}
       onClick={onClick}
     >

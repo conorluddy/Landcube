@@ -6,6 +6,26 @@ import { SignalMark } from '../ui/signal-mark';
 import { areRoadsDrawn, type StudioController, type StudioState } from './controller';
 
 /**
+ * Phone status line inside the bottom sheet's peek row: live status, then the "Data sources"
+ * disclosure that keeps real-terrain and road credits reachable.
+ */
+export function StudioSheetStatus({ state }: { state: StudioState }): ReactNode {
+  const { workspace, source } = state;
+
+  return (
+    <footer className="studio-sheet-status">
+      <SignalMark kind={workspace.activating ? 'live' : 'ok'} size="footer" />
+      <span className="studio-status-message" role="status" aria-live="polite">
+        {workspace.activating
+          ? 'Starting 3D…'
+          : state.status || (source.terrain ? 'Real terrain' : 'Procedural')}
+      </span>
+      <DataSources state={state} />
+    </footer>
+  );
+}
+
+/**
  * Bottom bar: viewport tools (inspector toggle, Overlays, Orbit, Tour) and a status pill with the
  * source, live status and data attribution. Real-terrain and road credits always stay reachable:
  * inline on desktop, behind "Data sources" on phones.
@@ -101,19 +121,7 @@ export function StudioFooter({
             {state.roads.network?.attribution}
           </a>
         )}
-        {(source.terrain !== undefined || isRoadCreditShown) && (
-          <details className="mobile-attribution">
-            <summary>Data sources</summary>
-            <div className="mobile-attribution-sources lc-glass" data-ui-surface>
-              {source.terrain && <p>{source.terrain.attribution}</p>}
-              {isRoadCreditShown && (
-                <a href={roadAttributionUrl} target="_blank" rel="noreferrer">
-                  {state.roads.network?.attribution} ↗
-                </a>
-              )}
-            </div>
-          </details>
-        )}
+        <DataSources state={state} />
         <a
           className="studio-github"
           href="https://github.com/conorluddy/Topogra"
@@ -124,5 +132,31 @@ export function StudioFooter({
         </a>
       </BarGroup>
     </FloatingBar>
+  );
+}
+
+// === HELPERS ===
+
+/** Credits behind a disclosure; only shown on phones (see `.mobile-attribution` CSS). */
+function DataSources({ state }: { state: StudioState }): ReactNode {
+  const { source } = state;
+  const isRoadCreditShown = areRoadsDrawn(state);
+
+  if (source.terrain === undefined && !isRoadCreditShown) {
+    return null;
+  }
+
+  return (
+    <details className="mobile-attribution">
+      <summary>Data sources</summary>
+      <div className="mobile-attribution-sources lc-glass" data-ui-surface>
+        {source.terrain && <p>{source.terrain.attribution}</p>}
+        {isRoadCreditShown && (
+          <a href={roadAttributionUrl} target="_blank" rel="noreferrer">
+            {state.roads.network?.attribution} ↗
+          </a>
+        )}
+      </div>
+    </details>
   );
 }

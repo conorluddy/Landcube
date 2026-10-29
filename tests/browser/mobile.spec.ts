@@ -1,0 +1,209 @@
+import { expect, test, type Page } from '@playwright/test';
+import { appUrl, serveStudio } from './studio-fixture';
+
+const phone = { width: 390, height: 844 };
+
+test.use({ viewport: phone });
+test.beforeEach(async ({ page }) => {
+  await serveStudio(page);
+  await page.goto(`${appUrl}?v=1&seed=123`);
+});
+
+function sheet(page: Page) {
+  return page.getByRole('complementary', { name: 'Landscape controls' });
+}
+
+function shell(page: Page) {
+  return page.locator('.studio-shell');
+}
+
+async function sheetHeight(page: Page): Promise<number> {
+  return (await sheet(page).boundingBox())?.height ?? 0;
+}
+
+/** The handle moves while the sheet animates, so drags start once its transition ends. */
+async function waitForSettledSheet(page: Page): Promise<void> {
+  await expect
+    .poll(() => sheet(page).evaluate((element) => element.getAnimations().length))
+    .toBe(0);
+}
+
+/** Drags the sheet handle vertically by `distancePx` in `steps` pointer moves `stepDelayMs` apart. */
+async function dragHandle(
+  page: Page,
+  distancePx: number,
+  steps: number,
+  stepDelayMs: number,
+): Promise<void> {
+  await waitForSettledSheet(page);
+  const grip = await page.getByRole('button', { name: 'Resize sheet' }).boundingBox();
+
+  if (grip === null) {
+    throw new Error('Sheet handle is not laid out.');
+  }
+
+  const x = grip.x + grip.width / 2;
+  const y = grip.y + grip.height / 2;
+
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+
+  for (let step = 1; step <= steps; step++) {
+    await page.mouse.move(x, y + (distancePx * step) / steps);
+
+    if (stepDelayMs > 0) {
+      await page.waitForTimeout(stepDelayMs);
+    }
+  }
+
+  await page.mouse.up();
+}
+
+test('the phone inspector is a bottom sheet that opens at half', async ({ page }) => {
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'half');
+  await expect(sheet(page)).toHaveAttribute('id', 'studio-inspector');
+  await expect(page.getByRole('button', { name: 'Resize sheet' })).toHaveAttribute(
+    'aria-controls',
+    'studio-inspector',
+  );
+  expect(await sheetHeight(page)).toBeLessThanOrEqual(phone.height * 0.62);
+  await expect(page.getByRole('button', { name: 'Export ↗' })).toHaveCount(1);
+});
+
+test('keyboard on the handle steps between peek, half and full', async ({ page }) => {
+  const handle = page.getByRole('button', { name: 'Resize sheet' });
+
+  await handle.focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'full');
+  await expect.poll(() => sheetHeight(page)).toBe(phone.height - 64);
+  await page.keyboard.press('Enter');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'half');
+  await page.keyboard.press('Escape');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'peek');
+  await expect.poll(() => sheetHeight(page)).toBe(190);
+  await expect(handle).toHaveAttribute('aria-valuetext', 'peek');
+  await page.keyboard.press('ArrowDown');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'peek');
+  await page.keyboard.press('ArrowUp');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'half');
+});
+
+test('a full sheet hides the map controls and the scale bar', async ({ page }) => {
+  const overlays = page.getByRole('button', { name: 'Overlays', exact: true });
+  const scaleBar = page.locator('[data-hud] .lc-hud-layer__instruments .lc-scale-bar');
+
+  await expect(overlays).toBeVisible();
+  await expect(scaleBar).toBeVisible();
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(overlays).toBeHidden();
+  await expect(scaleBar).toBeHidden();
+});
+
+test('map controls are 44px and open the Overlays popover', async ({ page }) => {
+  const overlays = page.getByRole('button', { name: 'Overlays', exact: true });
+  const box = await overlays.boundingBox();
+
+  expect([box?.width, box?.height]).toEqual([44, 44]);
+  await overlays.click();
+  await expect(page.getByRole('dialog', { name: 'Overlays' })).toBeVisible();
+  await expect(overlays).toHaveAttribute('aria-expanded', 'true');
+});
+
+test('the sheet animates between snaps unless reduced motion is set', async ({ page }) => {
+  await expect(sheet(page)).toHaveCSS('transition-duration', '0.32s');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(sheet(page)).toHaveCSS('transition-duration', '0s');
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  expect(await sheetHeight(page)).toBe(190);
+});
+
+test('the body scrolls at half and is locked at peek', async ({ page }) => {
+  const body = page.locator('.lc-bottom-sheet__body');
+  const scrollBody = async () =>
+    body.evaluate((element) => {
+      element.scrollTop = 200;
+
+      return element.scrollTop;
+    });
+
+  expect(await scrollBody()).toBeGreaterThan(0);
+  await body.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await expect(body).toHaveCSS('overflow-y', 'hidden');
+  await page.mouse.move(195, 800);
+  await page.mouse.wheel(0, 400);
+  expect(await body.evaluate((element) => element.scrollTop)).toBe(0);
+});
+
+test('a slow drag follows the pointer and settles on the nearest snap', async ({ page }) => {
+  const grip = await page.getByRole('button', { name: 'Resize sheet' }).boundingBox();
+  const halfHeight = await sheetHeight(page);
+
+  if (grip === null) {
+    throw new Error('Sheet handle is not laid out.');
+  }
+
+  await page.mouse.move(grip.x + 20, grip.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + 20, grip.y + 110, { steps: 5 });
+  expect(await sheetHeight(page)).toBeCloseTo(halfHeight - 100, 0);
+  await page.waitForTimeout(150);
+  await page.mouse.up();
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'half');
+  await dragHandle(page, 300, 10, 100);
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'peek');
+  await dragHandle(page, -540, 18, 100);
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'full');
+});
+
+test('a fast flick steps one snap in its direction', async ({ page }) => {
+  await dragHandle(page, -60, 3, 0);
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'full');
+  await dragHandle(page, 60, 3, 0);
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'half');
+});
+
+test('touch drags on the handle move the sheet', async ({ page }) => {
+  await waitForSettledSheet(page);
+  const grip = await page.getByRole('button', { name: 'Resize sheet' }).boundingBox();
+
+  if (grip === null) {
+    throw new Error('Sheet handle is not laid out.');
+  }
+
+  const x = grip.x + grip.width / 2;
+  const startY = grip.y + grip.height / 2;
+  const touch = await page.context().newCDPSession(page);
+  const send = (type: 'touchStart' | 'touchMove' | 'touchEnd', y: number) =>
+    touch.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
+    });
+
+  await send('touchStart', startY);
+
+  for (let step = 1; step <= 10; step++) {
+    await send('touchMove', startY + step * 30);
+    await page.waitForTimeout(100);
+  }
+
+  await send('touchEnd', startY + 300);
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'peek');
+});
+
+test('choosing a section from peek opens the sheet to half', async ({ page }) => {
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page
+    .getByRole('navigation', { name: 'Editing section' })
+    .getByRole('button', { name: 'Colour', exact: true })
+    .click();
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'half');
+  await expect(page.getByRole('region', { name: 'Colour settings' })).toBeVisible();
+});

@@ -25,7 +25,8 @@ test('Tab reaches every enabled button, icon button and sheet handle with a visi
 
   expect(expectedCount).toBeGreaterThan(0);
 
-  for (let step = 0; step < 400 && reached.size < expectedCount; step++) {
+  // A loop guard, not an assertion: it must outgrow every tabbable specimen on the page.
+  for (let step = 0; step < 800 && reached.size < expectedCount; step++) {
     await page.keyboard.press('Tab');
 
     const focused = await describeFocusedSpecimen(page);

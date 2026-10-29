@@ -14,6 +14,8 @@ const mediaModes: MediaMode[] = [
 
 // Screenshot baselines are generated on macOS and checked by the pre-commit hook; CI renders differently, so it skips them.
 test.skip(() => Boolean(process.env.CI), 'Screenshot baselines are local-only (macOS).');
+// Each media mode screenshots every specimen in one test, so the budget grows with the catalogue.
+test.describe.configure({ timeout: 120_000 });
 test.beforeEach(async ({ page }) => {
   await serveSpecimens(page);
 });

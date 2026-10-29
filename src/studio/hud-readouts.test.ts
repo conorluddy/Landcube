@@ -6,6 +6,7 @@ import { createStudioController, type StudioState } from './controller';
 import {
   chooseScaleBar,
   describeCameraReadouts,
+  describeSheetReadouts,
   describeTarget,
   formatMapLocation,
   getCanvasTone,
@@ -50,6 +51,20 @@ function in3d(state: StudioState): StudioState {
     cameraPose: { azimuthDegrees: 312, elevationDegrees: 34, fovDegrees: 38 },
   };
 }
+
+void test('the phone peek row shows seed, summit and contours, or summit, span and contour', () => {
+  const procedural = describeSheetReadouts(describeTarget(createState(), undefined));
+  const real = describeSheetReadouts(describeTarget(withRealTerrain(createState()), undefined));
+
+  assert.deepEqual(
+    procedural.map(({ label }) => label),
+    ['Seed', 'High', 'Contours'],
+  );
+  assert.deepEqual(
+    real.map(({ label, value }) => `${label} ${value}`),
+    ['High 751', 'Span 8', 'Contour 20'],
+  );
+});
 
 void test('procedural terrain reads as its seed, contour levels and nominal relief', () => {
   const target = describeTarget(createState(), { minimum: 120, maximum: 870 });
