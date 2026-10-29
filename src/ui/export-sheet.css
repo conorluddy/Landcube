@@ -1,0 +1,126 @@
+/* C-19 ExportSheet: summary readouts, then one section per output kind, 12px between rows. */
+.lc-export-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-10);
+  min-width: 0;
+}
+
+.lc-export-sheet__summary {
+  min-width: 0;
+}
+
+.lc-export-sheet__target {
+  margin: 0 0 var(--lc-s-4);
+  overflow: hidden;
+  color: var(--lc-text-strong);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-label);
+  line-height: 12px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lc-export-sheet__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-6);
+  min-width: 0;
+}
+
+.lc-export-sheet__hint {
+  margin: 0;
+  color: var(--lc-text-tertiary);
+  font-size: var(--lc-fs-hint);
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.lc-export-sheet__dimensions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--lc-s-6);
+}
+
+.lc-export-sheet__preview {
+  display: grid;
+  place-items: center;
+  min-height: 80px;
+  border: 1px solid var(--lc-line-subtle);
+  border-radius: var(--lc-r-control);
+  background: var(--lc-fill-field);
+  overflow: hidden;
+}
+
+.lc-export-sheet__preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+}
+
+/* 3MF and GLB are drawn but disabled until the exporters exist. */
+.lc-export-sheet__formats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-s-3);
+}
+
+.lc-export-sheet__format {
+  display: inline-flex;
+  gap: var(--lc-s-4);
+  align-items: center;
+  height: var(--lc-h-s);
+  padding: 0 var(--lc-s-6);
+  border: 1px solid var(--lc-line);
+  border-radius: var(--lc-r-control);
+  background: transparent;
+  color: var(--lc-text-body);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-ui);
+  letter-spacing: var(--lc-track-ui);
+  white-space: nowrap;
+}
+
+.lc-export-sheet__format[aria-pressed='true'] {
+  border-color: var(--lc-bone);
+  background: var(--lc-fill-selected);
+  color: var(--lc-text-primary);
+}
+
+.lc-export-sheet__format:disabled {
+  color: var(--lc-text-disabled);
+  cursor: not-allowed;
+}
+
+.lc-export-sheet__parts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-3);
+}
+
+.lc-export-sheet__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-s-3);
+}
+
+/* The Export dialog is modal and centred; the footer popovers stay anchored above the footer. */
+.lc-popover.lc-popover--modal {
+  position: fixed;
+  inset: 0;
+  width: min(480px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+}
+
+.lc-popover.lc-popover--modal::backdrop {
+  background: var(--lc-scrim);
+  backdrop-filter: blur(3px);
+}
+
+.lc-popover--modal .lc-popover__body {
+  max-height: calc(100dvh - 110px);
+}

@@ -91,7 +91,9 @@ function Surface({
     <dialog
       ref={ref}
       className={
-        isGlass ? 'lc-popover' : `legacy-controls ${modal ? 'studio-dialog' : 'studio-popover'}`
+        isGlass
+          ? `lc-popover${modal ? ' lc-popover--modal' : ''}`
+          : `legacy-controls ${modal ? 'studio-dialog' : 'studio-popover'}`
       }
       data-ui-surface
       aria-label={title}
@@ -242,6 +244,7 @@ function Studio({
       {state.workspace.exporting && (
         <Surface
           modal
+          isGlass
           title="Export"
           close={() => {
             c.workspace({ exporting: false });

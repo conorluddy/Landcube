@@ -71,6 +71,7 @@ import {
   type FrameStudioSettings,
 } from '../frame/frame-studio-settings';
 import type { FrameAssembly, FramePart, FramePartId } from '../types/frame';
+import type { ExportJob } from '../ui/job-list';
 
 export type StudioView = '2d' | '3d';
 export type InspectorSection =
@@ -170,6 +171,8 @@ export interface StudioState {
   seedLocked: boolean;
   status: string;
   manualLink: string;
+  /** Sequential frame-part STL downloads, oldest first. Cleared when the next batch starts. */
+  exportJobs: readonly ExportJob[];
   /** Measured from the rendered model; `spanKm` is its longer geographic side. */
   metrics: { height?: number; layerHeight?: number; spanKm?: number };
   /** Searched places that loaded, most recent first; kept in browser storage. */
@@ -229,7 +232,10 @@ export interface StudioController {
   model: (patch: Partial<StudioState['model']>) => boolean;
   dimensions: (patch: Partial<TerrainModelSettings>) => boolean;
   frame: (patch: Partial<FrameStudioSettings>) => void;
-  downloadFrameStl: (partId: FramePartId) => void;
+  /** True when the download started; failures are reported through `status`. */
+  downloadFrameStl: (partId: FramePartId) => boolean;
+  /** Downloads the parts one after another, listing each in `exportJobs`. */
+  downloadFrameStlParts: (partIds: readonly FramePartId[]) => Promise<void>;
   metrics: (height: number, layerHeight?: number) => void;
   /** Reports the model's longer geographic side; auto road width follows it. */
   modelSpan: (spanKm: number | undefined) => void;
@@ -256,8 +262,17 @@ export interface StudioController {
   interval: (value: 'auto' | number) => boolean;
   hatching: (value: boolean) => void;
   resetCamera: () => void;
-  downloadStl: () => void;
+  /** True when the download started; failures are reported through `status`. */
+  downloadStl: () => boolean;
   downloadStill: (scale: TerrainStillScale) => Promise<void>;
+}
+
+/** Pause between part downloads so each job paints and the browser sees separate saves. */
+const exportJobPaceMs = 120;
+
+/** A binary STL is an 84-byte header plus 50 bytes per triangle. */
+export function estimateBinaryStlBytes(part: FramePart): number {
+  return 84 + (part.solid.indices.length / 3) * 50;
 }
 
 /** Twenty updates a second keeps the sun smooth without flooding React with renders. */
@@ -349,6 +364,7 @@ export function createStudioController(
     seedLocked: actions.isSeedLocked,
     status: '',
     manualLink: '',
+    exportJobs: [],
     metrics: {},
     savedPlaces: savedPlacesResult?.ok === true ? savedPlacesResult.data : [],
   };
@@ -400,6 +416,21 @@ export function createStudioController(
   const workspace = (patch: Partial<StudioState['workspace']>) => {
     state = { ...state, workspace: { ...state.workspace, ...patch } };
     publish();
+  };
+
+  const findFramePart = (partId: FramePartId): FramePart | undefined => {
+    const assembly = state.frame.assembly;
+
+    return assembly?.ok === true ? assembly.data.parts.find(({ id }) => id === partId) : undefined;
+  };
+
+  const setExportJobs = (exportJobs: readonly ExportJob[]) => {
+    state = { ...state, exportJobs };
+    publish();
+  };
+
+  const updateExportJob = (jobId: string, patch: Partial<ExportJob>) => {
+    setExportJobs(state.exportJobs.map((job) => (job.id === jobId ? { ...job, ...patch } : job)));
   };
 
   /** Frames fit the model, so any model, height or frame shape edit rebuilds the assembly. */
@@ -768,20 +799,58 @@ export function createStudioController(
       publish();
     },
     downloadFrameStl(partId: FramePartId) {
-      const assembly = state.frame.assembly;
-      const part =
-        assembly?.ok === true ? assembly.data.parts.find(({ id }) => id === partId) : undefined;
+      const part = findFramePart(partId);
 
       if (!part) {
         notify(`Frame part ${partId} is not available. Fix the frame settings and retry.`);
 
-        return;
+        return false;
       }
 
       try {
         effects?.downloadFrameStl(part);
+
+        return true;
       } catch (error) {
         notify(error instanceof Error ? error.message : 'Frame STL export failed.');
+
+        return false;
+      }
+    },
+    async downloadFrameStlParts(partIds: readonly FramePartId[]) {
+      if (state.exportJobs.some(({ status }) => status === 'queued' || status === 'meshing')) {
+        return;
+      }
+
+      const parts = partIds.flatMap((partId) => findFramePart(partId) ?? []);
+
+      setExportJobs(
+        parts.map((part) => ({
+          id: part.id,
+          label: `${part.id} STL`,
+          status: 'queued',
+          fraction: 0,
+        })),
+      );
+
+      for (const part of parts) {
+        updateExportJob(part.id, { status: 'meshing' });
+        // Lets the list paint "meshing" before the synchronous STL build, and spaces the downloads.
+        await new Promise((resolve) => setTimeout(resolve, exportJobPaceMs));
+
+        try {
+          effects?.downloadFrameStl(part);
+          updateExportJob(part.id, {
+            status: 'done',
+            fraction: 1,
+            sizeBytes: estimateBinaryStlBytes(part),
+          });
+        } catch (error) {
+          updateExportJob(part.id, {
+            status: 'failed',
+            message: error instanceof Error ? error.message : 'Frame STL export failed.',
+          });
+        }
       }
     },
     metrics(height: number, layerHeight?: number) {
@@ -1112,8 +1181,12 @@ export function createStudioController(
     downloadStl() {
       try {
         effects?.downloadStl();
+
+        return true;
       } catch (error) {
         notify(error instanceof Error ? error.message : 'STL export failed.');
+
+        return false;
       }
     },
     async downloadStill(scale: TerrainStillScale) {
