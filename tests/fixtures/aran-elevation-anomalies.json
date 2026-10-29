@@ -1,0 +1,45 @@
+{
+  "description": "Terrarium source pixel observations near the Aran Islands, captured 2026-10-29. Coordinates use the zoom 8 pixel grid; other zooms use the containing pixel. Neighbor order is west, east, north, south. Elevations are meters.",
+  "source": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/",
+  "observations": [
+    {
+      "latitude": 53.123701798845715,
+      "longitude": -9.766845703125,
+      "zoom7": {
+        "tile": [60, 41],
+        "pixel": [135, 159],
+        "center": -834,
+        "neighbors": [22, 12, 26, 5]
+      },
+      "zoom8": {
+        "tile": [121, 83],
+        "pixel": [14, 63],
+        "center": 1832,
+        "neighbors": [9.55078125, 5, 79, -1]
+      },
+      "zoom9": {
+        "tile": [242, 166],
+        "pixel": [28, 126],
+        "center": 309,
+        "neighbors": [11.4609375, -516, 36.45703125, 5]
+      }
+    },
+    {
+      "latitude": 53.23892064092498,
+      "longitude": -9.3328857421875,
+      "zoom7": { "tile": [60, 41], "pixel": [174, 142], "center": 2, "neighbors": [4, 2, -2, -10] },
+      "zoom8": {
+        "tile": [121, 83],
+        "pixel": [93, 28],
+        "center": 1116,
+        "neighbors": [16, 75, -36, -2]
+      },
+      "zoom9": {
+        "tile": [242, 166],
+        "pixel": [186, 56],
+        "center": 1.9140625,
+        "neighbors": [1.765625, 1.94921875, 3.546875, 0.9296875]
+      }
+    }
+  ]
+}
