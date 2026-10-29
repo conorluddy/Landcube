@@ -229,7 +229,7 @@ test('real terrain interval, overlays and failed loading retain the current land
   expect((await download(page, 'Download SVG')).bytes.equals(original.bytes)).toBe(true);
   await page.getByRole('button', { name: 'Close Export' }).click();
   await page.getByRole('button', { name: 'Procedural', exact: true }).click();
-  await expect(page.getByText('Procedural landscape')).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Procedural landscape' })).toBeVisible();
   await section(page, 'Contours');
   await expect(page.getByRole('slider', { name: 'Density' })).toBeVisible();
 });

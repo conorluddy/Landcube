@@ -7,6 +7,10 @@
   border: 0;
 }
 
+.lc-group + .lc-group {
+  margin-top: var(--lc-s-10);
+}
+
 .lc-group__legend,
 .lc-group__visually-hidden {
   position: absolute;
