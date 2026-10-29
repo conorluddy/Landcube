@@ -20,6 +20,7 @@ import {
 import { Button, Group, Hint, NumberField, Range, Select, Toggle } from './fields';
 import { ExportPanel } from './export-panel';
 import { FramePanel } from './frame-panel';
+import { PlaceSearchField } from './place-search-field';
 import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
 
@@ -302,6 +303,12 @@ function Studio({
           >
             Coordinates
           </button>
+        </div>
+        <div
+          className={`header-place-search${state.source.selected === 'real' ? ' is-open' : ''}`}
+          inert={state.source.selected !== 'real'}
+        >
+          <PlaceSearchField controller={c} compact />
         </div>
         <div className="header-actions">
           <button
