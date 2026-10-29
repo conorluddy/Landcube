@@ -10,6 +10,7 @@ export default defineConfig(
   globalIgnores([
     'dist/',
     'dist-cli/',
+    'dist-specimens/',
     '.cache/',
     'test-results/',
     'playwright-report/',

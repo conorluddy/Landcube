@@ -1,0 +1,32 @@
+/* Dev-only layout for specimens.html; never imported by the app. */
+body {
+  margin: 0;
+  background: var(--lc-ink-0);
+  color: var(--lc-text-body);
+  font-family: var(--lc-font-sans);
+}
+
+.specimens {
+  padding: var(--lc-s-10);
+}
+
+.specimens h2 {
+  margin: var(--lc-s-10) 0 var(--lc-s-6);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  font-weight: 400;
+  letter-spacing: var(--lc-track-head);
+  text-transform: uppercase;
+}
+
+.specimens__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-s-8);
+  align-items: flex-start;
+}
+
+.specimens article {
+  padding: var(--lc-s-6);
+  background: var(--lc-ink-0);
+}
