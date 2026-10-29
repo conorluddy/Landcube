@@ -20,6 +20,7 @@ import { buildTerrainGroups } from './control-groups/terrain';
 import { getGroupCode, studioSections } from './sections';
 import { StudioHeader } from './studio-header';
 import { StudioFooter } from './studio-footer';
+import { ViewportStates } from './viewport-states';
 import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
 
@@ -199,6 +200,7 @@ function Studio({
         ref={viewport}
         aria-label={`${state.workspace.view.toUpperCase()} landscape viewport`}
       />
+      <ViewportStates controller={c} state={state} />
       <InspectorPanel
         id={inspectorId}
         label="Landscape controls"

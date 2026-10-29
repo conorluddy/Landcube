@@ -2,6 +2,7 @@ import type { RealContourInterval } from './real-terrain-contours';
 import { realTerrainBounds } from './constants/real-terrain';
 import { getMercatorSpanFraction, getMercatorX, getMercatorY } from './real-terrain-projection';
 import { preprocessElevations } from './elevation-preprocessing';
+import { TerrainLoadError } from './terrain-load-error';
 
 export interface RealTerrain {
   sample: (x: number, y: number, width: number, height: number) => number;
@@ -26,6 +27,9 @@ export interface DecodedTerrainTile {
 }
 
 /** Keeps fetching and image decoding platform-specific while sharing terrain sampling. */
+/** Called with 0 of N before the first tile, then once per tile that finishes. */
+export type TerrainLoadProgressReporter = (loadedTiles: number, totalTiles: number) => void;
+
 export type TerrainTileLoader = (tileUrl: string) => Promise<DecodedTerrainTile>;
 
 const tileSizePixels = 256;
@@ -43,6 +47,7 @@ export async function loadRealTerrain(
   loadTile: TerrainTileLoader,
   elevationFloor?: number,
   maxDepth?: number,
+  onProgress?: TerrainLoadProgressReporter,
 ): Promise<RealTerrain> {
   if (
     !Number.isFinite(latitude) ||
@@ -55,7 +60,8 @@ export async function loadRealTerrain(
     spanKm < realTerrainBounds.minimumSpanKm ||
     spanKm > realTerrainBounds.maximumSpanKm
   ) {
-    throw new Error(
+    throw new TerrainLoadError(
+      'locationOutOfRange',
       'Use latitude −85 to 85, longitude −180 to 180, and an area width of 2–200 km.',
     );
   }
@@ -64,11 +70,17 @@ export async function loadRealTerrain(
     elevationFloor !== undefined &&
     (!Number.isFinite(elevationFloor) || elevationFloor < -11000 || elevationFloor > 8900)
   ) {
-    throw new Error('Elevation floor must be between −11000 and 8900 meters.');
+    throw new TerrainLoadError(
+      'locationOutOfRange',
+      'Elevation floor must be between −11000 and 8900 meters.',
+    );
   }
 
   if (maxDepth !== undefined && (!Number.isFinite(maxDepth) || maxDepth < 0 || maxDepth > 11000)) {
-    throw new Error('Maximum depth must be between 0 and 11000 meters.');
+    throw new TerrainLoadError(
+      'locationOutOfRange',
+      'Maximum depth must be between 0 and 11000 meters.',
+    );
   }
 
   const effectiveFloor =
@@ -90,6 +102,7 @@ export async function loadRealTerrain(
   const elevations = new Float64Array(columns * rows);
   const requests: Promise<void>[] = [];
   const credits = new Set<string>();
+  let loadedTileCount = 0;
 
   for (let y = startY; y <= endY; y++) {
     for (let x = startX; x <= endX; x++) {
@@ -97,6 +110,7 @@ export async function loadRealTerrain(
     }
   }
 
+  onProgress?.(0, requests.length);
   await Promise.all(requests);
 
   elevations.set(preprocessElevations(elevations, columns, rows).values);
@@ -194,7 +208,7 @@ export async function loadRealTerrain(
     }
 
     if (tile.pixels.length !== tileSizePixels * tileSizePixels * 4) {
-      throw new Error('Terrain tile has unexpected dimensions.');
+      throw new TerrainLoadError('tileDecodeFailed', 'Terrain tile has unexpected dimensions.');
     }
 
     for (let row = 0; row < tileSizePixels; row++) {
@@ -210,6 +224,8 @@ export async function loadRealTerrain(
         );
       }
     }
+
+    onProgress?.(++loadedTileCount, requests.length);
   }
 }
 

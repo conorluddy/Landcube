@@ -1,9 +1,19 @@
+import { TerrainLoadError } from './terrain-load-error';
+
 const terrainTileTimeoutMs = 20_000;
 
 /** Downloads public elevation tiles with actionable errors shared by both platforms. */
-export async function downloadTerrainTile(tileUrl: string): Promise<Response> {
+export async function downloadTerrainTile(
+  tileUrl: string,
+  cancelSignal?: AbortSignal,
+): Promise<Response> {
+  const timeoutSignal = AbortSignal.timeout(terrainTileTimeoutMs);
+
   try {
-    const response = await fetch(tileUrl, { signal: AbortSignal.timeout(terrainTileTimeoutMs) });
+    const response = await fetch(tileUrl, {
+      signal:
+        cancelSignal === undefined ? timeoutSignal : AbortSignal.any([timeoutSignal, cancelSignal]),
+    });
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status} ${response.statusText}`.trim());
@@ -26,7 +36,8 @@ export async function downloadTerrainTile(tileUrl: string): Promise<Response> {
       cause = cause.cause;
     }
 
-    throw new Error(
+    throw new TerrainLoadError(
+      'tileDownloadFailed',
       `Terrain tile download failed (${tileUrl}): ${details.join(' — ') || 'Unknown network error'}. Check your connection and retry.`,
       { cause: error },
     );

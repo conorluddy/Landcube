@@ -1,0 +1,67 @@
+/* O-10 TileResolve: hairline tile grid filling from the centre, with a 1px bone scan-line sweep. */
+.lc-tile-resolve {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.lc-tile-resolve__grid {
+  display: grid;
+  grid-template-columns: repeat(var(--lc-tile-columns), 1fr);
+  grid-template-rows: repeat(var(--lc-tile-rows), 1fr);
+  width: 100%;
+  height: 100%;
+}
+
+.lc-tile-resolve__cell {
+  border: 0.5px solid var(--lc-line);
+  transition: background var(--lc-dur) var(--lc-ease);
+}
+
+.lc-tile-resolve__cell[data-resolved='true'] {
+  background: var(--lc-fill-hover);
+}
+
+.lc-tile-resolve__sweep {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--lc-bone);
+  box-shadow: 0 0 12px 2px var(--lc-line-hover);
+  animation: lc-tile-resolve-sweep 2.4s linear infinite;
+}
+
+@keyframes lc-tile-resolve-sweep {
+  from {
+    top: 0;
+  }
+
+  to {
+    top: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-tile-resolve__sweep {
+    animation: none;
+    opacity: 0;
+  }
+
+  .lc-tile-resolve__cell {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-tile-resolve__cell {
+    border-color: CanvasText;
+  }
+
+  .lc-tile-resolve__sweep {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+}

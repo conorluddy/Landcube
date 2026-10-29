@@ -1,0 +1,43 @@
+/* C-16 EmptyState: dashed hairline box, centred stack. */
+.lc-empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-4);
+  align-items: center;
+  min-width: 0;
+  padding: var(--lc-s-9) var(--lc-s-8);
+  border: 1px dashed var(--lc-line-strong);
+  border-radius: var(--lc-r-control);
+  text-align: center;
+}
+
+.lc-empty-state__glyph {
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-title);
+  font-weight: 300;
+  line-height: 1;
+}
+
+.lc-empty-state__title {
+  margin: 0;
+  color: var(--lc-text-strong);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-label);
+  text-transform: uppercase;
+}
+
+.lc-empty-state__body {
+  color: var(--lc-text-secondary);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-hint);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+@media (forced-colors: active) {
+  .lc-empty-state {
+    border-color: CanvasText;
+  }
+}

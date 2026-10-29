@@ -13,6 +13,8 @@ import {
 import type { RoadDetail } from '../../types/roads';
 import type { ControlGroupDefinition } from '../../ui/control-rows';
 import { describeRoadNetwork, type StudioController, type StudioState } from '../controller';
+import { operationErrorCodes } from '../../constants/operations';
+import { getFault } from '../../constants/faults';
 import { buttonRow, colourRow, hintRow, selectRow, statusRow, toggleRow } from '../control-rows';
 
 // === PUBLIC API ===
@@ -93,7 +95,11 @@ export function buildRoadsGroup(
         },
       },
       statusRow('roads-status', {
-        kind: 'info',
+        kind: state.roads.hasFailed && !state.roads.loading ? 'fault' : 'info',
+        code:
+          state.roads.hasFailed && !state.roads.loading
+            ? getFault(operationErrorCodes.mapDataFailed).code
+            : undefined,
         isAlwaysMounted: true,
         ref: roadsStatusRef,
         tabIndex: -1,
