@@ -7,6 +7,8 @@ export interface SegmentedOption<T extends string> {
   label: string;
   /** Shown as the native tooltip; the visible label stays the accessible name. */
   description?: string;
+  /** Accessible name when the visible label is a glyph (↻) that a screen reader cannot speak. */
+  accessibleLabel?: string;
 }
 
 export interface SegmentedProps<T extends string> {
@@ -83,6 +85,7 @@ export function Segmented<T extends string>({
             type="button"
             aria-pressed={option.value === value}
             tabIndex={index === tabStopIndex ? 0 : -1}
+            aria-label={option.accessibleLabel}
             title={option.description}
             disabled={disabled}
             onClick={() => {

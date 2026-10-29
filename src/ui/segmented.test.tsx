@@ -92,3 +92,19 @@ void test('Segmented disables every option and records its size', () => {
   assert.match(markup, /data-size="large"/);
   assert.equal(markup.match(/disabled=""/g)?.length, 2);
 });
+
+void test('Segmented gives a glyph option its accessible label', () => {
+  const markup = renderMarkup(
+    <Segmented
+      label="Turn direction"
+      value="cw"
+      options={[
+        { value: 'ccw', label: '↺', accessibleLabel: 'Counterclockwise' },
+        { value: 'cw', label: '↻', accessibleLabel: 'Clockwise' },
+      ]}
+      onChange={() => undefined}
+    />,
+  );
+
+  assert.match(markup, /aria-label="Clockwise"/);
+});

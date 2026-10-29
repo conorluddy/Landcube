@@ -96,7 +96,7 @@ test('an empty optional number field shows the dash placeholder', async ({ page 
   await expect(specimen.getByLabel('Width')).toHaveAttribute('placeholder', '—');
 });
 
-test('field pair stacks when its container is under 300px', async ({ page }) => {
+test('field pair stacks when its container is under 240px', async ({ page }) => {
   await serveSpecimens(page);
   await page.goto(`${specimensUrl}specimens.html?only=field-pair`);
   const columnCount = (key: string): Promise<number> =>

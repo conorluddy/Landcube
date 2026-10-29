@@ -5,6 +5,9 @@
  */
 import type { ControlGroupDefinition } from '../../ui/control-rows';
 import type { StudioController, StudioState } from '../controller';
+import { buildCameraGroups } from './camera';
+import { buildFrameGroups } from './frame';
+import { buildModelGroups } from './model';
 import { buildTerrainGroups } from './terrain';
 
 /**
@@ -17,4 +20,9 @@ export type ControlGroupBuilder = (
   state: StudioState,
 ) => ControlGroupDefinition[];
 
-export const controlGroupBuilders: readonly ControlGroupBuilder[] = [buildTerrainGroups];
+export const controlGroupBuilders: readonly ControlGroupBuilder[] = [
+  buildTerrainGroups,
+  buildCameraGroups,
+  buildModelGroups,
+  buildFrameGroups,
+];

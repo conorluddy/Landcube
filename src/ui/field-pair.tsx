@@ -4,7 +4,7 @@ export interface FieldPairProps {
   children: [ReactNode, ReactNode];
 }
 
-/** Two fields side by side (P-09); stacks when its container is narrower than 300px. */
+/** Two fields side by side (P-09); stacks when its container is narrower than 240px. */
 export function FieldPair({ children }: FieldPairProps): React.JSX.Element {
   return (
     <div className="lc-field-pair">

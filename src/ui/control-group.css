@@ -77,3 +77,19 @@
 .lc-group__link-glyph {
   flex: none;
 }
+
+/* Five- and six-column tiles are about 40px wide in the inspector: trim padding and type so words fit. */
+.lc-group .lc-choice-tiles:is([data-columns='5'], [data-columns='6']) .lc-choice-tiles__tile {
+  padding: var(--lc-s-3) var(--lc-s-1);
+  font-size: 10px;
+  line-height: 12px;
+}
+
+.lc-group .lc-choice-tiles:is([data-columns='5'], [data-columns='6']) .lc-choice-tiles__label {
+  overflow-wrap: normal;
+}
+
+/* Three mono-caps options ("Depth of field") must fit the 268px inspector without ellipsis. */
+.lc-inspector__body .lc-group .lc-segmented__item {
+  padding: 0 var(--lc-s-3);
+}
