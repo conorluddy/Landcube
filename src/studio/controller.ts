@@ -651,6 +651,7 @@ export function createStudioController(
       });
     },
     resetLighting() {
+      controller.daylightCycle({ enabled: false });
       controller.scene({
         lighting: {
           ...defaultTerrainLighting,

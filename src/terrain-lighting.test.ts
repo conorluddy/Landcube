@@ -32,6 +32,14 @@ void test('the daylight cycle spends most of its time in daylight and wraps thro
   assert.equal(getDaylightCycleLighting(1).timeOfDay, 5);
 });
 
+void test('the daylight cycle resumes from the selected time through the night', () => {
+  for (const hour of [0, 2, 4.5, 5, 12, 21, 23]) {
+    assert.ok(
+      Math.abs(getDaylightCycleLighting(getDaylightCyclePhase(hour)).timeOfDay - hour) < 1e-9,
+    );
+  }
+});
+
 void test('lighting defaults reveal natural materials and hemisphere suggestions use compass bearings', () => {
   assert.equal(defaultTerrainLighting.fill, 0.7);
   assert.equal(getSuggestedTerrainLightDirection(53), 120);

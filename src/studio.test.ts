@@ -348,6 +348,19 @@ void test('daylight cycle sweeps the sun until a manual lighting edit pauses it'
   assert.equal(c.getSnapshot().scene.lighting.timeOfDay, 12);
 });
 
+void test('resetting lighting pauses the daylight cycle', (t) => {
+  const { controller: c } = setup();
+
+  t.mock.timers.enable({ apis: ['setInterval', 'Date'] });
+  c.daylightCycle({ enabled: true });
+  c.resetLighting();
+  const reset = c.getSnapshot().scene.lighting;
+
+  t.mock.timers.tick(5000);
+  assert.equal(c.getSnapshot().scene.daylightCycle.enabled, false);
+  assert.deepEqual(c.getSnapshot().scene.lighting, reset);
+});
+
 void test('road edits restyle without refetching and a superseded download never reaches the new place', async (t) => {
   const requests: ((elements: unknown[]) => void)[] = [];
   const { controller: c, effects } = setup(

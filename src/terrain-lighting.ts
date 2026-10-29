@@ -181,9 +181,18 @@ export function getDaylightCycleLighting(
 
 /** Starts a cycle where the current time already sits, so enabling it never jumps. */
 export function getDaylightCyclePhase(timeOfDay: number): number {
-  const daylightProgress = (timeOfDay - daylightStartHour) / daylightHours;
+  const hour = ((timeOfDay % 24) + 24) % 24;
+  const daylightProgress = (hour - daylightStartHour) / daylightHours;
 
-  return daylightProgress >= 0 && daylightProgress < 1 ? daylightProgress * daylightShare : 0;
+  if (daylightProgress >= 0 && daylightProgress < 1) {
+    return daylightProgress * daylightShare;
+  }
+
+  const nightStartHour = daylightStartHour + daylightHours;
+  const nightHours = 24 - daylightHours;
+  const hoursSinceNightStart = (hour - nightStartHour + 24) % 24;
+
+  return daylightShare + (hoursSinceNightStart / nightHours) * (1 - daylightShare);
 }
 
 // === HELPERS ===
