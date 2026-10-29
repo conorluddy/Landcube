@@ -53,6 +53,16 @@
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
 }
+/* Light theme: the remaining legacy surfaces (Orbit popover, dialogs) follow the light tokens; the rest stays provisional. */
+:root[data-theme='light'] {
+  --legacy-text: var(--lc-text-primary);
+  --legacy-label-text: var(--lc-text-body);
+  --legacy-muted-label: var(--lc-text-tertiary);
+  --legacy-dialog-fill: #f6f6f4f5;
+  --legacy-scrim: #f6f6f480;
+  --legacy-shadow-ink-soft: #00000026;
+  --legacy-shadow-ink-strong: #00000033;
+}
 * {
   box-sizing: border-box;
 }
@@ -563,6 +573,19 @@ body,
   flex: none;
   color: var(--lc-text-strong);
   text-decoration: none;
+}
+/* The theme toggle is a 44px glass IconButton elsewhere; inside the 36px footer it shrinks to a bare square. */
+.studio-footer .lc-icon-button {
+  width: var(--lc-h-s);
+  height: var(--lc-h-s);
+  background: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  font-size: 11px;
+}
+.studio-footer .lc-icon-button[aria-pressed='true'] {
+  background: var(--lc-bone);
 }
 .studio-status a:hover {
   color: var(--lc-text-primary);

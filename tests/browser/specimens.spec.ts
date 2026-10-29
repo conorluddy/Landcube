@@ -4,12 +4,16 @@ import { serveSpecimens, specimensUrl } from './specimens-fixture';
 interface MediaMode {
   suffix: string;
   media: Parameters<Page['emulateMedia']>[0];
+  /** Query string for the specimens page, e.g. `?theme=light`. */
+  query?: string;
 }
 
 const mediaModes: MediaMode[] = [
   { suffix: '', media: {} },
   { suffix: '-reduced-motion', media: { reducedMotion: 'reduce' } },
   { suffix: '-forced-colors', media: { forcedColors: 'active' } },
+  // Light theme (provisional) in default media only, to keep the extra runtime near 30s.
+  { suffix: '-light', media: {}, query: '?theme=light' },
 ];
 
 // Screenshot baselines are generated on macOS and checked by the pre-commit hook; CI renders differently, so it skips them.
@@ -27,11 +31,11 @@ test('specimens page loads Geist and Geist Mono', async ({ page }) => {
   expect(await page.evaluate(() => document.fonts.check('10px "Geist"'))).toBe(true);
 });
 
-// One test per media mode: new components add specimens, not test code.
-for (const { suffix, media } of mediaModes) {
+// One test per media mode (and the light theme): new components add specimens, not test code.
+for (const { suffix, media, query = '' } of mediaModes) {
   test(`every specimen matches its screenshot${suffix || ' (default media)'}`, async ({ page }) => {
     await page.emulateMedia(media);
-    await page.goto(`${specimensUrl}specimens.html`);
+    await page.goto(`${specimensUrl}specimens.html${query}`);
     await page.evaluate(() => document.fonts.ready);
 
     const articles = page.locator('[data-specimen]');

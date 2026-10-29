@@ -1,0 +1,53 @@
+/*
+ * Light theme completion (provisional). `tokens.css` stays a byte copy of the design handoff, so
+ * the tokens its light block leaves out, and the contrast corrections, live here. Loaded after
+ * `tokens.css`; both blocks are parsed together by `tokens.test.ts`.
+ */
+
+:root {
+  color-scheme: dark;
+  --lc-theme-color: #202326; /* browser chrome tint; the studio replaces it with the design background */
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --lc-theme-color: #f6f6f4;
+
+  /* Contrast: tertiary/quiet darkened so they hold 3:1 on glass over the darkest default canvas. */
+  --lc-text-tertiary: #5f6266;
+  --lc-text-quiet: #6d7074;
+
+  /* Ramp steps that components read directly */
+  --lc-ink-1: #f6f6f4; /* glass base: select menus, reduced-transparency fallbacks */
+  --lc-white: #000000; /* "hover on bone" inverts with bone */
+  --lc-ring-thumb: 0 0 0 2px rgba(246, 246, 244, 0.8);
+
+  /* Elevation and scrims */
+  --lc-shadow-bar: 0 18px 40px -18px rgba(0, 0, 0, 0.3);
+  --lc-shadow-card: 0 24px 48px -18px rgba(0, 0, 0, 0.3);
+  --lc-scrim: rgba(246, 246, 244, 0.5);
+  --lc-crop-surround: rgba(246, 246, 244, 0.5);
+  --lc-ticks: repeating-linear-gradient(90deg, rgba(14, 15, 16, 0.3) 0 1px, transparent 1px 10%);
+
+  /* Signal accent: phosphor is unreadable on light glass, so it darkens; amber already holds. */
+  --lc-signal-amber: #c2410c;
+  --lc-signal-phosphor: #4d7c0f;
+}
+
+/* HUD marks sit on the canvas (the design background, not the theme) and follow `data-canvas-tone`.
+   On a dark canvas the hairline must stay light even though bone inverts in the light theme. */
+:root[data-theme='light'] .lc-hud-layer[data-canvas-tone='dark'] {
+  --lc-hud-hairline: rgba(242, 242, 240, 0.28);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  :root[data-theme='light'] .lc-glass {
+    background: rgba(246, 246, 244, 0.97);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-theme='light'] .lc-glass {
+    background: rgba(246, 246, 244, 0.97);
+  }
+}
