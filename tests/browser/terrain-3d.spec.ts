@@ -416,7 +416,7 @@ test('mapped roads retry after a busy service, restyle without refetching and cr
   await page.keyboard.press('Enter');
   await expect(page.getByRole('status').filter({ hasText: /mapped road/ })).toBeFocused();
   await expect(page.getByText('1 mapped road · 1 bridge and 0 tunnels hidden.')).toBeVisible();
-  await page.getByLabel('Detail').selectOption('tracks');
+  await page.getByLabel('Detail', { exact: true }).selectOption('tracks');
   await expect(page.getByText('2 mapped roads · 1 bridge and 0 tunnels hidden.')).toBeVisible();
   await page.getByLabel('Road width').fill('2');
   await page.getByRole('switch', { name: 'Mapped roads', exact: true }).uncheck();

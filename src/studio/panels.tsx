@@ -39,6 +39,7 @@ import {
 import { getTerrainWaterColor } from '../terrain-water';
 import type { DesignSettings } from '../types/design';
 import type { RoadDetail } from '../types/roads';
+import type { TerrainDetail } from '../types/terrain';
 import type { GrassPresetKey } from '../types/grass';
 import { grassPresets } from '../constants/grass';
 import {
@@ -250,6 +251,15 @@ export function TerrainPanel({ controller: c, state: s }: PanelProps): ReactNode
             displayValue={`${source.spanKm} km`}
             onChange={(index) => {
               c.source({ spanKm: realTerrainSpanStopsKm[index] });
+            }}
+          />
+          <Select
+            id="terrain-detail"
+            label="Elevation detail"
+            value={source.detail}
+            options={terrainDetailOptions}
+            onChange={(detail) => {
+              c.source({ detail });
             }}
           />
           <NumberField
@@ -1124,6 +1134,13 @@ function GrassGroup({ controller: c, state: s }: PanelProps): ReactNode {
     </Group>
   );
 }
+
+/** Max downloads more tiles and samples densely, so the label warns that it is slower. */
+const terrainDetailOptions: readonly { value: TerrainDetail; label: string }[] = [
+  { value: 'standard', label: 'Standard' },
+  { value: 'high', label: 'High' },
+  { value: 'max', label: 'Max (slower)' },
+];
 
 const roadDetailOptions: readonly { value: RoadDetail; label: string }[] = [
   { value: 'major', label: 'Major roads' },

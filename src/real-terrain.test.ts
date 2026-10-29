@@ -3,7 +3,19 @@ import { access } from 'node:fs/promises';
 import test from 'node:test';
 import { validateDesignSettings } from './design-settings';
 import type { RealTerrain, TerrainTileLoader } from './real-terrain';
-import { decodeTerrariumElevation, loadRealTerrain } from './real-terrain';
+import {
+  boxFilterElevations,
+  decodeTerrariumElevation,
+  loadRealTerrain,
+  selectTerrainZoom,
+} from './real-terrain';
+import {
+  defaultNewTerrainDetail,
+  getTerrainDetailProfile,
+  maximumConcurrentTileRequests,
+  maximumTerrainTileZoom,
+} from './constants/terrain-detail';
+import { getMercatorSpanFraction } from './real-terrain-projection';
 import { createOutputRenderer } from './export/image-export';
 import { engineConfiguration } from './constants/engine';
 import { bundledTerrainTileSources } from './constants/bundled-terrain-tiles';
@@ -49,7 +61,7 @@ const unusedTileLoader: TerrainTileLoader = () =>
 void test('invalid geographic bounds fail before requesting tiles', async () => {
   await assert.rejects(loadRealTerrain(90, 0, 25, unusedTileLoader), /latitude/);
   await assert.rejects(loadRealTerrain(53, NaN, 25, unusedTileLoader), /longitude/);
-  await assert.rejects(loadRealTerrain(53, -6, 0, unusedTileLoader), /2–200/);
+  await assert.rejects(loadRealTerrain(53, -6, 0, unusedTileLoader), /2–800/);
 });
 
 void test('fixture-backed terrain uses decoded pixels, normalized sampling, and source attribution', async () => {
@@ -245,18 +257,154 @@ void test('bundled tiles cover exactly the default location and exist on disk', 
   const requestedTileKeys: string[] = [];
   const { latitude, longitude, spanKm } = defaultRealTerrainPreset;
 
-  await loadRealTerrain(latitude, longitude, spanKm, (tileUrl) => {
-    requestedTileKeys.push(tileUrl.replace(/^.*\/terrarium\/|\.png$/g, ''));
+  await loadRealTerrain(
+    latitude,
+    longitude,
+    spanKm,
+    (tileUrl) => {
+      requestedTileKeys.push(tileUrl.replace(/^.*\/terrarium\/|\.png$/g, ''));
 
-    return Promise.resolve({
-      pixels: new Uint8Array(terrainTilePixelCount),
-      imagerySources: '',
-    });
-  });
+      return Promise.resolve({
+        pixels: new Uint8Array(terrainTilePixelCount),
+        imagerySources: '',
+      });
+    },
+    undefined,
+    undefined,
+    // A fresh studio visit opens at the default detail and design size.
+    {
+      detail: defaultNewTerrainDetail,
+      frame: versionOneDesignDefaults,
+      tileBudget: getTerrainDetailProfile(defaultNewTerrainDetail)?.tileBudget.browser,
+    },
+  );
 
   assert.deepEqual(requestedTileKeys.sort(), Object.keys(bundledTerrainTileSources).sort());
 
   for (const tileKey of requestedTileKeys) {
     await access(new URL(`../public/terrain-tiles/${tileKey}.png`, import.meta.url));
   }
+});
+
+const flatTileLoader: TerrainTileLoader = () =>
+  Promise.resolve({ pixels: new Uint8Array(terrainTilePixelCount), imagerySources: 'eudem' });
+
+void test('standard detail keeps the version-one zoom for every preset', () => {
+  for (const preset of realTerrainPresets) {
+    const spanFraction = getMercatorSpanFraction(preset.latitude, preset.spanKm);
+    const legacy = Math.max(0, Math.min(14, Math.floor(Math.log2(2 / spanFraction))));
+
+    for (const detail of [undefined, 'standard'] as const) {
+      assert.equal(
+        selectTerrainZoom(preset.latitude, preset.longitude, preset.spanKm, { detail }),
+        legacy,
+        preset.name,
+      );
+    }
+  }
+});
+
+void test('higher detail fetches deeper zooms sized to the output frame', () => {
+  const { latitude, longitude } = defaultRealTerrainPreset;
+  const frame = { width: 1440, height: 900 };
+  const standard = selectTerrainZoom(latitude, longitude, 8);
+  const high = selectTerrainZoom(latitude, longitude, 8, { detail: 'high', frame });
+  const max = selectTerrainZoom(latitude, longitude, 8, { detail: 'max', frame });
+
+  assert.equal(standard, 12);
+  assert.equal(high, 13);
+  assert.equal(max, 15);
+  assert.ok(
+    selectTerrainZoom(latitude, longitude, 8, {
+      detail: 'high',
+      frame: { width: 480, height: 320 },
+    }) < high,
+  );
+});
+
+void test('tile budgets step the zoom down without dropping below standard', () => {
+  const ireland = realTerrainPresets.find(({ name }) => name === 'Ireland');
+
+  assert.ok(ireland);
+  const { latitude, longitude, spanKm } = ireland;
+  const frame = { width: 4096, height: 2560 };
+  const generous = selectTerrainZoom(latitude, longitude, spanKm, {
+    detail: 'max',
+    frame,
+    tileBudget: 10_000,
+  });
+  const tight = selectTerrainZoom(latitude, longitude, spanKm, {
+    detail: 'max',
+    frame,
+    tileBudget: 16,
+  });
+  const none = selectTerrainZoom(latitude, longitude, spanKm, {
+    detail: 'max',
+    frame,
+    tileBudget: 0,
+  });
+
+  assert.ok(tight < generous);
+  assert.equal(none, selectTerrainZoom(latitude, longitude, spanKm));
+});
+
+void test('detail never requests zooms Terrarium does not serve', () => {
+  assert.equal(
+    selectTerrainZoom(46, 7, 2, { detail: 'max', frame: { width: 12288, height: 12288 } }),
+    maximumTerrainTileZoom,
+  );
+});
+
+void test('detail terrain carries its sampling while standard terrain stays version one', async () => {
+  const standard = await loadRealTerrain(0, 0, 2, flatTileLoader);
+  const high = await loadRealTerrain(0, 0, 2, flatTileLoader, undefined, undefined, {
+    detail: 'high',
+  });
+
+  assert.equal(standard.detail, undefined);
+  assert.equal(standard.sampling, undefined);
+  assert.equal(high.detail, 'high');
+  assert.deepEqual(high.sampling, getTerrainDetailProfile('high')?.sampling);
+});
+
+void test('box filtering averages full and partial edge blocks', () => {
+  const filtered = boxFilterElevations(Float64Array.from([1, 3, 5, 7, 9, 11, 13, 15, 17]), 3, 3, 2);
+
+  assert.equal(filtered.columns, 2);
+  assert.equal(filtered.rows, 2);
+  assert.deepEqual([...filtered.values], [5, 8, 14, 17]);
+});
+
+void test('tile downloads stay within the concurrency limit and credit in a stable order', async () => {
+  let inFlight = 0;
+  let peak = 0;
+  let calls = 0;
+  const attributions = new Set<string>();
+
+  for (const reverse of [false, true]) {
+    const loader: TerrainTileLoader = async () => {
+      const call = calls++;
+
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      // Later tiles finish first on one pass and last on the other.
+      await new Promise((resolve) => setTimeout(resolve, reverse ? 20 - (call % 20) : call % 20));
+      inFlight--;
+
+      return {
+        pixels: new Uint8Array(terrainTilePixelCount),
+        imagerySources: call % 2 ? 'srtm' : 'eudem',
+      };
+    };
+
+    const terrain = await loadRealTerrain(53, -8, 400, loader, undefined, undefined, {
+      detail: 'high',
+    });
+
+    attributions.add(terrain.attribution);
+  }
+
+  assert.ok(calls > maximumConcurrentTileRequests * 2, `only ${calls.toString()} tiles`);
+  assert.equal(peak, maximumConcurrentTileRequests);
+  assert.equal(attributions.size, 1);
 });

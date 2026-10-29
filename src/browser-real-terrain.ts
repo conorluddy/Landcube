@@ -1,7 +1,8 @@
 import { downloadTerrainTile } from './terrain-tile-download';
 import { bundledTerrainTileSources } from './constants/bundled-terrain-tiles';
 import { loadRealTerrain as loadTerrainFromTiles } from './real-terrain';
-import type { DecodedTerrainTile, RealTerrain } from './real-terrain';
+import type { DecodedTerrainTile, RealTerrain, RealTerrainDetailOptions } from './real-terrain';
+import { getTerrainDetailProfile } from './constants/terrain-detail';
 
 const terrainTileSizePixels = 256;
 /** Terrarium tiles are immutable; bump the version only if the cached format changes. */
@@ -15,7 +16,12 @@ export async function loadBrowserRealTerrain(
   spanKm: number,
   elevationFloor?: number,
   maxDepth?: number,
+  options: Omit<RealTerrainDetailOptions, 'tileBudget'> = {},
 ): Promise<RealTerrain> {
+  if (getTerrainDetailProfile(options.detail)) {
+    requestPersistentTileStorage();
+  }
+
   return loadTerrainFromTiles(
     latitude,
     longitude,
@@ -23,7 +29,28 @@ export async function loadBrowserRealTerrain(
     decodeBrowserTerrainTile,
     elevationFloor,
     maxDepth,
+    { ...options, tileBudget: getTerrainDetailProfile(options.detail)?.tileBudget.browser },
   );
+}
+
+let persistentStorageRequested = false;
+
+/**
+ * Detail loads cache many more tiles; persistent storage asks the browser not to evict them.
+ * Best effort: browsers may decline or never prompt, and the cache still works either way.
+ */
+function requestPersistentTileStorage(): void {
+  // Older browsers, insecure origins and test runtimes lack the Storage API altogether.
+  if (
+    persistentStorageRequested ||
+    !('storage' in navigator) ||
+    !('persist' in navigator.storage)
+  ) {
+    return;
+  }
+
+  persistentStorageRequested = true;
+  navigator.storage.persist().catch(() => false);
 }
 
 /** Downloads and decodes a Terrarium tile through browser canvas APIs. */

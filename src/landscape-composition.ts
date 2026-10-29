@@ -9,7 +9,7 @@ import {
   getRealContourElevations,
 } from './real-terrain-contours';
 import { deriveTerrainConfiguration } from './design-settings';
-import { createTerrainSampler, sampleTerrain } from './terrain-generation';
+import { createTerrainSampler, resolveTerrainSampling, sampleTerrain } from './terrain-generation';
 import type { Contour } from './types/contours';
 import type { DesignSettings } from './types/design';
 import type { EngineConfiguration } from './types/terrain';
@@ -49,7 +49,10 @@ export function generateLandscapeGeometry(
   engineConfiguration: Readonly<EngineConfiguration>,
   realTerrain?: RealTerrain,
 ): { contours: Contour[]; summits: ContourPoint[]; seaLevel?: SeaLevelGeometry } {
-  const terrainSettings = deriveTerrainConfiguration(settings, engineConfiguration);
+  const terrainSettings = resolveTerrainSampling(
+    deriveTerrainConfiguration(settings, engineConfiguration),
+    realTerrain,
+  );
   const field = sampleTerrain(
     realTerrain
       ? (x, y) => realTerrain.sample(x, y, settings.width, settings.height)

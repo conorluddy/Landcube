@@ -40,7 +40,9 @@ import {
 } from '../constants/real-terrain';
 import { loadBrowserRealTerrain } from '../browser-real-terrain';
 import { validateRealContourInterval } from '../real-terrain-contours';
-import type { RealTerrain } from '../real-terrain';
+import { selectTerrainZoom, type RealTerrain } from '../real-terrain';
+import { defaultNewTerrainDetail, getTerrainDetailProfile } from '../constants/terrain-detail';
+import type { TerrainDetail } from '../types/terrain';
 import type { DesignSettings, ValidatedDesignSettings } from '../types/design';
 import type { Result } from '../types/operations';
 import type { WaterStyle } from '../terrain-3d';
@@ -130,6 +132,8 @@ export interface TerrainSourceState {
   spanKm: number;
   maxDepth: number;
   elevationFloor?: number;
+  /** Source tiles and sampling density; never shared in design links. */
+  detail: TerrainDetail;
   interval: 'auto' | number;
   fixedInterval: number;
   hatching: boolean;
@@ -273,6 +277,7 @@ export function createStudioController(
       longitude: place.longitude,
       spanKm: place.spanKm,
       maxDepth: 50,
+      detail: defaultNewTerrainDetail,
       interval: 'auto',
       fixedInterval: 25,
       hatching: true,
@@ -893,7 +898,7 @@ export function createStudioController(
       }
 
       // Location fields edited since the parked load ask for a fresh load, not a stale restore.
-      if (parked?.fieldsKey !== getSourceFieldsKey(state.source)) {
+      if (parked?.fieldsKey !== getSourceFieldsKey(state.source, state.design)) {
         controller.source({ selected: 'real' });
         await controller.loadTerrain();
 
@@ -927,13 +932,14 @@ export function createStudioController(
           source.spanKm,
           source.elevationFloor,
           source.maxDepth,
+          { detail: source.detail, frame: state.design },
         );
 
         if (version !== requestVersion) {
           return;
         }
 
-        loadedFieldsKey = getSourceFieldsKey(source);
+        loadedFieldsKey = getSourceFieldsKey(source, state.design);
         saveSearchedPlace(searchedPlace, source);
         applySource(
           {
@@ -1066,13 +1072,23 @@ export function createStudioController(
 }
 
 /** Identifies the location fields a real-terrain load used; must list every input `loadTerrain` passes on. */
-function getSourceFieldsKey(source: TerrainSourceState): string {
+function getSourceFieldsKey(
+  source: TerrainSourceState,
+  frame: { width: number; height: number },
+): string {
   return JSON.stringify([
     source.latitude,
     source.longitude,
     source.spanKm,
     source.elevationFloor,
     source.maxDepth,
+    source.detail,
+    // Output size only matters through the tile zoom it selects.
+    selectTerrainZoom(source.latitude, source.longitude, source.spanKm, {
+      detail: source.detail,
+      frame,
+      tileBudget: getTerrainDetailProfile(source.detail)?.tileBudget.browser,
+    }),
   ]);
 }
 

@@ -14,8 +14,12 @@ import {
   validateDesignSettings,
 } from './design-settings';
 
-function setup(fetchRoads?: typeof fetch, placeStorage?: Pick<Storage, 'getItem' | 'setItem'>) {
-  const initial = parseDesignParameters(new URLSearchParams('v=1&seed=123&width=480&height=320'));
+function setup(
+  fetchRoads?: typeof fetch,
+  placeStorage?: Pick<Storage, 'getItem' | 'setItem'>,
+  designQuery = 'v=1&seed=123&width=480&height=320',
+) {
+  const initial = parseDesignParameters(new URLSearchParams(designQuery));
 
   assert.ok(initial.ok);
   let design = initial.data.settings;
@@ -231,7 +235,8 @@ void test('the tour waits when another terrain load is in flight', async (t) => 
 });
 
 void test('default location loads bundled tiles and credits only their recorded sources', async (t) => {
-  const { controller: c } = setup();
+  // The bundle matches a fresh visit: default detail at the default design size.
+  const { controller: c } = setup(undefined, undefined, 'v=1&seed=123');
   const requestedUrls: string[] = [];
 
   stubBrowserTileDecoding(t);

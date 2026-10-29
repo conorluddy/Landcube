@@ -7,9 +7,11 @@ import {
   formatDms,
   graticuleValues,
   latitudeFraction,
+  longitudeFraction,
   pickGraticuleStep,
   pickScaleDistanceKm,
 } from './floor-geo';
+import { projectToRealTerrainFrame } from './real-terrain-projection';
 
 const aso = boundsFromCenter(32.8842, 131.104, 25, 25);
 
@@ -78,8 +80,9 @@ void test('an off-center, non-square crop prints the bounds of the cropped area'
   assert.ok(place);
   assert.equal(place.widthKm, 8);
   assert.equal(place.lengthKm, 4);
-  assert.ok(Math.abs(place.bounds.north - (32.8842 + 8 / 111.32)) < 1e-9);
-  assert.ok(Math.abs(place.bounds.south - (32.8842 + 4 / 111.32)) < 1e-9);
+  // Mercator edges sit within 10 m of the flat-earth estimate at this scale.
+  assert.ok(Math.abs(place.bounds.north - (32.8842 + 8 / 111.32)) < 1e-4);
+  assert.ok(Math.abs(place.bounds.south - (32.8842 + 4 / 111.32)) < 1e-4);
   assert.equal(formatDms(place.bounds.north, 'lat'), '32°57′22″N');
   assert.equal(formatDms(place.bounds.south, 'lat'), '32°55′12″N');
   assert.equal(formatDms(place.bounds.west, 'lon'), '131°09′27″E');
@@ -96,7 +99,27 @@ void test('custom locations have no name or region', () => {
 
   assert.equal(place?.name, undefined);
   assert.equal(place?.region, undefined);
-  assert.equal(place?.latitude, 10);
+  assert.ok(Math.abs((place?.latitude ?? 0) - 10) < 1e-12);
+});
+
+void test('country-scale floor graticules land where the terrain projects them', () => {
+  const ireland = { location: { latitude: 53.41, longitude: -7.95 }, spanKm: 800 };
+  const frame = { width: 1440, height: 900 };
+  const place = createFloorPlace(ireland, { x: 0, y: 0, ...frame }, frame);
+
+  assert.ok(place);
+
+  for (const latitude of [51.45, 52.5, 53.41, 54.5, 55.38]) {
+    const { y } = projectToRealTerrainFrame(ireland, latitude, -7.95, frame);
+
+    assert.ok(Math.abs(latitudeFraction(place.bounds, latitude) - y / frame.height) < 1e-9);
+  }
+
+  for (const longitude of [-10.5, -7.95, -5.4]) {
+    const { x } = projectToRealTerrainFrame(ireland, 53.41, longitude, frame);
+
+    assert.ok(Math.abs(longitudeFraction(place.bounds, longitude) - x / frame.width) < 1e-9);
+  }
 });
 
 void test('sources without a location or a usable span have no floor place', () => {

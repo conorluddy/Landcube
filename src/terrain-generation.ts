@@ -10,6 +10,7 @@ import {
   unsignedIntegerRange,
 } from './constants/terrain';
 import type { HeightField, TerrainConfiguration } from './types/terrain';
+import type { RealTerrain } from './real-terrain';
 
 /** Mulberry32: deterministic, local randomness; no noise-library dependency. */
 export function createSeededRandomGenerator(seed: number): () => number {
@@ -124,13 +125,12 @@ export function createTerrainSampler(
   };
 }
 
-/** Samples beyond the frame while keeping memory within the engine budget. */
-export function sampleTerrain(
-  terrain: (x: number, y: number) => number,
+/** Spacing and dimensions `sampleTerrain` uses, doubling spacing until the sample budget fits. */
+export function getSampleGrid(
   width: number,
   height: number,
-  settings: Readonly<TerrainConfiguration>,
-): HeightField {
+  settings: Readonly<Pick<TerrainConfiguration, 'sampleSpacing' | 'overscan' | 'maxSamples'>>,
+): { spacing: number; columns: number; rows: number } {
   let spacing: number = settings.sampleSpacing;
   /** Includes overscan at the current sampling resolution. */
   const calculateSampleDimensions = () => ({
@@ -148,6 +148,25 @@ export function sampleTerrain(
     ({ columns, rows } = calculateSampleDimensions());
   }
 
+  return { spacing, columns, rows };
+}
+
+/** Real terrain loaded above standard detail brings its own, denser sampling. */
+export function resolveTerrainSampling(
+  settings: Readonly<TerrainConfiguration>,
+  realTerrain: Pick<RealTerrain, 'sampling'> | undefined,
+): Readonly<TerrainConfiguration> {
+  return realTerrain?.sampling ? { ...settings, ...realTerrain.sampling } : settings;
+}
+
+/** Samples beyond the frame while keeping memory within the engine budget. */
+export function sampleTerrain(
+  terrain: (x: number, y: number) => number,
+  width: number,
+  height: number,
+  settings: Readonly<TerrainConfiguration>,
+): HeightField {
+  const { spacing, columns, rows } = getSampleGrid(width, height, settings);
   const originX = -Math.ceil(settings.overscan / spacing) * spacing;
   const originY = originX;
   const values = new Float64Array(columns * rows);

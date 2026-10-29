@@ -2,10 +2,20 @@
 
 /** Terrarium tiles shipped in public/terrain-tiles, keyed by zoom/x/y, with their imagery sources. */
 export const bundledTerrainTileSources: Readonly<Record<string, string>> = {
-  '12/1954/1294': 'eudem/eudem_dem_5deg_n55w010.tif',
-  '12/1954/1295': 'eudem/eudem_dem_5deg_n50w010.tif, eudem/eudem_dem_5deg_n55w010.tif',
-  '12/1955/1294': 'eudem/eudem_dem_5deg_n55w010.tif',
-  '12/1955/1295': 'eudem/eudem_dem_5deg_n50w010.tif, eudem/eudem_dem_5deg_n55w010.tif',
-  '12/1956/1294': 'eudem/eudem_dem_5deg_n55w010.tif',
-  '12/1956/1295': 'eudem/eudem_dem_5deg_n50w010.tif, eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3909/2588': 'eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3909/2589': 'eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3909/2590': 'eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3909/2591': 'eudem/eudem_dem_5deg_n50w010.tif, eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3910/2588': 'eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3910/2589': 'eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3910/2590': 'eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3910/2591': 'eudem/eudem_dem_5deg_n50w010.tif, eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3911/2588': 'eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3911/2589': 'eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3911/2590': 'eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3911/2591': 'eudem/eudem_dem_5deg_n50w010.tif, eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3912/2588': 'eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3912/2589': 'eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3912/2590': 'eudem/eudem_dem_5deg_n55w010.tif',
+  '13/3912/2591': 'eudem/eudem_dem_5deg_n50w010.tif, eudem/eudem_dem_5deg_n55w010.tif',
 };

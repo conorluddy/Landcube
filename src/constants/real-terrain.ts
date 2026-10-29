@@ -5,15 +5,18 @@ export const realTerrainBounds = {
   minimumLongitude: -180,
   maximumLongitude: 180,
   minimumSpanKm: 2,
-  maximumSpanKm: 200,
+  maximumSpanKm: 800,
   defaultSpanKm: 25,
 } as const;
 
 /** Span slider stops: roughly logarithmic so small crops stay precise. Every preset span is a stop. */
 export const realTerrainSpanStopsKm = [
   2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90,
-  100, 120, 140, 160, 180, 200,
+  100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450, 500, 550, 600, 700, 800,
 ] as const;
+
+/** Shared by every loader and the CLI so the stated range always matches the enforced one. */
+export const realTerrainBoundsMessage = `Use latitude −85 to 85, longitude −180 to 180, and an area width of ${realTerrainBounds.minimumSpanKm}–${realTerrainBounds.maximumSpanKm} km.`;
 
 import type { LandscapeType } from '../terrain-elevation-gradient';
 
@@ -548,6 +551,23 @@ export const realTerrainPresets = [
     longitude: -5.3536,
     spanKm: 6,
     landscape: 'mediterranean',
+  },
+  // Whole islands; the landscape frame's short edge still covers Malin Head to Mizen Head.
+  {
+    name: 'Ireland',
+    country: 'Ireland',
+    latitude: 53.41,
+    longitude: -7.95,
+    spanKm: 800,
+    landscape: 'temperate',
+  },
+  {
+    name: 'Iceland',
+    country: 'Iceland',
+    latitude: 64.96,
+    longitude: -18.6,
+    spanKm: 600,
+    landscape: 'arctic',
   },
 ] as const satisfies readonly RealTerrainPreset[];
 
