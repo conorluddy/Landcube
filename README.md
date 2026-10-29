@@ -47,6 +47,8 @@ In 3D, **Model → Model dimensions** sets independent width and length in milli
 
 Real terrain is centered and cropped without stretching. Cursor deformation is available only for generated terrain; scale and detail also apply to generated terrain.
 
+Real terrain automatically repairs isolated elevation spikes and pits before rendering. This can change existing real-terrain output; points at the edge of a loaded area use only available neighbours, so repairs there may differ when the span changes.
+
 ## Use with an agent
 
 Ask for the image you want and where to save it. The skill generates an image and a matching JSON configuration for reproducible exports.

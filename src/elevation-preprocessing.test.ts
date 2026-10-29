@@ -21,6 +21,26 @@ void test('preserves a cliff with high ground on one side', () => {
   assert.equal(preprocessElevations(input, 3, 3).repairs['isolated-outliers'], 0);
 });
 
+void test('repairs isolated edge and corner pixels using available neighbours', () => {
+  for (const index of [0, 1, 4]) {
+    const grid = new Float64Array(9);
+
+    grid[index] = 1000;
+    assert.equal(preprocessElevations(grid, 3, 3).values[index], 0);
+  }
+});
+
+void test('uses pixels across tile boundaries in an assembled grid', () => {
+  const grid = new Float64Array(512 * 3);
+
+  grid[512 + 255] = 1832;
+  grid[512 + 256] = 1200;
+  const result = preprocessElevations(grid, 512, 3);
+
+  assert.equal(result.values[512 + 255], 0);
+  assert.equal(result.values[512 + 256], 0);
+});
+
 void test('checks the threshold and skips non-finite neighbours', () => {
   for (const [center, expected] of [
     [499, 0],
@@ -65,7 +85,9 @@ void test('applies the threshold to recorded Aran values with synthetic diagonal
       const [west, east, north, south] = sample.neighbors;
       const grid = Float64Array.from([0, north, 0, west, sample.center, east, 0, south, 0]);
 
-      assert.equal(preprocessElevations(grid, 3, 3).repairs['isolated-outliers'], expected);
+      const result = preprocessElevations(grid, 3, 3);
+
+      assert.equal(result.values[4] !== sample.center, expected === 1);
     }
   }
 });

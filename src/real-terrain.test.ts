@@ -24,6 +24,25 @@ void test('Terrarium decoding preserves sea level, negative heights and fraction
 
 const terrainTilePixelCount = 256 * 256 * 4;
 
+void test('real terrain repairs isolated source spikes before calculating its range', async () => {
+  const pixels = new Uint8Array(terrainTilePixelCount);
+
+  for (let offset = 0; offset < pixels.length; offset += 4) {
+    pixels[offset] = 128;
+  }
+
+  const spike = (128 * 256 + 128) * 4;
+
+  pixels[spike] = 135;
+  pixels[spike + 1] = 40;
+  const terrain = await loadRealTerrain(53.1203518, -9.7056319, 120, () =>
+    Promise.resolve({ pixels, imagerySources: 'eudem' }),
+  );
+
+  assert.equal(terrain.elevations?.maximumMeters, 0);
+  assert.equal(terrain.elevations.minimumMeters, 0);
+});
+
 const unusedTileLoader: TerrainTileLoader = () =>
   Promise.reject(new Error('Tile loading should not occur for invalid bounds'));
 
