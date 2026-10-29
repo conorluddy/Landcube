@@ -20,6 +20,28 @@ test.beforeEach(async ({ page }) => {
   await serveSpecimens(page);
 });
 
+// The dossier is the one component with a print stylesheet, so it alone gets a print pass.
+test('model-dossier specimens match their screenshots (print media)', async ({ page }) => {
+  await page.emulateMedia({ media: 'print' });
+  await page.goto(`${specimensUrl}specimens.html`);
+  await page.evaluate(() => document.fonts.ready);
+
+  const articles = page.locator('[data-specimen^="model-dossier/"]');
+  const count = await articles.count();
+
+  expect(count).toBeGreaterThan(0);
+
+  for (let index = 0; index < count; index++) {
+    const article = articles.nth(index);
+    const key = (await article.getAttribute('data-specimen')) ?? `unknown-${String(index)}`;
+
+    await expect(article).toHaveScreenshot(`${key.replaceAll('/', '--')}-print.png`, {
+      animations: 'disabled',
+      maxDiffPixels: 0,
+    });
+  }
+});
+
 test('specimens page loads Geist and Geist Mono', async ({ page }) => {
   await page.goto(`${specimensUrl}specimens.html`);
   await page.evaluate(() => document.fonts.ready);
