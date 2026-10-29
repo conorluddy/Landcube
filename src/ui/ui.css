@@ -32,6 +32,8 @@
 @import './color-field.css';
 
 /* #7 control groups */
+@import './status-message.css';
+@import './control-group.css';
 
 /* #8 shell */
 
