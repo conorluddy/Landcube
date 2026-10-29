@@ -1,0 +1,106 @@
+/* P-09 field frame, shared by TextField and NumberField (number-field.css adds only its extras). */
+.lc-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-3);
+  min-width: 0;
+}
+
+.lc-field__head {
+  display: flex;
+  gap: var(--lc-s-5);
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.lc-field__label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--lc-text-body);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-field__unit {
+  flex: none;
+  color: var(--lc-text-quiet);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-label);
+  text-transform: uppercase;
+}
+
+.lc-field__input {
+  width: 100%;
+  min-width: 0;
+  height: var(--lc-h-m);
+  padding: 0 9px;
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-value);
+  background: var(--lc-fill-field);
+  border: 1px solid var(--lc-line);
+  border-radius: var(--lc-r-control);
+}
+
+.lc-field__input[data-mono='true'],
+.lc-field__input[type='number'] {
+  font-family: var(--lc-font-mono);
+}
+
+.lc-field__input::placeholder {
+  color: var(--lc-text-quiet);
+}
+
+.lc-field__input:hover,
+[data-force-state='hover'] .lc-field__input {
+  border-color: var(--lc-line-hover);
+}
+
+.lc-field__input:focus-visible,
+[data-force-state='focus'] .lc-field__input {
+  border-color: var(--lc-line-focus);
+  outline: none;
+}
+
+.lc-field__input[aria-invalid='true'] {
+  border-color: var(--lc-signal-amber);
+}
+
+.lc-field__input:disabled {
+  color: var(--lc-text-disabled);
+  border-color: var(--lc-line-subtle);
+  cursor: not-allowed;
+}
+
+.lc-field__error {
+  color: var(--lc-signal-amber);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-coord);
+}
+
+@media (max-width: 767px) {
+  .lc-field__input {
+    height: var(--lc-h-l);
+    font-size: var(--lc-fs-m-input);
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-field__input {
+    border-color: CanvasText;
+    outline: 1px solid transparent;
+  }
+
+  .lc-field__input:focus-visible {
+    outline: 2px solid Highlight;
+  }
+
+  .lc-field__input[aria-invalid='true'] {
+    border-style: dashed;
+  }
+}

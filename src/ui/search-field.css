@@ -1,0 +1,133 @@
+/* P-10 SearchField: glass pill frame around the caller's combobox input. */
+.lc-search-field {
+  position: relative;
+  flex: 1 1 260px;
+  min-width: 120px;
+}
+
+.lc-search-field__frame {
+  display: flex;
+  gap: var(--lc-s-5);
+  align-items: center;
+  height: var(--lc-h-bar);
+  padding: 0 var(--lc-s-7);
+  background: var(--lc-glass-bar);
+  -webkit-backdrop-filter: var(--lc-glass-filter);
+  backdrop-filter: var(--lc-glass-filter);
+  border: 1px solid var(--lc-line-panel);
+  border-radius: var(--lc-r-panel);
+  box-shadow: var(--lc-shadow-bar);
+}
+
+.lc-search-field[data-size='mobile'] .lc-search-field__frame {
+  height: 46px;
+}
+
+.lc-search-field__frame:hover,
+[data-force-state='hover'] .lc-search-field__frame {
+  border-color: var(--lc-line-hover);
+}
+
+.lc-search-field__frame:focus-within,
+[data-force-state='focus'] .lc-search-field__frame {
+  border-color: var(--lc-line-focus);
+}
+
+/* The caller's input wears this class; the frame carries the focus state, so no second ring. */
+.lc-search-field__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-body);
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.lc-search-field[data-size='mobile'] .lc-search-field__input {
+  font-size: var(--lc-fs-m-input);
+}
+
+.lc-search-field__input::placeholder {
+  color: var(--lc-text-quiet);
+}
+
+.lc-search-field__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.lc-search-field__prefix {
+  flex: none;
+  color: var(--lc-text-quiet);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-label);
+}
+
+.lc-search-field__hint {
+  display: flex;
+  flex: none;
+  gap: var(--lc-s-2);
+}
+
+.lc-search-field__key {
+  padding: var(--lc-s-1) 5px;
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  border: 1px solid var(--lc-line-strong);
+  border-radius: var(--lc-r-control);
+}
+
+.lc-search-field__popover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  margin-top: var(--lc-s-2);
+}
+
+.lc-search-field__status {
+  margin-top: var(--lc-s-2);
+  color: var(--lc-text-quiet);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-coord);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .lc-search-field__frame {
+    background: color-mix(in srgb, var(--lc-ink-1) 96%, transparent);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .lc-search-field__frame {
+    background: color-mix(in srgb, var(--lc-ink-1) 96%, transparent);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-search-field__frame {
+    border-color: CanvasText;
+    background: Canvas;
+  }
+
+  .lc-search-field__frame:focus-within {
+    outline: 2px solid Highlight;
+  }
+
+  .lc-search-field__key {
+    border-color: CanvasText;
+  }
+}

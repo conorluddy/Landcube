@@ -1,0 +1,16 @@
+/* P-09 FieldPair: the wrapper is the container, so the grid can respond to it. */
+.lc-field-pair {
+  container-type: inline-size;
+}
+
+.lc-field-pair__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--lc-s-4);
+}
+
+@container (max-width: 299px) {
+  .lc-field-pair__grid {
+    grid-template-columns: 1fr;
+  }
+}
