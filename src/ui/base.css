@@ -1,0 +1,57 @@
+/* Global rules and the frosted-glass surface of the LANDCU.BE design system. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+:focus-visible {
+  outline: 2px solid var(--lc-line-focus);
+  outline-offset: 2px;
+}
+
+/* === GLASS === */
+.lc-glass {
+  background: var(--lc-glass-panel);
+  -webkit-backdrop-filter: var(--lc-glass-filter);
+  backdrop-filter: var(--lc-glass-filter);
+  border: 1px solid var(--lc-line-panel);
+  border-radius: var(--lc-r-panel);
+  box-shadow: var(--lc-shadow-panel);
+}
+
+/* Without blur or with reduced transparency the surface must stay legible. */
+@supports not (backdrop-filter: blur(1px)) {
+  .lc-glass {
+    background: rgba(14, 15, 16, 0.96);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .lc-glass {
+    background: rgba(14, 15, 16, 0.96);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-glass,
+  .lc-glass *,
+  .lc-glass *::before,
+  .lc-glass *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-glass input {
+    appearance: auto;
+  }
+}
