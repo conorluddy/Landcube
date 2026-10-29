@@ -1,0 +1,47 @@
+/* P-21 SheetHandle: 44px-tall hit area with a drawn grabber bar (36x4 is an assumed size). */
+.lc-sheet-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: var(--lc-h-l);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+}
+
+.lc-sheet-handle__grabber {
+  display: block;
+  width: 36px;
+  height: 4px;
+  border-radius: var(--lc-r-control);
+  background: var(--lc-line-hover);
+}
+
+@media (hover: hover) {
+  .lc-sheet-handle:hover .lc-sheet-handle__grabber {
+    background: var(--lc-ink-6);
+  }
+}
+
+[data-force-state='hover'] .lc-sheet-handle .lc-sheet-handle__grabber {
+  background: var(--lc-ink-6);
+}
+
+.lc-sheet-handle:focus-visible,
+[data-force-state='focus'] .lc-sheet-handle {
+  outline: 2px solid var(--lc-line-focus);
+  outline-offset: -2px;
+}
+
+.lc-sheet-handle:active .lc-sheet-handle__grabber,
+[data-force-state='active'] .lc-sheet-handle .lc-sheet-handle__grabber {
+  background: var(--lc-bone);
+}
+
+@media (forced-colors: active) {
+  .lc-sheet-handle__grabber {
+    background: ButtonText;
+  }
+}

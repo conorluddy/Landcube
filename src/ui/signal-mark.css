@@ -1,0 +1,85 @@
+/* P-17 SignalMark: 6px square (5px footer); diamonds are rotated squares. */
+.lc-signal-mark {
+  --lc-mark-color: var(--lc-signal);
+
+  display: inline-block;
+  flex: none;
+  width: var(--lc-mark-size);
+  height: var(--lc-mark-size);
+  background: var(--lc-mark-color);
+}
+
+.lc-signal-mark[data-accent='amber'] {
+  --lc-mark-color: var(--lc-signal-amber);
+}
+
+.lc-signal-mark[data-accent='phosphor'] {
+  --lc-mark-color: var(--lc-signal-phosphor);
+}
+
+/* Squares: footer 5, default 6, large 10. */
+.lc-signal-mark[data-size='footer'] {
+  --lc-mark-size: 5px;
+}
+
+.lc-signal-mark[data-size='default'] {
+  --lc-mark-size: 6px;
+}
+
+.lc-signal-mark[data-size='large'] {
+  --lc-mark-size: 10px;
+}
+
+/* Diamonds read smaller once rotated, so the box grows: 8 / 10 / 12. */
+.lc-signal-mark[data-kind='fault'],
+.lc-signal-mark[data-kind='waypoint'] {
+  transform: rotate(45deg);
+}
+
+.lc-signal-mark[data-kind='fault'][data-size='footer'],
+.lc-signal-mark[data-kind='waypoint'][data-size='footer'] {
+  --lc-mark-size: 8px;
+}
+
+.lc-signal-mark[data-kind='fault'][data-size='default'],
+.lc-signal-mark[data-kind='waypoint'][data-size='default'] {
+  --lc-mark-size: 10px;
+}
+
+.lc-signal-mark[data-kind='fault'][data-size='large'],
+.lc-signal-mark[data-kind='waypoint'][data-size='large'] {
+  --lc-mark-size: 12px;
+}
+
+.lc-signal-mark[data-kind='fault'] {
+  border: 1px solid var(--lc-mark-color);
+  background: transparent;
+}
+
+.lc-signal-mark[data-kind='live'] {
+  animation: lc-signal-pulse 1.6s var(--lc-ease) infinite;
+}
+
+@keyframes lc-signal-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-signal-mark[data-kind='live'] {
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-signal-mark {
+    background: CanvasText;
+    forced-color-adjust: none;
+  }
+
+  .lc-signal-mark[data-kind='fault'] {
+    border-color: CanvasText;
+    background: transparent;
+  }
+}

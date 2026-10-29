@@ -1,0 +1,66 @@
+/* P-04 IconButton: 44x44 glass square, 15px glyph. Active = bone fill, ink glyph. */
+.lc-icon-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--lc-h-l);
+  height: var(--lc-h-l);
+  padding: 0;
+  border-color: var(--lc-line);
+  color: var(--lc-text-primary);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
+
+@media (hover: hover) {
+  .lc-icon-button:hover:not(:disabled) {
+    border-color: var(--lc-line-hover);
+    color: var(--lc-white);
+  }
+}
+
+[data-force-state='hover'] .lc-icon-button {
+  border-color: var(--lc-line-hover);
+  color: var(--lc-white);
+}
+
+.lc-icon-button:focus-visible,
+[data-force-state='focus'] .lc-icon-button {
+  outline: 2px solid var(--lc-line-focus);
+  outline-offset: 2px;
+}
+
+.lc-icon-button:active:not(:disabled),
+[data-force-state='active'] .lc-icon-button {
+  background: var(--lc-fill-selected);
+}
+
+.lc-icon-button[aria-pressed='true'] {
+  background: var(--lc-bone);
+  color: var(--lc-text-on-bone);
+}
+
+/* Disabled is undesigned in the handoff. Assumption: ink-4 glyph, subtle border. */
+.lc-icon-button:disabled {
+  border-color: var(--lc-line-subtle);
+  color: var(--lc-text-disabled);
+  cursor: not-allowed;
+}
+
+@media (forced-colors: active) {
+  .lc-icon-button {
+    border-color: ButtonText;
+  }
+
+  .lc-icon-button[aria-pressed='true'] {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .lc-icon-button:disabled {
+    border-color: GrayText;
+    color: GrayText;
+  }
+}

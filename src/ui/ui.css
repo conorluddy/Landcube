@@ -5,6 +5,15 @@
 
 /* #4 static primitives */
 @import './tag.css';
+@import './button.css';
+@import './icon-button.css';
+@import './kbd.css';
+@import './signal-mark.css';
+@import './progress.css';
+@import './group-header.css';
+@import './readout-grid.css';
+@import './sheet-handle.css';
+@import './brand-lockup.css';
 
 /* #5 selection primitives */
 

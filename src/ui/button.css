@@ -1,0 +1,163 @@
+/* P-01/02/03 Button: mono caps, never wraps. Heights are README pixel sizes. */
+.lc-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lc-s-5);
+  max-width: 100%;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: var(--lc-r-control);
+  background: transparent;
+  color: var(--lc-text-strong);
+  cursor: pointer;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-ui);
+  font-weight: 500;
+  letter-spacing: var(--lc-track-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lc-button__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lc-button__glyph {
+  flex: none;
+}
+
+.lc-button[data-full-width='true'] {
+  display: flex;
+  width: 100%;
+}
+
+/* Sizes: primary 30/36/48/52, secondary 28/36/44/48; text follows secondary. */
+.lc-button[data-variant='primary'][data-size='small'] {
+  height: 30px;
+  padding: 0 var(--lc-s-6);
+}
+
+.lc-button[data-variant='primary'][data-size='medium'] {
+  height: 36px;
+  padding: 0 var(--lc-s-7);
+}
+
+.lc-button[data-variant='primary'][data-size='large'] {
+  height: 48px;
+  padding: 0 var(--lc-s-8);
+  font-size: var(--lc-fs-m-ui);
+}
+
+.lc-button[data-variant='primary'][data-size='extraLarge'] {
+  height: 52px;
+  padding: 0 var(--lc-s-9);
+  font-size: var(--lc-fs-m-ui);
+}
+
+.lc-button[data-variant='secondary'][data-size='small'],
+.lc-button[data-variant='text'][data-size='small'] {
+  height: 28px;
+  padding: 0 var(--lc-s-6);
+}
+
+.lc-button[data-variant='secondary'][data-size='medium'],
+.lc-button[data-variant='text'][data-size='medium'] {
+  height: 36px;
+  padding: 0 var(--lc-s-7);
+}
+
+.lc-button[data-variant='secondary'][data-size='large'],
+.lc-button[data-variant='text'][data-size='large'] {
+  height: 44px;
+  padding: 0 var(--lc-s-8);
+  font-size: var(--lc-fs-m-ui);
+}
+
+.lc-button[data-variant='secondary'][data-size='extraLarge'],
+.lc-button[data-variant='text'][data-size='extraLarge'] {
+  height: 48px;
+  padding: 0 var(--lc-s-9);
+  font-size: var(--lc-fs-m-ui);
+}
+
+.lc-button[data-variant='primary'] {
+  background: var(--lc-bone);
+  color: var(--lc-text-on-bone);
+}
+
+.lc-button[data-variant='secondary'] {
+  border-color: var(--lc-line-strong);
+}
+
+.lc-button[data-variant='text'] {
+  padding-inline: var(--lc-s-4);
+  color: var(--lc-text-secondary);
+  letter-spacing: var(--lc-track-ui);
+}
+
+/* Hover only where a pointer can hover; touch keeps the resting style. */
+@media (hover: hover) {
+  .lc-button[data-variant='primary']:hover:not(:disabled) {
+    background: var(--lc-white);
+  }
+
+  .lc-button[data-variant='secondary']:hover:not(:disabled) {
+    border-color: var(--lc-bone);
+    color: var(--lc-white);
+  }
+
+  .lc-button[data-variant='text']:hover:not(:disabled) {
+    color: var(--lc-bone);
+  }
+}
+
+/* Forced-state twins for specimens, outside the media query so they always render. */
+[data-force-state='hover'] .lc-button[data-variant='primary'] {
+  background: var(--lc-white);
+}
+
+[data-force-state='hover'] .lc-button[data-variant='secondary'] {
+  border-color: var(--lc-bone);
+  color: var(--lc-white);
+}
+
+[data-force-state='hover'] .lc-button[data-variant='text'] {
+  color: var(--lc-bone);
+}
+
+.lc-button:focus-visible,
+[data-force-state='focus'] .lc-button {
+  outline: 2px solid var(--lc-line-focus);
+  outline-offset: 2px;
+}
+
+.lc-button:active:not(:disabled),
+[data-force-state='active'] .lc-button {
+  opacity: 0.8;
+}
+
+/* Disabled is undesigned in the handoff. Assumption: ink-4 text, subtle border, no fill. */
+.lc-button:disabled {
+  border-color: var(--lc-line-subtle);
+  background: transparent;
+  color: var(--lc-text-disabled);
+  cursor: not-allowed;
+}
+
+.lc-button[aria-busy='true'] {
+  cursor: progress;
+}
+
+@media (forced-colors: active) {
+  .lc-button {
+    border-color: ButtonText;
+  }
+
+  .lc-button:disabled {
+    border-color: GrayText;
+    color: GrayText;
+  }
+}
