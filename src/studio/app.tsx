@@ -20,6 +20,7 @@ import { buildTerrainGroups } from './control-groups/terrain';
 import { getGroupCode, studioSections } from './sections';
 import { StudioHeader } from './studio-header';
 import { StudioFooter } from './studio-footer';
+import { StudioMapControls, StudioSheet } from './studio-sheet';
 import { ViewportStates } from './viewport-states';
 import { StudioHud } from './studio-hud';
 import type { HudStore } from './hud-store';
@@ -27,7 +28,7 @@ import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
 
 const inspectorId = 'studio-inspector';
-/** Below this the inspector becomes a full-width sheet with a horizontal section strip. */
+/** Below this the inspector becomes a bottom sheet with a horizontal section strip. */
 const phoneViewportQuery = '(max-width: 767px)';
 
 function Surface({
@@ -184,7 +185,7 @@ function Studio({
         c.workspace({ exporting: false });
       } else if (state.workspace.popover !== null) {
         c.workspace({ popover: null });
-      } else if (!state.workspace.collapsed) {
+      } else if (!isPhoneViewport && !state.workspace.collapsed) {
         c.workspace({ collapsed: true });
         inspectorToggle.current?.focus();
       }
@@ -195,12 +196,15 @@ function Studio({
     return () => {
       document.removeEventListener('keydown', escape);
     };
-  }, [c, state.workspace]);
+  }, [c, state.workspace, isPhoneViewport]);
   const props = { controller: c, state };
 
   return (
-    <div className="studio-shell">
-      <StudioHeader controller={c} state={state} />
+    <div
+      className="studio-shell"
+      data-sheet-snap={isPhoneViewport ? state.workspace.sheetSnap : undefined}
+    >
+      <StudioHeader controller={c} state={state} isPhoneViewport={isPhoneViewport} />
       <main
         id="studio-viewport"
         ref={viewport}
@@ -208,27 +212,41 @@ function Studio({
       />
       <ViewportStates controller={c} state={state} />
       <StudioHud state={state} hud={hud} />
-      <InspectorPanel
-        id={inspectorId}
-        label="Landscape controls"
-        railLabel="Editing section"
-        sections={studioSections}
-        activeSectionId={active}
-        onSelectSection={(section) => {
-          c.selectSection(section);
-        }}
-        hiddenSectionIds={state.workspace.view === '3d' ? [] : threeDOnlySections}
-        isCollapsed={state.workspace.collapsed}
-        headerTag={`Src · ${state.source.terrain ? 'Real' : 'Procedural'}`}
-        railOrientation={isPhoneViewport ? 'horizontal' : 'vertical'}
-        renderSection={(section) => renderSectionBody(section, props, cropPreview)}
-      />
-      <StudioFooter
-        controller={c}
-        state={state}
-        inspectorId={inspectorId}
-        inspectorToggleRef={inspectorToggle}
-      />
+      {isPhoneViewport ? (
+        <>
+          <StudioMapControls controller={c} state={state} />
+          <StudioSheet
+            controller={c}
+            state={state}
+            hud={hud}
+            id={inspectorId}
+            renderSection={(section) => renderSectionBody(section, props, cropPreview)}
+          />
+        </>
+      ) : (
+        <>
+          <InspectorPanel
+            id={inspectorId}
+            label="Landscape controls"
+            railLabel="Editing section"
+            sections={studioSections}
+            activeSectionId={active}
+            onSelectSection={(section) => {
+              c.selectSection(section);
+            }}
+            hiddenSectionIds={state.workspace.view === '3d' ? [] : threeDOnlySections}
+            isCollapsed={state.workspace.collapsed}
+            headerTag={`Src · ${state.source.terrain ? 'Real' : 'Procedural'}`}
+            renderSection={(section) => renderSectionBody(section, props, cropPreview)}
+          />
+          <StudioFooter
+            controller={c}
+            state={state}
+            inspectorId={inspectorId}
+            inspectorToggleRef={inspectorToggle}
+          />
+        </>
+      )}
       {state.workspace.popover !== null && (
         <Surface
           title={state.workspace.popover}

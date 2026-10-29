@@ -26,9 +26,12 @@ const sourceOptions = [
 export function StudioHeader({
   controller: c,
   state,
+  isPhoneViewport,
 }: {
   controller: StudioController;
   state: StudioState;
+  /** Phones fit one row: Export moves to the sheet's peek row and the link action shortens. */
+  isPhoneViewport: boolean;
 }): ReactNode {
   const isRealSource = state.source.selected === 'real';
 
@@ -73,22 +76,25 @@ export function StudioHeader({
           variant="text"
           size="small"
           title="Copies shared design settings. Location and 3D setup are excluded."
+          aria-label={isPhoneViewport ? 'Copy style link' : undefined}
           onClick={() => {
             void c.copyLink();
           }}
         >
-          Copy style link
+          {isPhoneViewport ? 'Link' : 'Copy style link'}
         </Button>
-        <Button
-          variant="primary"
-          size="small"
-          aria-haspopup="dialog"
-          onClick={() => {
-            c.workspace({ exporting: true, popover: null });
-          }}
-        >
-          Export ↗
-        </Button>
+        {!isPhoneViewport && (
+          <Button
+            variant="primary"
+            size="small"
+            aria-haspopup="dialog"
+            onClick={() => {
+              c.workspace({ exporting: true, popover: null });
+            }}
+          >
+            Export ↗
+          </Button>
+        )}
       </BarGroup>
     </FloatingBar>
   );

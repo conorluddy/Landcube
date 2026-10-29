@@ -1,0 +1,97 @@
+/*
+ * C-14 BottomSheet: pinned to the bottom of its containing block. Snap heights resolve against
+ * that block and mirror `measureSnapHeights` in bottom-sheet-snap.ts (half = 55%).
+ */
+.lc-bottom-sheet {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  height: var(--lc-sheet-height);
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  border-bottom: 0;
+  border-radius: var(--lc-r-sheet) var(--lc-r-sheet) 0 0;
+  background: var(--lc-glass-sheet);
+  color: var(--lc-text-body);
+  transition: height var(--lc-dur-sheet) var(--lc-ease);
+}
+
+.lc-bottom-sheet[data-snap='peek'] {
+  --lc-sheet-height: var(--lc-sheet-peek-height);
+}
+
+.lc-bottom-sheet[data-snap='half'] {
+  --lc-sheet-height: min(
+    max(55%, var(--lc-sheet-peek-height)),
+    calc(100% - var(--lc-sheet-full-inset))
+  );
+}
+
+.lc-bottom-sheet[data-snap='full'] {
+  --lc-sheet-height: calc(100% - var(--lc-sheet-full-inset));
+}
+
+.lc-bottom-sheet[data-dragging] {
+  transition: none;
+}
+
+/* Only the handle claims touch gestures; the body keeps native scrolling. */
+.lc-bottom-sheet__grip {
+  touch-action: none;
+}
+
+.lc-bottom-sheet__grip .lc-sheet-handle {
+  height: var(--lc-h-s);
+  cursor: grab;
+}
+
+.lc-bottom-sheet[data-dragging] .lc-sheet-handle {
+  cursor: grabbing;
+}
+
+.lc-bottom-sheet__peek {
+  min-width: 0;
+  padding: 0 var(--lc-s-8) var(--lc-s-5);
+}
+
+.lc-bottom-sheet__header {
+  min-width: 0;
+  padding: 0 0 var(--lc-s-5);
+  border-bottom: 1px solid var(--lc-line-subtle);
+}
+
+/* A tab strip in the header scrolls edge to edge but rests aligned with the body's inset. */
+.lc-bottom-sheet__header > .lc-section-rail {
+  padding-inline: var(--lc-s-8);
+  scroll-padding-inline: var(--lc-s-8);
+}
+
+.lc-bottom-sheet__body {
+  min-height: 0;
+  padding: 0 var(--lc-s-8) calc(var(--lc-s-9) + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* Peek is a summary: the body cannot scroll until the sheet opens. */
+.lc-bottom-sheet[data-snap='peek'] .lc-bottom-sheet__body {
+  overflow-y: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-bottom-sheet {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-bottom-sheet {
+    border-color: CanvasText;
+    background: Canvas;
+  }
+}

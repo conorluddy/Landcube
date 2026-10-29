@@ -571,16 +571,12 @@ body,
   display: none;
 }
 
+/*
+ * Phones (#97): one header row, the inspector as a bottom sheet (BottomSheet in src/ui), 44px map
+ * controls down the right edge and the scale bar above the sheet. Sheet heights mirror
+ * bottom-sheet.css: peek 190px, half 55%, full 64px from the top.
+ */
 @media (max-width: 767px) {
-  /* Phones stack the actions under the view and source switches. */
-  .studio-header {
-    flex-wrap: wrap;
-    row-gap: var(--lc-s-3);
-    height: auto;
-  }
-  .studio-actions {
-    margin-left: auto;
-  }
   .studio-brand,
   .studio-github,
   .studio-status .attribution,
@@ -590,13 +586,73 @@ body,
   #studio-inspector {
     top: auto;
     right: 0;
+    bottom: 0;
     left: 0;
-    width: 100%;
-    height: 60dvh;
-    border-radius: var(--lc-r-sheet) var(--lc-r-sheet) var(--lc-r-panel) var(--lc-r-panel);
   }
-  #studio-inspector[data-collapsed='true'] {
+  .studio-shell[data-sheet-snap='peek'] {
+    --studio-sheet-height: 190px;
+  }
+  .studio-shell[data-sheet-snap='half'] {
+    --studio-sheet-height: min(55%, calc(100% - 64px));
+  }
+  .studio-map-controls {
+    position: absolute;
+    top: 64px;
+    right: var(--lc-s-6);
+    z-index: 3;
+    flex-direction: column;
     height: auto;
+  }
+  .studio-shell[data-sheet-snap] .lc-hud-layer__instruments {
+    top: auto;
+    right: auto;
+    bottom: calc(var(--studio-sheet-height, 0px) + var(--lc-s-6));
+    left: var(--lc-s-6);
+  }
+  /* The map controls' Reset view button stands in for the drawn compass. */
+  .studio-shell[data-sheet-snap] .lc-hud-layer__instruments .lc-compass,
+  .studio-shell[data-sheet-snap='full'] .lc-hud-layer__instruments,
+  .studio-shell[data-sheet-snap='full'] .studio-map-controls {
+    display: none;
+  }
+  .studio-sheet-peek {
+    display: grid;
+    gap: var(--lc-s-3);
+  }
+  .studio-sheet-peek__row {
+    display: flex;
+    gap: var(--lc-s-6);
+    align-items: center;
+    min-width: 0;
+  }
+  .studio-sheet-peek .lc-readout-grid {
+    flex: 1 1 auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-width: 0;
+  }
+  .studio-sheet-peek .lc-readout-cell {
+    border-bottom: 0;
+  }
+  .studio-sheet-status {
+    position: relative;
+    display: flex;
+    gap: var(--lc-s-4);
+    align-items: center;
+    min-width: 0;
+    height: 20px;
+    color: var(--lc-text-quiet);
+    font-family: var(--lc-font-mono);
+    font-size: var(--lc-fs-label);
+    letter-spacing: var(--lc-track-label);
+    line-height: 12px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .studio-sheet-status .studio-status-message {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .mobile-attribution {
     display: block;
@@ -608,16 +664,17 @@ body,
   }
   .mobile-attribution-sources {
     position: absolute;
+    top: calc(100% + var(--lc-s-3));
     right: 0;
-    bottom: calc(100% + var(--lc-s-3));
+    z-index: 1;
     width: max-content;
-    max-width: min(320px, calc(100vw - 2 * var(--lc-s-6)));
+    max-width: min(320px, calc(100vw - 2 * var(--lc-s-8)));
     padding: var(--lc-s-6);
     color: var(--lc-text-secondary);
     font-family: var(--lc-font-sans);
     font-size: var(--lc-fs-hint);
     letter-spacing: 0;
-    line-height: 1.5;
+    line-height: 18px;
     text-transform: none;
     white-space: normal;
   }

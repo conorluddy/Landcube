@@ -39,3 +39,20 @@ void test('IconButton renders disabled', () => {
 
   assert.match(markup, /disabled=""/);
 });
+
+void test('IconButton announces a popover it opens and whether it is open', () => {
+  const plain = renderMarkup(<IconButton glyph="◫" label="Overlays" onClick={() => undefined} />);
+  const open = renderMarkup(
+    <IconButton
+      glyph="◫"
+      label="Overlays"
+      hasPopup="dialog"
+      isExpanded
+      onClick={() => undefined}
+    />,
+  );
+
+  assert.ok(!plain.includes('aria-haspopup') && !plain.includes('aria-expanded'));
+  assert.match(open, /aria-haspopup="dialog"/);
+  assert.match(open, /aria-expanded="true"/);
+});

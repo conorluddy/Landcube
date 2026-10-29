@@ -73,6 +73,7 @@ import {
 } from '../frame/frame-studio-settings';
 import type { FrameAssembly, FramePart, FramePartId } from '../types/frame';
 import type { ExportJob } from '../ui/job-list';
+import type { SheetSnap } from '../ui/sheet-handle';
 
 export type StudioView = '2d' | '3d';
 export type InspectorSection =
@@ -168,6 +169,8 @@ export interface StudioState {
     sections: Record<StudioView, InspectorSection>;
     popover: 'Overlays' | 'Orbit' | null;
     exporting: boolean;
+    /** Phone bottom-sheet height. Session-only: never serialized into links. */
+    sheetSnap: SheetSnap;
   };
   seedLocked: boolean;
   status: string;
@@ -364,6 +367,7 @@ export function createStudioController(
       sections: { '2d': 'Terrain', '3d': 'Terrain' },
       popover: null,
       exporting: false,
+      sheetSnap: 'half',
     },
     seedLocked: actions.isSeedLocked,
     status: '',

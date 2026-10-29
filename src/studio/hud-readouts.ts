@@ -89,6 +89,19 @@ export function describeTarget(
   };
 }
 
+/** The three card cells the phone sheet's peek row has room for, in the design's order. */
+export function describeSheetReadouts(target: ReadoutCardModel): ReadoutCardModel['cells'] {
+  const peekLabels = ['Seed', 'High', 'Span', 'Contours', 'Contour'];
+
+  return peekLabels
+    .flatMap((label) => target.cells.filter((cell) => cell.label === label))
+    .slice(0, 3)
+    .map((cell) =>
+      // "8 × 8" squares read as one span in a narrow cell.
+      cell.label === 'Span' ? { ...cell, value: cell.value.split(' × ')[0] } : cell,
+    );
+}
+
 /** Readouts along the top of the HUD frame. */
 export function describeCameraReadouts(state: StudioState): string[] {
   const pose = state.cameraPose;

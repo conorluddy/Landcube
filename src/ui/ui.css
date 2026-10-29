@@ -64,6 +64,7 @@
 @import './overlays/tile-resolve.css';
 
 /* #16 mobile sheet */
+@import './bottom-sheet.css';
 
 /* #17 mobile pages */
 

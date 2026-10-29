@@ -89,6 +89,16 @@ void test('studio switches views without losing independent sections or project 
   assert.equal(c.getSnapshot().scene.ground, false);
 });
 
+void test('the phone sheet opens at half and its snap never reaches the style link', () => {
+  const { controller: c } = setup();
+  const linkBefore = c.getSnapshot().design;
+
+  assert.equal(c.getSnapshot().workspace.sheetSnap, 'half');
+  c.workspace({ sheetSnap: 'full' });
+  assert.equal(c.getSnapshot().workspace.sheetSnap, 'full');
+  assert.equal(c.getSnapshot().design, linkBefore);
+});
+
 void test('failed view activation preserves all settings and releases the activation lock', async () => {
   const { controller: c, effects } = setup();
 
