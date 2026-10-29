@@ -15,6 +15,8 @@ export interface ButtonProps extends AriaAttributes {
   /** Sets aria-busy; the label stays visible. */
   isBusy?: boolean;
   isFullWidth?: boolean;
+  /** Native tooltip for detail the label leaves out. */
+  title?: string;
   ref?: Ref<HTMLButtonElement>;
 }
 
@@ -29,6 +31,7 @@ export function Button({
   disabled = false,
   isBusy = false,
   isFullWidth = false,
+  title,
   ref,
   ...ariaAttributes
 }: ButtonProps): React.JSX.Element {
@@ -41,6 +44,7 @@ export function Button({
       data-variant={variant}
       data-size={size}
       data-full-width={isFullWidth ? 'true' : undefined}
+      title={title}
       disabled={disabled}
       aria-busy={isBusy ? true : undefined}
       onClick={onClick}

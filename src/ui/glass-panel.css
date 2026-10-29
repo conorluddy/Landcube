@@ -1,0 +1,21 @@
+/* GlassPanel: panel-alpha glass. Paint containment keeps blur work inside the panel's box. */
+.lc-glass-panel {
+  min-width: 0;
+  color: var(--lc-text-body);
+  contain: paint;
+}
+
+.lc-glass-panel[data-padding='default'] {
+  padding: var(--lc-s-9);
+}
+
+.lc-glass-panel[data-padding='none'] {
+  padding: 0;
+}
+
+@media (forced-colors: active) {
+  .lc-glass-panel {
+    border-color: CanvasText;
+    background: Canvas;
+  }
+}

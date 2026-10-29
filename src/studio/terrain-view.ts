@@ -9,6 +9,7 @@ import type { FloorPlace } from '../floor-geo';
 import type { RoadPath } from '../types/roads';
 import type { GrassGeography } from '../grass-coverage';
 import { getAutoRotateSpeed, type TerrainViewPreset } from '../terrain-camera';
+import { createShellMotion } from './shell-motion';
 
 interface StudioTerrainView {
   isActive: () => boolean;
@@ -48,6 +49,7 @@ export function createStudioTerrainView(
   let active = false;
   let floorPlace: FloorPlace | undefined;
   let interval: number | undefined;
+  const motion = createShellMotion(() => document.querySelector('.studio-shell'));
 
   const syncFrame = () => {
     const { frame, model } = controller.getSnapshot();
@@ -141,6 +143,7 @@ export function createStudioTerrainView(
 
     if (differs('rotating')) {
       view.setRotating(scene.rotating);
+      motion.setHeld('turntable', active && scene.rotating);
     }
 
     if (differs('camera')) {
@@ -168,10 +171,17 @@ export function createStudioTerrainView(
         view = module.createTerrain3d((height, layerHeight) => {
           controller.metrics(height, layerHeight);
         });
+        const canvas = document.querySelector<HTMLCanvasElement>('canvas.terrain-3d');
+
+        if (canvas) {
+          motion.watchCanvas(canvas);
+        }
+
         syncScene();
       }
 
       active = mode === '3d';
+      motion.setHeld('turntable', active && controller.getSnapshot().scene.rotating);
       document.querySelector('#terrain')?.toggleAttribute('hidden', active);
       view?.setVisible(active);
 

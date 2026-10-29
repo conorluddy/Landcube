@@ -1,0 +1,128 @@
+import type { ReactNode, Ref } from 'react';
+import { roadAttributionUrl } from '../constants/roads';
+import { BarGroup, FloatingBar } from '../ui/floating-bar';
+import { Button } from '../ui/button';
+import { SignalMark } from '../ui/signal-mark';
+import { areRoadsDrawn, type StudioController, type StudioState } from './controller';
+
+/**
+ * Bottom bar: viewport tools (inspector toggle, Overlays, Orbit, Tour) and a status pill with the
+ * source, live status and data attribution. Real-terrain and road credits always stay reachable:
+ * inline on desktop, behind "Data sources" on phones.
+ */
+export function StudioFooter({
+  controller: c,
+  state,
+  inspectorId,
+  inspectorToggleRef,
+}: {
+  controller: StudioController;
+  state: StudioState;
+  inspectorId: string;
+  inspectorToggleRef: Ref<HTMLButtonElement>;
+}): ReactNode {
+  const { workspace, source } = state;
+  const isRoadCreditShown = areRoadsDrawn(state);
+
+  return (
+    <FloatingBar as="footer" size="footer" className="studio-footer">
+      <BarGroup className="studio-tools" role="group" label="Viewport tools">
+        <Button
+          variant="text"
+          size="small"
+          ref={inspectorToggleRef}
+          aria-expanded={!workspace.collapsed}
+          aria-controls={inspectorId}
+          aria-label={workspace.collapsed ? 'Expand controls' : 'Collapse controls'}
+          onClick={() => {
+            c.workspace({ collapsed: !workspace.collapsed });
+          }}
+        >
+          {workspace.collapsed ? 'Controls ↑' : 'Controls ↓'}
+        </Button>
+        <Button
+          variant="text"
+          size="small"
+          aria-haspopup="dialog"
+          aria-expanded={workspace.popover === 'Overlays'}
+          onClick={() => {
+            c.workspace({ popover: workspace.popover === 'Overlays' ? null : 'Overlays' });
+          }}
+        >
+          Overlays
+        </Button>
+        {workspace.view === '3d' && (
+          <Button
+            variant="text"
+            size="small"
+            aria-haspopup="dialog"
+            aria-expanded={workspace.popover === 'Orbit'}
+            onClick={() => {
+              c.workspace({ popover: workspace.popover === 'Orbit' ? null : 'Orbit' });
+            }}
+          >
+            Orbit
+          </Button>
+        )}
+        <Button
+          variant="text"
+          size="small"
+          aria-pressed={source.autoplay.enabled}
+          aria-label="Tour"
+          title={source.autoplay.enabled ? 'Pause tour' : 'Play tour'}
+          onClick={() => {
+            void c.autoplay({ enabled: !source.autoplay.enabled });
+          }}
+        >
+          {source.autoplay.enabled ? '❚❚ Tour' : '▶ Tour'}
+        </Button>
+      </BarGroup>
+      <BarGroup className="studio-status">
+        <SignalMark kind={workspace.activating ? 'live' : 'ok'} size="footer" />
+        <span className="source-label">
+          {source.terrain ? 'Real terrain' : `Procedural · ${state.design.seed}`}
+        </span>
+        <span className="studio-status-message" role="status" aria-live="polite">
+          {workspace.activating ? 'Starting 3D…' : state.status}
+        </span>
+        {source.terrain && (
+          <span title={source.terrain.attribution} className="attribution">
+            {source.terrain.attribution}
+          </span>
+        )}
+        {isRoadCreditShown && (
+          <a
+            className="attribution"
+            href={roadAttributionUrl}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`${state.roads.network?.attribution ?? ''} (opens in a new tab)`}
+          >
+            {state.roads.network?.attribution}
+          </a>
+        )}
+        {(source.terrain !== undefined || isRoadCreditShown) && (
+          <details className="mobile-attribution">
+            <summary>Data sources</summary>
+            <div className="mobile-attribution-sources lc-glass" data-ui-surface>
+              {source.terrain && <p>{source.terrain.attribution}</p>}
+              {isRoadCreditShown && (
+                <a href={roadAttributionUrl} target="_blank" rel="noreferrer">
+                  {state.roads.network?.attribution} ↗
+                </a>
+              )}
+            </div>
+          </details>
+        )}
+        <a
+          className="studio-github"
+          href="https://github.com/conorluddy/Topogra"
+          target="_blank"
+          rel="noreferrer"
+        >
+          GitHub ↗
+        </a>
+      </BarGroup>
+    </FloatingBar>
+  );
+}

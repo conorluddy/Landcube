@@ -32,7 +32,7 @@ test('GitHub Pages repository subpath loads the studio, lazy 3D, style links and
     });
   });
   await page.goto(`${appUrl}Topogra/?v=1&seed=123&width=320&height=240`);
-  await expect(page.getByRole('heading', { name: 'Topogra Landscape studio' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'LANDCU.BE Studio' })).toBeVisible();
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await expect(page.locator('canvas.terrain-3d')).toBeVisible();
   await section(page, 'Model');
@@ -57,6 +57,20 @@ test('GitHub Pages repository subpath loads the studio, lazy 3D, style links and
   expect(assets.every((url) => new URL(url).pathname.startsWith('/Topogra/assets/'))).toBe(true);
   expect(assets.some((url) => url.includes('/terrain-3d-'))).toBe(true);
   expect(errors).toEqual([]);
+});
+
+test('version-one design link exports byte-identical SVG through the shell redesign (REQ-1)', async ({
+  page,
+}) => {
+  // The fixture was exported before the LANDCU.BE port; a mismatch means the renderer changed.
+  const fixture = await readFile(resolve('tests/browser/fixtures/seed-123-320x240.svg'));
+
+  await serveStudio(page);
+  await page.goto(`${appUrl}?v=1&seed=123&width=320&height=240`);
+  await page.getByRole('button', { name: 'Export ↗' }).click();
+  const svg = await download(page, 'Download SVG');
+
+  expect(svg.bytes.equals(fixture)).toBe(true);
 });
 
 test('analytics loads only on the hosted site and never sees the design-link query', async ({

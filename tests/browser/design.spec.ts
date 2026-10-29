@@ -31,6 +31,8 @@ test('studio separates view, inspector and shortcuts while retaining settings', 
   await section(page, 'Contours');
   await page.getByRole('slider', { name: 'Weight', exact: true }).fill('1.5');
   await page.getByRole('button', { name: 'Collapse controls' }).click();
+  await expect(page.getByRole('region', { name: 'Contours settings' })).toBeHidden();
+  await expect(page.getByRole('navigation', { name: 'Editing section' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Overlays', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Overlays', exact: true }).click();
   await page.getByLabel('Grid style').selectOption('crosses');
