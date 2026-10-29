@@ -209,6 +209,27 @@ void test('autoplay tours preset locations after each delay until switched off',
   assert.equal(c.getSnapshot().source.place, secondPlace);
 });
 
+void test('the tour waits when another terrain load is in flight', async (t) => {
+  const { controller: c } = setup();
+
+  stubBrowserTileDecoding(t);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  await c.autoplay({ enabled: true, delaySeconds: 5 });
+  const before = c.getSnapshot().source.place;
+  const pendingFetch = t.mock.method(
+    globalThis,
+    'fetch',
+    () => new Promise<Response>(() => undefined),
+  );
+
+  void c.loadTerrain();
+  assert.equal(c.getSnapshot().source.loading, true);
+  t.mock.timers.tick(5000);
+  assert.equal(c.getSnapshot().source.place, before);
+  await c.autoplay({ enabled: false });
+  pendingFetch.mock.restore();
+});
+
 void test('default location loads bundled tiles and credits only their recorded sources', async (t) => {
   const { controller: c } = setup();
   const requestedUrls: string[] = [];
@@ -259,6 +280,58 @@ void test('a searched place is saved and listed once its terrain loads', async (
   assert.deepEqual(setup(undefined, storage).controller.getSnapshot().savedPlaces, [saved]);
 });
 
+void test('searched places from separate tabs are merged when each load succeeds', async (t) => {
+  const items = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => items.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      items.set(key, value);
+    },
+  };
+  const first = setup(undefined, storage).controller;
+  const second = setup(undefined, storage).controller;
+
+  stubBrowserTileDecoding(t);
+  await first.loadSearchedPlace({
+    name: 'Ben Nevis',
+    detail: '',
+    latitude: 56.7969,
+    longitude: -5.0035,
+    provider: 'photon',
+  });
+  await second.loadSearchedPlace({
+    name: 'Snowdon',
+    detail: '',
+    latitude: 53.0685,
+    longitude: -4.076,
+    provider: 'photon',
+  });
+  assert.deepEqual(
+    setup(undefined, storage)
+      .controller.getSnapshot()
+      .savedPlaces.map((place) => place.name),
+    ['Snowdon', 'Ben Nevis'],
+  );
+});
+
+void test('a failed searched place is not saved by a later manual load', async (t) => {
+  const { controller: c } = setup();
+
+  stubBrowserTileDecoding(t);
+  const fetchStub = t.mock.method(globalThis, 'fetch', () => Promise.reject(new Error('offline')));
+
+  await c.loadSearchedPlace({
+    name: 'Ben Nevis',
+    detail: '',
+    latitude: 56.7969,
+    longitude: -5.0035,
+    provider: 'photon',
+  });
+  fetchStub.mock.restore();
+  await c.loadTerrain();
+  assert.deepEqual(c.getSnapshot().savedPlaces, []);
+});
+
 void test('bundled tiles served as HTML fall back to the public tile service', async (t) => {
   const { controller: c } = setup();
   const requestedUrls: string[] = [];
@@ -295,6 +368,19 @@ void test('daylight cycle sweeps the sun until a manual lighting edit pauses it'
   t.mock.timers.tick(5000);
   assert.equal(c.getSnapshot().scene.daylightCycle.enabled, false);
   assert.equal(c.getSnapshot().scene.lighting.timeOfDay, 12);
+});
+
+void test('resetting lighting pauses the daylight cycle', (t) => {
+  const { controller: c } = setup();
+
+  t.mock.timers.enable({ apis: ['setInterval', 'Date'] });
+  c.daylightCycle({ enabled: true });
+  c.resetLighting();
+  const reset = c.getSnapshot().scene.lighting;
+
+  t.mock.timers.tick(5000);
+  assert.equal(c.getSnapshot().scene.daylightCycle.enabled, false);
+  assert.deepEqual(c.getSnapshot().scene.lighting, reset);
 });
 
 void test('road edits restyle without refetching and a superseded download never reaches the new place', async (t) => {

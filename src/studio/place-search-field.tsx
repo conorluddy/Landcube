@@ -25,6 +25,7 @@ export function PlaceSearchField({
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState<SearchState>({ kind: 'idle' });
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [isOpen, setIsOpen] = useState(false);
   // The chosen name fills the input; it should not search again until the text changes.
   const chosenQuery = useRef<string | undefined>(undefined);
 
@@ -70,6 +71,8 @@ export function PlaceSearchField({
     chosenQuery.current = place.name;
     setQuery(place.name);
     setSearch({ kind: 'idle' });
+    setActiveIndex(-1);
+    setIsOpen(false);
     void controller.loadSearchedPlace(place);
   };
 
@@ -94,30 +97,44 @@ export function PlaceSearchField({
           role="combobox"
           autoComplete="off"
           placeholder="Mountain, town, lake…"
-          aria-expanded={places.length > 0}
+          aria-expanded={isOpen}
           aria-controls={`${id}-results`}
           aria-activedescendant={activeIndex >= 0 ? `${id}-result-${activeIndex}` : undefined}
           value={query}
+          onFocus={() => {
+            setIsOpen(true);
+          }}
+          onBlur={() => {
+            setIsOpen(false);
+          }}
           onChange={(event) => {
             setQuery(event.target.value);
+            setIsOpen(true);
           }}
           onKeyDown={(event) => {
             if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && places.length > 0) {
               event.preventDefault();
               const step = event.key === 'ArrowDown' ? 1 : -1;
 
-              setActiveIndex((index) => (index + step + places.length) % places.length);
+              setIsOpen(true);
+              setActiveIndex((index) =>
+                index < 0 && step < 0
+                  ? places.length - 1
+                  : (index + step + places.length) % places.length,
+              );
             } else if (event.key === 'Enter' && activeIndex >= 0 && activeIndex < places.length) {
               event.preventDefault();
               choosePlace(places[activeIndex]);
             } else if (event.key === 'Escape') {
               setSearch({ kind: 'idle' });
+              setActiveIndex(-1);
+              setIsOpen(false);
             }
           }}
         />
       </label>
-      <div className="place-search-popover">
-        {places.length > 0 && (
+      <div className="place-search-popover" data-open={isOpen}>
+        {isOpen && places.length > 0 && (
           <ul id={`${id}-results`} className="place-search-results" role="listbox">
             {places.map((place, index) => (
               <li

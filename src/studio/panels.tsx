@@ -162,7 +162,9 @@ export function TerrainPanel({ controller: c, state: s }: PanelProps): ReactNode
         </Group>
       ) : (
         <Group title="Real location">
-          <PlaceSearchField controller={c} />
+          <div className="sidebar-place-search">
+            <PlaceSearchField controller={c} />
+          </div>
           <label className="field-row">
             <span>Location</span>
             <select
