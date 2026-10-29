@@ -16,15 +16,9 @@ type SearchState =
 
 /**
  * Autocompleting place search; choosing a match loads its terrain and saves it to the menu.
- * `compact` frames it as the header's glass SearchField; otherwise it renders the legacy inspector row.
+ * Framed as the glass SearchField, in the header and in the Terrain section.
  */
-export function PlaceSearchField({
-  controller,
-  compact = false,
-}: {
-  controller: StudioController;
-  compact?: boolean;
-}): ReactNode {
+export function PlaceSearchField({ controller }: { controller: StudioController }): ReactNode {
   const id = useId();
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState<SearchState>({ kind: 'idle' });
@@ -83,7 +77,7 @@ export function PlaceSearchField({
   const input = (
     <input
       id={`${id}-search`}
-      className={compact ? searchFieldInputClassName : undefined}
+      className={searchFieldInputClassName}
       type="text"
       role="combobox"
       autoComplete="off"
@@ -146,7 +140,7 @@ export function PlaceSearchField({
           ))}
         </ul>
       )}
-      <p className="export-hint" role="status">
+      <p role="status">
         {search.kind === 'loading'
           ? 'Searching…'
           : search.kind === 'failed'
@@ -158,17 +152,5 @@ export function PlaceSearchField({
     </div>
   );
 
-  if (compact) {
-    return <SearchField label="Search" isOpen={isOpen} input={input} popover={popover} />;
-  }
-
-  return (
-    <div className="place-search">
-      <label className="field-row">
-        <span>Search</span>
-        {input}
-      </label>
-      {popover}
-    </div>
-  );
+  return <SearchField label="Search" isOpen={isOpen} input={input} popover={popover} />;
 }

@@ -5,6 +5,7 @@
  */
 import type { ControlGroupDefinition } from '../../ui/control-rows';
 import type { StudioController, StudioState } from '../controller';
+import { buildTerrainGroups } from './terrain';
 
 /**
  * Builds a section's groups from the current state. Pure apart from the callbacks it closes over:
@@ -16,4 +17,4 @@ export type ControlGroupBuilder = (
   state: StudioState,
 ) => ControlGroupDefinition[];
 
-export const controlGroupBuilders: readonly ControlGroupBuilder[] = [];
+export const controlGroupBuilders: readonly ControlGroupBuilder[] = [buildTerrainGroups];

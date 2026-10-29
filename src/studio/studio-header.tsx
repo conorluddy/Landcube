@@ -65,7 +65,7 @@ export function StudioHeader({
         }}
       />
       <div className="header-place-search" data-open={isRealSource} inert={!isRealSource}>
-        <PlaceSearchField controller={c} compact />
+        <PlaceSearchField controller={c} />
       </div>
       <BarGroup isSpacer />
       <BarGroup className="studio-actions">

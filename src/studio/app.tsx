@@ -4,18 +4,13 @@ import { flushSync } from 'react-dom';
 import { InspectorPanel } from '../ui/inspector-panel';
 import { threeDOnlySections, type StudioController, type InspectorSection } from './controller';
 import { CameraPanel, OrbitPanel } from './camera-panel';
-import {
-  ColourPanel,
-  ContoursPanel,
-  OverlaysPanel,
-  ScenePanel,
-  TerrainPanel,
-  type PanelProps,
-} from './panels';
+import { ColourPanel, ContoursPanel, OverlaysPanel, ScenePanel, type PanelProps } from './panels';
 import { Button, Group, Hint, NumberField, Range, Select, Toggle } from './fields';
 import { ExportPanel } from './export-panel';
 import { FramePanel } from './frame-panel';
-import { studioSections } from './sections';
+import { ControlGroup } from '../ui/control-group';
+import { buildTerrainGroups } from './control-groups/terrain';
+import { getGroupCode, studioSections } from './sections';
 import { StudioHeader } from './studio-header';
 import { StudioFooter } from './studio-footer';
 import type { CropPreview } from './crop-preview';
@@ -274,9 +269,7 @@ function Studio({
         isCollapsed={state.workspace.collapsed}
         headerTag={`Src · ${state.source.terrain ? 'Real' : 'Procedural'}`}
         railOrientation={isPhoneViewport ? 'horizontal' : 'vertical'}
-        renderSection={(section) => (
-          <div className="legacy-controls">{renderSectionBody(section, props, cropPreview)}</div>
-        )}
+        renderSection={(section) => renderSectionBody(section, props, cropPreview)}
       />
       <StudioFooter
         controller={c}
@@ -353,20 +346,27 @@ function renderSectionBody(
 ): ReactNode {
   switch (section) {
     case 'Terrain':
-      return <TerrainPanel {...props} />;
+      return buildTerrainGroups(props.controller, props.state).map((group) => (
+        <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
+      ));
     case 'Contours':
-      return <ContoursPanel {...props} />;
+      return legacyControls(<ContoursPanel {...props} />);
     case 'Colour':
-      return <ColourPanel {...props} />;
+      return legacyControls(<ColourPanel {...props} />);
     case 'Camera':
-      return <CameraPanel {...props} />;
+      return legacyControls(<CameraPanel {...props} />);
     case 'Scene':
-      return <ScenePanel {...props} />;
+      return legacyControls(<ScenePanel {...props} />);
     case 'Model':
-      return <ModelPanel {...props} cropPreview={cropPreview} />;
+      return legacyControls(<ModelPanel {...props} cropPreview={cropPreview} />);
     case 'Frame':
-      return <FramePanel {...props} />;
+      return legacyControls(<FramePanel {...props} />);
   }
+}
+
+/** Non-migrated sections keep the legacy field styles until #91-#93 replace them. */
+function legacyControls(panel: ReactNode): ReactNode {
+  return <div className="legacy-controls">{panel}</div>;
 }
 
 function subscribeToPhoneViewport(onChange: () => void): () => void {
