@@ -19,6 +19,8 @@ If the request does not specify an output destination, inspect the current works
 
 Use generated terrain unless the request names a real location, coordinates, or requests geographic terrain. For real terrain, use `--terrain-preset NAME` when an available preset matches; otherwise pass `--terrain real --latitude NUMBER --longitude=NUMBER --span-km NUMBER`. Use equals syntax for negative coordinates (for example `--longitude=-8.707332`) so commands also work with older CLI versions.
 
+New real-terrain designs use `--terrain-detail high`. Use `--terrain-detail max` for large prints or country-scale spans (up to 800 km, for example `--terrain-preset Ireland`), accepting a slower first run; use `standard` only to reproduce older output. Downloaded tiles are cached on disk for later runs.
+
 New real-terrain designs omit depths below sea level by default (`--max-depth 0`). Use `--max-depth METERS` when the brief calls for bathymetry, for example `--max-depth 100`. Existing configurations without `maxDepth` retain their original depth range; pass the flag explicitly to update them.
 
 For coastal artwork, inspect the generated image: the public tiles combine land elevation and bathymetry and can contain stepped source boundaries near shore. If those artifacts are visible, try `--elevation-floor METERS` to omit affected low elevations, inspect again, and report the chosen cutoff. This intentionally removes low terrain; it does not reconstruct an accurate shoreline. Omit the option when all elevations should be retained.

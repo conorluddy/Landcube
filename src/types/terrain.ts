@@ -24,3 +24,6 @@ export interface HeightField {
   spacing: number;
   values: Float64Array;
 }
+
+/** How much real-terrain source data and sampling density a render requests. */
+export type TerrainDetail = 'standard' | 'high' | 'max';

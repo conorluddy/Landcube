@@ -17,12 +17,15 @@ export const isolatedElevationOutliers: ElevationRule = {
   id: 'isolated-outliers',
   apply(values, columns, rows) {
     const output = values.slice();
+    // One reused buffer instead of a sorted array per cell keeps country-scale grids fast.
+    const neighbors = new Float64Array(8);
     let repaired = 0;
 
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < columns; x++) {
         const index = y * columns + x;
-        const neighbors: number[] = [];
+        let count = 0;
+        let allFinite = true;
 
         for (let dy = -1; dy <= 1; dy++) {
           for (let dx = -1; dx <= 1; dx++) {
@@ -30,28 +33,46 @@ export const isolatedElevationOutliers: ElevationRule = {
             const ny = y + dy;
 
             if ((dx !== 0 || dy !== 0) && nx >= 0 && nx < columns && ny >= 0 && ny < rows) {
-              neighbors.push(values[ny * columns + nx]);
+              const neighbor = values[ny * columns + nx];
+
+              allFinite &&= Number.isFinite(neighbor);
+              // Insertion keeps the buffer sorted, matching an ascending sort of the neighbours.
+              let slot = count++;
+
+              while (slot > 0 && neighbors[slot - 1] > neighbor) {
+                neighbors[slot] = neighbors[slot - 1];
+                slot--;
+              }
+
+              neighbors[slot] = neighbor;
             }
           }
         }
 
-        if (neighbors.length < minimumNeighborCount || !neighbors.every(Number.isFinite)) {
+        if (count < minimumNeighborCount || !allFinite) {
           continue;
         }
 
-        neighbors.sort((a, b) => a - b);
-        const middle = Math.floor(neighbors.length / 2);
+        const middle = Math.floor(count / 2);
         const median =
-          neighbors.length % 2
-            ? neighbors[middle]
-            : (neighbors[middle - 1] + neighbors[middle]) / 2;
+          count % 2 ? neighbors[middle] : (neighbors[middle - 1] + neighbors[middle]) / 2;
 
         if (
-          Number.isFinite(values[index]) &&
-          Math.abs(values[index] - median) >= outlierDeviationMeters &&
-          neighbors.filter((value) => Math.abs(value - median) <= neighborAgreementMeters).length >=
-            Math.ceil(neighbors.length * 0.75)
+          !Number.isFinite(values[index]) ||
+          Math.abs(values[index] - median) < outlierDeviationMeters
         ) {
+          continue;
+        }
+
+        let agreeing = 0;
+
+        for (let slot = 0; slot < count; slot++) {
+          if (Math.abs(neighbors[slot] - median) <= neighborAgreementMeters) {
+            agreeing++;
+          }
+        }
+
+        if (agreeing >= Math.ceil(count * 0.75)) {
           output[index] = median;
           repaired++;
         }

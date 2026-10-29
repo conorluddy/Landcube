@@ -1,7 +1,8 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import { preprocessElevations } from './elevation-preprocessing';
+import { isolatedElevationOutliers, preprocessElevations } from './elevation-preprocessing';
+import { createSeededRandomGenerator } from './terrain-generation';
 
 void test('repairs isolated positive and negative outliers without mutating input', () => {
   for (const height of [1832, -834]) {
@@ -91,3 +92,66 @@ void test('applies the threshold to recorded Aran values with synthetic diagonal
     }
   }
 });
+
+void test('matches a sort-per-cell reference on a seeded grid with spikes and gaps', () => {
+  const columns = 41;
+  const rows = 37;
+  const random = createSeededRandomGenerator(79);
+  const values = Float64Array.from({ length: columns * rows }, () => {
+    const roll = random();
+
+    if (roll < 0.01) {
+      return Number.NaN;
+    }
+
+    return roll < 0.08 ? (random() - 0.5) * 4000 : random() * 120;
+  });
+
+  const result = isolatedElevationOutliers.apply(values, columns, rows);
+
+  assert.ok(result.repaired > 20, `only ${result.repaired.toString()} repairs exercised`);
+  assert.deepEqual(result.values, referenceOutlierRepair(values, columns, rows));
+});
+
+/** The original rule, written plainly: collect, sort, take the median. */
+function referenceOutlierRepair(values: Float64Array, columns: number, rows: number) {
+  const output = values.slice();
+
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < columns; x++) {
+      const neighbors: number[] = [];
+
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+
+          if ((dx !== 0 || dy !== 0) && nx >= 0 && nx < columns && ny >= 0 && ny < rows) {
+            neighbors.push(values[ny * columns + nx]);
+          }
+        }
+      }
+
+      if (neighbors.length < 3 || !neighbors.every(Number.isFinite)) {
+        continue;
+      }
+
+      neighbors.sort((a, b) => a - b);
+      const middle = Math.floor(neighbors.length / 2);
+      const median =
+        neighbors.length % 2 ? neighbors[middle] : (neighbors[middle - 1] + neighbors[middle]) / 2;
+      const value = values[y * columns + x];
+
+      if (
+        Number.isFinite(value) &&
+        Math.abs(value - median) >= 500 &&
+        neighbors.filter((neighbor) => Math.abs(neighbor - median) <= 100).length >=
+          Math.ceil(neighbors.length * 0.75)
+      ) {
+        output[y * columns + x] = median;
+      }
+    }
+  }
+
+  return output;
+}

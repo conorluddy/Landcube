@@ -1,41 +1,58 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { PNG } from 'pngjs';
+import { versionOneDesignDefaults } from '../src/constants/design';
 import { defaultRealTerrainPreset } from '../src/constants/real-terrain';
+import { defaultNewTerrainDetail, getTerrainDetailProfile } from '../src/constants/terrain-detail';
 import { loadRealTerrain } from '../src/real-terrain';
 import { downloadTerrainTile } from '../src/terrain-tile-download';
 
 // Bundles the studio's opening location so first load needs no tile downloads.
-// Run with `npm run bundle:terrain` after changing the default preset.
+// Run with `npm run bundle:terrain` after changing the default preset or detail levels:
+// the studio opens at the default detail and design size, which together pick the tile zoom.
 const tileDirectory = 'public/terrain-tiles';
 const manifestPath = 'src/constants/bundled-terrain-tiles.ts';
 const tileKeyPattern = /\/terrarium\/(\d+\/\d+\/\d+)\.png$/;
 const imagerySourcesByTile: Record<string, string> = {};
 const { latitude, longitude, spanKm } = defaultRealTerrainPreset;
 
-await loadRealTerrain(latitude, longitude, spanKm, async (tileUrl) => {
-  const tileKey = tileKeyPattern.exec(tileUrl)?.[1];
+await rm(tileDirectory, { recursive: true, force: true });
+await loadRealTerrain(
+  latitude,
+  longitude,
+  spanKm,
+  async (tileUrl) => {
+    const tileKey = tileKeyPattern.exec(tileUrl)?.[1];
 
-  if (tileKey === undefined) {
-    throw new Error(`Unexpected Terrarium tile URL: ${tileUrl}`);
-  }
+    if (tileKey === undefined) {
+      throw new Error(`Unexpected Terrarium tile URL: ${tileUrl}`);
+    }
 
-  const response = await downloadTerrainTile(tileUrl);
-  const bytes = Buffer.from(await response.arrayBuffer());
-  const imagerySources = response.headers.get('x-amz-meta-x-imagery-sources') ?? '';
+    const response = await downloadTerrainTile(tileUrl);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    const imagerySources = response.headers.get('x-amz-meta-x-imagery-sources') ?? '';
 
-  // Bundled tiles must keep their credit; an empty source list would ship them unattributed.
-  if (imagerySources === '') {
-    throw new Error(`Terrarium tile ${tileKey} has no imagery sources header; retry the bundle.`);
-  }
+    // Bundled tiles must keep their credit; an empty source list would ship them unattributed.
+    if (imagerySources === '') {
+      throw new Error(`Terrarium tile ${tileKey} has no imagery sources header; retry the bundle.`);
+    }
 
-  const tilePath = `${tileDirectory}/${tileKey}.png`;
+    const tilePath = `${tileDirectory}/${tileKey}.png`;
 
-  await mkdir(tilePath.slice(0, tilePath.lastIndexOf('/')), { recursive: true });
-  await writeFile(tilePath, bytes);
-  imagerySourcesByTile[tileKey] = imagerySources;
+    await mkdir(tilePath.slice(0, tilePath.lastIndexOf('/')), { recursive: true });
+    await writeFile(tilePath, bytes);
+    imagerySourcesByTile[tileKey] = imagerySources;
 
-  return { pixels: PNG.sync.read(bytes).data, imagerySources };
-});
+    return { pixels: PNG.sync.read(bytes).data, imagerySources };
+  },
+  undefined,
+  // The studio's opening load passes no elevation floor; depth clipping does not change tiles.
+  undefined,
+  {
+    detail: defaultNewTerrainDetail,
+    frame: versionOneDesignDefaults,
+    tileBudget: getTerrainDetailProfile(defaultNewTerrainDetail)?.tileBudget.browser,
+  },
+);
 
 const entries = Object.keys(imagerySourcesByTile)
   .sort()

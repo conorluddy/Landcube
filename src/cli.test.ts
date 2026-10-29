@@ -12,6 +12,9 @@ import { validateDesignSettings } from './design-settings';
 import { createOutputRenderer } from './export/image-export';
 import type { DesignSettings } from './types/design';
 
+// Real-terrain fixtures must never read or fill the user's tile cache.
+process.env.TOPOGRA_TILE_CACHE = 'off';
+
 const executeFile = promisify(execFile);
 
 void test('CLI reports the package version', async () => {
@@ -597,4 +600,85 @@ void test('physical contour intervals round-trip through CLI configs and old con
   }
 
   assert.equal(await runCli(['generate', '--contour-interval', '25'], io), 2);
+});
+
+void test('terrain detail defaults to high for new designs and standard for older configs', async (context) => {
+  const { runCli } = await import('./cli');
+  const { PNG } = await import('pngjs');
+  const directory = await mkdtemp(join(tmpdir(), 'topogra-detail-'));
+  const tile = new PNG({ width: 256, height: 256 });
+  const requestedZooms = new Set<number>();
+
+  context.mock.method(globalThis, 'fetch', (url: string) => {
+    requestedZooms.add(Number(/\/terrarium\/(\d+)\//.exec(url)?.[1]));
+
+    return Promise.resolve(new Response(new Uint8Array(PNG.sync.write(tile))));
+  });
+  const io = {
+    stdout: { write: () => true },
+    stderr: { write: () => true },
+  } as unknown as Parameters<typeof runCli>[1];
+
+  const generate = async (name: string, ...extra: string[]) => {
+    const config = join(directory, `${name}.json`);
+
+    requestedZooms.clear();
+    assert.equal(
+      await runCli(
+        [
+          'generate',
+          ...extra,
+          '--seed',
+          '1',
+          '--output',
+          join(directory, `${name}.svg`),
+          '--save-config',
+          config,
+        ],
+        io,
+      ),
+      0,
+    );
+
+    return {
+      zooms: [...requestedZooms],
+      saved: JSON.parse(await readFile(config, 'utf8')) as {
+        terrain: { terrainDetail?: string };
+      },
+    };
+  };
+
+  const high = await generate('high', '--terrain-preset', 'Errigal');
+
+  assert.equal(high.saved.terrain.terrainDetail, 'high');
+  assert.deepEqual(high.zooms, [13]);
+
+  const standard = await generate(
+    'standard',
+    '--terrain-preset',
+    'Errigal',
+    '--terrain-detail',
+    'standard',
+  );
+
+  assert.equal(standard.saved.terrain.terrainDetail, 'standard');
+  assert.deepEqual(standard.zooms, [12]);
+
+  // Configurations saved before detail levels existed keep their version-one terrain.
+  const legacyConfig = join(directory, 'legacy-input.json');
+  const legacyTerrain: Record<string, unknown> = { ...high.saved.terrain };
+
+  delete legacyTerrain.terrainDetail;
+
+  await writeFile(legacyConfig, JSON.stringify({ ...high.saved, terrain: legacyTerrain }));
+  assert.deepEqual((await generate('legacy', '--config', legacyConfig)).zooms, [12]);
+
+  await assert.rejects(
+    runCommand(['generate', '--terrain-preset', 'Errigal', '--terrain-detail', 'ultra']),
+    /Terrain detail must be standard, high, max/,
+  );
+  await assert.rejects(
+    runCommand(['generate', '--terrain', 'generated', '--terrain-detail', 'high']),
+    /--terrain-detail requires real terrain/,
+  );
 });

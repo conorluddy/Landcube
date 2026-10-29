@@ -44,7 +44,7 @@ import { createOutputRenderer } from './export/image-export';
 import { calculateContourElevations, getTerrainTerraceLevels } from './landscape-composition';
 import { logOperationError } from './operation-logging';
 import { renderContoursIntoSvg } from './svg-rendering';
-import { createTerrainSampler, sampleTerrain } from './terrain-generation';
+import { createTerrainSampler, resolveTerrainSampling, sampleTerrain } from './terrain-generation';
 import type { CursorInfluence } from './types/cursor';
 import type { DesignChangeKind, DesignSettings } from './types/design';
 import type { Result } from './types/operations';
@@ -98,7 +98,7 @@ const cursor: CursorInfluence = { x: 0, y: 0, strength: 0 };
 const targetCursorInfluence: CursorInfluence = { ...cursor };
 let width = innerWidth;
 let height = innerHeight;
-let baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
+let baseHeightField = sampleCurrentTerrain(terrain, width, height);
 let contourElevations = calculateContourElevations(settings, engineConfiguration, realTerrain);
 let summits: ReturnType<typeof findTerrainSummits> = [];
 let contours: ReturnType<typeof extractContours> = [];
@@ -205,7 +205,7 @@ controls.connect({
       ? (x, y) => sampleLoadedTerrain(x, y)
       : createTerrainSampler(settings.seed, terrainSettings);
     cursor.strength = targetCursorInfluence.strength = 0;
-    baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
+    baseHeightField = sampleCurrentTerrain(terrain, width, height);
     renderCurrentLandscape();
   },
 });
@@ -274,7 +274,7 @@ function updateSettings(nextDesignSettings: DesignSettings): boolean {
       terrain = realTerrain
         ? (x, y) => sampleLoadedTerrain(x, y)
         : createTerrainSampler(settings.seed, terrainSettings);
-      baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
+      baseHeightField = sampleCurrentTerrain(terrain, width, height);
     }
 
     if (change === 'terrain' || change === 'contours') {
@@ -358,6 +358,8 @@ function updateTerrain3d(): void {
       ? (x: number, y: number) => loaded.sample(x, y, frame.width, frame.height)
       : terrain;
 
+    // The mesh keeps engine density: grass redraws it per shell, so denser detail sampling
+    // would multiply GPU work. It still reads the finer tiles that higher detail loads.
     modelSourceField = sampleTerrain(sampler, frame.width, frame.height, terrainSettings);
     modelSourceSampler = terrain;
     modelCrop = undefined;
@@ -616,7 +618,7 @@ const resizeViewport = () => {
   viewportResizeDebounceTimer = setTimeout(() => {
     width = nextWidth;
     height = nextHeight;
-    baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
+    baseHeightField = sampleCurrentTerrain(terrain, width, height);
     renderCurrentLandscape();
   }, engineConfiguration.resizeDebounceMs);
 };
@@ -624,7 +626,7 @@ const resizeViewport = () => {
 new ResizeObserver(resizeViewport).observe(viewport);
 width = Math.max(1, viewport.clientWidth);
 height = Math.max(1, viewport.clientHeight);
-baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
+baseHeightField = sampleCurrentTerrain(terrain, width, height);
 applyPageStyle();
 renderCurrentLandscape();
 
@@ -653,6 +655,20 @@ requestAnimationFrame(() => {
 async function openDefaultLocation(): Promise<void> {
   await controls.selectView('3d');
   await controls.useCoordinates();
+}
+
+/** 2D sampling uses the loaded real terrain's density when it brings one, else the design's. */
+function sampleCurrentTerrain(
+  sampler: (x: number, y: number) => number,
+  frameWidth: number,
+  frameHeight: number,
+): HeightField {
+  return sampleTerrain(
+    sampler,
+    frameWidth,
+    frameHeight,
+    resolveTerrainSampling(terrainSettings, realTerrain),
+  );
 }
 
 /** Keeps the active geographic patch centered as the viewport changes. */

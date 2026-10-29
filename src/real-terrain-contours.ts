@@ -1,4 +1,5 @@
-import { extractContours } from './contour-extraction';
+import { extractContours, simplifyContours } from './contour-extraction';
+import { getTerrainDetailProfile } from './constants/terrain-detail';
 import type { Contour } from './types/contours';
 import type { HeightField } from './types/terrain';
 import type { RealTerrain } from './real-terrain';
@@ -82,7 +83,11 @@ export function extractLandscapeContours(
   levels: readonly number[],
   terrain?: RealTerrain,
 ): Contour[] {
-  const contours = extractContours(field, levels);
+  const profile = getTerrainDetailProfile(terrain?.detail);
+  // Denser detail fields trace far more vertices than the output can show.
+  const contours = profile
+    ? simplifyContours(extractContours(field, levels), profile.simplifyTolerance)
+    : extractContours(field, levels);
   const interval = getRealContourInterval(terrain);
 
   if (interval !== undefined && terrain?.elevations) {

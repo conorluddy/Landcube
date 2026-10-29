@@ -191,3 +191,82 @@ export function extractContourAtElevation(field: HeightField, elevation: number)
 export function extractContours(field: HeightField, levels: readonly number[]): Contour[] {
   return levels.map((level) => extractContourAtElevation(field, level));
 }
+
+/**
+ * Ramer–Douglas–Peucker simplification: drops points within `tolerance` of the kept outline.
+ * Closed paths keep their first point and never collapse below a triangle.
+ */
+export function simplifyContours(contours: readonly Contour[], tolerance: number): Contour[] {
+  return contours.map((contour) => ({
+    ...contour,
+    paths: contour.paths.map((path) => ({
+      ...path,
+      points: simplifyContourPoints(path.points, path.closed, tolerance),
+    })),
+  }));
+}
+
+function simplifyContourPoints(
+  points: readonly ContourPoint[],
+  closed: boolean,
+  tolerance: number,
+): ContourPoint[] {
+  // A closed loop returns to its first point, so simplify it as an open path ending there.
+  const outline = closed ? [...points, points[0]] : points;
+  const last = outline.length - 1;
+
+  if (last < 2) {
+    return [...points];
+  }
+
+  const kept = new Uint8Array(outline.length);
+  const pending: [number, number][] = [[0, last]];
+
+  kept[0] = kept[last] = 1;
+
+  // An explicit stack keeps long country-scale coastlines from overflowing recursion.
+  while (pending.length > 0) {
+    const [start, end] = pending.pop() ?? [0, 0];
+    let farthest = -1;
+    let farthestDistance = tolerance;
+
+    for (let index = start + 1; index < end; index++) {
+      const distance = getSegmentDistance(outline[index], outline[start], outline[end]);
+
+      if (distance > farthestDistance) {
+        farthest = index;
+        farthestDistance = distance;
+      }
+    }
+
+    if (farthest !== -1) {
+      kept[farthest] = 1;
+      pending.push([start, farthest], [farthest, end]);
+    }
+  }
+
+  const simplified = outline.filter((_, index) => kept[index] === 1);
+
+  if (!closed) {
+    return simplified;
+  }
+
+  simplified.pop();
+
+  return simplified.length >= 3 ? simplified : [...points];
+}
+
+function getSegmentDistance(point: ContourPoint, start: ContourPoint, end: ContourPoint): number {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  const t =
+    lengthSquared === 0
+      ? 0
+      : Math.max(
+          0,
+          Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared),
+        );
+
+  return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
+}

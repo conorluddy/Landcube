@@ -1,6 +1,10 @@
 import { versionOneDesignDefaults } from '../src/constants/design';
 import { engineConfiguration } from '../src/constants/engine';
-import { extractContourAtElevation, extractContours } from '../src/contour-extraction';
+import {
+  extractContourAtElevation,
+  extractContours,
+  simplifyContours,
+} from '../src/contour-extraction';
 import { deriveTerrainConfiguration } from '../src/design-settings';
 import { calculateContourElevations } from '../src/landscape-composition';
 import { createTerrainSampler, sampleTerrain } from '../src/terrain-generation';
@@ -219,4 +223,50 @@ await test('contour segments do not cross within sampled cells across ten seeds'
       }
     }
   }
+});
+
+void test('simplification drops near-collinear points and keeps open endpoints', () => {
+  const points = Array.from({ length: 11 }, (_, index) => ({
+    x: index,
+    y: index === 5 ? 3 : (index % 2) * 0.1,
+  }));
+  const [contour] = simplifyContours([{ elevation: 0, paths: [{ points, closed: false }] }], 0.25);
+  const simplified = contour.paths[0].points;
+
+  assert.deepEqual(simplified[0], points[0]);
+  assert.deepEqual(simplified.at(-1), points.at(-1));
+  assert.ok(
+    simplified.some((point) => point.y === 3),
+    'the peak survives',
+  );
+  assert.ok(simplified.length < points.length);
+});
+
+void test('simplified closed loops keep their start and never collapse below a triangle', () => {
+  const circle = Array.from({ length: 64 }, (_, index) => ({
+    x: Math.cos((index / 64) * Math.PI * 2) * 10,
+    y: Math.sin((index / 64) * Math.PI * 2) * 10,
+  }));
+  const speck = [
+    { x: 0, y: 0 },
+    { x: 0.1, y: 0 },
+    { x: 0.05, y: 0.1 },
+  ];
+  const [contour] = simplifyContours(
+    [
+      {
+        elevation: 0,
+        paths: [
+          { points: circle, closed: true },
+          { points: speck, closed: true },
+        ],
+      },
+    ],
+    0.25,
+  );
+
+  assert.deepEqual(contour.paths[0].points[0], circle[0]);
+  assert.ok(contour.paths[0].points.length >= 3 && contour.paths[0].points.length < 64);
+  assert.deepEqual(contour.paths[1].points, speck);
+  assert.ok(contour.paths.every((path) => path.closed));
 });
