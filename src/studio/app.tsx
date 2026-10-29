@@ -458,6 +458,19 @@ function Studio({
               {state.roads.network?.attribution}
             </a>
           )}
+          {(state.source.terrain || areRoadsDrawn(state)) && (
+            <details className="mobile-attribution">
+              <summary>Data sources</summary>
+              <div>
+                {state.source.terrain && <p>{state.source.terrain.attribution}</p>}
+                {areRoadsDrawn(state) && (
+                  <a href={roadAttributionUrl} target="_blank" rel="noreferrer">
+                    {state.roads.network?.attribution} ↗
+                  </a>
+                )}
+              </div>
+            </details>
+          )}
         </div>
         <a
           className="studio-github"
