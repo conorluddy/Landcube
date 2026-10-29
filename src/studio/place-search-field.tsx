@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
   placeSearchAttribution,
   placeSearchDebounceMs,
@@ -14,7 +14,14 @@ type SearchState =
   | { kind: 'failed'; message: string };
 
 /** Autocompleting place search; choosing a match loads its terrain and saves it to the menu. */
-export function PlaceSearchField({ controller }: { controller: StudioController }): ReactNode {
+export function PlaceSearchField({
+  controller,
+  compact = false,
+}: {
+  controller: StudioController;
+  compact?: boolean;
+}): ReactNode {
+  const id = useId();
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState<SearchState>({ kind: 'idle' });
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -69,24 +76,33 @@ export function PlaceSearchField({ controller }: { controller: StudioController 
   return (
     <div className="place-search">
       <label className="field-row">
-        <span>Search</span>
+        <span className={compact ? 'visually-hidden' : undefined}>Search</span>
+        {compact && (
+          <svg className="header-search-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="1.7" />
+            <path
+              d="m15.5 15.5 4 4"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+            />
+          </svg>
+        )}
         <input
-          id="terrain-place-search"
+          id={`${id}-search`}
           type="text"
           role="combobox"
           autoComplete="off"
           placeholder="Mountain, town, lake…"
           aria-expanded={places.length > 0}
-          aria-controls="terrain-place-results"
-          aria-activedescendant={
-            activeIndex >= 0 ? `terrain-place-result-${activeIndex}` : undefined
-          }
+          aria-controls={`${id}-results`}
+          aria-activedescendant={activeIndex >= 0 ? `${id}-result-${activeIndex}` : undefined}
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
           }}
           onKeyDown={(event) => {
-            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && places.length > 0) {
               event.preventDefault();
               const step = event.key === 'ArrowDown' ? 1 : -1;
 
@@ -100,35 +116,37 @@ export function PlaceSearchField({ controller }: { controller: StudioController 
           }}
         />
       </label>
-      {places.length > 0 && (
-        <ul id="terrain-place-results" className="place-search-results" role="listbox">
-          {places.map((place, index) => (
-            <li
-              id={`terrain-place-result-${index}`}
-              key={`${place.latitude},${place.longitude},${place.name}`}
-              role="option"
-              aria-selected={index === activeIndex}
-              onMouseDown={(event) => {
-                // Keeps focus in the input so the click lands before any blur.
-                event.preventDefault();
-                choosePlace(place);
-              }}
-            >
-              <strong>{place.name}</strong>
-              {place.detail !== '' && <span>{place.detail}</span>}
-            </li>
-          ))}
-        </ul>
-      )}
-      <p className="export-hint" role="status">
-        {search.kind === 'loading'
-          ? 'Searching…'
-          : search.kind === 'failed'
-            ? search.message
-            : search.kind === 'results' && places.length === 0
-              ? 'No places found.'
-              : placeSearchAttribution}
-      </p>
+      <div className="place-search-popover">
+        {places.length > 0 && (
+          <ul id={`${id}-results`} className="place-search-results" role="listbox">
+            {places.map((place, index) => (
+              <li
+                id={`${id}-result-${index}`}
+                key={`${place.latitude},${place.longitude},${place.name}`}
+                role="option"
+                aria-selected={index === activeIndex}
+                onMouseDown={(event) => {
+                  // Keeps focus in the input so the click lands before any blur.
+                  event.preventDefault();
+                  choosePlace(place);
+                }}
+              >
+                <strong>{place.name}</strong>
+                {place.detail !== '' && <span>{place.detail}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="export-hint" role="status">
+          {search.kind === 'loading'
+            ? 'Searching…'
+            : search.kind === 'failed'
+              ? search.message
+              : search.kind === 'results' && places.length === 0
+                ? 'No places found.'
+                : placeSearchAttribution}
+        </p>
+      </div>
     </div>
   );
 }
