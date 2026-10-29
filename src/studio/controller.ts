@@ -808,6 +808,12 @@ export function createStudioController(
       };
 
       const showNextPlace = async () => {
+        if (state.source.loading) {
+          scheduleNextPlace();
+
+          return;
+        }
+
         const next = getNextAutoplayPlace(state.source.place);
 
         controller.source({
@@ -817,6 +823,7 @@ export function createStudioController(
           spanKm: next.spanKm,
         });
         await controller.loadTerrain();
+
         scheduleNextPlace();
       };
 

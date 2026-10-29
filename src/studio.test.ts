@@ -209,6 +209,26 @@ void test('autoplay tours preset locations after each delay until switched off',
   assert.equal(c.getSnapshot().source.place, secondPlace);
 });
 
+void test('the tour waits when another terrain load is in flight', async (t) => {
+  const { controller: c } = setup();
+
+  stubBrowserTileDecoding(t);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  await c.autoplay({ enabled: true, delaySeconds: 5 });
+  const before = c.getSnapshot().source.place;
+  const pendingFetch = t.mock.method(
+    globalThis,
+    'fetch',
+    () => new Promise<Response>(() => undefined),
+  );
+  void c.loadTerrain();
+  assert.equal(c.getSnapshot().source.loading, true);
+  t.mock.timers.tick(5000);
+  assert.equal(c.getSnapshot().source.place, before);
+  await c.autoplay({ enabled: false });
+  pendingFetch.mock.restore();
+});
+
 void test('default location loads bundled tiles and credits only their recorded sources', async (t) => {
   const { controller: c } = setup();
   const requestedUrls: string[] = [];
