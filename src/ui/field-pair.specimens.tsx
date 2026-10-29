@@ -18,6 +18,6 @@ function Demo(): React.JSX.Element {
 export default defineSpecimens('field-pair', [
   { variant: 'default', width: 396, render: () => <Demo /> },
   { variant: 'default', state: 'narrow', width: 200, render: () => <Demo /> },
-  { variant: 'default', state: 'just-under', width: 323, render: () => <Demo /> },
-  { variant: 'default', state: 'at-threshold', width: 324, render: () => <Demo /> },
+  { variant: 'default', state: 'just-under', width: 263, render: () => <Demo /> },
+  { variant: 'default', state: 'at-threshold', width: 264, render: () => <Demo /> },
 ]);

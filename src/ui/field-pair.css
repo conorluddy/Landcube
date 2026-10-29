@@ -9,7 +9,7 @@
   gap: var(--lc-s-4);
 }
 
-@container (max-width: 299px) {
+@container (max-width: 239px) {
   .lc-field-pair__grid {
     grid-template-columns: 1fr;
   }

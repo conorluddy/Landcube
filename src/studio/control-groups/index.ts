@@ -9,6 +9,9 @@ import { buildColourGroups } from './colour';
 import { buildContourGroups } from './contours';
 import { buildOverlayPopoverGroups } from './overlays';
 import { buildSceneGroups } from './scene';
+import { buildCameraGroups } from './camera';
+import { buildFrameGroups } from './frame';
+import { buildModelGroups } from './model';
 import { buildTerrainGroups } from './terrain';
 
 /**
@@ -27,4 +30,7 @@ export const controlGroupBuilders: readonly ControlGroupBuilder[] = [
   buildColourGroups,
   buildSceneGroups,
   buildOverlayPopoverGroups,
+  buildCameraGroups,
+  buildModelGroups,
+  buildFrameGroups,
 ];

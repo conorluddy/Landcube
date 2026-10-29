@@ -3,11 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { InspectorPanel } from '../ui/inspector-panel';
 import { threeDOnlySections, type StudioController, type InspectorSection } from './controller';
-import { CameraPanel, OrbitPanel } from './camera-panel';
 import type { PanelProps } from './panels';
-import { Button, Group, Hint, NumberField, Range, Select, Toggle } from './fields';
+import { Button, Hint } from './fields';
 import { ExportPanel } from './export-panel';
-import { FramePanel } from './frame-panel';
 import { ControlGroup } from '../ui/control-group';
 import { GlassPanel } from '../ui/glass-panel';
 import { IconButton } from '../ui/icon-button';
@@ -15,6 +13,9 @@ import { buildColourGroups } from './control-groups/colour';
 import { buildContourGroups } from './control-groups/contours';
 import { buildOverlayPopoverGroups } from './control-groups/overlays';
 import { buildSceneGroups } from './control-groups/scene';
+import { buildCameraGroups, buildOrbitGroup } from './control-groups/camera';
+import { buildFrameGroups } from './control-groups/frame';
+import { buildModelGroups } from './control-groups/model';
 import { buildTerrainGroups } from './control-groups/terrain';
 import { getGroupCode, studioSections } from './sections';
 import { StudioHeader } from './studio-header';
@@ -146,87 +147,6 @@ function Surface({
   );
 }
 
-function ModelPanel({
-  controller: c,
-  state: s,
-  cropPreview,
-}: PanelProps & { cropPreview: CropPreview }): ReactNode {
-  const host = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (host.current) {
-      return cropPreview.attach(host.current);
-    }
-  }, [cropPreview]);
-  const model = s.model;
-
-  return (
-    <>
-      <div ref={host} />
-      <Group title="Model dimensions">
-        <div className="control-grid">
-          <NumberField
-            label={model.dimensions.cropShape === 'circle' ? 'Diameter (mm)' : 'Width (X, mm)'}
-            value={model.dimensions.widthMm}
-            min={1}
-            max={1000}
-            onChange={(value) => value !== undefined && c.dimensions({ widthMm: value })}
-          />
-          {model.dimensions.cropShape !== 'circle' && (
-            <NumberField
-              label="Length (Y, mm)"
-              value={model.dimensions.lengthMm}
-              min={1}
-              max={1000}
-              onChange={(value) => value !== undefined && c.dimensions({ lengthMm: value })}
-            />
-          )}
-        </div>
-        <NumberField
-          label="Base thickness (mm)"
-          value={model.dimensions.baseThicknessMm}
-          min={0.1}
-          max={100}
-          onChange={(value) => value !== undefined && c.dimensions({ baseThicknessMm: value })}
-        />
-        <Hint>
-          Minimum material below the lowest valley. Overall height:{' '}
-          <output>{s.metrics.height?.toFixed(2) ?? '—'} mm</output>.
-        </Hint>
-      </Group>
-      <Group title="Shape">
-        <Select
-          label="Terrain shape"
-          value={model.dimensions.terrainShape ?? 'smooth'}
-          options={['smooth', 'terraced']}
-          onChange={(value) => c.dimensions({ terrainShape: value })}
-        />
-        <Toggle
-          label="Auto height for location"
-          value={model.autoExaggeration}
-          onChange={(value) => c.model({ autoExaggeration: value })}
-        />
-        <Range
-          label="Height exaggeration"
-          value={model.exaggeration}
-          min={0}
-          max={1}
-          step={0.05}
-          suffix="×"
-          onChange={(value) => c.model({ exaggeration: value, autoExaggeration: false })}
-        />
-        {model.dimensions.terrainShape === 'terraced' && (
-          <Hint>
-            Flat shelves follow the contour interval and are included in STL. Layer height:{' '}
-            {s.metrics.layerHeight?.toFixed(3) ?? '—'} mm.
-          </Hint>
-        )}
-        <Hint>Download the prepared model from Export → STL.</Hint>
-      </Group>
-    </>
-  );
-}
-
 function Studio({
   controller: c,
   terrain,
@@ -313,7 +233,7 @@ function Studio({
               <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
             ))
           ) : (
-            <OrbitPanel {...props} />
+            <ControlGroup group={buildOrbitGroup(c, state, false)} code={getGroupCode('orbit')} />
           )}
         </Surface>
       )}
@@ -384,21 +304,22 @@ function renderSectionBody(
         <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
       ));
     case 'Camera':
-      return legacyControls(<CameraPanel {...props} />);
+      return buildCameraGroups(props.controller, props.state).map((group) => (
+        <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
+      ));
     case 'Scene':
       return buildSceneGroups(props.controller, props.state).map((group) => (
         <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
       ));
     case 'Model':
-      return legacyControls(<ModelPanel {...props} cropPreview={cropPreview} />);
+      return buildModelGroups(props.controller, props.state, cropPreview).map((group) => (
+        <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
+      ));
     case 'Frame':
-      return legacyControls(<FramePanel {...props} />);
+      return buildFrameGroups(props.controller, props.state).map((group) => (
+        <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
+      ));
   }
-}
-
-/** Non-migrated sections keep the legacy field styles until #91-#93 replace them. */
-function legacyControls(panel: ReactNode): ReactNode {
-  return <div className="legacy-controls">{panel}</div>;
 }
 
 function subscribeToPhoneViewport(onChange: () => void): () => void {
