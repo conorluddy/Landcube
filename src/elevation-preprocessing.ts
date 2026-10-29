@@ -8,9 +8,11 @@ export interface ElevationRule {
   ): { values: Float64Array; repaired: number };
 }
 
-export const elevationPipelineVersion = 1;
+const outlierDeviationMeters = 500;
+const neighborAgreementMeters = 100;
+const minimumAgreeingNeighbors = 6;
 
-/** Repairs isolated outliers without changing cliff edges or reading prior repairs. */
+/** Repairs isolated outliers using the original grid; border cells need a halo. */
 export const isolatedElevationOutliers: ElevationRule = {
   id: 'isolated-outliers',
   apply(values, columns, rows) {
@@ -33,8 +35,11 @@ export const isolatedElevationOutliers: ElevationRule = {
         const median = (neighbors[3] + neighbors[4]) / 2;
 
         if (
-          Math.abs(values[index] - median) >= 500 &&
-          neighbors.filter((value) => Math.abs(value - median) <= 100).length >= 6
+          Number.isFinite(values[index]) &&
+          neighbors.every(Number.isFinite) &&
+          Math.abs(values[index] - median) >= outlierDeviationMeters &&
+          neighbors.filter((value) => Math.abs(value - median) <= neighborAgreementMeters).length >=
+            minimumAgreeingNeighbors
         ) {
           output[index] = median;
           repaired++;
@@ -53,6 +58,22 @@ export function preprocessElevations(
   rows: number,
   rules: readonly ElevationRule[] = [isolatedElevationOutliers],
 ): { values: Float64Array; repairs: Record<string, number> } {
+  if (
+    !Number.isInteger(columns) ||
+    !Number.isInteger(rows) ||
+    columns < 1 ||
+    rows < 1 ||
+    values.length !== columns * rows
+  ) {
+    throw new Error(
+      'Elevation grid dimensions must be positive integers matching the number of values.',
+    );
+  }
+
+  if (new Set(rules.map((rule) => rule.id)).size !== rules.length) {
+    throw new Error('Elevation preprocessing rule IDs must be unique.');
+  }
+
   let current = values;
   const repairs: Record<string, number> = {};
 
