@@ -57,6 +57,36 @@ test('a tray downloads at the model size plus border and clearance, leaving the 
   expect((await modelDownload(page)).equals(before)).toBe(true);
 });
 
+test('downloading selected frame parts lists each job and offers the success sheet', async ({
+  page,
+}) => {
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await section(page, 'Frame');
+  await page
+    .getByRole('group', { name: 'Frame style' })
+    .getByRole('button', { name: 'Tray', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Export ↗' }).click();
+  const batch = await download(page, 'Download selected parts');
+
+  expect(batch.filename).toMatch(/-frame-171x171mm\.stl$/);
+  const jobs = page.getByRole('list', { name: 'Frame part downloads' });
+
+  await expect(jobs.getByRole('listitem')).toHaveCount(1);
+  await expect(jobs.getByRole('listitem')).toContainText('frame STL');
+  await expect(jobs.getByRole('listitem')).toContainText('Done');
+  const success = page.getByRole('status', { name: 'frame STL downloaded' });
+
+  await expect(success).toBeVisible();
+  await expect(success.getByRole('button', { name: 'Send to printer' })).toBeDisabled();
+  await success.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(success).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Download selected parts' })).toBeEnabled();
+  await page.getByRole('checkbox', { name: /^frame/ }).uncheck();
+  await expect(page.getByRole('button', { name: 'Download selected parts' })).toBeDisabled();
+});
+
 test('switching the crop to circle rebuilds a round frame', async ({ page }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
   await page.getByRole('button', { name: '3D', exact: true }).click();

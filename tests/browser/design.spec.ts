@@ -100,6 +100,7 @@ test('SVG and PNG exports preserve settled dimensions and transparency', async (
   const opaque = await download(page, 'Download SVG');
 
   expect(opaque.bytes.toString()).toContain('fill="#202326"');
+  await expect(page.getByRole('status', { name: 'SVG downloaded' })).toBeVisible();
   await page.getByLabel('Transparent background').check();
   const transparent = await download(page, 'Download SVG');
 

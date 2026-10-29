@@ -1,0 +1,52 @@
+/* C-18 JobList: one hairline row per export job; label, size and status tag, bar while meshing. */
+.lc-job-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lc-job-list__item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-s-2) var(--lc-s-5);
+  align-items: center;
+  min-height: 34px;
+  padding: var(--lc-s-4) 0;
+  border-bottom: 1px solid var(--lc-line-subtle);
+}
+
+.lc-job-list__label {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--lc-text-body);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-body);
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-job-list__item[data-status='queued'] .lc-job-list__label {
+  color: var(--lc-text-quiet);
+}
+
+.lc-job-list__size {
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-value-s);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lc-job-list__progress,
+.lc-job-list__message {
+  flex: 1 0 100%;
+}
+
+.lc-job-list__message {
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-fs-hint);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}

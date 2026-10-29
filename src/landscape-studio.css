@@ -264,11 +264,6 @@ body,
   opacity: 0.4;
   cursor: default;
 }
-.control-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
 .range-control {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -323,11 +318,6 @@ body,
 }
 .primary-button:hover {
   background: var(--legacy-primary-hover);
-}
-.button-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 .text-button {
   color: var(--legacy-sage-soft);
@@ -397,19 +387,6 @@ body,
 }
 .studio-popover .surface-body {
   max-height: calc(100dvh - 180px);
-}
-.output-preview {
-  min-height: 80px;
-  display: grid;
-  place-items: center;
-  background: var(--legacy-preview-ground);
-  border-radius: var(--legacy-radius-8);
-  overflow: hidden;
-}
-:where(.legacy-controls) .output-preview img {
-  max-width: 100%;
-  max-height: 200px;
-  object-fit: contain;
 }
 .terrain-crop-preview {
   display: block;

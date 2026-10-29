@@ -662,3 +662,72 @@ void test('grass presets apply their look until a look value is set by hand', ()
   assert.equal(c.getSnapshot().scene.grass.lengthMm, 2);
   assert.equal(c.getSnapshot().scene.grass.baseColor, grassPresets.alpine.baseColor);
 });
+
+void test('downloading frame parts lists a job that runs queued, meshing, then done', async () => {
+  const { controller: c, effects } = setup();
+  const statusesSeen: string[] = [];
+
+  effects.downloadFrameStl = () => {
+    statusesSeen.push(...c.getSnapshot().exportJobs.map(({ status }) => status));
+  };
+
+  c.metrics(24);
+  c.frame({ preset: 'tray' });
+  const queued = c.downloadFrameStlParts(['frame']);
+
+  assert.equal(c.getSnapshot().exportJobs[0].status, 'meshing');
+  await queued;
+
+  assert.deepEqual(statusesSeen, ['meshing']);
+  const [job] = c.getSnapshot().exportJobs;
+
+  assert.equal(job.label, 'frame STL');
+  assert.equal(job.status, 'done');
+  assert.equal(job.fraction, 1);
+  assert.ok((job.sizeBytes ?? 0) > 84);
+});
+
+void test('a failing part download marks its job failed with the reason', async () => {
+  const { controller: c, effects } = setup();
+
+  effects.downloadFrameStl = () => {
+    throw new Error('Mesh is open.');
+  };
+
+  c.metrics(24);
+  c.frame({ preset: 'tray' });
+  await c.downloadFrameStlParts(['frame']);
+
+  assert.equal(c.getSnapshot().exportJobs[0].status, 'failed');
+  assert.equal(c.getSnapshot().exportJobs[0].message, 'Mesh is open.');
+});
+
+void test('part downloads are skipped while a batch is still running', async () => {
+  const { controller: c, effects } = setup();
+  let downloads = 0;
+
+  effects.downloadFrameStl = () => {
+    downloads++;
+  };
+
+  c.metrics(24);
+  c.frame({ preset: 'tray' });
+  const first = c.downloadFrameStlParts(['frame']);
+
+  await c.downloadFrameStlParts(['frame']);
+  await first;
+  assert.equal(downloads, 1);
+});
+
+void test('single downloads report whether they started', () => {
+  const { controller: c, effects } = setup();
+
+  assert.equal(c.downloadStl(), true);
+  assert.equal(c.downloadFrameStl('frame'), false);
+
+  effects.downloadStl = () => {
+    throw new Error('No model yet.');
+  };
+
+  assert.equal(c.downloadStl(), false);
+});
