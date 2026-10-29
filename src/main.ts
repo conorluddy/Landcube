@@ -16,6 +16,12 @@ import type { GrassGeography } from './grass-coverage';
 import { generatedTerrainReliefMeters, generatedTerrainSpanMeters } from './constants/grass';
 import { findTerrainSummits } from './summit-markers';
 import { getRequiredElement } from './dom-elements';
+import { awayPointer, createHudStore, type MapLocation } from './studio/hud-store';
+import {
+  locateModelFraction,
+  locateViewportPoint,
+  type ModelPlacement,
+} from './studio/hud-location';
 import './ui/ui.css';
 import './landscape-studio.css';
 import { designChangePriority, versionOneDesignDefaults } from './constants/design';
@@ -110,6 +116,11 @@ let lastContourRenderTimeMs = 0;
 let designUrlDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingChange: DesignChangeKind | undefined;
 let settingsUpdateFrameIdentifier: number | undefined;
+const hud = createHudStore();
+let pendingHudPointerEvent: PointerEvent | undefined;
+let hudPointerFrameIdentifier: number | undefined;
+let reliefField: HeightField | undefined;
+let modelPlacement: ModelPlacement | undefined;
 
 const controls = createStudioController(
   {
@@ -330,6 +341,7 @@ function renderCurrentLandscape(): void {
       ? baseHeightField
       : applyCursorElevation(baseHeightField, cursor, settings);
 
+  publishGeneratedRelief();
   contours = extractContours(field, contourElevations, realTerrain);
   summits = findTerrainSummits(field);
   seaLevel = createSeaLevelGeometry(field, width, height, realTerrain);
@@ -401,6 +413,11 @@ function updateTerrain3d(): void {
     controls.getSnapshot().savedPlaces,
   );
 
+  modelPlacement = place
+    ? { kind: 'geographic', bounds: place.bounds }
+    : realTerrain
+      ? undefined
+      : { kind: 'generated', crop: modelCrop, frame: modelSourceFrame };
   // Before the update, so the update builds roads at the new auto width. A width change also
   // rebuilds once on the previous terrain; that costs one ribbon pass per place load.
   controls.modelSpan(place ? Math.max(place.widthKm, place.lengthKm) : undefined);
@@ -528,6 +545,8 @@ function scheduleCursorAnimation(): void {
 
 /** Tracks eligible pointers while keeping control interaction deformation-free. */
 function moveCursor(event: PointerEvent): void {
+  trackHudPointer(event);
+
   if (
     terrain3d.isActive() ||
     realTerrain !== undefined ||
@@ -564,17 +583,114 @@ function releaseCursor(): void {
   scheduleCursorAnimation();
 }
 
+/** The pointer left the page or was cancelled: settle the cursor hill and hide the crosshair. */
+function releasePointer(): void {
+  pendingHudPointerEvent = undefined;
+  hud.setPointer(awayPointer);
+  releaseCursor();
+}
+
+/** Feeds the HUD crosshair: a mouse or pen over the open viewport, never over a UI surface. */
+function trackHudPointer(event: PointerEvent): void {
+  const isOverViewport =
+    event.pointerType !== 'touch' &&
+    event.target instanceof Element &&
+    event.target.closest('#studio-viewport') !== null &&
+    event.target.closest('[data-ui-surface]') === null;
+
+  if (!isOverViewport) {
+    pendingHudPointerEvent = undefined;
+    hud.setPointer(awayPointer);
+
+    return;
+  }
+
+  pendingHudPointerEvent = event;
+  hudPointerFrameIdentifier ??= requestAnimationFrame(publishHudPointer);
+}
+
+/** Locates the latest pointer once per frame; a 3D drag keeps the last location instead of ray casting. */
+function publishHudPointer(): void {
+  hudPointerFrameIdentifier = undefined;
+  const event = pendingHudPointerEvent;
+
+  if (!event) {
+    return;
+  }
+
+  const bounds = terrainSvgElement.getBoundingClientRect();
+  const point = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+
+  hud.setPointer({
+    kind: 'tracking',
+    xPx: point.x,
+    yPx: point.y,
+    location: locatePointer(event, point),
+  });
+}
+
+function locatePointer(
+  event: PointerEvent,
+  point: { x: number; y: number },
+): MapLocation | undefined {
+  if (!terrain3d.isActive()) {
+    return locateViewportPoint(point, { width, height }, realTerrain);
+  }
+
+  const previous = hud.getSnapshot().pointer;
+
+  if (event.buttons !== 0) {
+    return previous.kind === 'tracking' ? previous.location : undefined;
+  }
+
+  const fraction = terrain3d.getSurfaceFractionAt(event.clientX, event.clientY);
+
+  return fraction && modelPlacement ? locateModelFraction(fraction, modelPlacement) : undefined;
+}
+
+/** Generated terrain's elevation range on its nominal relief, recomputed when the field changes. */
+function publishGeneratedRelief(): void {
+  if (realTerrain) {
+    reliefField = undefined;
+    hud.setGeneratedRelief(undefined);
+
+    return;
+  }
+
+  if (reliefField === baseHeightField) {
+    return;
+  }
+
+  reliefField = baseHeightField;
+  let minimum = Infinity;
+  let maximum = -Infinity;
+
+  for (const value of baseHeightField.values) {
+    minimum = Math.min(minimum, value);
+    maximum = Math.max(maximum, value);
+  }
+
+  const metersPerUnit =
+    generatedTerrainReliefMeters /
+    (engineConfiguration.elevationMax - engineConfiguration.elevationMin);
+
+  hud.setGeneratedRelief({
+    minimum: Math.round((minimum - engineConfiguration.elevationMin) * metersPerUnit),
+    maximum: Math.round((maximum - engineConfiguration.elevationMin) * metersPerUnit),
+  });
+}
+
 /** Connects pointer and page lifecycle events to rendering and URL synchronization. */
 window.addEventListener('pointermove', moveCursor, { passive: true });
 window.addEventListener('pointerdown', moveCursor, { passive: true });
 window.addEventListener('pointerup', (event) => {
   if (event.pointerType === 'touch') {
-    releaseCursor();
+    releasePointer();
   }
 });
-window.addEventListener('pointercancel', releaseCursor);
-document.documentElement.addEventListener('pointerleave', releaseCursor);
-window.addEventListener('blur', releaseCursor);
+window.addEventListener('pointercancel', releasePointer);
+document.documentElement.addEventListener('pointerleave', releasePointer);
+window.addEventListener('blur', releasePointer);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     if (cursorAnimationFrameIdentifier !== undefined) {
@@ -605,7 +721,7 @@ window.addEventListener('popstate', () => {
 });
 let viewportResizeDebounceTimer: ReturnType<typeof setTimeout>;
 
-mountStudio(controls, terrainSvgElement, outputRenderer, cropPreview);
+mountStudio(controls, terrainSvgElement, outputRenderer, cropPreview, hud);
 const viewport = getRequiredElement(document, '#studio-viewport', HTMLElement);
 
 const resizeViewport = () => {

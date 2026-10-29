@@ -1,0 +1,103 @@
+/* C-07 ReadoutCard: 300px glass card; header 10/14, title Geist 22 light over place Mono 9.5. */
+.lc-readout-card {
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  max-width: 100%;
+  color: var(--lc-text-primary);
+  pointer-events: auto;
+  contain: paint;
+}
+
+.lc-readout-card__header {
+  display: flex;
+  gap: var(--lc-s-5);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--lc-s-5) var(--lc-s-7);
+  border-bottom: 1px solid var(--lc-line-subtle);
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lc-readout-card__label {
+  display: flex;
+  flex: none;
+  gap: var(--lc-s-4);
+  align-items: center;
+}
+
+.lc-readout-card__source {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lc-readout-card__identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-1);
+  padding: var(--lc-s-7) var(--lc-s-7) var(--lc-s-6);
+}
+
+.lc-readout-card__title,
+.lc-readout-card__place {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-readout-card__title {
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-title);
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.lc-readout-card__place {
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-mono);
+  font-size: 9.5px;
+  letter-spacing: var(--lc-track-head);
+  text-transform: uppercase;
+}
+
+.lc-readout-card .lc-readout-grid {
+  border-top: 1px solid var(--lc-line-subtle);
+}
+
+.lc-readout-card .lc-readout-cell {
+  padding: 9px var(--lc-s-7);
+}
+
+.lc-readout-card__scale {
+  padding: var(--lc-s-5) var(--lc-s-7) var(--lc-s-6);
+}
+
+.lc-readout-card__attribution {
+  margin: 0;
+  padding: var(--lc-s-4) var(--lc-s-7) var(--lc-s-5);
+  color: var(--lc-text-quiet);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-micro);
+  line-height: 1.45;
+}
+
+.lc-readout-card__scale + .lc-readout-card__attribution {
+  padding-top: 0;
+}
+
+@media (forced-colors: active) {
+  .lc-readout-card {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+}

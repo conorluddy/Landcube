@@ -20,6 +20,7 @@ import {
   defaultRotationSeconds,
   defaultTerrainCameraSettings,
   terrainViewPresets,
+  type CameraPose,
   type TerrainCameraSettings,
   type TerrainViewPreset,
   type TurntableDirection,
@@ -175,6 +176,8 @@ export interface StudioState {
   exportJobs: readonly ExportJob[];
   /** Measured from the rendered model; `spanKm` is its longer geographic side. */
   metrics: { height?: number; layerHeight?: number; spanKm?: number };
+  /** The 3D camera, published at most 20 times a second; undefined until the 3D view first draws. */
+  cameraPose?: CameraPose;
   /** Searched places that loaded, most recent first; kept in browser storage. */
   savedPlaces: SavedPlace[];
 }
@@ -237,6 +240,7 @@ export interface StudioController {
   /** Downloads the parts one after another, listing each in `exportJobs`. */
   downloadFrameStlParts: (partIds: readonly FramePartId[]) => Promise<void>;
   metrics: (height: number, layerHeight?: number) => void;
+  cameraPose: (pose: CameraPose) => void;
   /** Reports the model's longer geographic side; auto road width follows it. */
   modelSpan: (spanKm: number | undefined) => void;
   source: (patch: Partial<TerrainSourceState>) => void;
@@ -860,6 +864,10 @@ export function createStudioController(
 
       state = { ...state, metrics: { ...state.metrics, height, layerHeight } };
       rebuildFrame();
+      publish();
+    },
+    cameraPose(pose: CameraPose) {
+      state = { ...state, cameraPose: pose };
       publish();
     },
     modelSpan(spanKm: number | undefined) {
