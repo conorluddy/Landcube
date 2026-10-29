@@ -16,6 +16,7 @@ export const isolatedElevationOutliers: ElevationRule = {
   apply(values, columns, rows) {
     const output = values.slice();
     let repaired = 0;
+
     for (let y = 1; y < rows - 1; y++) {
       for (let x = 1; x < columns - 1; x++) {
         const index = y * columns + x;
@@ -30,6 +31,7 @@ export const isolatedElevationOutliers: ElevationRule = {
           values[index + columns + 1],
         ].sort((a, b) => a - b);
         const median = (neighbors[3] + neighbors[4]) / 2;
+
         if (
           Math.abs(values[index] - median) >= 500 &&
           neighbors.filter((value) => Math.abs(value - median) <= 100).length >= 6
@@ -39,6 +41,7 @@ export const isolatedElevationOutliers: ElevationRule = {
         }
       }
     }
+
     return { values: output, repaired };
   },
 };
@@ -49,13 +52,16 @@ export function preprocessElevations(
   columns: number,
   rows: number,
   rules: readonly ElevationRule[] = [isolatedElevationOutliers],
-) {
+): { values: Float64Array; repairs: Record<string, number> } {
   let current = values;
   const repairs: Record<string, number> = {};
+
   for (const rule of rules) {
     const result = rule.apply(current, columns, rows);
+
     current = result.values;
     repairs[rule.id] = result.repaired;
   }
+
   return { values: current, repairs };
 }
