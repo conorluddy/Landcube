@@ -101,8 +101,12 @@ export function PlaceSearchField({
           aria-controls={`${id}-results`}
           aria-activedescendant={activeIndex >= 0 ? `${id}-result-${activeIndex}` : undefined}
           value={query}
-          onFocus={() => setIsOpen(true)}
-          onBlur={() => setIsOpen(false)}
+          onFocus={() => {
+            setIsOpen(true);
+          }}
+          onBlur={() => {
+            setIsOpen(false);
+          }}
           onChange={(event) => {
             setQuery(event.target.value);
             setIsOpen(true);

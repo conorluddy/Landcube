@@ -458,7 +458,7 @@ function Studio({
               {state.roads.network?.attribution}
             </a>
           )}
-          {(state.source.terrain || areRoadsDrawn(state)) && (
+          {(state.source.terrain !== undefined || areRoadsDrawn(state)) && (
             <details className="mobile-attribution">
               <summary>Data sources</summary>
               <div>

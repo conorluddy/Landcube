@@ -221,6 +221,7 @@ void test('the tour waits when another terrain load is in flight', async (t) => 
     'fetch',
     () => new Promise<Response>(() => undefined),
   );
+
   void c.loadTerrain();
   assert.equal(c.getSnapshot().source.loading, true);
   t.mock.timers.tick(5000);
@@ -318,6 +319,7 @@ void test('a failed searched place is not saved by a later manual load', async (
 
   stubBrowserTileDecoding(t);
   const fetchStub = t.mock.method(globalThis, 'fetch', () => Promise.reject(new Error('offline')));
+
   await c.loadSearchedPlace({
     name: 'Ben Nevis',
     detail: '',

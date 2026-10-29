@@ -361,7 +361,7 @@ export function createStudioController(
     }
 
     const stored = placeStorage ? readSavedPlaces(placeStorage) : undefined;
-    const savedPlaces = addSavedPlace(stored?.ok ? stored.data : state.savedPlaces, place);
+    const savedPlaces = addSavedPlace(stored?.ok === true ? stored.data : state.savedPlaces, place);
     const written = placeStorage ? writeSavedPlaces(placeStorage, savedPlaces) : undefined;
 
     state = { ...state, savedPlaces };
