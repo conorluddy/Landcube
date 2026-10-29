@@ -9,14 +9,11 @@ import { ExportPanel } from './export-panel';
 import { ControlGroup } from '../ui/control-group';
 import { GlassPanel } from '../ui/glass-panel';
 import { IconButton } from '../ui/icon-button';
-import { buildColourGroups } from './control-groups/colour';
-import { buildContourGroups } from './control-groups/contours';
+import { createPinnedPlaceholder } from '../ui/layout-manager';
 import { buildOverlayPopoverGroups } from './control-groups/overlays';
-import { buildSceneGroups } from './control-groups/scene';
-import { buildCameraGroups, buildOrbitGroup } from './control-groups/camera';
-import { buildFrameGroups } from './control-groups/frame';
-import { buildModelGroups } from './control-groups/model';
-import { buildTerrainGroups } from './control-groups/terrain';
+import { buildOrbitGroup } from './control-groups/camera';
+import { buildSectionGroups } from './control-groups';
+import { StudioPinnedPanels } from './pinned-panels';
 import { getGroupCode, studioSections } from './sections';
 import { StudioHeader } from './studio-header';
 import { StudioFooter } from './studio-footer';
@@ -237,8 +234,15 @@ function Studio({
             hiddenSectionIds={state.workspace.view === '3d' ? [] : threeDOnlySections}
             isCollapsed={state.workspace.collapsed}
             headerTag={`Src · ${state.source.terrain ? 'Real' : 'Procedural'}`}
-            renderSection={(section) => renderSectionBody(section, props, cropPreview)}
+            renderSection={(section) =>
+              renderSectionBody(section, props, cropPreview, {
+                pinnedGroupIds: new Set(state.workspace.pinnedGroups.map(({ id }) => id)),
+                pin: c.pinGroup,
+                dock: c.dockGroup,
+              })
+            }
           />
+          <StudioPinnedPanels controller={c} state={state} cropPreview={cropPreview} />
           <StudioFooter
             controller={c}
             state={state}
@@ -312,42 +316,45 @@ function Studio({
   );
 }
 
-/** Today's legacy panel for a section; #90-#93 replace these with ControlGroup builders. */
+/** Desktop only: groups can float out of the inspector, leaving a placeholder behind. */
+interface GroupPinning {
+  pinnedGroupIds: ReadonlySet<string>;
+  pin: (id: string) => void;
+  dock: (id: string) => void;
+}
+
+/** A section's control groups; with `pinning`, pinnable groups get a pin button. */
 function renderSectionBody(
   section: InspectorSection,
   props: PanelProps,
   cropPreview: CropPreview,
+  pinning?: GroupPinning,
 ): ReactNode {
-  switch (section) {
-    case 'Terrain':
-      return buildTerrainGroups(props.controller, props.state).map((group) => (
-        <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
-      ));
-    case 'Contours':
-      return buildContourGroups(props.controller, props.state).map((group) => (
-        <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
-      ));
-    case 'Colour':
-      return buildColourGroups(props.controller, props.state).map((group) => (
-        <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
-      ));
-    case 'Camera':
-      return buildCameraGroups(props.controller, props.state).map((group) => (
-        <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
-      ));
-    case 'Scene':
-      return buildSceneGroups(props.controller, props.state).map((group) => (
-        <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
-      ));
-    case 'Model':
-      return buildModelGroups(props.controller, props.state, cropPreview).map((group) => (
-        <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
-      ));
-    case 'Frame':
-      return buildFrameGroups(props.controller, props.state).map((group) => (
-        <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
-      ));
-  }
+  return buildSectionGroups(section, props.controller, props.state, cropPreview).map((group) => {
+    const code = getGroupCode(group.id);
+
+    if (pinning?.pinnedGroupIds.has(group.id) === true) {
+      const placeholder = createPinnedPlaceholder(group, () => {
+        pinning.dock(group.id);
+      });
+
+      return <ControlGroup key={group.id} group={placeholder} code={code} />;
+    }
+
+    return (
+      <ControlGroup
+        key={group.id}
+        group={group}
+        code={code}
+        onPin={
+          pinning &&
+          (() => {
+            pinning.pin(group.id);
+          })
+        }
+      />
+    );
+  });
 }
 
 function subscribeToPhoneViewport(onChange: () => void): () => void {

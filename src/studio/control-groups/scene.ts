@@ -44,6 +44,7 @@ function buildCursorInteractionGroup(
   return {
     id: 'cursor-interaction',
     title: 'Cursor interaction',
+    isPinnable: true,
     rows: [
       toggleRow('cursorEnabled', {
         label: 'Enable interaction',
@@ -73,6 +74,7 @@ function buildSurfaceGroup(
   return {
     id: 'surface',
     title: 'Surface',
+    isPinnable: true,
     rows: [
       toggleRow('scene-surface', {
         label: 'Show land surface',
@@ -105,6 +107,7 @@ function buildGroundGroup(
   return {
     id: 'ground',
     title: 'Ground',
+    isPinnable: true,
     rows: [
       toggleRow('scene-ground', {
         label: 'Studio floor',
@@ -138,6 +141,7 @@ function buildWaterGroup(controller: StudioController, state: StudioState): Cont
   return {
     id: 'water',
     title: 'Water',
+    isPinnable: true,
     rows: [
       selectRow('scene-water-style', {
         label: 'Water style',
@@ -198,6 +202,7 @@ function buildLightingGroup(
   return {
     id: 'lighting',
     title: 'Lighting',
+    isPinnable: true,
     rows: [
       {
         kind: 'range',

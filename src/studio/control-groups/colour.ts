@@ -62,6 +62,7 @@ function buildPaletteGroup(
   return {
     id: 'palette',
     title: 'Palette',
+    isPinnable: true,
     rows: [
       tilesRow<PaletteName>('palette-presets', {
         label: 'Palette presets',
@@ -106,6 +107,7 @@ function buildMaterialsGroup(
   return {
     id: 'materials',
     title: 'Materials',
+    isPinnable: true,
     rows: [
       selectRow('material-preset', {
         label: 'Material preset',
@@ -126,6 +128,7 @@ function buildLandGroup(controller: StudioController, state: StudioState): Contr
   return {
     id: 'land',
     title: 'Land',
+    isPinnable: true,
     rows: [
       selectRow('land-finish', {
         label: 'Land finish',
@@ -174,6 +177,7 @@ function buildElevationGradientGroup(
   return {
     id: 'elevation-gradient',
     title: 'Elevation gradient',
+    isPinnable: true,
     rows: [
       toggleRow('gradient-enabled', {
         label: 'Color by elevation',
@@ -237,6 +241,7 @@ function buildWaterMaterialGroup(
   return {
     id: 'water-material',
     title: 'Water material',
+    isPinnable: true,
     rows: [
       selectRow('water-finish', {
         label: 'Water finish',

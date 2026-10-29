@@ -67,6 +67,7 @@ function buildFrameStyleGroup(
   return {
     id: 'frame',
     title: 'Frame',
+    isPinnable: true,
     rows: [
       tilesRow('frame-style', {
         label: 'Frame style',
@@ -123,6 +124,7 @@ function buildDimensionsGroup(
   return {
     id: 'dimensions',
     title: 'Dimensions',
+    isPinnable: true,
     rows: [
       millimetreRow('frame-border', isTray ? 'Border' : 'Overhang', settings.borderWidthMm, {
         min: 1.2,
@@ -168,6 +170,7 @@ function buildEdgeGroup(controller: StudioController, state: StudioState): Contr
   return {
     id: 'edge',
     title: 'Edge',
+    isPinnable: true,
     rows: [
       tilesRow('frame-edge-shape', {
         label: 'Edge shape',

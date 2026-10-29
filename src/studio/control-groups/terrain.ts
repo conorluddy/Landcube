@@ -103,6 +103,7 @@ function buildProceduralLandscapeGroup(
   return {
     id: 'procedural-landscape',
     title: 'Procedural landscape',
+    isPinnable: true,
     rows: [
       hintRow('seed-readout', [
         'Seed ',

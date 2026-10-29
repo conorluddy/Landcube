@@ -44,6 +44,7 @@ function buildModelDimensionsGroup(
   return {
     id: 'model-dimensions',
     title: 'Model dimensions',
+    isPinnable: true,
     rows: [
       cropPreview !== undefined &&
         customRow('crop-preview', () => createElement(CropPreviewHost, { cropPreview })),
@@ -89,6 +90,7 @@ function buildShapeGroup(controller: StudioController, state: StudioState): Cont
   return {
     id: 'shape',
     title: 'Shape',
+    isPinnable: true,
     rows: [
       selectRow('model-terrain-shape', {
         label: 'Terrain shape',
