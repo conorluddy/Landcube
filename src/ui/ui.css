@@ -9,6 +9,12 @@
 /* #5 selection primitives */
 
 /* #6 field primitives */
+@import './ruler-slider.css';
+@import './text-field.css';
+@import './number-field.css';
+@import './field-pair.css';
+@import './search-field.css';
+@import './color-field.css';
 
 /* #7 control groups */
 

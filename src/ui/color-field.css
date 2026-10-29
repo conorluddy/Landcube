@@ -1,0 +1,85 @@
+/* P-11 ColorField: hex readout + 22x14 swatch over an invisible native colour input. */
+.lc-color-field {
+  display: flex;
+  gap: var(--lc-s-4);
+  align-items: center;
+  min-height: var(--lc-h-xs);
+  min-width: 0;
+}
+
+.lc-color-field__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--lc-text-body);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-color-field__hex {
+  flex: none;
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-ui);
+}
+
+.lc-color-field__swatch {
+  position: relative;
+  flex: none;
+  width: 22px;
+  height: 14px;
+  border: 1px solid color-mix(in srgb, var(--lc-white) 20%, transparent);
+  border-radius: var(--lc-r-inner);
+}
+
+.lc-color-field__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.lc-color-field__swatch:has(.lc-color-field__input:focus-visible),
+[data-force-state='focus'] .lc-color-field__swatch {
+  outline: 2px solid var(--lc-line-focus);
+  outline-offset: 2px;
+}
+
+.lc-color-field__input:focus-visible {
+  outline: none;
+}
+
+.lc-color-field__swatch:hover,
+[data-force-state='hover'] .lc-color-field__swatch {
+  border-color: var(--lc-line-hover);
+}
+
+[data-force-state='active'] .lc-color-field__swatch {
+  border-color: var(--lc-bone);
+}
+
+.lc-color-field:has(.lc-color-field__input:disabled) {
+  opacity: 0.5;
+}
+
+.lc-color-field__input:disabled {
+  cursor: not-allowed;
+}
+
+@media (forced-colors: active) {
+  .lc-color-field__swatch {
+    border-color: CanvasText;
+    forced-color-adjust: none;
+  }
+
+  .lc-color-field__input {
+    opacity: 1;
+    appearance: auto;
+  }
+}
