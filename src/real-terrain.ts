@@ -1,6 +1,7 @@
 import type { RealContourInterval } from './real-terrain-contours';
 import { realTerrainBounds } from './constants/real-terrain';
 import { getMercatorSpanFraction, getMercatorX, getMercatorY } from './real-terrain-projection';
+import { preprocessElevations } from './elevation-preprocessing';
 
 export interface RealTerrain {
   sample: (x: number, y: number, width: number, height: number) => number;
@@ -97,6 +98,8 @@ export async function loadRealTerrain(
   }
 
   await Promise.all(requests);
+
+  elevations.set(preprocessElevations(elevations, columns, rows).values);
 
   // Opt-in clipping avoids inventing coastline geometry or changing legacy terrain.
   if (effectiveFloor !== undefined) {
