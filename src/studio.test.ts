@@ -259,6 +259,57 @@ void test('a searched place is saved and listed once its terrain loads', async (
   assert.deepEqual(setup(undefined, storage).controller.getSnapshot().savedPlaces, [saved]);
 });
 
+void test('searched places from separate tabs are merged when each load succeeds', async (t) => {
+  const items = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => items.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      items.set(key, value);
+    },
+  };
+  const first = setup(undefined, storage).controller;
+  const second = setup(undefined, storage).controller;
+
+  stubBrowserTileDecoding(t);
+  await first.loadSearchedPlace({
+    name: 'Ben Nevis',
+    detail: '',
+    latitude: 56.7969,
+    longitude: -5.0035,
+    provider: 'photon',
+  });
+  await second.loadSearchedPlace({
+    name: 'Snowdon',
+    detail: '',
+    latitude: 53.0685,
+    longitude: -4.076,
+    provider: 'photon',
+  });
+  assert.deepEqual(
+    setup(undefined, storage)
+      .controller.getSnapshot()
+      .savedPlaces.map((place) => place.name),
+    ['Snowdon', 'Ben Nevis'],
+  );
+});
+
+void test('a failed searched place is not saved by a later manual load', async (t) => {
+  const { controller: c } = setup();
+
+  stubBrowserTileDecoding(t);
+  const fetchStub = t.mock.method(globalThis, 'fetch', () => Promise.reject(new Error('offline')));
+  await c.loadSearchedPlace({
+    name: 'Ben Nevis',
+    detail: '',
+    latitude: 56.7969,
+    longitude: -5.0035,
+    provider: 'photon',
+  });
+  fetchStub.mock.restore();
+  await c.loadTerrain();
+  assert.deepEqual(c.getSnapshot().savedPlaces, []);
+});
+
 void test('bundled tiles served as HTML fall back to the public tile service', async (t) => {
   const { controller: c } = setup();
   const requestedUrls: string[] = [];

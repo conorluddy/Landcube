@@ -352,16 +352,16 @@ export function createStudioController(
   const listeners = new Set<() => void>();
   const roadLoader = createRoadNetworkLoader(fetchRoads);
 
-  const saveSearchedPlace = (location: { latitude: number; longitude: number }) => {
-    const place = pendingSearchedPlace;
-
-    pendingSearchedPlace = undefined;
-
+  const saveSearchedPlace = (
+    place: SavedPlace | undefined,
+    location: { latitude: number; longitude: number },
+  ) => {
     if (!place || !isSameSavedPlace(place, location)) {
       return;
     }
 
-    const savedPlaces = addSavedPlace(state.savedPlaces, place);
+    const stored = placeStorage ? readSavedPlaces(placeStorage) : undefined;
+    const savedPlaces = addSavedPlace(stored?.ok ? stored.data : state.savedPlaces, place);
     const written = placeStorage ? writeSavedPlaces(placeStorage, savedPlaces) : undefined;
 
     state = { ...state, savedPlaces };
@@ -906,6 +906,9 @@ export function createStudioController(
     async loadTerrain() {
       const version = ++requestVersion;
       const source = state.source;
+      const searchedPlace = pendingSearchedPlace;
+
+      pendingSearchedPlace = undefined;
 
       controller.source({ loading: true, status: 'Downloading elevation tiles…' });
 
@@ -923,7 +926,7 @@ export function createStudioController(
         }
 
         loadedFieldsKey = getSourceFieldsKey(source);
-        saveSearchedPlace(source);
+        saveSearchedPlace(searchedPlace, source);
         applySource(
           {
             ...terrain,
@@ -990,6 +993,7 @@ export function createStudioController(
       return placeSearcher.search(query);
     },
     async loadSearchedPlace(match) {
+      void controller.autoplay({ enabled: false });
       pendingSearchedPlace = {
         name: match.name,
         region: match.detail,
