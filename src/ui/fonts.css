@@ -1,0 +1,43 @@
+/*
+ * Self-hosted Geist typefaces (SIL OFL 1.1, Vercel). Licence: public/fonts/LICENSE-Geist.txt.
+ * The woff2 files sit beside this stylesheet so Vite hashes them and rewrites the URLs for `base`.
+ *
+ * Fallback metric overrides are approximate, tuned by eye against Arial and Menlo/Courier New
+ * so the webfont swap causes little layout shift. To recompute exact values, run
+ * `npx fontaine` (or the `capsize` metrics tool) against the Geist and Geist Mono files and
+ * compare with the local system font's ascent, descent, line gap and average width.
+ */
+
+@font-face {
+  font-family: 'Geist';
+  src: url('./fonts/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('./fonts/GeistMono-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Fallback';
+  src: local('Arial');
+  size-adjust: 104%;
+  ascent-override: 86%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Geist Mono Fallback';
+  src: local('Menlo'), local('Courier New');
+  size-adjust: 101%;
+  ascent-override: 88%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}

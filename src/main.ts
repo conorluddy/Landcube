@@ -1,3 +1,4 @@
+import './ui/fonts.css';
 import { cropTerrainModelField } from './terrain-model';
 import type { HeightField } from './types/terrain';
 import { createSeaLevelGeometry, type SeaLevelGeometry } from './sea-level';
