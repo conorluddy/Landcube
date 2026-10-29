@@ -45,6 +45,7 @@ void test('real terrain shows autoplay and real location with the legacy field i
     'terrain-elevation-floor',
     'terrain-elevation-hint',
     'load-terrain',
+    'terrain-empty',
     'terrain-status',
     'terrain-session-hint',
     'terrain-sources-link',

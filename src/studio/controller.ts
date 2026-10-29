@@ -51,6 +51,7 @@ import { operationErrorCodes } from '../constants/operations';
 import type { RoadNetwork, RoadStyle } from '../types/roads';
 import { createRoadNetworkLoader, getRoadPlacementKey } from './road-loader';
 import { createPlaceSearcher } from './place-searcher';
+import { describeTerrainFault, type StudioFault, type TerrainLoadProgress } from './terrain-fault';
 import type { PlaceMatch } from '../place-search';
 import {
   addSavedPlace,
@@ -120,6 +121,8 @@ export interface RoadNetworkState {
   status: string;
   /** The last download failed in a way a later attempt may fix. */
   canRetry: boolean;
+  /** The last download failed; `status` explains why. */
+  hasFailed: boolean;
 }
 export interface TerrainSourceState {
   selected: 'generated' | 'real';
@@ -135,6 +138,10 @@ export interface TerrainSourceState {
   hatching: boolean;
   loading: boolean;
   status: string;
+  /** Tiles downloaded so far; null before the first report and whenever nothing is loading. */
+  loadProgress: TerrainLoadProgress | null;
+  /** The last load failure, shown as a FaultCard until dismissed, retried or superseded. */
+  fault: StudioFault | null;
   /** Steps through preset locations in menu order, waiting after each load settles. */
   autoplay: { enabled: boolean; delaySeconds: number };
 }
@@ -231,6 +238,9 @@ export interface StudioController {
   /** Switches to real terrain, opening its location controls and loading the selected place. */
   useCoordinates: () => Promise<void>;
   loadTerrain: () => Promise<void>;
+  /** Stops the running terrain download; tiles already cached stay cached. */
+  cancelTerrainLoad: () => void;
+  dismissTerrainFault: () => void;
   autoplay: (patch: Partial<TerrainSourceState['autoplay']>) => Promise<void>;
   daylightCycle: (patch: Partial<SceneSettings['daylightCycle']>) => void;
   /** Edits road style; switching roads on for real terrain fetches them once. */
@@ -278,6 +288,8 @@ export function createStudioController(
       hatching: true,
       loading: false,
       status: '',
+      loadProgress: null,
+      fault: null,
       autoplay: { enabled: false, delaySeconds: 10 },
     },
     scene: {
@@ -318,7 +330,7 @@ export function createStudioController(
       roads: { ...defaultRoadStyle },
       grass: { ...defaultGrassStyle },
     },
-    roads: { sourceKey: '', loading: false, status: '', canRetry: false },
+    roads: { sourceKey: '', loading: false, status: '', canRetry: false, hasFailed: false },
     model: {
       dimensions: { ...defaultTerrainModelSettings },
       crop: { ...defaultTerrainCrop },
@@ -342,6 +354,7 @@ export function createStudioController(
   };
   let effects: StudioEffects | undefined;
   let requestVersion = 0;
+  let terrainLoadCancel: AbortController | undefined;
   // Saved once its terrain loads, so a failed or superseded load never lists the place.
   let pendingSearchedPlace: SavedPlace | undefined;
   // Procedural mode parks the last real terrain so switching back is instant.
@@ -440,7 +453,13 @@ export function createStudioController(
       roadLoader.cancel();
       state = {
         ...state,
-        roads: { sourceKey: roadSourceKey, loading: false, status: '', canRetry: false },
+        roads: {
+          sourceKey: roadSourceKey,
+          loading: false,
+          status: '',
+          canRetry: false,
+          hasFailed: false,
+        },
       };
     }
 
@@ -492,7 +511,12 @@ export function createStudioController(
       return;
     }
 
-    setRoads({ loading: true, status: 'Downloading OpenStreetMap roads…', canRetry: false });
+    setRoads({
+      loading: true,
+      status: 'Downloading OpenStreetMap roads…',
+      canRetry: false,
+      hasFailed: false,
+    });
     let result: Awaited<ReturnType<typeof roadLoader.load>>;
 
     try {
@@ -514,7 +538,12 @@ export function createStudioController(
     }
 
     if (!result.ok) {
-      setRoads({ loading: false, status: result.error.message, canRetry: result.error.retryable });
+      setRoads({
+        loading: false,
+        status: result.error.message,
+        canRetry: result.error.retryable,
+        hasFailed: true,
+      });
 
       return;
     }
@@ -872,6 +901,7 @@ export function createStudioController(
       void controller.autoplay({ enabled: false });
 
       requestVersion++;
+      terrainLoadCancel?.abort();
 
       if (state.source.terrain) {
         parked = { terrain: state.source.terrain, fieldsKey: loadedFieldsKey };
@@ -880,6 +910,8 @@ export function createStudioController(
       controller.source({
         selected: 'generated',
         loading: false,
+        loadProgress: null,
+        fault: null,
         status: 'Using generated terrain.',
       });
       applySource(undefined, true);
@@ -918,7 +950,17 @@ export function createStudioController(
 
       pendingSearchedPlace = undefined;
 
-      controller.source({ loading: true, status: 'Downloading elevation tiles…' });
+      terrainLoadCancel?.abort();
+      const cancel = new AbortController();
+      let latestProgress: TerrainLoadProgress | null = null;
+
+      terrainLoadCancel = cancel;
+      controller.source({
+        loading: true,
+        status: 'Downloading elevation tiles…',
+        loadProgress: null,
+        fault: null,
+      });
 
       try {
         const terrain = await loadBrowserRealTerrain(
@@ -927,6 +969,16 @@ export function createStudioController(
           source.spanKm,
           source.elevationFloor,
           source.maxDepth,
+          {
+            cancelSignal: cancel.signal,
+            onProgress: (loaded, total) => {
+              latestProgress = { loaded, total };
+
+              if (version === requestVersion) {
+                controller.source({ loadProgress: latestProgress });
+              }
+            },
+          },
         );
 
         if (version !== requestVersion) {
@@ -949,16 +1001,31 @@ export function createStudioController(
         });
       } catch (error) {
         if (version === requestVersion) {
-          controller.source({
-            status:
-              error instanceof Error ? error.message : 'Terrain could not load. Please retry.',
-          });
+          const fault = describeTerrainFault(error, latestProgress);
+
+          controller.source({ status: fault.message, fault });
         }
       } finally {
         if (version === requestVersion) {
-          controller.source({ loading: false });
+          controller.source({ loading: false, loadProgress: null });
         }
       }
+    },
+    cancelTerrainLoad() {
+      if (!state.source.loading) {
+        return;
+      }
+
+      requestVersion++;
+      terrainLoadCancel?.abort();
+      controller.source({
+        loading: false,
+        loadProgress: null,
+        status: 'Terrain download cancelled.',
+      });
+    },
+    dismissTerrainFault() {
+      controller.source({ fault: null });
     },
     grass(patch: Partial<GrassStyle>) {
       const preset =

@@ -2,9 +2,12 @@ import type { Specimen } from '../ui/specimens';
 import { specimenKey } from '../ui/specimens';
 
 // Later components add `src/ui/<name>.specimens.tsx`; no edit needed here.
-const modules = import.meta.glob<{ default: Specimen[] }>('../ui/*.specimens.tsx', {
-  eager: true,
-});
+const modules = import.meta.glob<{ default: Specimen[] }>(
+  ['../ui/*.specimens.tsx', '../ui/overlays/*.specimens.tsx'],
+  {
+    eager: true,
+  },
+);
 const allSpecimens = Object.values(modules).flatMap((module) => module.default);
 const forceableStates = ['hover', 'focus', 'active'];
 

@@ -22,6 +22,7 @@ import {
   statusRow,
   toggleRow,
 } from '../control-rows';
+import { EmptyState } from '../../ui/empty-state';
 import { PlaceSearchField } from '../place-search-field';
 
 // === PUBLIC API ===
@@ -226,6 +227,16 @@ function buildRealLocationGroup(
           void controller.loadTerrain();
         },
       }),
+      source.selected === 'real' &&
+        !source.terrain &&
+        !source.loading &&
+        customRow('terrain-empty', () =>
+          createElement(
+            EmptyState,
+            { glyph: '◇', title: 'No terrain loaded' },
+            'Choose a place or enter coordinates, then load terrain.',
+          ),
+        ),
       statusRow('terrain-status', {
         kind: 'info',
         isAlwaysMounted: true,

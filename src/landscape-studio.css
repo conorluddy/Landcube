@@ -487,6 +487,31 @@ body,
   bottom: calc(60px + env(safe-area-inset-bottom));
   z-index: 2;
 }
+/* Loader and fault cards (#96) sit top-left of the viewport, clear of the inspector. */
+.studio-viewport-states {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.studio-viewport-states__card {
+  position: absolute;
+  top: 60px;
+  left: var(--lc-s-6);
+  width: min(420px, calc(100% - 432px));
+  pointer-events: auto;
+}
+@container studio-shell (width < 768px) {
+  .studio-viewport-states__card {
+    right: var(--lc-s-6);
+    width: auto;
+  }
+  .studio-viewport-states__card .lc-loader-card,
+  .studio-viewport-states__card .lc-fault-card {
+    max-width: none;
+  }
+}
 .studio-brand {
   padding: 0 var(--lc-s-6);
 }

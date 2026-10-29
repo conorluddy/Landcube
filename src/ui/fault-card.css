@@ -1,0 +1,81 @@
+/* C-15 FaultCard: diamond, E-code and title, metric right; full-width primary, secondaries side by side. */
+.lc-fault-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-6);
+  width: 100%;
+  max-width: 420px;
+  min-width: 0;
+  padding: var(--lc-s-8);
+  color: var(--lc-text-body);
+}
+
+.lc-fault-card[data-inline='true'] {
+  padding: var(--lc-s-5);
+  border: 1px solid var(--lc-line);
+  border-radius: var(--lc-r-control);
+  background: var(--lc-fill-field);
+}
+
+.lc-fault-card__header {
+  display: flex;
+  gap: var(--lc-s-5);
+  align-items: center;
+  min-width: 0;
+}
+
+.lc-fault-card__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--lc-text-strong);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-label);
+  line-height: 16px;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.lc-fault-card__code {
+  color: var(--lc-text-primary);
+}
+
+.lc-fault-card__metric {
+  flex: none;
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lc-fault-card__body {
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-body);
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.lc-fault-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-4);
+}
+
+.lc-fault-card__secondary {
+  display: flex;
+  gap: var(--lc-s-4);
+}
+
+.lc-fault-card__secondary > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+@media (forced-colors: active) {
+  .lc-fault-card[data-inline='true'] {
+    border-color: CanvasText;
+  }
+}

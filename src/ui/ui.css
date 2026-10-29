@@ -47,6 +47,11 @@
 @import './popover.css';
 
 /* #15 faults */
+@import './fault-card.css';
+@import './empty-state.css';
+@import './loader-card.css';
+@import './overlays/no-data-hatch.css';
+@import './overlays/tile-resolve.css';
 
 /* #16 mobile sheet */
 

@@ -4,6 +4,8 @@ import {
   placeSearchDebounceMs,
   placeSearchMinimumQueryLength,
 } from '../constants/place-search';
+import { getFault } from '../constants/faults';
+import { operationErrorCodes } from '../constants/operations';
 import type { PlaceMatch } from '../place-search';
 import type { StudioController } from './controller';
 import { SearchField, searchFieldInputClassName } from '../ui/search-field';
@@ -144,7 +146,7 @@ export function PlaceSearchField({ controller }: { controller: StudioController 
         {search.kind === 'loading'
           ? 'Searching…'
           : search.kind === 'failed'
-            ? search.message
+            ? `${getFault(operationErrorCodes.placeSearchFailed).code} · ${search.message}`
             : search.kind === 'results' && places.length === 0
               ? 'No places found.'
               : placeSearchAttribution}

@@ -1,0 +1,20 @@
+/* O-09 NoDataHatch: static hairline hatch filling its positioned parent. */
+.lc-no-data-hatch {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: repeating-linear-gradient(-45deg, var(--lc-line-strong) 0 1px, transparent 1px 9px);
+  pointer-events: none;
+}
+
+.lc-no-data-hatch .lc-tag {
+  background: var(--lc-glass-tip);
+}
+
+@media (forced-colors: active) {
+  .lc-no-data-hatch {
+    background: repeating-linear-gradient(-45deg, CanvasText 0 1px, transparent 1px 9px);
+  }
+}

@@ -1,0 +1,47 @@
+/* C-17 LoaderCard: glass card, title and percent over detail, 2px bar, CANCEL. */
+.lc-loader-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-5);
+  align-items: stretch;
+  width: 100%;
+  max-width: 320px;
+  min-width: 0;
+  padding: var(--lc-s-8);
+  color: var(--lc-text-body);
+}
+
+.lc-loader-card__header {
+  display: flex;
+  gap: var(--lc-s-5);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.lc-loader-card__title,
+.lc-loader-card__detail,
+.lc-loader-card__percent {
+  margin: 0;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-label);
+  text-transform: uppercase;
+}
+
+.lc-loader-card__title {
+  color: var(--lc-text-strong);
+}
+
+.lc-loader-card__percent {
+  color: var(--lc-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-loader-card__detail {
+  color: var(--lc-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-loader-card .lc-button {
+  align-self: flex-end;
+}

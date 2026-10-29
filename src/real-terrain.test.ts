@@ -3,6 +3,7 @@ import { access } from 'node:fs/promises';
 import test from 'node:test';
 import { validateDesignSettings } from './design-settings';
 import type { RealTerrain, TerrainTileLoader } from './real-terrain';
+import type { TerrainLoadError } from './terrain-load-error';
 import { decodeTerrariumElevation, loadRealTerrain } from './real-terrain';
 import { createOutputRenderer } from './export/image-export';
 import { engineConfiguration } from './constants/engine';
@@ -50,6 +51,41 @@ void test('invalid geographic bounds fail before requesting tiles', async () => 
   await assert.rejects(loadRealTerrain(90, 0, 25, unusedTileLoader), /latitude/);
   await assert.rejects(loadRealTerrain(53, NaN, 25, unusedTileLoader), /longitude/);
   await assert.rejects(loadRealTerrain(53, -6, 0, unusedTileLoader), /2–200/);
+});
+
+void test('tile progress reports 0 of N, then each finished tile', async () => {
+  const pixels = new Uint8Array(terrainTilePixelCount);
+  const reports: [number, number][] = [];
+
+  await loadRealTerrain(
+    53.1203518,
+    -9.7056319,
+    120,
+    () => Promise.resolve({ pixels, imagerySources: 'eudem' }),
+    undefined,
+    undefined,
+    (loadedTiles, totalTiles) => reports.push([loadedTiles, totalTiles]),
+  );
+
+  const totalTiles = reports[0][1];
+
+  assert.deepEqual(reports[0], [0, totalTiles]);
+  assert.equal(reports.length, totalTiles + 1);
+  assert.deepEqual(reports.at(-1), [totalTiles, totalTiles]);
+  assert.ok(reports.every(([, total]) => total === totalTiles));
+});
+
+void test('out-of-range locations and bad tiles carry a fault kind', async () => {
+  await assert.rejects(
+    loadRealTerrain(90, 0, 25, unusedTileLoader),
+    (error: TerrainLoadError) => error.kind === 'locationOutOfRange',
+  );
+  await assert.rejects(
+    loadRealTerrain(53, -6, 25, () =>
+      Promise.resolve({ pixels: new Uint8Array(4), imagerySources: '' }),
+    ),
+    (error: TerrainLoadError) => error.kind === 'tileDecodeFailed',
+  );
 });
 
 void test('fixture-backed terrain uses decoded pixels, normalized sampling, and source attribution', async () => {
