@@ -1,0 +1,113 @@
+/* C-03/04 SectionRail: index (Mono 8.5) over the name (Mono 10, tracked caps). Active = fill + 2px bone bar. */
+.lc-section-rail {
+  display: flex;
+  min-width: 0;
+}
+
+.lc-section-rail[data-orientation='vertical'] {
+  flex-direction: column;
+  gap: var(--lc-s-1);
+}
+
+.lc-section-rail[data-orientation='horizontal'] {
+  gap: var(--lc-s-3);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.lc-section-rail__item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+  min-width: 0;
+  margin: 0;
+  padding: 9px var(--lc-s-6);
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--lc-text-tertiary);
+  cursor: pointer;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-ui);
+  letter-spacing: var(--lc-track-ui);
+  line-height: 12px;
+  text-align: left;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  transition:
+    background var(--lc-dur-fast) var(--lc-ease),
+    color var(--lc-dur-fast) var(--lc-ease);
+  white-space: nowrap;
+}
+
+.lc-section-rail__title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The index is drawn here so the button's text, and so its name, stay the bare title. */
+.lc-section-rail__item::before {
+  content: attr(data-index);
+  color: var(--lc-text-disabled);
+  font-size: var(--lc-fs-micro);
+  letter-spacing: var(--lc-track-coord);
+  line-height: 10px;
+}
+
+.lc-section-rail[data-orientation='horizontal'] .lc-section-rail__item {
+  flex: none;
+  min-width: 72px;
+  border: 1px solid var(--lc-line);
+  border-radius: var(--lc-r-control);
+  scroll-snap-align: start;
+}
+
+.lc-section-rail__item[aria-pressed='true'] {
+  background: var(--lc-fill-active);
+  box-shadow: inset 2px 0 0 var(--lc-bone);
+  color: var(--lc-text-primary);
+}
+
+.lc-section-rail[data-orientation='horizontal'] .lc-section-rail__item[aria-pressed='true'] {
+  border-color: var(--lc-bone);
+  box-shadow: none;
+}
+
+.lc-section-rail__item[aria-pressed='true']::before {
+  color: var(--lc-text-tertiary);
+}
+
+.lc-section-rail__item:hover:not([aria-pressed='true']),
+[data-force-state='hover'] .lc-section-rail__item:not([aria-pressed='true']) {
+  background: var(--lc-fill-hover);
+  color: var(--lc-text-strong);
+}
+
+.lc-section-rail__item:focus-visible,
+[data-force-state='focus'] .lc-section-rail__item[aria-pressed='true'] {
+  outline: 2px solid var(--lc-line-focus);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-section-rail__item {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-section-rail__item[aria-pressed='true'] {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  .lc-section-rail__item[aria-pressed='true']::before {
+    color: HighlightText;
+  }
+}

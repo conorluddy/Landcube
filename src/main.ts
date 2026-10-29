@@ -532,7 +532,7 @@ function moveCursor(event: PointerEvent): void {
     terrain3d.isActive() ||
     realTerrain !== undefined ||
     !settings.cursorEnabled ||
-    (event.target instanceof Element && event.target.closest('header, aside, footer, dialog'))
+    (event.target instanceof Element && event.target.closest('[data-ui-surface]'))
   ) {
     if (targetCursorInfluence.strength !== 0) {
       releaseCursor();

@@ -36,6 +36,10 @@
 @import './control-group.css';
 
 /* #8 shell */
+@import './floating-bar.css';
+@import './glass-panel.css';
+@import './section-rail.css';
+@import './inspector-panel.css';
 
 /* #13 export */
 

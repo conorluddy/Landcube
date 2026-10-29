@@ -25,6 +25,15 @@
   box-shadow: var(--lc-shadow-panel);
 }
 
+/* Blur over a repainting WebGL canvas costs frames: while the camera moves, glass trades blur for alpha. */
+[data-motion='active'] .lc-glass,
+[data-motion='active'] .lc-search-field__frame,
+[data-motion='active'] .lc-segmented[data-on-glass-bar] {
+  background: var(--lc-glass-sheet);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 /* Without blur or with reduced transparency the surface must stay legible. */
 @supports not (backdrop-filter: blur(1px)) {
   .lc-glass {

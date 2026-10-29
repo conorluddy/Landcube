@@ -10,7 +10,7 @@ body {
   padding: var(--lc-s-10);
 }
 
-.specimens h2 {
+.specimens > section > h2 {
   margin: var(--lc-s-10) 0 var(--lc-s-6);
   font-family: var(--lc-font-mono);
   font-size: var(--lc-fs-label);
