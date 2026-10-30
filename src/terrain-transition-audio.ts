@@ -70,7 +70,15 @@ export function createTerrainTransitionAudio(): TerrainTransitionAudio {
         }
 
         isStarting = false;
-        current = startRumble(audioContext, loaded);
+        const rumble = startRumble(audioContext, loaded);
+
+        current = rumble;
+        // A finished rumble can't be revived, so a later sustain must start a fresh one.
+        rumble.source.addEventListener('ended', () => {
+          if (current === rumble) {
+            current = undefined;
+          }
+        });
         scheduleEnd(current, audioContext.currentTime, audioContext.currentTime + durationSeconds);
       },
       (error: unknown) => {
