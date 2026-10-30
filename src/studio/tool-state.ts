@@ -1,6 +1,10 @@
 import { getTerrainCropBounds, type TerrainCropSettings } from '../terrain-crop';
 import type { CropFrameHandle } from '../ui/overlays/crop-frame';
-import type { MapLocation } from './hud-store';
+import type { RealTerrain } from '../real-terrain';
+import { measureGroundMeters } from '../route-sampling';
+import { projectToRealTerrainFrame } from '../real-terrain-projection';
+import type { GeoPoint, RouteEditing } from '../types/terrain-analysis';
+import type { LocationProjector, MapLocation } from './hud-store';
 
 /**
  * Pure math for the on-canvas tools (#102): crop frame handles that resize `model.crop` with the
@@ -36,6 +40,75 @@ const shiftNudgeFraction = 0.05;
 const earthRadiusMeters = 6_371_008.8;
 
 // === PUBLIC API ===
+
+export type RouteKeyAction = 'finish' | 'escape' | 'delete';
+
+/** What a key does to the route being drawn or edited; nothing while it is only being viewed. */
+export function getRouteKeyAction(key: string, editing: RouteEditing): RouteKeyAction | undefined {
+  if (editing.mode === 'viewing') {
+    return undefined;
+  }
+
+  if (key === 'Enter') {
+    return 'finish';
+  }
+
+  if (key === 'Escape') {
+    return 'escape';
+  }
+
+  return (key === 'Delete' || key === 'Backspace') && editing.selectedIndex !== undefined
+    ? 'delete'
+    : undefined;
+}
+
+/** Only a place on Earth can be a waypoint; generated terrain's local metres cannot. */
+export function toGeoPoint(location: MapLocation | undefined): GeoPoint | undefined {
+  return location?.kind === 'geographic'
+    ? { latitude: location.latitude, longitude: location.longitude }
+    : undefined;
+}
+
+/** Where a new waypoint goes when its segment is clicked: halfway, before the user drags it. */
+export function getSegmentMidpoint(from: GeoPoint, to: GeoPoint): GeoPoint {
+  return {
+    latitude: (from.latitude + to.latitude) / 2,
+    longitude: (from.longitude + to.longitude) / 2,
+  };
+}
+
+/**
+ * Screen position of a route point: the 2D frame projection, as `RouteLine` draws it, or in 3D the
+ * camera projector (`view.projectLocation`), which is undefined off the model or behind the camera.
+ */
+export function projectRoutePoint(
+  point: GeoPoint,
+  view: {
+    is3d: boolean;
+    terrain: Pick<RealTerrain, 'location' | 'spanKm'> | undefined;
+    projectLocation?: LocationProjector;
+  },
+  frame: { width: number; height: number } | undefined,
+): { xPx: number; yPx: number } | undefined {
+  const { terrain } = view;
+
+  if (view.is3d) {
+    return view.projectLocation?.({ kind: 'geographic', ...point });
+  }
+
+  if (frame === undefined || terrain?.location === undefined || terrain.spanKm === undefined) {
+    return undefined;
+  }
+
+  const { x, y } = projectToRealTerrainFrame(
+    { location: terrain.location, spanKm: terrain.spanKm },
+    point.latitude,
+    point.longitude,
+    frame,
+  );
+
+  return { xPx: x, yPx: y };
+}
 
 /** Where the crop sits on its source, normalised exactly as the crop widget normalises it. */
 export function getCropFractionBox(
@@ -153,6 +226,65 @@ export function formatDistance(meters: number): string {
   }
 
   return `${String(Number((meters / 1000).toPrecision(3)))} km`;
+}
+
+/** Source elevation as `350 m`; a missing one is "unavailable", never 0. */
+export function formatElevation(meters: number | undefined): string {
+  return meters === undefined ? 'unavailable' : `${String(Math.round(meters))} m`;
+}
+
+/** Signed end-minus-start difference as `+250 m`; unavailable unless both elevations exist. */
+export function formatElevationDifference(
+  startMeters: number | undefined,
+  endMeters: number | undefined,
+): string {
+  if (startMeters === undefined || endMeters === undefined) {
+    return 'unavailable';
+  }
+
+  const rounded = Math.round(endMeters - startMeters);
+
+  return `${rounded > 0 ? '+' : ''}${String(rounded)} m`;
+}
+
+export interface MeasureReadout {
+  value: string;
+  meta: string[];
+}
+
+/**
+ * The measure callout. Geographic endpoints get great-circle distance, bearing and source
+ * elevations straight from the sampler (never the mesh, so exaggeration, terraces, crop and camera
+ * cannot change them); generated terrain keeps its nominal distance and bearing only.
+ */
+export function describeMeasurement(
+  start: MapLocation,
+  end: MapLocation,
+  sampleElevationMeters: ((point: GeoPoint) => number | undefined) | undefined,
+): MeasureReadout {
+  const isGeographic = start.kind === 'geographic' && end.kind === 'geographic';
+  const meters = isGeographic ? measureGroundMeters(start, end) : distanceBetweenPlaces(start, end);
+  const bearing = bearingDegrees(start, end);
+  const bearingLine =
+    bearing === undefined || meters === 0 ? '' : `Bearing ${formatBearing(bearing)}`;
+  const value = meters === undefined ? '—' : formatDistance(meters);
+
+  if (!isGeographic) {
+    return { value, meta: [bearingLine] };
+  }
+
+  const startMeters = sampleElevationMeters?.(start);
+  const endMeters = sampleElevationMeters?.(end);
+
+  return {
+    value,
+    meta: [
+      bearingLine,
+      `Start ${formatElevation(startMeters)}`,
+      `End ${formatElevation(endMeters)}`,
+      `Δ ${formatElevationDifference(startMeters, endMeters)}`,
+    ],
+  };
 }
 
 /** Whole degrees, zero-padded like a compass: `007°`. */

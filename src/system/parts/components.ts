@@ -795,6 +795,32 @@ const overlays: ComponentPart[] = [
   ),
   part(
     'OVLY',
+    'Tools',
+    'route-editor',
+    'Route editor',
+    'Numbered waypoint handles with insert targets on each segment; start square, end diamond.',
+    {
+      spec: [
+        row('Handles', 'Numbered, square start, diamond end'),
+        row('Insert', 'Segment midpoints'),
+      ],
+    },
+  ),
+  part(
+    'OVLY',
+    'Readouts',
+    'route-profile',
+    'Route profile',
+    'Elevation against ground distance, with gaps left open and steep spans named as well as coloured.',
+    {
+      spec: [
+        row('Chart', 'Slider; arrows, Home/End, Page keys'),
+        row('Steep', 'Climb and descent bands'),
+      ],
+    },
+  ),
+  part(
+    'OVLY',
     'States',
     'no-data-hatch',
     'No data',

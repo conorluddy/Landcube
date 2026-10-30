@@ -27,6 +27,9 @@ export interface HudSnapshot {
 /** The place under a viewport (client) point: the 2D plane, or the 3D surface by ray cast. */
 export type ClientPointLocator = (clientX: number, clientY: number) => MapLocation | undefined;
 
+/** Where a place appears over the viewport, in pixels relative to it; undefined when not drawn. */
+export type LocationProjector = (location: MapLocation) => { xPx: number; yPx: number } | undefined;
+
 export interface HudStore {
   getSnapshot: () => HudSnapshot;
   subscribe: (listener: () => void) => () => void;
@@ -35,6 +38,13 @@ export interface HudStore {
   /** Locates a point on demand for the measure tool; undefined until `src/main.ts` provides one. */
   locateClientPoint: ClientPointLocator;
   setLocator: (locator: ClientPointLocator) => void;
+  /** Projects a place to viewport pixels on demand (2D frame or 3D camera); undefined until provided. */
+  projectLocation: LocationProjector;
+  setProjector: (projector: LocationProjector) => void;
+  /** Bumps when the camera moves or the model rebuilds, so overlays re-project their places. */
+  getProjectionRevision: () => number;
+  subscribeProjection: (listener: () => void) => () => void;
+  notifyProjectionChanged: () => void;
 }
 
 export const awayPointer: HudPointer = Object.freeze({ kind: 'away' });
@@ -44,7 +54,10 @@ export const awayPointer: HudPointer = Object.freeze({ kind: 'away' });
 export function createHudStore(): HudStore {
   let snapshot: HudSnapshot = { pointer: awayPointer };
   let locator: ClientPointLocator | undefined;
+  let projector: LocationProjector | undefined;
+  let projectionRevision = 0;
   const listeners = new Set<() => void>();
+  const projectionListeners = new Set<() => void>();
 
   const update = (patch: Partial<HudSnapshot>) => {
     snapshot = { ...snapshot, ...patch };
@@ -82,6 +95,25 @@ export function createHudStore(): HudStore {
     locateClientPoint: (clientX, clientY) => locator?.(clientX, clientY),
     setLocator(nextLocator) {
       locator = nextLocator;
+    },
+    projectLocation: (location) => projector?.(location),
+    setProjector(nextProjector) {
+      projector = nextProjector;
+    },
+    getProjectionRevision: () => projectionRevision,
+    subscribeProjection(listener) {
+      projectionListeners.add(listener);
+
+      return () => {
+        projectionListeners.delete(listener);
+      };
+    },
+    notifyProjectionChanged() {
+      projectionRevision += 1;
+
+      for (const listener of projectionListeners) {
+        listener();
+      }
     },
   };
 }

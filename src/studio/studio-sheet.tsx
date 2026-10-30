@@ -7,7 +7,8 @@ import { getInspectorSectionId } from '../ui/inspector-panel';
 import { ReadoutCell, ReadoutGrid } from '../ui/readout-grid';
 import { SectionRail } from '../ui/section-rail';
 import {
-  threeDOnlySections,
+  getActiveSection,
+  getHiddenSections,
   type InspectorSection,
   type StudioController,
   type StudioState,
@@ -31,17 +32,20 @@ export function StudioSheet({
   state,
   hud,
   id,
+  routeProfile,
   renderSection,
 }: {
   controller: StudioController;
   state: StudioState;
   hud: HudStore;
   id: string;
+  /** The route profile, shown at the top of the sheet body while a route exists (REQ-25). */
+  routeProfile?: ReactNode;
   renderSection: (section: InspectorSection) => ReactNode;
 }): ReactNode {
   const { workspace } = state;
-  const activeSectionId = workspace.sections[workspace.view];
-  const hiddenSectionIds = workspace.view === '3d' ? [] : threeDOnlySections;
+  const activeSectionId = getActiveSection(state);
+  const hiddenSectionIds = getHiddenSections(state);
 
   return (
     <BottomSheet
@@ -71,6 +75,7 @@ export function StudioSheet({
         />
       }
     >
+      {routeProfile}
       {studioSections.map((section) => (
         <section
           key={section.id}
@@ -88,7 +93,7 @@ export function StudioSheet({
 
 /**
  * Phone map controls (P-04 in a mobile FloatingBar) down the right edge: reset the 3D camera,
- * Overlays, the command palette, the crop (3D) and measure tools, and Orbit in 3D. Hidden while the sheet is full (CSS on `[data-sheet-snap]`).
+ * the command palette, the crop (3D), measure and route (real terrain) tools. Hidden while the sheet is full (CSS on `[data-sheet-snap]`).
  */
 export function StudioMapControls({
   controller: c,
@@ -108,15 +113,6 @@ export function StudioMapControls({
         disabled={!is3d}
         onClick={() => {
           c.resetCamera();
-        }}
-      />
-      <IconButton
-        glyph="◫"
-        label="Overlays"
-        hasPopup="dialog"
-        isExpanded={workspace.popover === 'Overlays'}
-        onClick={() => {
-          c.workspace({ popover: workspace.popover === 'Overlays' ? null : 'Overlays' });
         }}
       />
       <IconButton
@@ -145,14 +141,14 @@ export function StudioMapControls({
           toggleTool(c, state, 'measure');
         }}
       />
-      {is3d && (
+      {/* Like the desktop toolbar, Route exists only on real terrain; a dead button would also push the column into the sheet. */}
+      {state.source.terrain !== undefined && (
         <IconButton
-          glyph="⌖"
-          label="Orbit"
-          hasPopup="dialog"
-          isExpanded={workspace.popover === 'Orbit'}
+          glyph="⌇"
+          label="Route tool"
+          isActive={getActiveTool(state) === 'route'}
           onClick={() => {
-            c.workspace({ popover: workspace.popover === 'Orbit' ? null : 'Orbit' });
+            toggleTool(c, state, 'route');
           }}
         />
       )}
@@ -163,7 +159,11 @@ export function StudioMapControls({
 // === HELPERS ===
 
 /** The phone mode bar: a tool drops the sheet to peek so the canvas is free to work on. */
-function toggleTool(c: StudioController, state: StudioState, tool: 'crop' | 'measure'): void {
+function toggleTool(
+  c: StudioController,
+  state: StudioState,
+  tool: 'crop' | 'measure' | 'route',
+): void {
   if (getActiveTool(state) === tool) {
     c.workspace({ toolMode: 'none' });
   } else {
@@ -197,7 +197,7 @@ function SheetPeek({
           size="small"
           aria-haspopup="dialog"
           onClick={() => {
-            c.workspace({ exporting: true, popover: null });
+            c.workspace({ exporting: true });
           }}
         >
           Export ↗

@@ -12,11 +12,14 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
+import { RouteProfileHost } from './route-profile-host';
+import { hasRouteProfile } from './active-route-analysis';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { InspectorPanel } from '../ui/inspector-panel';
 import {
-  threeDOnlySections,
+  getActiveSection,
+  getHiddenSections,
   type StudioController,
   type StudioMode,
   type InspectorSection,
@@ -33,8 +36,6 @@ import { StatusMessage } from '../ui/status-message';
 import { TextField } from '../ui/text-field';
 import { IconButton } from '../ui/icon-button';
 import { createPinnedPlaceholder } from '../ui/layout-manager';
-import { buildOverlayPopoverGroups } from './control-groups/overlays';
-import { buildOrbitGroup } from './control-groups/camera';
 import { buildSectionGroups } from './control-groups';
 import { StudioPinnedPanels } from './pinned-panels';
 import { getGroupCode, studioSections } from './sections';
@@ -198,7 +199,7 @@ function Studio({
   const viewport = useRef<HTMLDivElement>(null);
   const inspectorToggle = useRef<HTMLButtonElement>(null);
   const systemLink = useRef<HTMLButtonElement>(null);
-  const active = state.workspace.sections[state.workspace.view];
+  const active = getActiveSection(state);
   const isPhoneViewport = useSyncExternalStore(subscribeToPhoneViewport, readIsPhoneViewport);
   const [modeFlip] = useState(() => createStudioModeFlip(c));
   const flip = useSyncExternalStore(modeFlip.subscribe, modeFlip.getSnapshot);
@@ -276,8 +277,6 @@ function Studio({
         c.endCompare();
       } else if (state.workspace.comparePresetsOpen) {
         c.workspace({ comparePresetsOpen: false });
-      } else if (state.workspace.popover !== null) {
-        c.workspace({ popover: null });
       } else if (!isPhoneViewport && !state.workspace.collapsed) {
         c.workspace({ collapsed: true });
         inspectorToggle.current?.focus();
@@ -309,11 +308,27 @@ function Studio({
       document.removeEventListener('keydown', openPalette);
     };
   }, [c]);
+  const [isRouteProfileCollapsed, setIsRouteProfileCollapsed] = useState(false);
   const props = { controller: c, state };
+  const routeProfile = hasRouteProfile(state) ? (
+    <RouteProfileHost
+      controller={c}
+      state={state}
+      isCollapsed={isRouteProfileCollapsed}
+      onCollapsedChange={setIsRouteProfileCollapsed}
+    />
+  ) : undefined;
 
   return (
     <div
       className="studio-shell"
+      data-route-profile={
+        !isPhoneViewport && routeProfile !== undefined
+          ? isRouteProfileCollapsed
+            ? 'collapsed'
+            : 'open'
+          : undefined
+      }
       data-sheet-snap={isPhoneViewport ? state.workspace.sheetSnap : undefined}
       data-page-hidden={isPhoneViewport && state.workspace.page !== 'studio' ? true : undefined}
       data-mode-target={isPhoneViewport ? 'studio' : state.workspace.mode}
@@ -373,6 +388,7 @@ function Studio({
                 state={state}
                 hud={hud}
                 id={inspectorId}
+                routeProfile={routeProfile}
                 renderSection={(section) => renderSectionBody(section, props, cropPreview)}
               />
               <PhonePages controller={c} state={state} renderer={renderer} />
@@ -388,7 +404,7 @@ function Studio({
                 onSelectSection={(section) => {
                   c.selectSection(section);
                 }}
-                hiddenSectionIds={state.workspace.view === '3d' ? [] : threeDOnlySections}
+                hiddenSectionIds={getHiddenSections(state)}
                 isCollapsed={state.workspace.collapsed}
                 headerTag={`Src · ${state.source.terrain ? 'Real' : 'Procedural'}`}
                 renderSection={(section) =>
@@ -401,6 +417,9 @@ function Studio({
               />
               <StudioPinnedPanels controller={c} state={state} cropPreview={cropPreview} />
               <StudioToolBar controller={c} state={state} />
+              {routeProfile !== undefined && (
+                <div className="studio-route-profile">{routeProfile}</div>
+              )}
               <StudioFooter
                 controller={c}
                 state={state}
@@ -416,22 +435,6 @@ function Studio({
           )}
         </>
       </Activity>
-      {state.workspace.popover !== null && (
-        <Surface
-          title={state.workspace.popover}
-          close={() => {
-            c.workspace({ popover: null });
-          }}
-        >
-          {state.workspace.popover === 'Overlays' ? (
-            buildOverlayPopoverGroups(c, state).map((group) => (
-              <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
-            ))
-          ) : (
-            <ControlGroup group={buildOrbitGroup(c, state, false)} code={getGroupCode('orbit')} />
-          )}
-        </Surface>
-      )}
       {state.workspace.exporting && (
         <Surface
           modal

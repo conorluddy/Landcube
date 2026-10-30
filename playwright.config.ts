@@ -13,7 +13,10 @@ export default defineConfig({
   // Lets CI shards split by test instead of by file; one worker still runs tests serially.
   fullyParallel: true,
   workers: 1,
-  timeout: 30_000,
+  // Software WebGL renders every 3D frame on CI, so any spec that enters 3D can outrun a short budget.
+  // One shared budget replaces per-file overrides, which kept missing the next spec to touch 3D.
+  timeout: 90_000,
+  expect: { timeout: 10_000 },
   // Keeps baseline names free of the project name.
   snapshotPathTemplate:
     '{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}{-snapshotSuffix}{ext}',

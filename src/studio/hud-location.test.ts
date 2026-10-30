@@ -21,14 +21,15 @@ void test('generated terrain locates in metres on its nominal 10 km square', () 
   });
 });
 
-void test('a 3D model fraction interpolates the model bounds from the north-west corner', () => {
-  assert.deepEqual(
-    locateModelFraction(
-      { x: 0.25, y: 0.5 },
-      { kind: 'geographic', bounds: { north: 56, south: 54, west: -9, east: -7 } },
-    ),
-    { kind: 'geographic', latitude: 55, longitude: -8.5 },
+void test('a 3D pick at a known frame point matches the 2D Mercator inverse', () => {
+  const crop = { x: 100, y: 50, width: 400, height: 200 };
+  const fromModel = locateModelFraction(
+    { x: 0.25, y: 0.5 },
+    { kind: 'geographic', placement, crop, frame },
   );
+  const fromViewport = locateViewportPoint({ x: 200, y: 150 }, frame, placement);
+
+  assert.deepEqual(fromModel, fromViewport);
 });
 
 void test('a generated 3D model fraction offsets by its crop of the frame', () => {

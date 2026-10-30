@@ -250,3 +250,11 @@
   font-family: var(--lc-font-sans);
   font-size: var(--lc-fs-m-body);
 }
+
+/* Route profile in the sheet body: flat, on the sheet's own glass, above the section controls. */
+@media (max-width: 767px) {
+  .lc-bottom-sheet__body > .lc-route-profile {
+    margin-bottom: var(--lc-s-6);
+    border-bottom: 1px solid var(--lc-line);
+  }
+}

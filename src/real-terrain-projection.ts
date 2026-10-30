@@ -22,6 +22,14 @@ export function getMercatorY(latitude: number): number {
 }
 
 /** The square source span as a fraction of the Mercator world width. */
+export function getLatitudeAtMercatorY(mercatorY: number): number {
+  return (Math.atan(Math.sinh(Math.PI * (1 - 2 * mercatorY))) * 180) / Math.PI;
+}
+
+export function getLongitudeAtMercatorX(mercatorX: number): number {
+  return mercatorX * 360 - 180;
+}
+
 export function getMercatorSpanFraction(latitude: number, spanKm: number): number {
   return (spanKm * 1000) / (earthCircumferenceMeters * Math.cos((latitude * Math.PI) / 180));
 }
@@ -55,12 +63,12 @@ export function locateRealTerrainFramePoint(
   const { location, spanKm } = placement;
   const frameSize = Math.max(frame.width, frame.height);
   const spanFraction = getMercatorSpanFraction(location.latitude, spanKm);
-  const longitude = getLongitude(
+  const longitude = getLongitudeAtMercatorX(
     getMercatorX(location.longitude) + ((point.x - frame.width / 2) / frameSize) * spanFraction,
   );
 
   return {
-    latitude: getLatitude(
+    latitude: getLatitudeAtMercatorY(
       getMercatorY(location.latitude) + ((point.y - frame.height / 2) / frameSize) * spanFraction,
     ),
     longitude: ((((longitude + 180) % 360) + 360) % 360) - 180,
@@ -78,22 +86,14 @@ export function getRealTerrainSourceBounds(placement: RealTerrainPlacement): Geo
   const centerY = getMercatorY(location.latitude);
 
   return {
-    north: getLatitude(centerY - halfSpan),
-    south: getLatitude(centerY + halfSpan),
-    west: getLongitude(centerX - halfSpan),
-    east: getLongitude(centerX + halfSpan),
+    north: getLatitudeAtMercatorY(centerY - halfSpan),
+    south: getLatitudeAtMercatorY(centerY + halfSpan),
+    west: getLongitudeAtMercatorX(centerX - halfSpan),
+    east: getLongitudeAtMercatorX(centerX + halfSpan),
   };
 }
 
 // === HELPERS ===
-
-function getLatitude(mercatorY: number): number {
-  return (Math.atan(Math.sinh(Math.PI * (1 - 2 * mercatorY))) * 180) / Math.PI;
-}
-
-function getLongitude(mercatorX: number): number {
-  return mercatorX * 360 - 180;
-}
 
 function wrapWorldOffset(offset: number): number {
   return offset - Math.round(offset);
