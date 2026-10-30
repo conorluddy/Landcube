@@ -4,7 +4,11 @@ import { createSeaLevelGeometry, type SeaLevelGeometry } from './sea-level';
 import { createStudioTerrainView } from './studio/terrain-view';
 import { createStudioController, getSceneCredits } from './studio/controller';
 import { createCropPreview } from './studio/crop-preview';
-import { mountStudio } from './studio/app';
+import { mountStudio, phoneViewportQuery } from './studio/app';
+import { applySignalAccent, readSignalAccent } from './studio/accent';
+import { browserLocalStorage, browserSessionStorage } from './studio/browser-storage';
+import { shouldShowSplash } from './studio/pages/splash-session';
+import { signalAccentStorageKey } from './constants/library';
 import { downloadBlob } from './studio/export-panel';
 import { encodeTerrainStill } from './export/still-export';
 import { createBinaryStl } from './export/stl-export';
@@ -61,12 +65,6 @@ const millisecondsPerSecond = 1000;
 const maximumCursorFrameElapsedMs = 100;
 const cursorPositionSettlingTolerancePixels = 0.5;
 const cursorStrengthSettlingTolerance = 0.002;
-
-try {
-  applyTheme(readTheme(localStorage), document.documentElement, localStorage);
-} catch {
-  // Blocked storage: stay on the dark default; the footer toggle still works for this visit.
-}
 
 /** Restores startup settings before sampling the first landscape. */
 const startupStartedAtMs = performance.now();
@@ -739,6 +737,21 @@ window.addEventListener('popstate', () => {
 });
 let viewportResizeDebounceTimer: ReturnType<typeof setTimeout>;
 
+// Stored appearance applies before the first paint of the studio; the splash is phone-only.
+applyTheme(readTheme(browserLocalStorage), document.documentElement, browserLocalStorage);
+applySignalAccent(
+  readSignalAccent(browserLocalStorage, signalAccentStorageKey),
+  document.documentElement,
+  browserLocalStorage,
+  signalAccentStorageKey,
+);
+controls.workspace({
+  hasSeenSplash: !shouldShowSplash(
+    matchMedia(phoneViewportQuery).matches,
+    opensDesignLink,
+    browserSessionStorage,
+  ),
+});
 mountStudio(controls, terrainSvgElement, outputRenderer, cropPreview, hud);
 const viewport = getRequiredElement(document, '#studio-viewport', HTMLElement);
 

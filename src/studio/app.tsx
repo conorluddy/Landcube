@@ -26,10 +26,12 @@ import { StudioHud } from './studio-hud';
 import type { HudStore } from './hud-store';
 import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
+import { PhonePages } from './pages/phone-pages';
 
 const inspectorId = 'studio-inspector';
+
 /** Below this the inspector becomes a bottom sheet with a horizontal section strip. */
-const phoneViewportQuery = '(max-width: 767px)';
+export const phoneViewportQuery = '(max-width: 767px)';
 
 function Surface({
   title,
@@ -228,6 +230,7 @@ function Studio({
     <div
       className="studio-shell"
       data-sheet-snap={isPhoneViewport ? state.workspace.sheetSnap : undefined}
+      data-page-hidden={isPhoneViewport && state.workspace.page !== 'studio' ? true : undefined}
     >
       <StudioHeader controller={c} state={state} isPhoneViewport={isPhoneViewport} />
       <main
@@ -247,6 +250,7 @@ function Studio({
             id={inspectorId}
             renderSection={(section) => renderSectionBody(section, props, cropPreview)}
           />
+          <PhonePages controller={c} state={state} renderer={renderer} />
         </>
       ) : (
         <>

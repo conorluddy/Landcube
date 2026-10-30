@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { appUrl, serveStudio } from './studio-fixture';
+import { appUrl, section, serveStudio } from './studio-fixture';
 
 const phone = { width: 390, height: 844 };
 
@@ -206,4 +206,139 @@ test('choosing a section from peek opens the sheet to half', async ({ page }) =>
     .click();
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'half');
   await expect(page.getByRole('region', { name: 'Colour settings' })).toBeVisible();
+});
+
+function pages(page: Page) {
+  return page.getByRole('navigation', { name: 'Pages' });
+}
+
+async function openPage(page: Page, name: string): Promise<void> {
+  await pages(page).getByRole('button', { name, exact: true }).click();
+}
+
+test('the tab bar is 84px tall under the sheet and the studio is the current page', async ({
+  page,
+}) => {
+  const box = await pages(page).boundingBox();
+
+  expect([box?.height, (box?.y ?? 0) + (box?.height ?? 0)]).toEqual([84, phone.height]);
+  await expect(pages(page).getByRole('button', { name: 'Studio', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(pages(page).locator('[aria-current="page"]')).toHaveCount(1);
+});
+
+test('tab bar navigation hides the studio and shows the Library, then returns', async ({
+  page,
+}) => {
+  await openPage(page, 'Library');
+  await expect(pages(page).getByRole('button', { name: 'Library' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(page.getByRole('region', { name: 'Library' })).toBeVisible();
+  await expect(shell(page)).toBeHidden();
+  await expect(page.locator('#terrain')).toBeAttached();
+  await openPage(page, 'Studio');
+  await expect(shell(page)).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Library' })).toBeHidden();
+});
+
+test('a saved design survives a reload and opening it restores the seed', async ({ page }) => {
+  await openPage(page, 'Library');
+  await expect(page.getByText('No saved designs')).toBeVisible();
+  await page.getByRole('button', { name: 'Save current' }).click();
+  const card = page.locator('.lc-model-card');
+
+  await expect(card).toHaveCount(1);
+  await expect(card.locator('img')).toHaveCount(1);
+  await page.goto(`${appUrl}?v=1&seed=456`);
+  await openPage(page, 'Library');
+  await expect(card).toHaveCount(1);
+  await card.getByRole('button').first().click();
+  await expect(shell(page)).toBeVisible();
+  await expect(page.locator('#seed-value')).toHaveText('123');
+});
+
+test('deleting a saved design empties the Library', async ({ page }) => {
+  await openPage(page, 'Library');
+  await page.getByRole('button', { name: 'Save current' }).click();
+  await page.getByRole('button', { name: 'Delete Seed 123' }).click();
+  await expect(page.getByText('No saved designs')).toBeVisible();
+});
+
+test('corrupt saved designs show an empty Library with a message', async ({ page }) => {
+  await page.evaluate(() => {
+    localStorage.setItem('landcube-saved-designs', '{broken');
+  });
+  await openPage(page, 'Library');
+  await expect(page.getByText('No saved designs')).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('corrupt');
+});
+
+test('applying a palette preset changes the canvas colour', async ({ page }) => {
+  await section(page, 'Colour');
+  const before = await page.getByLabel('Canvas color').inputValue();
+
+  await openPage(page, 'Presets');
+  await page
+    .getByRole('group', { name: 'Palettes' })
+    .getByRole('button', { name: 'Blueprint' })
+    .click();
+  await openPage(page, 'Studio');
+  await section(page, 'Colour');
+  await expect(page.getByLabel('Canvas color')).not.toHaveValue(before);
+  await expect(page.getByLabel('Canvas color')).toHaveValue('#153c68');
+});
+
+test('the Account theme row sets data-theme on the document and persists', async ({ page }) => {
+  await openPage(page, 'Account');
+  await page.getByRole('group', { name: 'Theme' }).getByRole('button', { name: 'Light' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  expect(await page.evaluate(() => localStorage.getItem('landcube-theme'))).toBe('light');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+});
+
+test('the Account signal accent sets data-signal-accent and persists', async ({ page }) => {
+  await openPage(page, 'Account');
+  await page
+    .getByRole('group', { name: 'Signal accent' })
+    .getByRole('button', { name: 'Amber' })
+    .click();
+  await expect(page.locator('html')).toHaveAttribute('data-signal-accent', 'amber');
+  expect(await page.evaluate(() => localStorage.getItem('landcube-signal-accent'))).toBe('amber');
+});
+
+test('clearing local storage from Account empties the Library after confirming', async ({
+  page,
+}) => {
+  await openPage(page, 'Library');
+  await page.getByRole('button', { name: 'Save current' }).click();
+  await expect(page.locator('.lc-model-card')).toHaveCount(1);
+  await openPage(page, 'Account');
+  await page.getByRole('button', { name: /Clear local storage/ }).click();
+  expect(await page.evaluate(() => localStorage.getItem('landcube-saved-designs'))).not.toBeNull();
+  await page.getByRole('button', { name: 'Confirm clear' }).click();
+  await expect(page.getByText('Local storage cleared.')).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('landcube-saved-designs'))).toBeNull();
+  await openPage(page, 'Library');
+  await expect(page.getByText('No saved designs')).toBeVisible();
+});
+
+test('a fresh phone session shows the splash until Enter studio, then not again', async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    sessionStorage.clear();
+  });
+  await page.goto(appUrl);
+  const enter = page.getByRole('button', { name: 'Enter studio' });
+
+  await expect(page.getByRole('region', { name: 'Welcome' })).toBeVisible();
+  await enter.click();
+  await expect(enter).toBeHidden();
+  await page.reload();
+  await expect(enter).toBeHidden();
 });

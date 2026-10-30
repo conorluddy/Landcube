@@ -154,6 +154,8 @@ export interface TerrainSourceState {
   /** Steps through preset locations in menu order, waiting after each load settles. */
   autoplay: { enabled: boolean; delaySeconds: number };
 }
+export type StudioPage = 'studio' | 'library' | 'presets' | 'account';
+
 export interface StudioState {
   design: ValidatedDesignSettings;
   source: TerrainSourceState;
@@ -182,6 +184,10 @@ export interface StudioState {
     pinnedGroups: readonly PinnedGroupPlacement[];
     /** The open command palette and its query; null while closed. */
     palette: { query: string } | null;
+    /** Phone root page; `studio` keeps the WebGL canvas visible. Session-only, no router. */
+    page: StudioPage;
+    /** False only on a phone's first visit of the session; see `src/studio/pages/splash-session.ts`. */
+    hasSeenSplash: boolean;
   };
   seedLocked: boolean;
   status: string;
@@ -390,6 +396,8 @@ export function createStudioController(
       sheetSnap: 'half',
       pinnedGroups: [],
       palette: null,
+      page: 'studio',
+      hasSeenSplash: true,
     },
     seedLocked: actions.isSeedLocked,
     status: '',

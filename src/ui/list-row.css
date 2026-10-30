@@ -1,0 +1,91 @@
+/* C-10 ListRow: 28px leading tile, title over mono detail, trailing value and chevron, hairline below. */
+.lc-list-row {
+  display: flex;
+  gap: var(--lc-s-6);
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 56px;
+  padding: var(--lc-s-4) 0;
+  border: 0;
+  border-bottom: 1px solid var(--lc-line);
+  background: transparent;
+  color: var(--lc-text-primary);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+
+button.lc-list-row,
+a.lc-list-row {
+  cursor: pointer;
+}
+
+.lc-list-row__leading {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--lc-line-strong);
+  border-radius: var(--lc-r-control);
+  color: var(--lc-text-secondary);
+  font-family: var(--lc-font-mono);
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.lc-list-row__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--lc-s-2);
+  min-width: 0;
+}
+
+.lc-list-row__title {
+  overflow: hidden;
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-lead);
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-list-row__detail {
+  overflow: hidden;
+  color: var(--lc-text-quiet);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-m-micro);
+  letter-spacing: var(--lc-track-ui);
+  line-height: 12px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lc-list-row__meta {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-m-ui);
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-list-row__chevron {
+  flex: none;
+  color: var(--lc-text-quiet);
+  font-size: var(--lc-fs-m-title);
+  line-height: 18px;
+}
+
+@media (forced-colors: active) {
+  .lc-list-row {
+    border-color: CanvasText;
+    color: CanvasText;
+  }
+}

@@ -1,0 +1,8 @@
+/* Account > Signal accent: `data-signal-accent` on <html> recolours OK and live marks. Bone is the token default. */
+:root[data-signal-accent='amber'] {
+  --lc-signal: var(--lc-signal-amber);
+}
+
+:root[data-signal-accent='phosphor'] {
+  --lc-signal: var(--lc-signal-phosphor);
+}

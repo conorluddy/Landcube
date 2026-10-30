@@ -606,11 +606,19 @@ body,
   .source-label {
     display: none;
   }
+  /* The tab bar (#17) sits below the sheet; a full sheet covers it and drops the offset. */
+  .studio-shell {
+    --studio-tab-bar-height: 84px;
+  }
   #studio-inspector {
     top: auto;
     right: 0;
-    bottom: 0;
+    bottom: var(--studio-tab-bar-height);
     left: 0;
+    transition-property: height, bottom;
+  }
+  .studio-shell[data-sheet-snap='full'] #studio-inspector {
+    bottom: 0;
   }
   .studio-shell[data-sheet-snap='peek'] {
     --studio-sheet-height: 190px;
@@ -629,7 +637,7 @@ body,
   .studio-shell[data-sheet-snap] .lc-hud-layer__instruments {
     top: auto;
     right: auto;
-    bottom: calc(var(--studio-sheet-height, 0px) + var(--lc-s-6));
+    bottom: calc(var(--studio-sheet-height, 0px) + var(--studio-tab-bar-height) + var(--lc-s-6));
     left: var(--lc-s-6);
   }
   /* The map controls' Reset view button stands in for the drawn compass. */
@@ -712,4 +720,98 @@ body,
   .header-place-search {
     transition: none;
   }
+}
+
+/* === MOBILE ROOT PAGES (#17) === */
+/* Hidden, not display:none: the canvas keeps its size so switching pages never resizes or redraws it. */
+.studio-shell[data-page-hidden] {
+  visibility: hidden;
+}
+.studio-shell {
+  --studio-page-ground: var(--lc-ink-0);
+}
+:root[data-theme='light'] .studio-shell {
+  --studio-page-ground: #f6f6f4;
+}
+.studio-page {
+  position: absolute;
+  inset: 0 0 var(--studio-tab-bar-height, 84px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  --lc-page-inset: 22px;
+
+  gap: var(--lc-s-10);
+  padding: var(--lc-s-10) var(--lc-page-inset) var(--lc-s-9);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  visibility: visible;
+  background: var(--studio-page-ground);
+  color: var(--lc-text-primary);
+}
+.studio-page__header {
+  display: flex;
+  gap: var(--lc-s-6);
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--lc-h-xl);
+}
+.studio-page__title {
+  margin: 0;
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-m-h1);
+  font-weight: 300;
+}
+.studio-page__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--lc-s-5);
+}
+.studio-page__confirm {
+  display: grid;
+  gap: var(--lc-s-6);
+  padding: var(--lc-s-6) 0;
+  border-bottom: 1px solid var(--lc-line);
+}
+.studio-page__confirm-text {
+  margin: 0;
+  color: var(--lc-text-secondary);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-m-body);
+  line-height: 1.5;
+}
+.studio-page__confirm-actions {
+  display: flex;
+  gap: var(--lc-s-4);
+}
+.studio-tab-bar {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 6;
+  visibility: visible;
+}
+.studio-tab-bar[data-covered] {
+  display: none;
+}
+.studio-splash {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-8);
+  align-items: stretch;
+  justify-content: flex-end;
+  padding: var(--lc-s-10) 26px 56px;
+  visibility: visible;
+  background:
+    linear-gradient(var(--lc-line-subtle) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(90deg, var(--lc-line-subtle) 1px, transparent 1px) 0 0 / 32px 32px,
+    var(--studio-page-ground);
+}
+.studio-splash__tagline {
+  margin: 0;
+  color: var(--lc-text-secondary);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-m-body);
 }
