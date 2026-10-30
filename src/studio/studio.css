@@ -269,7 +269,7 @@ body,
 .studio-status .source-label,
 .studio-status .studio-status-message,
 .studio-status .attribution,
-.studio-status .studio-github,
+.studio-status .studio-credit,
 .studio-status .studio-mode-link {
   min-width: 0;
   overflow: hidden;
@@ -292,7 +292,7 @@ body,
   text-decoration: none;
 }
 
-.studio-github,
+.studio-credit,
 .studio-mode-link {
   flex: none;
   color: var(--lc-text-strong);
@@ -312,7 +312,7 @@ body,
 }
 
 .studio-status .attribution:hover,
-.studio-status .studio-github:hover,
+.studio-status .studio-credit:hover,
 .studio-status .studio-mode-link:hover {
   color: var(--lc-text-primary);
 }

@@ -127,8 +127,8 @@ export function SystemFooter({
         <button type="button" className="studio-mode-link" onClick={onExit}>
           ↩ Studio
         </button>
-        <a className="studio-github" href={sourceRepositoryUrl} target="_blank" rel="noreferrer">
-          GitHub ↗
+        <a className="studio-credit" href="https://conor.fyi" target="_blank" rel="noreferrer">
+          conor.fyi ↗
         </a>
       </BarGroup>
     </FloatingBar>

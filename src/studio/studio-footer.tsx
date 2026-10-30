@@ -149,13 +149,8 @@ export function StudioFooter({
         >
           Design system ◧
         </button>
-        <a
-          className="studio-github"
-          href="https://github.com/conorluddy/landcube"
-          target="_blank"
-          rel="noreferrer"
-        >
-          GitHub ↗
+        <a className="studio-credit" href="https://conor.fyi" target="_blank" rel="noreferrer">
+          conor.fyi ↗
         </a>
       </BarGroup>
     </FloatingBar>
