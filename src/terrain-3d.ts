@@ -32,6 +32,11 @@ import {
 } from './terrain-lighting';
 import { createTerrainLineBuffers } from './terrain-3d-lines';
 import { createTerrainRoadLayer } from './terrain-3d-roads';
+import {
+  createTerrainRouteLayer,
+  noRouteOverlay,
+  type TerrainRouteOverlay,
+} from './terrain-3d-route';
 import { createTerrainGrassLayer } from './terrain-3d-grass';
 import { getGrassRoads, type GrassGeography, type GrassSite } from './grass-coverage';
 import type { GrassStyle } from './types/grass';
@@ -90,6 +95,7 @@ export interface Terrain3d {
     terraceLevels?: TerrainTerraceLevels,
     roads?: readonly RoadPath[],
     grassGeography?: GrassGeography,
+    route?: TerrainRouteOverlay,
   ): void;
   setVisible(value: boolean): void;
   /** Pass false when a terrain update follows, so the new height morphs with it. */
@@ -445,6 +451,7 @@ export function createTerrain3d(
   const landscape = new THREE.Group();
 
   const roads = createTerrainRoadLayer();
+  const route = createTerrainRouteLayer();
   const grass = createTerrainGrassLayer();
   let roadStyle: Readonly<RoadStyle> = defaultRoadStyle;
   let grassTerrain:
@@ -498,7 +505,7 @@ export function createTerrain3d(
     updateLoop();
   };
 
-  landscape.add(surface, base, contourLayer, roads.mesh, grass.mesh, sea, waterSides);
+  landscape.add(surface, base, contourLayer, roads.mesh, route.object, grass.mesh, sea, waterSides);
   scene.add(landscape);
   const framePreview = createTerrainFramePreview(renderer);
 
@@ -759,6 +766,22 @@ export function createTerrain3d(
     );
   };
 
+  /** Test hooks: what the route layer drew, on the canvas wrapper like `data-terrain-transition`. */
+  const syncRouteHooks = () => {
+    const { points, waypoints } = route.getCounts();
+    const { dataset } = renderer.domElement;
+
+    if (points === 0) {
+      delete dataset.routePoints;
+      delete dataset.routeWaypoints;
+
+      return;
+    }
+
+    dataset.routePoints = String(points);
+    dataset.routeWaypoints = String(waypoints);
+  };
+
   const syncDecorations = () => {
     const opacity = strokeOpacity * (transition?.incomingOpacity ?? 1);
 
@@ -769,6 +792,8 @@ export function createTerrain3d(
     syncContourTreatment();
     syncWater();
     roads.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
+    route.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
+    syncRouteHooks();
     const wasAnimated = grass.isAnimated();
 
     grass.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
@@ -943,6 +968,7 @@ export function createTerrain3d(
       terraceLevels?: TerrainTerraceLevels,
       roadPaths: readonly RoadPath[] = noRoadPaths,
       grassGeography?: GrassGeography,
+      routeOverlay: TerrainRouteOverlay = noRouteOverlay,
     ) {
       lastUpdate = [
         contours,
@@ -954,6 +980,7 @@ export function createTerrain3d(
         terraceLevels,
         roadPaths,
         grassGeography,
+        routeOverlay,
       ];
       // Terrace levels follow the contour interval but only shape terraced models.
       const morphKey = JSON.stringify([
@@ -1122,6 +1149,16 @@ export function createTerrain3d(
         exaggeration,
         elevationOffset,
       });
+      route.update({
+        ...routeOverlay,
+        field,
+        width,
+        height,
+        modelSettings,
+        exaggeration,
+        elevationOffset,
+      });
+      syncRouteHooks();
       grassTerrain = grassGeography && {
         field,
         width,

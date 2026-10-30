@@ -74,6 +74,7 @@ export const studioSections = [
       'geographic-decorations',
       'roads',
       'sea-level',
+      'route',
     ],
   },
   {

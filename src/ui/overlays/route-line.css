@@ -1,0 +1,85 @@
+/* O-08 RouteLine: bone line over an ink halo; diamond waypoints with a label tip. */
+.lc-route-line {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.lc-route-line__path {
+  position: absolute;
+  inset: 0;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lc-route-line__halo {
+  stroke: var(--lc-ink-1);
+  stroke-opacity: 0.5;
+  stroke-width: 7px;
+}
+
+.lc-route-line__line {
+  stroke: var(--lc-bone);
+  stroke-width: 2.5px;
+}
+
+/* The wrapper sits on the point; the 10px diamond centres on it and the label trails to the right. */
+.lc-route-line__waypoint {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  width: 10px;
+  height: 10px;
+  transform: translate(-5px, -5px);
+}
+
+.lc-route-line__label {
+  position: absolute;
+  left: 16px;
+  padding: 2px 5px;
+  border: 1px solid var(--lc-line);
+  background: color-mix(in srgb, var(--lc-ink-1) 70%, transparent);
+  color: var(--lc-bone);
+  font-family: var(--lc-font-mono);
+  font-size: 9.5px;
+  line-height: 12px;
+  letter-spacing: var(--lc-track-coord);
+  white-space: nowrap;
+}
+
+@media (forced-colors: active) {
+  .lc-route-line__halo {
+    stroke: Canvas;
+  }
+
+  .lc-route-line__line {
+    stroke: CanvasText;
+  }
+
+  .lc-route-line__label {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+
+/* The GPX file input in the Overlays popover reuses the field frame. */
+.lc-field__input[type='file'] {
+  padding: 0;
+  line-height: var(--lc-h-m);
+  cursor: pointer;
+}
+
+.lc-field__input[type='file']::file-selector-button {
+  height: 100%;
+  margin-right: 9px;
+  padding: 0 9px;
+  border: 0;
+  border-right: 1px solid var(--lc-line);
+  background: transparent;
+  color: var(--lc-text-primary);
+  font: inherit;
+  cursor: pointer;
+}

@@ -24,6 +24,7 @@ void test('fault codes sit in their range', () => {
     [operationErrorCodes.clipboardFailed]: 1,
     [operationErrorCodes.mapDataFailed]: 2,
     [operationErrorCodes.placeSearchFailed]: 2,
+    [operationErrorCodes.invalidRoute]: 2,
     [operationErrorCodes.exportFailed]: 4,
     tileDownloadFailed: 2,
     tileDecodeFailed: 2,

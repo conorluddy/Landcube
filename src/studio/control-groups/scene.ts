@@ -1,6 +1,6 @@
 /*
  * Scene section (SCEN.01 to SCEN.06): cursor interaction in 2D; surface, grass, ground, water and
- * lighting in 3D. The overlay groups (SCEN.07 to SCEN.11) register under SCEN too but render in the
+ * lighting in 3D. The overlay groups (SCEN.07 to SCEN.12) register under SCEN too but render in the
  * Overlays popover; see ./overlays.ts. Row ids are the legacy field ids the e2e tests bind to.
  */
 import type { ControlGroupDefinition } from '../../ui/control-rows';

@@ -15,6 +15,7 @@ import { createBinaryStl } from './export/stl-export';
 import type { RealTerrain } from './real-terrain';
 import { createFloorPlace } from './floor-geo';
 import { clipRoadsToCrop, noRoadPaths } from './road-ribbons';
+import { clipRouteToCrop, noRouteOverlay, type TerrainRouteOverlay } from './terrain-3d-route';
 import type { RoadPath } from './types/roads';
 import type { GrassGeography } from './grass-coverage';
 import { generatedTerrainReliefMeters, generatedTerrainSpanMeters } from './constants/grass';
@@ -372,6 +373,10 @@ let modelSourceField: HeightField | undefined;
 let modelCropKey = '';
 let modelCrop: ReturnType<typeof cropTerrainModelField> | undefined;
 let roadPaths: { key: unknown[]; paths: RoadPath[] } = { key: [], paths: [] };
+let routeOverlay: { key: unknown[]; overlay: TerrainRouteOverlay } = {
+  key: [],
+  overlay: noRouteOverlay,
+};
 
 function updateTerrain3d(): void {
   if (!terrain3d.isActive()) {
@@ -450,6 +455,7 @@ function updateTerrain3d(): void {
     getTerrainTerraceLevels(settings, engineConfiguration, realTerrain),
     getCroppedRoadPaths(modelSourceFrame, modelCrop, dimensions.cropShape ?? 'rectangle'),
     getGrassGeography(modelSourceFrame, modelCrop),
+    getCroppedRoute(modelSourceFrame, modelCrop, dimensions.cropShape ?? 'rectangle'),
   );
 }
 
@@ -499,6 +505,32 @@ function getCroppedRoadPaths(
   }
 
   return roadPaths.paths;
+}
+
+/** Projects the visible GPX route into the model crop, reusing the last result when unchanged. */
+function getCroppedRoute(
+  frame: { width: number; height: number },
+  crop: NonNullable<typeof modelCrop>,
+  shape: 'rectangle' | 'circle',
+): TerrainRouteOverlay {
+  const { route } = controls.getSnapshot().workspace;
+  const location = realTerrain?.location;
+  const spanKm = realTerrain?.spanKm;
+
+  if (route === null || !route.isVisible || !location || spanKm === undefined) {
+    return noRouteOverlay;
+  }
+
+  const key = [route, location, spanKm, frame, crop, shape];
+
+  if (key.some((value, index) => value !== routeOverlay.key[index])) {
+    routeOverlay = {
+      key,
+      overlay: clipRouteToCrop(route, { location, spanKm }, frame, crop, shape),
+    };
+  }
+
+  return routeOverlay.overlay;
 }
 
 /** Credits every external source visible in the 3D view. */
@@ -745,6 +777,17 @@ applySignalAccent(
   browserLocalStorage,
   signalAccentStorageKey,
 );
+// A route load, toggle or clear redraws the 3D model; 2D reads it straight from state.
+let drawnRoute = controls.getSnapshot().workspace.route;
+
+controls.subscribe(() => {
+  const { route } = controls.getSnapshot().workspace;
+
+  if (route !== drawnRoute) {
+    drawnRoute = route;
+    updateTerrain3d();
+  }
+});
 controls.workspace({
   hasSeenSplash: !shouldShowSplash(
     matchMedia(phoneViewportQuery).matches,

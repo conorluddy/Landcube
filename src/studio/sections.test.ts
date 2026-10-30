@@ -11,6 +11,7 @@ void test('groups keep their registered position, so the first and last read 01 
   assert.equal(getGroupCode('autoplay'), 'TERR.01');
   assert.equal(getGroupCode('orbit'), 'CAMR.04');
   assert.equal(getGroupCode('sea-level'), 'SCEN.11');
+  assert.equal(getGroupCode('route'), 'SCEN.12');
   assert.equal(getGroupCode('edge'), 'FRAM.03');
 });
 
