@@ -1,0 +1,98 @@
+/*
+ * O-08 A/B wipe: full-bleed like the HudLayer, pointer-transparent except the handle. Side B is
+ * clipped to the right of the divider; a 1px bone divider and a 56x24 bone handle mark the edge.
+ */
+.lc-wipe {
+  --lc-wipe-inset-top: 72px;
+  --lc-wipe-inset-left: var(--lc-s-10);
+  --lc-wipe-inset-right: 420px;
+
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.lc-wipe[data-inspector='collapsed'] {
+  --lc-wipe-inset-right: 116px;
+}
+
+.lc-wipe__side-b {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(0 0 0 var(--lc-wipe-position));
+}
+
+.lc-wipe__side-b > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.lc-wipe__tag {
+  position: absolute;
+  top: var(--lc-wipe-inset-top);
+  background: var(--lc-glass-tip);
+}
+
+.lc-wipe__tag[data-side='a'] {
+  left: var(--lc-wipe-inset-left);
+}
+
+.lc-wipe__tag[data-side='b'] {
+  right: var(--lc-wipe-inset-right);
+}
+
+.lc-wipe__divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--lc-wipe-position);
+  width: 1px;
+  background: var(--lc-bone);
+}
+
+.lc-wipe__handle {
+  position: absolute;
+  top: 50%;
+  left: var(--lc-wipe-position);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 24px;
+  border-radius: var(--lc-r-control);
+  background: var(--lc-bone);
+  color: var(--lc-text-on-bone);
+  cursor: ew-resize;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  line-height: 14px;
+  pointer-events: auto;
+  touch-action: none;
+  transform: translate(-50%, -50%);
+}
+
+.lc-wipe__handle:focus-visible {
+  outline: 2px solid var(--lc-bone);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .lc-wipe {
+    --lc-wipe-inset-right: var(--lc-s-6);
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-wipe__divider {
+    background: CanvasText;
+  }
+
+  .lc-wipe__handle {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+}

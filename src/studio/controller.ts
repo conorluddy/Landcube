@@ -52,6 +52,12 @@ import type { TerrainStillScale } from '../export/still-export';
 import { defaultRoadStyle, roadDetailClasses, roadSpanLimitsKm } from '../constants/roads';
 import { operationErrorCodes } from '../constants/operations';
 import type { RoadNetwork, RoadStyle } from '../types/roads';
+import {
+  clampDivider,
+  defaultDividerFraction,
+  getComparePresetPatch,
+  isComparePresetId,
+} from './wipe-compare';
 import { createRoadNetworkLoader, getRoadPlacementKey } from './road-loader';
 import { createPlaceSearcher } from './place-searcher';
 import { describeTerrainFault, type StudioFault, type TerrainLoadProgress } from './terrain-fault';
@@ -206,6 +212,10 @@ export interface StudioState {
     route: WorkspaceRoute | null;
     /** Why the last GPX file was refused; the previous route stays. */
     routeFault: OperationError | null;
+    /** The A/B preset wipe. Session-only; `null` while no preset is being compared. */
+    compare: { presetId: string; dividerFraction: number } | null;
+    /** The desktop preset strip. Session-only. */
+    comparePresetsOpen: boolean;
   };
   seedLocked: boolean;
   status: string;
@@ -268,6 +278,13 @@ export interface StudioController {
   clearRoute: () => void;
   toggleRoute: () => void;
   design: (patch: Partial<DesignSettings>) => boolean;
+  /** Starts (or retargets) the A/B wipe against a palette preset; unknown ids are ignored. */
+  startCompare: (presetId: string) => void;
+  /** Moves the wipe divider, clamped to 0-1; a no-op while not comparing. */
+  moveDivider: (fraction: number) => void;
+  /** Applies the compared preset through `design()`, then ends the compare. */
+  applyCompare: () => void;
+  endCompare: () => void;
   newLandscape: () => void;
   lockSeed: (value: boolean) => void;
   copyLink: () => Promise<void>;
@@ -422,6 +439,8 @@ export function createStudioController(
       hasSeenSplash: true,
       route: null,
       routeFault: null,
+      compare: null,
+      comparePresetsOpen: false,
     },
     seedLocked: actions.isSeedLocked,
     status: '',
@@ -755,6 +774,39 @@ export function createStudioController(
       }
 
       return ok;
+    },
+    startCompare(presetId: string) {
+      if (!isComparePresetId(presetId)) {
+        return;
+      }
+
+      workspace({
+        compare: {
+          presetId,
+          dividerFraction: state.workspace.compare?.dividerFraction ?? defaultDividerFraction,
+        },
+      });
+    },
+    moveDivider(fraction: number) {
+      const { compare } = state.workspace;
+
+      if (compare !== null) {
+        workspace({ compare: { ...compare, dividerFraction: clampDivider(fraction) } });
+      }
+    },
+    applyCompare() {
+      const { compare } = state.workspace;
+
+      if (compare !== null && isComparePresetId(compare.presetId)) {
+        controller.design(getComparePresetPatch(compare.presetId));
+      }
+
+      workspace({ compare: null });
+    },
+    endCompare() {
+      if (state.workspace.compare !== null) {
+        workspace({ compare: null });
+      }
     },
     newLandscape() {
       if (!state.seedLocked) {

@@ -98,6 +98,15 @@ export function StudioFooter({
         >
           {source.autoplay.enabled ? '❚❚ Tour' : '▶ Tour'}
         </Button>
+        <IconButton
+          glyph="◧"
+          label="Compare presets"
+          isActive={workspace.comparePresetsOpen}
+          onClick={() => {
+            c.endCompare();
+            c.workspace({ comparePresetsOpen: !workspace.comparePresetsOpen });
+          }}
+        />
       </BarGroup>
       <BarGroup className="studio-status">
         <SignalMark kind={workspace.activating ? 'live' : 'ok'} size="footer" />

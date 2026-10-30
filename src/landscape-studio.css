@@ -815,3 +815,49 @@ body,
   font-family: var(--lc-font-sans);
   font-size: var(--lc-fs-m-body);
 }
+
+/* Preset compare strip: bottom-centre of the visible viewport, clear of the readout card and the compass. */
+.studio-compare {
+  position: absolute;
+  right: 500px;
+  bottom: 60px;
+  left: 324px;
+  z-index: 2;
+  display: flex;
+  gap: var(--lc-s-6);
+  align-items: center;
+  justify-content: center;
+  padding: var(--lc-s-4) var(--lc-s-6);
+  border: 1px solid var(--lc-line-panel);
+  border-radius: var(--lc-r-panel);
+  box-shadow: var(--lc-shadow-panel);
+}
+.studio-compare[data-inspector='collapsed'] {
+  right: 196px;
+}
+.studio-compare .lc-preset-strip {
+  min-width: 0;
+  margin-inline: 0;
+  padding-inline: 0;
+}
+.studio-compare__card {
+  display: flex;
+  flex: none;
+  scroll-snap-align: start;
+}
+.studio-compare__actions {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--lc-s-3);
+}
+.studio-compare .lc-status-message {
+  position: absolute;
+  bottom: calc(100% + var(--lc-s-4));
+  left: 0;
+}
+@media (max-width: 767px) {
+  .studio-compare {
+    display: none;
+  }
+}
