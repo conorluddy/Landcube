@@ -37,6 +37,8 @@ import {
   noRouteOverlay,
   type TerrainRouteOverlay,
 } from './terrain-3d-route';
+import { createDisplayedSurface, type DisplayedSurface } from './terrain-3d-route-drape';
+import type { FramePoint } from './real-terrain-projection';
 import { createTerrainGrassLayer } from './terrain-3d-grass';
 import { getGrassRoads, type GrassGeography, type GrassSite } from './grass-coverage';
 import type { GrassStyle } from './types/grass';
@@ -141,6 +143,13 @@ export interface Terrain3d {
   getCameraPose(): CameraPose;
   /** The terrain point under a viewport position, as fractions across the model (0,0 = north-west). */
   getSurfaceFractionAt(clientX: number, clientY: number): { x: number; y: number } | undefined;
+  /** Shows the profile-inspection marker at a crop-unit point on the route; never rebuilds it. */
+  setRouteMarker(point: FramePoint | undefined): void;
+  /**
+   * Displayed surface height (smooth or terraced) at a crop-unit point, in landscape-local
+   * preview units before the frame seat lift; undefined off the model or before a terrain update.
+   */
+  getDisplayedSurfaceHeight(point: FramePoint): number | undefined;
 }
 
 type GradientRange = readonly [minimum: number, maximum: number];
@@ -372,6 +381,7 @@ export function createTerrain3d(
   let model: TerrainModel | undefined;
   let modelKey = '';
   let terracedContours: Contour[] | undefined;
+  let displayedSurface: DisplayedSurface | undefined;
   let waterSurfacePositions: Float32Array = new Float32Array();
   let lastUpdate: Parameters<Terrain3d['update']> | undefined;
   let gradientRange: GradientRange = [0, 1];
@@ -768,18 +778,22 @@ export function createTerrain3d(
 
   /** Test hooks: what the route layer drew, on the canvas wrapper like `data-terrain-transition`. */
   const syncRouteHooks = () => {
-    const { points, waypoints } = route.getCounts();
+    const { points, waypoints, markers, builds } = route.getCounts();
     const { dataset } = renderer.domElement;
+
+    dataset.routeBuilds = String(builds);
 
     if (points === 0) {
       delete dataset.routePoints;
       delete dataset.routeWaypoints;
+      delete dataset.routeMarker;
 
       return;
     }
 
     dataset.routePoints = String(points);
     dataset.routeWaypoints = String(waypoints);
+    dataset.routeMarker = markers > 0 ? 'visible' : 'none';
   };
 
   const syncDecorations = () => {
@@ -792,7 +806,7 @@ export function createTerrain3d(
     syncContourTreatment();
     syncWater();
     roads.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
-    route.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
+    route.setSuppressed(shouldHideDecorations());
     syncRouteHooks();
     const wasAnimated = grass.isAnimated();
 
@@ -1122,6 +1136,16 @@ export function createTerrain3d(
 
         gradientRange = [gradientMinimum, gradientMaximum];
         elevationGradient.setRange(...gradientRange);
+        // Overlays rest on what is drawn, so terraced models hand over their stepped top.
+        displayedSurface = createDisplayedSurface({
+          field,
+          width,
+          height,
+          modelSettings,
+          exaggeration,
+          elevationOffset: model.elevationOffsetMm * previewScale,
+          terracedSurfaceMm: model.contourEdges ? model.surface : undefined,
+        });
         previousField = field;
         modelKey = key;
         onModel(model.overallHeightMm, model.layerHeightMm);
@@ -1133,7 +1157,7 @@ export function createTerrain3d(
 
       const previewScale = getPreviewScale();
 
-      if (!model) {
+      if (!model || !displayedSurface) {
         throw new Error('Terrain model is unavailable.');
       }
 
@@ -1149,15 +1173,7 @@ export function createTerrain3d(
         exaggeration,
         elevationOffset,
       });
-      route.update({
-        ...routeOverlay,
-        field,
-        width,
-        height,
-        modelSettings,
-        exaggeration,
-        elevationOffset,
-      });
+      route.update({ ...routeOverlay, surface: displayedSurface });
       syncRouteHooks();
       grassTerrain = grassGeography && {
         field,
@@ -1551,6 +1567,12 @@ export function createTerrain3d(
         y: THREE.MathUtils.clamp((local.z - bounds.min.z) / (bounds.max.z - bounds.min.z), 0, 1),
       };
     },
+    setRouteMarker(point) {
+      route.setInspectedPoint(point);
+      syncRouteHooks();
+      draw();
+    },
+    getDisplayedSurfaceHeight: (point) => displayedSurface?.heightAt(point),
     pickFocus() {
       const canvas = renderer.domElement;
 

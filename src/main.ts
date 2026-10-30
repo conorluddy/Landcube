@@ -16,7 +16,13 @@ import { createBinaryStl } from './export/stl-export';
 import type { RealTerrain } from './real-terrain';
 import { createFloorPlace } from './floor-geo';
 import { clipRoadsToCrop, noRoadPaths } from './road-ribbons';
-import { clipRouteToCrop, noRouteOverlay, type TerrainRouteOverlay } from './terrain-3d-route';
+import {
+  clipRouteToCrop,
+  noRouteOverlay,
+  projectRoutePointToCrop,
+  type TerrainRouteOverlay,
+} from './terrain-3d-route';
+import { locateRouteDistance } from './route-sampling';
 import type { RoadPath } from './types/roads';
 import type { GrassGeography } from './grass-coverage';
 import { generatedTerrainReliefMeters, generatedTerrainSpanMeters } from './constants/grass';
@@ -462,6 +468,7 @@ function updateTerrain3d(): void {
     getGrassGeography(modelSourceFrame, modelCrop),
     getCroppedRoute(modelSourceFrame, modelCrop, dimensions.cropShape ?? 'rectangle'),
   );
+  syncRouteMarker();
 }
 
 /** Real scale and source anchoring for grass; generated terrain gets a nominal scale. */
@@ -526,7 +533,9 @@ function getCroppedRoute(
     return noRouteOverlay;
   }
 
-  const key = [route.active, location, spanKm, frame, crop, shape];
+  // Geometry only: threshold and inspection edits keep the projected route and its ribbon.
+  const { waypoints, namedWaypoints } = route.active;
+  const key = [waypoints, namedWaypoints, location, spanKm, frame, crop, shape];
 
   if (key.some((value, index) => value !== routeOverlay.key[index])) {
     routeOverlay = {
@@ -542,6 +551,43 @@ function getCroppedRoute(
   }
 
   return routeOverlay.overlay;
+}
+
+/** Points the 3D marker at the profile's inspected distance, on the same basis as the analysis. */
+function syncRouteMarker(): void {
+  const { route } = controls.getSnapshot().workspace;
+  const location = realTerrain?.location;
+  const spanKm = realTerrain?.spanKm;
+
+  if (
+    !terrain3d.isActive() ||
+    route?.inspectedDistanceMeters === undefined ||
+    !route.isVisible ||
+    !location ||
+    spanKm === undefined ||
+    !modelSourceFrame ||
+    !modelCrop
+  ) {
+    terrain3d.setRouteMarker(undefined);
+
+    return;
+  }
+
+  const point = locateRouteDistance(
+    route.active.originalPoints ?? route.active.waypoints,
+    route.inspectedDistanceMeters,
+  );
+
+  terrain3d.setRouteMarker(
+    point &&
+      projectRoutePointToCrop(
+        point,
+        { location, spanKm },
+        modelSourceFrame,
+        modelCrop,
+        controls.getSnapshot().model.dimensions.cropShape ?? 'rectangle',
+      ),
+  );
 }
 
 /** Credits every external source visible in the 3D view. */
@@ -808,15 +854,27 @@ applySignalAccent(
   browserLocalStorage,
   signalAccentStorageKey,
 );
-// A route load, toggle or clear redraws the 3D model; 2D reads it straight from state.
+// Route geometry and visibility redraw the 3D model; the profile cursor only moves its marker.
+// 2D reads the route straight from state. Terrain, crop and model changes update 3D themselves.
 let drawnRoute = controls.getSnapshot().workspace.route;
 
 controls.subscribe(() => {
   const { route } = controls.getSnapshot().workspace;
+  const previous = drawnRoute;
 
-  if (route !== drawnRoute) {
-    drawnRoute = route;
+  drawnRoute = route;
+
+  if (
+    route?.active.waypoints !== previous?.active.waypoints ||
+    route?.active.namedWaypoints !== previous?.active.namedWaypoints ||
+    route?.isVisible !== previous?.isVisible
+  ) {
     updateTerrain3d();
+  } else if (
+    route?.inspectedDistanceMeters !== previous?.inspectedDistanceMeters ||
+    route?.active.originalPoints !== previous?.active.originalPoints
+  ) {
+    syncRouteMarker();
   }
 });
 controls.workspace({

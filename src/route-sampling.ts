@@ -64,6 +64,41 @@ export function measureGroundMeters(start: GeoPoint, end: GeoPoint): number {
   return 2 * earthRadiusMeters * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+/**
+ * The point `distanceMeters` along the route by cumulative ground distance, as profile samples
+ * are placed. Distances beyond either end clamp to it; fewer than two points have no length.
+ */
+export function locateRouteDistance(
+  points: readonly GeoPoint[],
+  distanceMeters: number,
+): GeoPoint | undefined {
+  if (!Number.isFinite(distanceMeters)) {
+    throw new RangeError(
+      `Route distance must be a finite number of metres, got ${distanceMeters}.`,
+    );
+  }
+
+  if (points.length < 2) {
+    return undefined;
+  }
+
+  let startMeters = 0;
+
+  for (let index = 1; index < points.length; index += 1) {
+    const lengthMeters = measureGroundMeters(points[index - 1], points[index]);
+
+    if (distanceMeters < startMeters + lengthMeters) {
+      const fraction = Math.max(0, (distanceMeters - startMeters) / lengthMeters);
+
+      return interpolatePoint(points[index - 1], points[index], fraction);
+    }
+
+    startMeters += lengthMeters;
+  }
+
+  return copyPoint(points[points.length - 1]);
+}
+
 // === HELPERS ===
 
 function measureSegments(points: readonly GeoPoint[]): number[] {
