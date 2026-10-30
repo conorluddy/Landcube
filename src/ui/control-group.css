@@ -133,3 +133,75 @@
 .lc-inspector__body .lc-group .lc-segmented__item {
   padding: 0 var(--lc-s-3);
 }
+
+/* Director shot strip: numbered thumbnails of saved camera views. */
+.lc-shot-strip {
+  display: flex;
+  gap: var(--lc-s-2);
+  margin: 0;
+  padding: 0 0 var(--lc-s-2);
+  overflow-x: auto;
+  list-style: none;
+}
+
+.lc-shot-strip__tile {
+  position: relative;
+  flex: 0 0 96px;
+}
+
+.lc-shot-strip__view {
+  display: block;
+  position: relative;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--lc-line);
+  border-radius: var(--lc-r-control);
+  background: transparent;
+  cursor: pointer;
+  transition: border-color var(--lc-dur-fast) var(--lc-ease);
+}
+
+.lc-shot-strip__view:hover {
+  border-color: var(--lc-line-hover);
+}
+
+.lc-shot-strip__view:focus-visible {
+  border-color: var(--lc-line-focus);
+  outline: none;
+}
+
+.lc-shot-strip__view img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.lc-shot-strip__number,
+.lc-shot-strip__remove {
+  position: absolute;
+  top: var(--lc-s-2);
+  min-width: 18px;
+  padding: 0 var(--lc-s-2);
+  border: 0;
+  border-radius: var(--lc-r-control);
+  background: var(--lc-fill-selected);
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-hint);
+  line-height: 18px;
+}
+
+.lc-shot-strip__number {
+  left: var(--lc-s-2);
+}
+
+.lc-shot-strip__remove {
+  right: var(--lc-s-2);
+  cursor: pointer;
+}
+
+.lc-shot-strip__remove:hover {
+  background: var(--lc-fill-hover);
+}

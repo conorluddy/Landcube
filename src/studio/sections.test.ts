@@ -33,7 +33,7 @@ void test('every group id is registered under exactly one section', () => {
   }
 });
 
-void test('sections run 01 to 10 in design order with unique codes', () => {
+void test('sections run 01 to 11 in design order with unique codes', () => {
   assert.deepEqual(
     studioSections.map((section) => `${String(section.index).padStart(2, '0')} ${section.code}`),
     [
@@ -42,11 +42,12 @@ void test('sections run 01 to 10 in design order with unique codes', () => {
       '03 COLR',
       '04 CAMR',
       '05 ORBT',
-      '06 SCEN',
-      '07 OVLY',
-      '08 ROUT',
-      '09 MODL',
-      '10 FRAM',
+      '06 DRCT',
+      '07 SCEN',
+      '08 OVLY',
+      '09 ROUT',
+      '10 MODL',
+      '11 FRAM',
     ],
   );
 });
@@ -58,6 +59,7 @@ void test('section ids and titles match the inspector sections the e2e tests add
     'Colour',
     'Camera',
     'Orbit',
+    'Director',
     'Scene',
     'Overlays',
     'Route',

@@ -7,14 +7,14 @@
  * `section#inspector-{id.toLowerCase()}[aria-label="{title} settings"]` and the rail button name
  * ("Model") from it, which the e2e tests bind to. Slug ↔ id: terrain ↔ 'Terrain',
  * contours ↔ 'Contours', colour ↔ 'Colour', camera ↔ 'Camera',
- * orbit ↔ 'Orbit', scene ↔ 'Scene', overlays ↔ 'Overlays', route ↔ 'Route', model ↔ 'Model',
+ * orbit ↔ 'Orbit', director ↔ 'Director', scene ↔ 'Scene', overlays ↔ 'Overlays', route ↔ 'Route', model ↔ 'Model',
  * frame ↔ 'Frame'. Export groups carry no code yet (open question on #88).
  */
 import type { InspectorSection } from './controller';
 
 export interface StudioSection {
   id: InspectorSection;
-  /** 1-based display index: 01 TERR … 10 FRAM. */
+  /** 1-based display index: 01 TERR … 11 FRAM. */
   index: number;
   code: string;
   title: string;
@@ -66,36 +66,43 @@ export const studioSections = [
     groupIds: ['orbit'],
   },
   {
-    id: 'Scene',
+    id: 'Director',
     index: 6,
+    code: 'DRCT',
+    title: 'Director',
+    groupIds: ['director-shots'],
+  },
+  {
+    id: 'Scene',
+    index: 7,
     code: 'SCEN',
     title: 'Scene',
     groupIds: ['cursor-interaction', 'surface', 'grass', 'ground', 'water', 'lighting'],
   },
   {
     id: 'Overlays',
-    index: 7,
+    index: 8,
     code: 'OVLY',
     title: 'Overlays',
     groupIds: ['decorative-grid', 'summit-markers', 'geographic-decorations', 'roads', 'sea-level'],
   },
   {
     id: 'Route',
-    index: 8,
+    index: 9,
     code: 'ROUT',
     title: 'Route',
     groupIds: ['route'],
   },
   {
     id: 'Model',
-    index: 9,
+    index: 10,
     code: 'MODL',
     title: 'Model',
     groupIds: ['model-dimensions', 'shape'],
   },
   {
     id: 'Frame',
-    index: 10,
+    index: 11,
     code: 'FRAM',
     title: 'Frame',
     groupIds: ['frame', 'dimensions', 'edge'],

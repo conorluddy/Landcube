@@ -26,6 +26,7 @@ import {
   type TerrainViewPreset,
   type TurntableDirection,
 } from '../terrain-camera';
+import type { CameraShot, CapturedCameraShot } from '../terrain-camera-shots';
 import { terrainMaterialPresets, type LandFinish, type WaterFinish } from '../terrain-materials';
 import {
   copyElevationGradient,
@@ -103,6 +104,7 @@ export type InspectorSection =
   | 'Colour'
   | 'Camera'
   | 'Orbit'
+  | 'Director'
   | 'Scene'
   | 'Overlays'
   | 'Route'
@@ -111,6 +113,7 @@ export type InspectorSection =
 export const threeDOnlySections: readonly InspectorSection[] = [
   'Camera',
   'Orbit',
+  'Director',
   'Model',
   'Frame',
 ];
@@ -270,6 +273,8 @@ export interface StudioState {
   cameraPose?: CameraPose;
   /** Searched places that loaded, most recent first; kept in browser storage. */
   savedPlaces: SavedPlace[];
+  /** Bookmarked 3D views for the director tour. Session-only; cleared when the terrain changes. */
+  cameraShots: { shots: readonly CapturedCameraShot[]; isPlaying: boolean };
 }
 export interface StudioEffects {
   /** Location and source changes morph the 3D terrain; interval and hatching edits cut. */
@@ -283,6 +288,11 @@ export interface StudioEffects {
   /** Spike: drops into first person at a viewport point (the orbit centre when omitted); false on a miss. */
   walkAt(clientX?: number, clientY?: number): boolean;
   pickFocus(): Promise<boolean>;
+  /** Undefined while the 3D view is not showing. */
+  captureCameraShot(): { shot: CameraShot; thumbnailUrl: string } | undefined;
+  flyToCameraShot(shot: CameraShot): void;
+  playCameraShots(shots: readonly CameraShot[], onStop: () => void): void;
+  stopCameraShots(): void;
   /** Resolves to the saved image's pixel size. */
   downloadStill(scale: TerrainStillScale): Promise<{ width: number; height: number }>;
   downloadStl(): void;
@@ -410,6 +420,14 @@ export interface StudioController {
   interval: (value: 'auto' | number) => boolean;
   hatching: (value: boolean) => void;
   resetCamera: () => void;
+  /** Bookmarks the current 3D view; a no-op outside 3D. */
+  saveCameraShot: () => void;
+  removeCameraShot: (id: number) => void;
+  clearCameraShots: () => void;
+  flyToCameraShot: (id: number) => void;
+  /** Starts the looping tour, or stops it when it is playing. */
+  toggleCameraShotPlayback: () => void;
+  stopCameraShots: () => void;
   /** True when the download started; failures are reported through `status`. */
   downloadStl: () => boolean;
   downloadStill: (scale: TerrainStillScale) => Promise<void>;
@@ -534,7 +552,9 @@ export function createStudioController(
     exportJobs: [],
     metrics: {},
     savedPlaces: savedPlacesResult?.ok === true ? savedPlacesResult.data : [],
+    cameraShots: { shots: [], isPlaying: false },
   };
+  let nextCameraShotId = 1;
   let effects: StudioEffects | undefined;
   let requestVersion = 0;
   let terrainLoadCancel: AbortController | undefined;
@@ -578,6 +598,19 @@ export function createStudioController(
   const notify = (message: string) => {
     state = { ...state, status: message };
     publish();
+  };
+
+  const setCameraShots = (patch: Partial<StudioState['cameraShots']>) => {
+    state = { ...state, cameraShots: { ...state.cameraShots, ...patch } };
+    publish();
+  };
+
+  /** Shots frame the old landscape, so a new one starts with an empty stack. */
+  const discardCameraShots = () => {
+    if (state.cameraShots.shots.length > 0) {
+      effects?.stopCameraShots();
+      setCameraShots({ shots: [], isPlaying: false });
+    }
   };
 
   const workspace = (patch: Partial<StudioState['workspace']>) => {
@@ -764,6 +797,10 @@ export function createStudioController(
           },
         },
       };
+    }
+
+    if (locationChanged) {
+      discardCameraShots();
     }
 
     if (locationChanged && state.model.autoExaggeration) {
@@ -1081,6 +1118,7 @@ export function createStudioController(
     },
     newLandscape() {
       if (!state.seedLocked) {
+        discardCameraShots();
         actions.newLandscape();
         sync();
       }
@@ -1656,6 +1694,66 @@ export function createStudioController(
     },
     resetCamera() {
       effects?.resetCamera();
+    },
+    saveCameraShot() {
+      const captured = effects?.captureCameraShot();
+
+      if (!captured) {
+        return;
+      }
+
+      const shots = [
+        ...state.cameraShots.shots,
+        { ...captured.shot, id: nextCameraShotId++, thumbnailUrl: captured.thumbnailUrl },
+      ];
+
+      setCameraShots({ shots });
+      notify(`Shot ${shots.length} saved`);
+    },
+    removeCameraShot(id) {
+      const shots = state.cameraShots.shots.filter((shot) => shot.id !== id);
+
+      if (shots.length === 0) {
+        effects?.stopCameraShots();
+      }
+
+      setCameraShots({ shots, isPlaying: state.cameraShots.isPlaying && shots.length > 0 });
+    },
+    clearCameraShots() {
+      effects?.stopCameraShots();
+      setCameraShots({ shots: [], isPlaying: false });
+      notify('Shots cleared');
+    },
+    flyToCameraShot(id) {
+      const shot = state.cameraShots.shots.find((candidate) => candidate.id === id);
+
+      if (shot) {
+        effects?.flyToCameraShot(shot);
+      }
+    },
+    toggleCameraShotPlayback() {
+      const { shots, isPlaying } = state.cameraShots;
+
+      if (isPlaying) {
+        effects?.stopCameraShots();
+
+        return;
+      }
+
+      if (shots.length === 0) {
+        notify('Press B to save a shot first');
+
+        return;
+      }
+
+      effects?.playCameraShots(shots, () => {
+        setCameraShots({ isPlaying: false });
+      });
+      setCameraShots({ isPlaying: true });
+      notify(`Playing ${shots.length} ${shots.length === 1 ? 'shot' : 'shots'}`);
+    },
+    stopCameraShots() {
+      effects?.stopCameraShots();
     },
     downloadStl() {
       try {

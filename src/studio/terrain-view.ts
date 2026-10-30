@@ -14,6 +14,7 @@ import { getAutoRotateSpeed, type TerrainViewPreset } from '../terrain-camera';
 import { createShellMotion } from './shell-motion';
 import { generatedTerrainSpanMeters } from '../constants/grass';
 import { createCameraPosePublisher } from './camera-pose';
+import type { CameraShot } from '../terrain-camera-shots';
 
 interface StudioTerrainView {
   isActive: () => boolean;
@@ -28,6 +29,10 @@ interface StudioTerrainView {
   setCameraDirection: (azimuthDegrees: number, elevationDegrees: number) => void;
   walkAt: (clientX?: number, clientY?: number) => boolean;
   pickFocus: () => Promise<boolean>;
+  captureCameraShot: () => { shot: CameraShot; thumbnailUrl: string } | undefined;
+  flyToCameraShot: (shot: CameraShot) => void;
+  playCameraShots: (shots: readonly CameraShot[], onStop: () => void) => void;
+  stopCameraShots: () => void;
   captureStill: (scale: number) => HTMLCanvasElement;
   /** Arms a morph for the next 3D rebuild; the 2D view and an inactive 3D view always cut. */
   requestTransition: () => void;
@@ -300,6 +305,10 @@ export function createStudioTerrainView(
     setCameraDirection: (azimuth, elevation) => view?.setCameraDirection(azimuth, elevation),
     walkAt,
     pickFocus: () => view?.pickFocus() ?? Promise.resolve(false),
+    captureCameraShot: () => (view && active && !suspended ? view.captureCameraShot() : undefined),
+    flyToCameraShot: (shot) => view?.flyToCameraShot(shot),
+    playCameraShots: (shots, onStop) => view?.playCameraShots(shots, onStop),
+    stopCameraShots: () => view?.stopCameraShots(),
     captureStill(scale) {
       if (!view || !active) {
         throw new Error('Select the 3D view before downloading a 3D still.');

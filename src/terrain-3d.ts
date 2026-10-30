@@ -78,6 +78,13 @@ import type { HeightField } from './types/terrain';
 import { seaLevelHatchSpacing, seaLevelHatchOpacity } from './constants/sea-level';
 import type { SeaLevelGeometry } from './sea-level';
 import * as THREE from 'three';
+import {
+  advanceCameraShotPlayback,
+  cameraShotMoveMs,
+  interpolateCameraShot,
+  type CameraShot,
+  type CameraShotPlayback,
+} from './terrain-camera-shots';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createTerrainWalk } from './terrain-walk';
 import { createTerrainTransitionAudio } from './terrain-transition-audio';
@@ -158,6 +165,12 @@ export interface Terrain3d {
   walkAt(metersPerUnit: number, clientX?: number, clientY?: number): boolean;
   /** Runs after every drawn frame (orbit, presets, turntable, rebuilds); returns an unsubscribe. */
   subscribeDraw(listener: () => void): () => void;
+  /** The current view and a small preview drawn from it. */
+  captureCameraShot(): { shot: CameraShot; thumbnailUrl: string };
+  flyToCameraShot(shot: CameraShot): void;
+  /** Tours the shots in a loop until stopped; `onStop` runs however playback ends, e.g. on a drag. */
+  playCameraShots(shots: readonly CameraShot[], onStop: () => void): void;
+  stopCameraShots(): void;
 }
 
 type GradientRange = readonly [minimum: number, maximum: number];
@@ -607,6 +620,8 @@ export function createTerrain3d(
   };
 
   controls.addEventListener('change', draw);
+  // Grabbing the camera takes it back from a shot tour.
+  controls.addEventListener('start', () => stopCameraShots?.());
 
   const resize = () => {
     const width = Math.max(1, viewport.clientWidth);
@@ -728,6 +743,78 @@ export function createTerrain3d(
     step();
   };
 
+  /** Ends a running shot flight or tour; undefined while none runs. */
+  let stopCameraShots: (() => void) | undefined;
+
+  const getCameraShot = (): CameraShot => {
+    const { x, y, z } = camera.position.clone().sub(controls.target).normalize();
+    const { x: targetX, y: targetY, z: targetZ } = controls.target;
+
+    return {
+      target: { x: targetX, y: targetY, z: targetZ },
+      direction: { x, y, z },
+      distance: getViewDistance(),
+    };
+  };
+
+  const placeCameraShot = ({ target, direction, distance }: CameraShot) => {
+    controls.target.set(target.x, target.y, target.z);
+    placeCamera(new THREE.Vector3(direction.x, direction.y, direction.z), distance);
+    draw();
+  };
+
+  /** Eases through `shots` from the current view; holds between them and loops when asked. */
+  const runCameraShots = (
+    shots: readonly CameraShot[],
+    shouldLoop: boolean,
+    onStop: () => void = () => undefined,
+  ) => {
+    stopCameraShots?.();
+    settleViewAnimation?.();
+    const isReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let from = getCameraShot();
+    let playback: CameraShotPlayback = { kind: 'moving', index: 0, startedAtMs: performance.now() };
+    let frame = 0;
+
+    const stop = () => {
+      cancelAnimationFrame(frame);
+      stopCameraShots = undefined;
+      controls.autoRotate = rotating;
+      onStop();
+    };
+
+    const step = () => {
+      const now = performance.now();
+      const next = advanceCameraShotPlayback(playback, now, shots.length);
+
+      if (playback.kind === 'moving' && next.kind !== 'moving') {
+        from = shots[playback.index];
+        placeCameraShot(from);
+
+        if (!shouldLoop && playback.index === shots.length - 1) {
+          stop();
+
+          return;
+        }
+      }
+
+      playback = next;
+
+      if (playback.kind === 'moving') {
+        const progress = isReducedMotion ? 1 : (now - playback.startedAtMs) / cameraShotMoveMs;
+
+        placeCameraShot(interpolateCameraShot(from, shots[playback.index], progress));
+      }
+
+      frame = requestAnimationFrame(step);
+    };
+
+    // The turntable would fight the tour for the camera.
+    controls.autoRotate = false;
+    stopCameraShots = stop;
+    step();
+  };
+
   const raycaster = new THREE.Raycaster();
 
   const getTerrainPointAt = (clientX: number, clientY: number) => {
@@ -820,6 +907,7 @@ export function createTerrain3d(
   };
 
   const reset = () => {
+    stopCameraShots?.();
     const home = new THREE.Vector3(0, 2.1, 2.5);
 
     controls.target.set(0, 0, 0);
@@ -1379,6 +1467,7 @@ export function createTerrain3d(
       visible = value;
 
       if (!value) {
+        stopCameraShots?.();
         finishTransition();
         cancelFocusPick?.();
         // Leaving 3D must release the walk's frame loop, key capture and studio state.
@@ -1761,6 +1850,7 @@ export function createTerrain3d(
       controls.autoRotateSpeed = value;
     },
     applyViewPreset(preset: TerrainViewPreset) {
+      stopCameraShots?.();
       const { polarDegrees, azimuthDegrees } = terrainViewPresets[preset];
 
       animateCameraDirection(
@@ -1772,6 +1862,7 @@ export function createTerrain3d(
       );
     },
     setCameraDirection(azimuthDegrees: number, elevationDegrees: number) {
+      stopCameraShots?.();
       animateCameraDirection(
         new THREE.Vector3().setFromSphericalCoords(
           1,
@@ -1781,15 +1872,38 @@ export function createTerrain3d(
       );
     },
     requestTransition() {
+      stopCameraShots?.();
       isTransitionArmed = true;
     },
     setRotating(value: boolean) {
       rotating = value;
-      controls.autoRotate = value;
+      // A running tour restores the turntable when it stops.
+      controls.autoRotate = value && stopCameraShots === undefined;
       previousTime = performance.now();
       updateLoop();
     },
     reset,
+    captureCameraShot() {
+      const thumbnail = document.createElement('canvas');
+      const source = renderer.domElement;
+
+      thumbnail.width = 192;
+      thumbnail.height = Math.max(1, Math.round((192 * source.height) / source.width));
+      // Drawn straight after a render, before the WebGL buffer is cleared.
+      render();
+      thumbnail.getContext('2d')?.drawImage(source, 0, 0, thumbnail.width, thumbnail.height);
+
+      return { shot: getCameraShot(), thumbnailUrl: thumbnail.toDataURL('image/jpeg', 0.8) };
+    },
+    flyToCameraShot(shot: CameraShot) {
+      runCameraShots([shot], false);
+    },
+    playCameraShots(shots: readonly CameraShot[], onStop: () => void) {
+      runCameraShots(shots, true, onStop);
+    },
+    stopCameraShots() {
+      stopCameraShots?.();
+    },
   };
 
   return api;
