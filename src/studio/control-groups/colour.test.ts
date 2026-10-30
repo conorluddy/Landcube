@@ -28,6 +28,7 @@ void test('3D adds materials, land, elevation gradient and water material in ord
 
   assert.deepEqual(listGroupIds(buildColourGroups(controller, state)), [
     'palette',
+    'workspace',
     'materials',
     'land',
     'elevation-gradient',

@@ -43,6 +43,7 @@ export const studioSections = [
     title: 'Colour',
     groupIds: [
       'palette',
+      'workspace',
       'materials',
       'land',
       'elevation-gradient',

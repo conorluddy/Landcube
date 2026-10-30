@@ -40,6 +40,7 @@ export function buildColourGroups(
     buildPaletteGroup(controller, state),
     ...(state.workspace.view === '3d'
       ? [
+          buildWorkspaceGroup(controller, state),
           buildMaterialsGroup(controller, state),
           buildLandGroup(controller, state),
           buildElevationGradientGroup(controller, state),
@@ -95,6 +96,34 @@ function buildPaletteGroup(
         'palette-hint',
         'Palette presets change both canvas and contour colours. Edit individual contour colour in Contours.',
       ),
+    ],
+  };
+}
+
+function buildWorkspaceGroup(
+  controller: StudioController,
+  state: StudioState,
+): ControlGroupDefinition {
+  return {
+    id: 'workspace',
+    title: 'Workspace',
+    isPinnable: true,
+    rows: [
+      tilesRow<'dark' | 'light'>('workspace-colour', {
+        label: 'Workspace',
+        value: state.scene.groundColor === '#202326' ? 'dark' : 'light',
+        options: [
+          { value: 'dark', label: 'Dark', swatchColor: '#202326' },
+          { value: 'light', label: 'Light', swatchColor: '#b4b4b4' },
+        ],
+        onChange: (value) => {
+          controller.scene({
+            ground: true,
+            groundMatch: false,
+            groundColor: value === 'dark' ? '#202326' : '#b4b4b4',
+          });
+        },
+      }),
     ],
   };
 }

@@ -307,7 +307,7 @@ export function createTerrain3d(
   const backdropTint = new THREE.Color(1, 1, 1);
 
   const updateStageVisibility = () => {
-    const enabled = showGround && base.visible;
+    const enabled = showGround;
 
     stage.setVisible(enabled);
     scene.background = new THREE.Color(
