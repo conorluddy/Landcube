@@ -11,6 +11,7 @@ import { createCanvasSuspender } from './studio/canvas-suspend';
 import { readSystemLink, replaceSystemLink } from './system-link';
 import { applySignalAccent, readSignalAccent } from './studio/accent';
 import { browserLocalStorage, browserSessionStorage } from './studio/browser-storage';
+import { readStoredScene, saveStoredScene } from './studio/scene-storage';
 import { shouldShowSplash } from './studio/pages/splash-session';
 import { signalAccentStorageKey } from './constants/library';
 import { downloadBlob } from './studio/export-panel';
@@ -63,8 +64,10 @@ import {
   copyDesignLink,
   hasDesignParameters,
   loadInitialDesign,
+  readDesignStyle,
   readLockedSeed,
   replaceDesignUrl,
+  saveDesignStyle,
   saveLockedSeed,
 } from './design-sharing';
 import { createOutputRenderer } from './export/image-export';
@@ -74,7 +77,7 @@ import { renderContoursIntoSvg } from './svg-rendering';
 import { createTerrainSampler, sampleTerrain } from './terrain-generation';
 import type { CursorInfluence } from './types/cursor';
 import type { DesignChangeKind, DesignSettings } from './types/design';
-import type { Result } from './types/operations';
+import type { OperationError, Result } from './types/operations';
 
 const millisecondsPerSecond = 1000;
 const maximumCursorFrameElapsedMs = 100;
@@ -101,11 +104,18 @@ try {
 }
 
 const opensDesignLink = hasDesignParameters(new URLSearchParams(location.search));
+const storedStyleResult = readDesignStyle(browserLocalStorage);
+
+if (!storedStyleResult.ok) {
+  logOperationError(storedStyleResult.error);
+}
+
 const initialDesignResult = loadInitialDesign(
   new URLSearchParams(location.search),
   { width: innerWidth, height: innerHeight },
   generateRandomSeed(),
   storedSeedResult.ok ? storedSeedResult.data : null,
+  storedStyleResult.ok ? storedStyleResult.data : undefined,
 );
 const fallbackDesignResult = parseDesignParameters(new URLSearchParams(), versionOneDesignDefaults);
 
@@ -136,6 +146,7 @@ let lastContourRenderTimeMs = 0;
 let designUrlDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingChange: DesignChangeKind | undefined;
 let settingsUpdateFrameIdentifier: number | undefined;
+const reportedStorageFailures = new Set<string>();
 const hud = createHudStore();
 const compareScenes = createCompareSceneStore();
 let pendingHudPointerEvent: PointerEvent | undefined;
@@ -259,6 +270,32 @@ if (!initialDesignResult.ok) {
   controls.notify(message);
 }
 
+const storedSceneResult = readStoredScene(browserLocalStorage, controls.getSnapshot().scene);
+
+if (storedSceneResult.ok) {
+  controls.scene(storedSceneResult.data);
+} else {
+  logOperationError(storedSceneResult.error);
+}
+
+let savedScene = controls.getSnapshot().scene;
+
+controls.subscribe(() => {
+  const { scene } = controls.getSnapshot();
+
+  // The daylight sweep moves the sun 20 times a second; the look saves once it stops.
+  if (scene === savedScene || scene.daylightCycle.enabled) {
+    return;
+  }
+
+  savedScene = scene;
+  const result = saveStoredScene(browserLocalStorage, scene);
+
+  if (!result.ok) {
+    reportStorageFailureOnce(result.error);
+  }
+});
+
 /** Commits a validated edit and batches the required rendering work. */
 function updateSettings(nextDesignSettings: DesignSettings): boolean {
   const result = validateDesignSettings(nextDesignSettings);
@@ -275,9 +312,12 @@ function updateSettings(nextDesignSettings: DesignSettings): boolean {
   );
 
   settings = result.data;
+  let hasStyleChange = false;
 
   for (const key of changed) {
     const kind = classifyDesignSettingChange(key);
+
+    hasStyleChange ||= kind !== 'terrain' && kind !== 'output';
 
     if (!pendingChange || designChangePriority[kind] > designChangePriority[pendingChange]) {
       pendingChange = kind;
@@ -286,6 +326,14 @@ function updateSettings(nextDesignSettings: DesignSettings): boolean {
 
   clearTimeout(designUrlDebounceTimer);
   designUrlDebounceTimer = setTimeout(synchronizeDesignUrl, designUrlDebounceMs);
+
+  if (hasStyleChange) {
+    const saved = saveDesignStyle(browserLocalStorage, settings);
+
+    if (!saved.ok) {
+      reportStorageFailureOnce(saved.error);
+    }
+  }
 
   if (settingsUpdateFrameIdentifier !== undefined || !pendingChange) {
     return true;
@@ -348,6 +396,16 @@ function synchronizeDesignUrl(): string {
   clearTimeout(designUrlDebounceTimer);
 
   return replaceDesignUrl(location.href, settings, history);
+}
+
+/** Style saves repeat on every edit, so blocked storage is logged once per message, not per slider step. */
+function reportStorageFailureOnce(error: OperationError): void {
+  if (reportedStorageFailures.has(error.message)) {
+    return;
+  }
+
+  reportedStorageFailures.add(error.message);
+  logOperationError(error);
 }
 
 /** Keeps the page backdrop and browser theme aligned with the design. */

@@ -11,7 +11,7 @@ Browser and CLI share settings validation, terrain generation, contour extractio
 - Terrain, contour, composition, and SVG modules form the shared rendering pipeline; `src/export/` owns export behavior.
 - Shared domain constants and types live in `src/constants/` and `src/types/`.
 
-Preserve reproducibility: existing version-one links depend on stable defaults and terrain semantics. Browser design links omit real-terrain locations; CLI configurations preserve terrain settings. Static exports use settled terrain without cursor deformation. Real-terrain output includes source attribution.
+Preserve reproducibility: existing version-one links depend on stable defaults and terrain semantics. Browser design links omit real-terrain locations; CLI configurations preserve terrain settings. The browser restores the last 3D look from localStorage (`src/studio/scene-storage.ts`) on every visit, since links do not carry it; the last design style restores only without a design link, so links never mix in stored values. Static exports use settled terrain without cursor deformation. Real-terrain output includes source attribution.
 
 Keep browser and CLI behavior aligned through the shared pipeline.
 
