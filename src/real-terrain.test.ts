@@ -5,7 +5,7 @@ import test from 'node:test';
 import { validateDesignSettings } from './design-settings';
 import type { RealTerrain, TerrainTileLoader } from './real-terrain';
 import type { TerrainLoadError } from './terrain-load-error';
-import { decodeTerrariumElevation, loadRealTerrain } from './real-terrain';
+import { creditTerrainSources, decodeTerrariumElevation, loadRealTerrain } from './real-terrain';
 import { createOutputRenderer } from './export/image-export';
 import { engineConfiguration } from './constants/engine';
 import { bundledTerrainTileSources } from './constants/bundled-terrain-tiles';
@@ -519,4 +519,15 @@ void test('source revision is stable for identical loads and changes with every 
 
   assert.equal(await load(0, 0, 2), base);
   assert.equal(new Set([base, ...variants]).size, variants.length + 1);
+});
+
+void test('a tile is credited for each source family named in its imagery header', () => {
+  assert.deepEqual(creditTerrainSources('eudem/eudem_dem_5deg_n55w010.tif'), [
+    'Produced using Copernicus data and information funded by the European Union — EU-DEM layers',
+  ]);
+  assert.equal(creditTerrainSources('srtm/N55W009.hgt, etopo1/x.tif').length, 2);
+});
+
+void test('a tile with no imagery header credits every source, since any could apply', () => {
+  assert.ok(creditTerrainSources('').length > 5);
 });

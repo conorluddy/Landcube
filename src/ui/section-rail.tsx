@@ -10,13 +10,16 @@ export interface RailSection<T extends string> {
   /** Four-letter section code, e.g. 'TERR'. */
   code: string;
   title: string;
+  /** Shown in the rail in place of the title, which stays the accessible name, e.g. 'FNDN'. */
+  shortTitle?: string;
 }
 
 export interface SectionRailProps<T extends string> {
   /** Accessible name of the navigation landmark. */
   label: string;
   sections: readonly RailSection<T>[];
-  activeSectionId: T;
+  /** Null shows no section pressed, e.g. while a panel lists search results across sections. */
+  activeSectionId: T | null;
   onSelectSection: (id: T) => void;
   /** Left out of the rail; the others keep their index, so the numbering shows a gap. */
   hiddenSectionIds?: readonly T[];
@@ -90,7 +93,7 @@ export function SectionRail<T extends string>({
             onSelectSection(section.id);
           }}
         >
-          <span className="lc-section-rail__title">{section.title}</span>
+          <span className="lc-section-rail__title">{section.shortTitle ?? section.title}</span>
         </button>
       ))}
     </nav>

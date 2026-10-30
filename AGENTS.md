@@ -5,6 +5,7 @@ LANDCU.BE generates decorative topographic SVG and PNG artwork from seeded synth
 Browser and CLI share settings validation, terrain generation, contour extraction, composition, and SVG rendering. Browser PNG export uses canvas; Node PNG export uses Resvg. Real terrain uses public Terrarium elevation tiles with platform-specific decoding.
 
 - `src/main.ts` and control modules own the browser experience; `src/ui/` holds the design-system components and tokens, and `src/studio/studio.css` the shell layout.
+- `src/system/` is design-system mode: a lazy-loaded gallery inside the studio whose plates are the `src/ui` specimen definitions. See `src/system/README.md`.
 - `src/cli.ts` owns CLI commands and configuration handling.
 - `src/design-settings.ts` owns validated settings and versioned URL serialization; `src/design-sharing.ts` owns browser restoration and sharing.
 - Terrain, contour, composition, and SVG modules form the shared rendering pipeline; `src/export/` owns export behavior.

@@ -8,4 +8,5 @@ export const operationErrorCodes = {
   mapDataFailed: 'MAP_DATA_FAILED',
   placeSearchFailed: 'PLACE_SEARCH_FAILED',
   invalidRoute: 'INVALID_ROUTE',
+  moduleLoadFailed: 'MODULE_LOAD_FAILED',
 } as const;

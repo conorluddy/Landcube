@@ -41,6 +41,7 @@
 @import './glass-panel.css';
 @import './section-rail.css';
 @import './inspector-panel.css';
+@import './part-row.css';
 
 /* #13 export */
 @import './job-list.css';

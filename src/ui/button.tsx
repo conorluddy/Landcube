@@ -17,6 +17,8 @@ export interface ButtonProps extends AriaAttributes {
   isFullWidth?: boolean;
   /** Native tooltip for detail the label leaves out. */
   title?: string;
+  /** Renders a link that opens in a new tab instead of a button; `onClick` and `disabled` don't apply. */
+  href?: string;
   ref?: Ref<HTMLButtonElement>;
 }
 
@@ -32,9 +34,39 @@ export function Button({
   isBusy = false,
   isFullWidth = false,
   title,
+  href,
   ref,
   ...ariaAttributes
 }: ButtonProps): React.JSX.Element {
+  const content = (
+    <>
+      <span className="lc-button__label">{children}</span>
+      {trailingGlyph === undefined ? null : (
+        <span className="lc-button__glyph" aria-hidden="true">
+          {trailingGlyph}
+        </span>
+      )}
+    </>
+  );
+
+  if (href !== undefined) {
+    return (
+      <a
+        {...ariaAttributes}
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="lc-button"
+        data-variant={variant}
+        data-size={size}
+        data-full-width={isFullWidth ? 'true' : undefined}
+        title={title}
+      >
+        {content}
+      </a>
+    );
+  }
+
   return (
     <button
       {...ariaAttributes}
@@ -49,12 +81,7 @@ export function Button({
       aria-busy={isBusy ? true : undefined}
       onClick={onClick}
     >
-      <span className="lc-button__label">{children}</span>
-      {trailingGlyph === undefined ? null : (
-        <span className="lc-button__glyph" aria-hidden="true">
-          {trailingGlyph}
-        </span>
-      )}
+      {content}
     </button>
   );
 }

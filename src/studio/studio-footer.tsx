@@ -37,11 +37,20 @@ export function StudioFooter({
   state,
   inspectorId,
   inspectorToggleRef,
+  systemLinkRef,
+  onOpenSystem,
+  onPreloadSystem,
 }: {
   controller: StudioController;
   state: StudioState;
   inspectorId: string;
   inspectorToggleRef: Ref<HTMLButtonElement>;
+  /** The Design system link, so focus can return to it when the gallery closes. */
+  systemLinkRef: Ref<HTMLButtonElement>;
+  /** Flips the studio into design-system mode. */
+  onOpenSystem: () => void;
+  /** Fetches the system chunk ahead of a likely click, so the flip lands on loaded content. */
+  onPreloadSystem: () => void;
 }): ReactNode {
   const { workspace, source } = state;
   const isRoadCreditShown = areRoadsDrawn(state);
@@ -74,13 +83,18 @@ export function StudioFooter({
         )}
         <DataSources state={state} />
         <ThemeToggle />
-        <a
-          className="studio-github"
-          href="https://github.com/conorluddy/landcube"
-          target="_blank"
-          rel="noreferrer"
+        <button
+          ref={systemLinkRef}
+          type="button"
+          className="studio-mode-link"
+          onClick={onOpenSystem}
+          onPointerEnter={onPreloadSystem}
+          onFocus={onPreloadSystem}
         >
-          GitHub ↗
+          Design system <span aria-hidden="true">◧</span>
+        </button>
+        <a className="studio-credit" href="https://conor.fyi" target="_blank" rel="noreferrer">
+          conor.fyi ↗
         </a>
       </BarGroup>
       <BarGroup className="studio-tools" role="group" label="Viewport tools">

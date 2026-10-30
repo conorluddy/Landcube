@@ -210,12 +210,9 @@ export async function loadRealTerrain(
     const tile = await loadTile(
       `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${zoom}/${wrappedX}/${boundedY}.png`,
     );
-    const sources = tile.imagerySources.toLowerCase();
 
-    for (const [identifiers, credit] of terrainCredits) {
-      if (identifiers.some((identifier) => sources.includes(identifier)) || sources === '') {
-        credits.add(credit);
-      }
+    for (const credit of creditTerrainSources(tile.imagerySources)) {
+      credits.add(credit);
     }
 
     if (tile.pixels.length !== terrariumTileSizePixels * terrariumTileSizePixels * 4) {
@@ -240,6 +237,18 @@ export async function loadRealTerrain(
 
     onProgress?.(++loadedTileCount, requests.length);
   }
+}
+
+/** The data credits a tile's imagery-sources header requires; an unknown (empty) header credits every source. */
+export function creditTerrainSources(imagerySources: string): string[] {
+  const sources = imagerySources.toLowerCase();
+
+  return terrainCredits
+    .filter(
+      ([identifiers]) =>
+        sources === '' || identifiers.some((identifier) => sources.includes(identifier)),
+    )
+    .map(([, credit]) => credit);
 }
 
 const terrainCredits: readonly [readonly string[], string][] = [

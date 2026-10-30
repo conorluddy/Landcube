@@ -1,9 +1,15 @@
 import {
+  Activity,
+  Component,
+  lazy,
+  Suspense,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
+  type CSSProperties,
   type ReactNode,
 } from 'react';
 import { RouteProfileHost } from './route-profile-host';
@@ -15,9 +21,12 @@ import {
   getActiveSection,
   getHiddenSections,
   type StudioController,
+  type StudioMode,
   type InspectorSection,
   type PanelProps,
 } from './controller';
+import { createModeFlip, type ModeFlip } from './mode-flip';
+import { isTextField } from '../system/browse-keys';
 import { DossierPanel } from './dossier-panel';
 import { ExportPanel } from './export-panel';
 import { ControlGroup } from '../ui/control-group';
@@ -44,8 +53,19 @@ import type { HudStore } from './hud-store';
 import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
 import { PhonePages } from './pages/phone-pages';
+import { operationErrorCodes } from '../constants/operations';
+import { logOperationError } from '../operation-logging';
+import type { OperationError } from '../types/operations';
 
 const inspectorId = 'studio-inspector';
+
+// The design-system gallery is its own chunk: the studio bundle never carries the registry or specimens.
+const loadSystemMode = () => import('../system/system-mode');
+const systemModeLoadError: OperationError = {
+  code: operationErrorCodes.moduleLoadFailed,
+  message: 'The design system could not load. Check your connection, then try again.',
+  retryable: true,
+};
 
 /** Below this the inspector becomes a bottom sheet with a horizontal section strip. */
 export const phoneViewportQuery = '(max-width: 767px)';
@@ -178,19 +198,80 @@ function Studio({
   const state = useSyncExternalStore(c.subscribe, c.getSnapshot);
   const viewport = useRef<HTMLDivElement>(null);
   const inspectorToggle = useRef<HTMLButtonElement>(null);
+  const systemLink = useRef<HTMLButtonElement>(null);
   const active = getActiveSection(state);
   const isPhoneViewport = useSyncExternalStore(subscribeToPhoneViewport, readIsPhoneViewport);
+  const [modeFlip] = useState(() => createStudioModeFlip(c));
+  const flip = useSyncExternalStore(modeFlip.subscribe, modeFlip.getSnapshot);
+  const isSystemShown = !isPhoneViewport && flip.shownMode === 'system';
+  const previousShownMode = useRef(flip.shownMode);
+  // Mounted on first entry (the chunk is lazy), then kept: Activity hides whichever side is off
+  // screen, so studio tools, Find and plate values all survive a round trip.
+  const [isSystemMounted, setIsSystemMounted] = useState(isSystemShown);
+  // Stable, so system mode's effects that depend on it don't re-run on every studio render.
+  const selectSystemPart = useCallback(
+    (systemPartId: string) => {
+      c.workspace({ systemPartId });
+    },
+    [c],
+  );
+
+  if (isSystemShown && !isSystemMounted) {
+    setIsSystemMounted(true);
+  }
+
+  // A rejected lazy import stays rejected, so a failed load swaps in a fresh one for the retry.
+  const [SystemMode, setSystemMode] = useState(() => lazy(loadSystemMode));
+
+  // Opening from the studio moves focus into the gallery; a link straight in leaves it alone.
+  const [isSystemOpenedFromStudio, setIsSystemOpenedFromStudio] = useState(false);
+
+  const requestMode = (mode: StudioMode) => {
+    if (mode === 'system') {
+      preloadSystemMode();
+      setIsSystemOpenedFromStudio(true);
+    }
+
+    modeFlip.request(mode);
+  };
 
   useLayoutEffect(() => {
     viewport.current?.append(terrain);
   }, [terrain]);
+  useEffect(() => modeFlip.dispose, [modeFlip]);
+  // Leaving system mode hides the focused control; land on the link that opens it again.
+  useEffect(() => {
+    const wasSystem = previousShownMode.current === 'system';
+
+    previousShownMode.current = flip.shownMode;
+
+    const focused = document.activeElement;
+    // Hidden by Activity, not yet blurred: the browser moves focus off it only on its next frame.
+    const isFocusLost = focused === null || focused === document.body || !focused.checkVisibility();
+
+    if (wasSystem && flip.shownMode === 'studio' && isFocusLost) {
+      systemLink.current?.focus();
+    }
+  }, [flip.shownMode]);
+  // System mode is desktop-only, and a mode set elsewhere (a link, a phone rotation) shows without a flip.
+  useEffect(() => {
+    if (isPhoneViewport && state.workspace.mode === 'system') {
+      c.workspace({ mode: 'studio' });
+    } else if (!flip.isBusy && flip.shownMode !== state.workspace.mode) {
+      modeFlip.snapTo(state.workspace.mode);
+    }
+  }, [c, modeFlip, isPhoneViewport, state.workspace.mode, flip.isBusy, flip.shownMode]);
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) {
         return;
       }
 
-      if (state.workspace.exporting) {
+      if (state.workspace.mode === 'system') {
+        if (!isTextField(event.target)) {
+          modeFlip.request('studio');
+        }
+      } else if (state.workspace.exporting) {
         c.workspace({ exporting: false });
       } else if (state.workspace.compare !== null) {
         c.endCompare();
@@ -207,10 +288,10 @@ function Studio({
     return () => {
       document.removeEventListener('keydown', escape);
     };
-  }, [c, state.workspace, isPhoneViewport]);
+  }, [c, modeFlip, state.workspace, isPhoneViewport]);
   useEffect(() => {
     const openPalette = (event: KeyboardEvent) => {
-      if (!isCommandPaletteShortcut(event)) {
+      if (!isCommandPaletteShortcut(event) || c.getSnapshot().workspace.mode === 'system') {
         return;
       }
 
@@ -250,63 +331,110 @@ function Studio({
       }
       data-sheet-snap={isPhoneViewport ? state.workspace.sheetSnap : undefined}
       data-page-hidden={isPhoneViewport && state.workspace.page !== 'studio' ? true : undefined}
+      data-mode-target={isPhoneViewport ? 'studio' : state.workspace.mode}
+      data-flip={flip.isBusy ? flip.transition : undefined}
+      style={
+        flip.isBusy
+          ? ({ '--lc-mode-flip-angle': `${String(flip.angleDegrees)}deg` } as CSSProperties)
+          : undefined
+      }
     >
-      <StudioHeader controller={c} state={state} isPhoneViewport={isPhoneViewport} />
       <main
         id="studio-viewport"
         className="studio-viewport"
         ref={viewport}
         aria-label={`${state.workspace.view.toUpperCase()} landscape viewport`}
+        // From the start of the fold-out, not the swap: the canvas takes no input once leaving.
+        inert={isSystemShown || state.workspace.mode === 'system'}
       />
-      <ViewportStates controller={c} state={state} />
-      {!isPhoneViewport && <CompareHost controller={c} state={state} scenes={compareScenes} />}
-      <StudioHud controller={c} state={state} hud={hud} />
-      {isPhoneViewport ? (
-        <>
-          <StudioMapControls controller={c} state={state} />
-          <StudioSheet
-            controller={c}
-            state={state}
-            hud={hud}
-            id={inspectorId}
-            routeProfile={routeProfile}
-            renderSection={(section) => renderSectionBody(section, props, cropPreview)}
-          />
-          <PhonePages controller={c} state={state} renderer={renderer} />
-        </>
-      ) : (
-        <>
-          <InspectorPanel
-            id={inspectorId}
-            label="Landscape controls"
-            railLabel="Editing section"
-            sections={studioSections}
-            activeSectionId={active}
-            onSelectSection={(section) => {
-              c.selectSection(section);
+      <div className="studio-ground" aria-hidden="true" />
+      {flip.isBusy && <div key={flip.sweepCount} className="studio-scan" aria-hidden="true" />}
+      {isSystemMounted && (
+        <Activity mode={isSystemShown ? 'visible' : 'hidden'}>
+          <SystemModeBoundary
+            onFailure={() => {
+              logOperationError(systemModeLoadError);
+              setSystemMode(() => lazy(loadSystemMode));
+              setIsSystemMounted(false);
+              modeFlip.snapTo('studio');
+              c.workspace({ mode: 'studio' });
+              c.notify(systemModeLoadError.message);
             }}
-            hiddenSectionIds={getHiddenSections(state)}
-            isCollapsed={state.workspace.collapsed}
-            headerTag={`Src · ${state.source.terrain ? 'Real' : 'Procedural'}`}
-            renderSection={(section) =>
-              renderSectionBody(section, props, cropPreview, {
-                pinnedGroupIds: new Set(state.workspace.pinnedGroups.map(({ id }) => id)),
-                pin: c.pinGroup,
-                dock: c.dockGroup,
-              })
-            }
-          />
-          <StudioPinnedPanels controller={c} state={state} cropPreview={cropPreview} />
-          <StudioToolBar controller={c} state={state} />
-          {routeProfile !== undefined && <div className="studio-route-profile">{routeProfile}</div>}
-          <StudioFooter
-            controller={c}
-            state={state}
-            inspectorId={inspectorId}
-            inspectorToggleRef={inspectorToggle}
-          />
-        </>
+          >
+            <Suspense fallback={null}>
+              <SystemMode
+                partId={state.workspace.systemPartId}
+                isFocusedOnEntry={isSystemOpenedFromStudio}
+                onSelectPart={selectSystemPart}
+                onExit={() => {
+                  requestMode('studio');
+                }}
+              />
+            </Suspense>
+          </SystemModeBoundary>
+        </Activity>
       )}
+      <Activity mode={isSystemShown ? 'hidden' : 'visible'}>
+        <>
+          <StudioHeader controller={c} state={state} isPhoneViewport={isPhoneViewport} />
+          <ViewportStates controller={c} state={state} />
+          {!isPhoneViewport && <CompareHost controller={c} state={state} scenes={compareScenes} />}
+          <StudioHud controller={c} state={state} hud={hud} />
+          {isPhoneViewport ? (
+            <>
+              <StudioMapControls controller={c} state={state} />
+              <StudioSheet
+                controller={c}
+                state={state}
+                hud={hud}
+                id={inspectorId}
+                routeProfile={routeProfile}
+                renderSection={(section) => renderSectionBody(section, props, cropPreview)}
+              />
+              <PhonePages controller={c} state={state} renderer={renderer} />
+            </>
+          ) : (
+            <>
+              <InspectorPanel
+                id={inspectorId}
+                label="Landscape controls"
+                railLabel="Editing section"
+                sections={studioSections}
+                activeSectionId={active}
+                onSelectSection={(section) => {
+                  c.selectSection(section);
+                }}
+                hiddenSectionIds={getHiddenSections(state)}
+                isCollapsed={state.workspace.collapsed}
+                headerTag={`Src · ${state.source.terrain ? 'Real' : 'Procedural'}`}
+                renderSection={(section) =>
+                  renderSectionBody(section, props, cropPreview, {
+                    pinnedGroupIds: new Set(state.workspace.pinnedGroups.map(({ id }) => id)),
+                    pin: c.pinGroup,
+                    dock: c.dockGroup,
+                  })
+                }
+              />
+              <StudioPinnedPanels controller={c} state={state} cropPreview={cropPreview} />
+              <StudioToolBar controller={c} state={state} />
+              {routeProfile !== undefined && (
+                <div className="studio-route-profile">{routeProfile}</div>
+              )}
+              <StudioFooter
+                controller={c}
+                state={state}
+                inspectorId={inspectorId}
+                inspectorToggleRef={inspectorToggle}
+                systemLinkRef={systemLink}
+                onOpenSystem={() => {
+                  requestMode('system');
+                }}
+                onPreloadSystem={preloadSystemMode}
+              />
+            </>
+          )}
+        </>
+      </Activity>
       {state.workspace.exporting && (
         <Surface
           modal
@@ -408,6 +536,47 @@ function renderSectionBody(
         }
       />
     );
+  });
+}
+
+/** Starts fetching the system chunk early; a failure surfaces through SystemModeBoundary on render. */
+function preloadSystemMode(): void {
+  loadSystemMode().catch(() => undefined);
+}
+
+/** Catches a system chunk that fails to load, so the shell never goes blank. */
+class SystemModeBoundary extends Component<
+  { onFailure: () => void; children: ReactNode },
+  { hasFailed: boolean }
+> {
+  override state = { hasFailed: false };
+
+  static getDerivedStateFromError(): { hasFailed: boolean } {
+    return { hasFailed: true };
+  }
+
+  override componentDidCatch(): void {
+    this.props.onFailure();
+  }
+
+  override render(): ReactNode {
+    return this.state.hasFailed ? null : this.props.children;
+  }
+}
+
+function createStudioModeFlip(c: StudioController): ModeFlip {
+  return createModeFlip({
+    initialMode: c.getSnapshot().workspace.mode,
+    commit: (mode) => {
+      c.workspace({ mode });
+    },
+    prefersReducedMotion: () => matchMedia('(prefers-reduced-motion: reduce)').matches,
+    timers: {
+      setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      clearTimeout: (handle) => {
+        window.clearTimeout(handle);
+      },
+    },
   });
 }
 

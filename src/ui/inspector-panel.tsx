@@ -26,6 +26,18 @@ export interface InspectorPanelProps<T extends string> {
   railOrientation?: SectionRailOrientation;
   /** Called for every section, hidden or not, so section state survives tab switches. */
   renderSection: (id: T) => ReactNode;
+  /** Replaces the active section's header, e.g. while the body shows search results. */
+  header?: InspectorHeader;
+  /** Pinned to the bottom of the vertical rail, e.g. a keyboard hint. */
+  railFooter?: ReactNode;
+  /** The section the rail shows pressed when it differs from the body's; null for none. */
+  railSelectionId?: T | null;
+}
+
+export interface InspectorHeader {
+  index: string;
+  title: string;
+  tag?: string;
 }
 
 /**
@@ -44,8 +56,18 @@ export function InspectorPanel<T extends string>({
   headerTag,
   railOrientation = 'vertical',
   renderSection,
+  header,
+  railFooter,
+  railSelectionId = activeSectionId,
 }: InspectorPanelProps<T>): React.JSX.Element {
   const activeSection = sections.find((section) => section.id === activeSectionId);
+  const shownHeader: InspectorHeader | undefined =
+    header ??
+    (activeSection && {
+      index: `${formatSectionIndex(activeSection.index)} / ${formatSectionIndex(sections.length)}`,
+      title: activeSection.title,
+      tag: headerTag,
+    });
 
   return (
     <GlassPanel
@@ -62,20 +84,23 @@ export function InspectorPanel<T extends string>({
       <SectionRail
         label={railLabel}
         sections={sections}
-        activeSectionId={activeSectionId}
+        activeSectionId={railSelectionId}
         onSelectSection={onSelectSection}
         hiddenSectionIds={hiddenSectionIds}
         orientation={railOrientation}
         getPanelId={getInspectorSectionId}
       />
+      {railFooter !== undefined && <div className="lc-inspector__rail-footer">{railFooter}</div>}
       <div className="lc-inspector__panel" hidden={isCollapsed}>
-        {activeSection !== undefined && (
+        {shownHeader !== undefined && (
           <div className="lc-inspector__header">
             <span className="lc-inspector__index" aria-hidden="true">
-              {formatSectionIndex(activeSection.index)} / {formatSectionIndex(sections.length)}
+              {shownHeader.index}
             </span>
-            <h2 className="lc-inspector__title">{activeSection.title}</h2>
-            {headerTag !== undefined && <span className="lc-inspector__tag">{headerTag}</span>}
+            <h2 className="lc-inspector__title">{shownHeader.title}</h2>
+            {shownHeader.tag !== undefined && (
+              <span className="lc-inspector__tag">{shownHeader.tag}</span>
+            )}
           </div>
         )}
         <div className="lc-inspector__body">
