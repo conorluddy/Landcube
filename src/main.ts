@@ -30,7 +30,9 @@ import {
 } from './studio/hud-location';
 import { applyTheme, currentTheme, readTheme, subscribeToTheme } from './studio/theme';
 import './ui/ui.css';
-import './landscape-studio.css';
+import './studio/studio.css';
+import './studio/studio-surfaces.css';
+import './studio/studio-phone.css';
 import { designChangePriority, versionOneDesignDefaults } from './constants/design';
 import { engineConfiguration } from './constants/engine';
 import { operationErrorCodes } from './constants/operations';

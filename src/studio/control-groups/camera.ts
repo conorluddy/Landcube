@@ -1,7 +1,7 @@
 /*
  * Camera section (CAMR.01 to CAMR.04): lens, focus, exposure and orbit. The Orbit popover in the
  * footer renders the same orbit group (without the camera-settings reset), so while that popover
- * is open the section omits it rather than repeat its ids. Row ids are the legacy field ids the
+ * is open the section omits it rather than repeat its ids. Row ids are the original field ids the
  * e2e tests bind to. The pattern is in ./README.md.
  */
 import type { ControlGroupDefinition } from '../../ui/control-rows';

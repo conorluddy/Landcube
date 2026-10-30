@@ -179,11 +179,16 @@ function DataSources({ state }: { state: StudioState }): ReactNode {
 
   return (
     <details className="mobile-attribution">
-      <summary>Data sources</summary>
+      <summary className="mobile-attribution-summary">Data sources</summary>
       <div className="mobile-attribution-sources lc-glass" data-ui-surface>
-        {source.terrain && <p>{source.terrain.attribution}</p>}
+        {source.terrain && <p className="mobile-attribution-text">{source.terrain.attribution}</p>}
         {isRoadCreditShown && (
-          <a href={roadAttributionUrl} target="_blank" rel="noreferrer">
+          <a
+            className="mobile-attribution-link"
+            href={roadAttributionUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
             {state.roads.network?.attribution} ↗
           </a>
         )}

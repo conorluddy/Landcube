@@ -1,0 +1,227 @@
+/* Studio shell: page root, full-bleed viewport and the floating chrome around it. Tokens only. */
+
+html {
+  background: var(--lc-theme-color);
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-sans);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+html,
+body,
+#studio {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+#terrain,
+.terrain-3d {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#terrain {
+  pointer-events: none;
+}
+
+.terrain-3d {
+  touch-action: none;
+}
+
+/* === SHELL: floating glass chrome over a full-bleed viewport === */
+.studio-shell {
+  container: studio-shell / inline-size;
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.studio-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.studio-header {
+  position: absolute;
+  top: var(--lc-s-6);
+  right: var(--lc-s-6);
+  left: var(--lc-s-6);
+  z-index: 3;
+}
+
+.studio-footer {
+  position: absolute;
+  right: var(--lc-s-6);
+  bottom: calc(var(--lc-s-6) + env(safe-area-inset-bottom));
+  left: var(--lc-s-6);
+  z-index: 3;
+}
+
+/* Crop / measure tool pill: inside the HUD frame's top left, under its camera readouts. */
+.studio-tool-bar {
+  position: absolute;
+  top: 112px;
+  left: 36px;
+  z-index: 2;
+}
+
+.studio-shell > .lc-inspector {
+  position: absolute;
+  top: 60px;
+  right: var(--lc-s-6);
+  bottom: calc(60px + env(safe-area-inset-bottom));
+  z-index: 2;
+}
+
+/* Loader and fault cards sit top-left of the viewport, clear of the inspector. */
+.studio-viewport-states {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.studio-viewport-states__card {
+  position: absolute;
+  top: 60px;
+  left: var(--lc-s-6);
+  width: min(420px, calc(100% - 432px));
+  pointer-events: auto;
+}
+
+@container studio-shell (width < 768px) {
+  .studio-viewport-states__card {
+    right: var(--lc-s-6);
+    width: auto;
+  }
+
+  .studio-viewport-states__card .lc-loader-card,
+  .studio-viewport-states__card .lc-fault-card {
+    max-width: none;
+  }
+}
+
+.studio-brand {
+  padding: 0 var(--lc-s-6);
+}
+
+/* The header search opens beside the terrain-source switch and shrinks first (minimum 120px). */
+.header-place-search {
+  display: flex;
+  flex: 1 1 260px;
+  min-width: 120px;
+  max-width: 360px;
+  transition: opacity var(--lc-dur) var(--lc-ease);
+}
+
+.header-place-search[data-open='false'] {
+  flex: 0 0 0;
+  min-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.header-place-search .lc-search-field {
+  flex: 1 1 auto;
+}
+
+/*
+ * The search reaches its 120px minimum at an 811px shell; narrower, the header pills overflow
+ * (measured with the default header content), so the search moves to the Terrain section.
+ */
+@container studio-shell (width < 811px) {
+  .header-place-search {
+    display: none;
+  }
+}
+
+@container studio-shell (width >= 811px) {
+  .sidebar-place-search {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-place-search {
+    transition: none;
+  }
+}
+
+/* === FOOTER STATUS: source, live status, then data credits === */
+.studio-status {
+  position: relative;
+  flex: 1 1 auto;
+  gap: var(--lc-s-5);
+  padding: 0 var(--lc-s-6);
+  color: var(--lc-text-quiet);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.studio-status .source-label,
+.studio-status .studio-status-message,
+.studio-status .attribution,
+.studio-status .studio-github {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.source-label {
+  flex: none;
+  color: var(--lc-text-strong);
+}
+
+.studio-status-message {
+  flex: 1 1 auto;
+}
+
+.studio-status .attribution {
+  flex: 0 1 auto;
+  max-width: 220px;
+  color: var(--lc-text-tertiary);
+  text-decoration: none;
+}
+
+.studio-github {
+  flex: none;
+  color: var(--lc-text-strong);
+  text-decoration: none;
+}
+
+.studio-status .attribution:hover,
+.studio-status .studio-github:hover {
+  color: var(--lc-text-primary);
+}
+
+/* The theme toggle is a 44px glass IconButton elsewhere; inside the 36px footer it shrinks to a bare square. */
+.studio-footer .lc-icon-button {
+  width: var(--lc-h-s);
+  height: var(--lc-h-s);
+  background: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  font-size: 11px;
+}
+
+.studio-footer .lc-icon-button[aria-pressed='true'] {
+  background: var(--lc-bone);
+}
+
+.mobile-attribution {
+  display: none;
+}

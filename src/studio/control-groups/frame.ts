@@ -1,7 +1,7 @@
 /*
  * Frame section (FRAM.01 to FRAM.03): printable frame style and finish, its key dimensions and its
  * edge profile. Dimensions and edge are hidden while the style is "none". Parts download from
- * Export. Row ids follow the legacy group labels the e2e tests bind to. The pattern is in
+ * Export. Row ids follow the original group labels the e2e tests bind to. The pattern is in
  * ./README.md.
  */
 import { createElement, type ReactNode } from 'react';

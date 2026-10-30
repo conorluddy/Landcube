@@ -31,7 +31,7 @@ void test('the seed readout keeps its output id inside the hint', () => {
   assert.match(markup, /<output id="seed-value">123<\/output>/);
 });
 
-void test('real terrain shows autoplay and real location with the legacy field ids', () => {
+void test('real terrain shows autoplay and real location with the original field ids', () => {
   const { controller, state } = createContext({ selected: 'real' });
   const groups = buildTerrainGroups(controller, state);
 

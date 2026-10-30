@@ -99,7 +99,7 @@ void test('palette tiles carry the preset background and line colour as their sw
   assert.equal(paper.swatchBorderColor, designPalettePresets.Paper.lineColor);
 });
 
-void test('the canvas colour input keeps the legacy background id', () => {
+void test('the canvas colour input keeps the original background id', () => {
   const { controller, state } = createContext();
 
   assert.match(renderGroups(buildColourGroups(controller, state)), /id="background"/);

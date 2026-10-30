@@ -1,7 +1,7 @@
 /*
  * Contours section (CONT.01 to CONT.04): contour interval (real terrain) or density (procedural),
  * line appearance, index contours, and in 3D the contour line and engraving treatment.
- * Row ids are the legacy field ids the e2e tests bind to. The pattern is in ./README.md.
+ * Row ids are the original field ids the e2e tests bind to. The pattern is in ./README.md.
  */
 import { indexContourStyles } from '../../constants/design';
 import { getRealContourInterval } from '../../real-terrain-contours';

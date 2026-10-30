@@ -115,7 +115,7 @@ export function parseNumberDraft(draft: string, rules: NumberDraftRules): Number
   return isValid ? { isValid, value: number } : { isValid };
 }
 
-/** Same wording as the legacy studio field. */
+/** Same wording as the original studio field. */
 export function describeNumberRange(min: number | undefined, max: number | undefined): string {
   return `Enter a valid value${min === undefined ? '' : ` from ${String(min)}`}${
     max === undefined ? '' : ` to ${String(max)}`

@@ -35,7 +35,7 @@ export type DesignNumberSetting = keyof typeof designNumberConstraints;
 /**
  * Binds a numeric design setting to a slider, replacing `DesignRange`: the row id is the setting
  * name, bounds come from `designNumberConstraints`, and the output reads
- * `Number(value.toFixed(2))` followed by `unit` (the legacy `suffix`, e.g. " px").
+ * `Number(value.toFixed(2))` followed by `unit` (the original `suffix`, e.g. " px").
  */
 export function designRangeRow(
   controller: StudioController,

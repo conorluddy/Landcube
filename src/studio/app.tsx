@@ -2,13 +2,19 @@ import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNod
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { InspectorPanel } from '../ui/inspector-panel';
-import { threeDOnlySections, type StudioController, type InspectorSection } from './controller';
-import type { PanelProps } from './panels';
-import { Button, Hint } from './fields';
+import {
+  threeDOnlySections,
+  type StudioController,
+  type InspectorSection,
+  type PanelProps,
+} from './controller';
 import { DossierPanel } from './dossier-panel';
 import { ExportPanel } from './export-panel';
 import { ControlGroup } from '../ui/control-group';
 import { GlassPanel } from '../ui/glass-panel';
+import { Button } from '../ui/button';
+import { StatusMessage } from '../ui/status-message';
+import { TextField } from '../ui/text-field';
 import { IconButton } from '../ui/icon-button';
 import { createPinnedPlaceholder } from '../ui/layout-manager';
 import { buildOverlayPopoverGroups } from './control-groups/overlays';
@@ -41,15 +47,12 @@ function Surface({
   close,
   children,
   modal = false,
-  isGlass = false,
   bareClassName,
 }: {
   title: string;
   close: () => void;
   children: ReactNode;
   modal?: boolean;
-  /** Hosts the content in a GlassPanel instead of the legacy dialog chrome (migrated popovers). */
-  isGlass?: boolean;
   /** Renders the children with no heading, in a dialog with this class; they bring their own panel. */
   bareClassName?: string;
 }): ReactNode {
@@ -101,12 +104,7 @@ function Surface({
   return (
     <dialog
       ref={ref}
-      className={
-        bareClassName ??
-        (isGlass
-          ? `lc-popover${modal ? ' lc-popover--modal' : ''}`
-          : `legacy-controls ${modal ? 'studio-dialog' : 'studio-popover'}`)
-      }
+      className={bareClassName ?? `lc-popover${modal ? ' lc-popover--modal' : ''}`}
       data-ui-surface
       aria-label={title}
       onCancel={(event) => {
@@ -141,7 +139,7 @@ function Surface({
     >
       {bareClassName !== undefined ? (
         children
-      ) : isGlass ? (
+      ) : (
         <GlassPanel padding="none" className="lc-popover__panel">
           <div className="lc-popover__heading">
             <h2 className="lc-popover__title">{title}</h2>
@@ -149,16 +147,6 @@ function Surface({
           </div>
           <div className="lc-popover__body">{children}</div>
         </GlassPanel>
-      ) : (
-        <>
-          <div className="surface-heading">
-            <h2>{title}</h2>
-            <button type="button" aria-label={`Close ${title}`} onClick={close}>
-              ×
-            </button>
-          </div>
-          <div className="surface-body">{children}</div>
-        </>
       )}
     </dialog>
   );
@@ -244,6 +232,7 @@ function Studio({
       <StudioHeader controller={c} state={state} isPhoneViewport={isPhoneViewport} />
       <main
         id="studio-viewport"
+        className="studio-viewport"
         ref={viewport}
         aria-label={`${state.workspace.view.toUpperCase()} landscape viewport`}
       />
@@ -297,7 +286,6 @@ function Studio({
       {state.workspace.popover !== null && (
         <Surface
           title={state.workspace.popover}
-          isGlass={state.workspace.popover === 'Overlays'}
           close={() => {
             c.workspace({ popover: null });
           }}
@@ -314,7 +302,6 @@ function Studio({
       {state.workspace.exporting && (
         <Surface
           modal
-          isGlass
           title="Export"
           close={() => {
             c.workspace({ exporting: false });
@@ -326,7 +313,6 @@ function Studio({
       {state.workspace.dossierOpen && (
         <Surface
           modal
-          isGlass
           title="Model dossier"
           close={() => {
             c.workspace({ dossierOpen: false });
@@ -355,28 +341,21 @@ function Studio({
             c.dismissManualLink();
           }}
         >
-          <Hint>
-            Clipboard access is unavailable. Select and copy this link. Location and 3D settings are
-            excluded.
-          </Hint>
-          <label>
-            Copy this link
-            <input
-              type="text"
-              readOnly
-              value={state.manualLink}
-              onFocus={(event) => {
-                event.target.select();
+          <div className="studio-copy-link">
+            <StatusMessage kind="info">
+              Clipboard access is unavailable. Select and copy this link. Location and 3D settings
+              are excluded.
+            </StatusMessage>
+            <TextField label="Copy this link" value={state.manualLink} isReadOnly />
+            <Button
+              variant="primary"
+              onClick={() => {
+                c.dismissManualLink();
               }}
-            />
-          </label>
-          <Button
-            onClick={() => {
-              c.dismissManualLink();
-            }}
-          >
-            Done
-          </Button>
+            >
+              Done
+            </Button>
+          </div>
         </Surface>
       )}
     </div>

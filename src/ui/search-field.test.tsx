@@ -5,7 +5,7 @@ import { renderMarkup } from './test-helpers';
 
 const input = <input className={searchFieldInputClassName} role="combobox" />;
 
-void test('SearchField keeps the caller className for legacy selectors', () => {
+void test('SearchField keeps the caller className for external selectors', () => {
   const markup = renderMarkup(
     <SearchField
       className="header-place-search"

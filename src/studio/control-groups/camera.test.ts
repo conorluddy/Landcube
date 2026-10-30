@@ -8,7 +8,7 @@ import { renderMarkup } from '../../ui/test-helpers';
 import { createStudioController, type StudioController, type StudioState } from '../controller';
 import { buildCameraGroups } from './camera';
 
-void test('perspective camera shows lens, focus, exposure and orbit with the legacy ids', () => {
+void test('perspective camera shows lens, focus, exposure and orbit with the original ids', () => {
   const { controller, state } = createContext();
   const groups = buildCameraGroups(controller, state);
 

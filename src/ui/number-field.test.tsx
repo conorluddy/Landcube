@@ -31,7 +31,7 @@ void test('parseNumberDraft treats an empty draft as undefined when optional', (
   assert.deepEqual(parseNumberDraft('0', { ...bounded, isOptional: true }), { isValid: false });
 });
 
-void test('describeNumberRange keeps the legacy wording', () => {
+void test('describeNumberRange keeps the original wording', () => {
   assert.equal(describeNumberRange(1, 10), 'Enter a valid value from 1 to 10.');
   assert.equal(describeNumberRange(undefined, 10), 'Enter a valid value to 10.');
   assert.equal(describeNumberRange(undefined, undefined), 'Enter a valid value.');

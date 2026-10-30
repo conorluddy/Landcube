@@ -21,7 +21,7 @@ const sourceOptions = [
 /**
  * Top bar of glass pills: brand, view and terrain-source switches, place search, then the
  * style-link and export actions. The search shrinks first and hides below a measured width
- * (see `.studio-shell` container rules in landscape-studio.css).
+ * (see `.studio-shell` container rules in studio.css).
  */
 export function StudioHeader({
   controller: c,

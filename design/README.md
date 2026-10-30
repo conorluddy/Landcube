@@ -1,5 +1,9 @@
 # Handoff: LANDCU.BE design system (HUD / frosted glass)
 
+## Implementation
+
+This handoff is implemented. Tokens live at `src/ui/tokens.css` (a byte-equal copy of `design/tokens.css`, enforced by `src/ui/tokens.test.ts`); the light-theme additions are in `src/ui/theme-light.css`. Components are under `src/ui/` (see `src/ui/README.md`), and every variant and state is shown at `/specimens.html`. The text below is the original handoff and still mentions `src/landscape-studio.css`, which no longer exists.
+
 ## Overview
 
 A monochrome "surgical planning" design system for **LANDCU.BE** (repo: `conorluddy/Topogra`). Floating dark frosted-glass panels over a full-bleed terrain canvas, hairline borders, small tight type, all-caps tracked monospace labels, numbered section codes. It covers the desktop studio, the mobile app (21 screens), and a set of feature experiments.

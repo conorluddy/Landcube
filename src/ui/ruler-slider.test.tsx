@@ -5,8 +5,8 @@ import { renderMarkup } from './test-helpers';
 
 const noop = (): void => undefined;
 
-/** Copied from the legacy `Range` in src/studio/fields.tsx; the e2e `output[for]` selectors read this. */
-function legacyRangeOutputText(value: number, suffix = '', displayValue?: string): string {
+/** Copied from the original `Range` field; the e2e `output[for]` selectors read this. */
+function originalRangeOutputText(value: number, suffix = '', displayValue?: string): string {
   return displayValue ?? `${Number(value.toFixed(2))}${suffix}`;
 }
 
@@ -24,7 +24,7 @@ function renderSlider(props: Partial<Parameters<typeof RulerSlider>[0]> = {}): s
   );
 }
 
-void test('RulerSlider output text matches the legacy Range contract', () => {
+void test('RulerSlider output text matches the original Range contract', () => {
   const cases: { value: number; unit?: string; displayValue?: string }[] = [
     { value: 3 },
     { value: 0.1 + 0.2 },
@@ -40,7 +40,7 @@ void test('RulerSlider output text matches the legacy Range contract', () => {
   for (const { value, unit, displayValue } of cases) {
     assert.equal(
       outputText(renderSlider({ value, unit, displayValue })),
-      legacyRangeOutputText(value, unit, displayValue),
+      originalRangeOutputText(value, unit, displayValue),
     );
   }
 });

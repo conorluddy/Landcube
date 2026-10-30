@@ -7,11 +7,13 @@
 :root {
   color-scheme: dark;
   --lc-theme-color: #202326; /* browser chrome tint; the studio replaces it with the design background */
+  --lc-page-ground: var(--lc-ink-0); /* phone root pages and splash */
 }
 
 :root[data-theme='light'] {
   color-scheme: light;
   --lc-theme-color: #f6f6f4;
+  --lc-page-ground: var(--lc-ink-1);
 
   /* Contrast: tertiary/quiet darkened so they hold 3:1 on glass over the darkest default canvas. */
   --lc-text-tertiary: #5f6266;
