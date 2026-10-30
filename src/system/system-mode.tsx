@@ -30,7 +30,17 @@ export default function SystemMode({
   onExit,
 }: SystemModeProps): React.JSX.Element {
   const part = findPartById(partId) ?? findPartByCode(partId) ?? systemParts[0];
-  const [navSectionId, setNavSectionId] = useState<SystemSectionId>(part.section);
+  // The rail can browse another section; stepping across sections takes it back to the part's.
+  const [navChoice, setNavChoice] = useState({
+    partSection: part.section,
+    sectionId: part.section,
+  });
+
+  if (navChoice.partSection !== part.section) {
+    setNavChoice({ partSection: part.section, sectionId: part.section });
+  }
+
+  const navSectionId = navChoice.partSection === part.section ? navChoice.sectionId : part.section;
   const [query, setQuery] = useState('');
   const findInput = useRef<HTMLInputElement>(null);
   const hits = query.trim() === '' ? undefined : findParts(systemParts, query);
@@ -44,14 +54,11 @@ export default function SystemMode({
     }
   }, [part.id, partId, onSelectPart]);
 
-  // Stepping across a section boundary takes the nav along with it.
+  // The control that opened this mode is hidden with the studio chrome; keep keyboard users in place.
   useEffect(() => {
-    setNavSectionId(part.section);
-  }, [part.section]);
-
-  // The control that opened this mode unmounted with the studio chrome; keep keyboard users in place.
-  useEffect(() => {
-    const isFocusLost = document.activeElement === null || document.activeElement === document.body;
+    const focused = document.activeElement;
+    // Hidden by Activity, not yet blurred: the browser moves focus off it only on its next frame.
+    const isFocusLost = focused === null || focused === document.body || !focused.checkVisibility();
 
     if (isFocusedOnEntry && isFocusLost) {
       document
@@ -67,10 +74,16 @@ export default function SystemMode({
         return;
       }
 
-      if (isFindShortcut(event) && !(event.key === '/' && isTextField(event.target))) {
-        event.preventDefault();
-        findInput.current?.focus();
-        findInput.current?.select();
+      if (isFindShortcut(event)) {
+        // `/` types into fields, and a second ⌘F from Find falls through to the browser's find.
+        const isTypedSlash = event.key === '/' && isTextField(event.target);
+        const isRepeatFromFind = event.target === findInput.current;
+
+        if (!isTypedSlash && !isRepeatFromFind) {
+          event.preventDefault();
+          findInput.current?.focus();
+          findInput.current?.select();
+        }
 
         return;
       }
@@ -104,13 +117,7 @@ export default function SystemMode({
         onExit={onExit}
       />
       <SystemHud part={part} plateCount={countPlates(part)} />
-      <SystemStage
-        part={part}
-        section={section}
-        previousPart={stepPart(systemParts, part.id, -1)}
-        nextPart={stepPart(systemParts, part.id, 1)}
-        onSelectPart={onSelectPart}
-      />
+      <SystemStage part={part} onSelectPart={onSelectPart} />
       <SystemNav
         sections={systemSections}
         parts={systemParts}
@@ -118,8 +125,8 @@ export default function SystemMode({
         activePartId={part.id}
         hits={hits}
         query={query}
-        onSelectSection={(id) => {
-          setNavSectionId(id);
+        onSelectSection={(id: SystemSectionId) => {
+          setNavChoice({ partSection: part.section, sectionId: id });
           setQuery('');
         }}
         onSelectPart={onSelectPart}

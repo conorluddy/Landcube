@@ -10,6 +10,7 @@ import { SearchField, searchFieldInputClassName } from '../ui/search-field';
 import { SignalMark } from '../ui/signal-mark';
 import { formatCount } from './part-search';
 import type { CodedPart, SystemSection } from './registry.types';
+import { terrainPlateCredit } from './terrain-plate';
 
 export const sourceRepositoryUrl = 'https://github.com/conorluddy/Topogra';
 
@@ -142,8 +143,11 @@ export function SystemFooter({
           Rev A · {partCount} parts · {sectionCount} sections
         </span>
         <span className="attribution">Geist · Geist Mono · tokens.css</span>
+        <span className="attribution" title={`Terrain plates: ${terrainPlateCredit}`}>
+          {terrainPlateCredit}
+        </span>
         <button type="button" className="studio-mode-link" onClick={onExit}>
-          ↩ Studio
+          <span aria-hidden="true">↩</span> Studio
         </button>
         <a className="studio-credit" href="https://conor.fyi" target="_blank" rel="noreferrer">
           conor.fyi ↗

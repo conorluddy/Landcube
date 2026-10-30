@@ -27,6 +27,10 @@ void test('Cmd+F, Ctrl+F and a bare slash open Find', () => {
   assert.equal(isFindShortcut({ ...plain, key: '/' }), true);
 });
 
+void test('slash opens Find on layouts where it needs Shift, such as Shift+7 on German keyboards', () => {
+  assert.equal(isFindShortcut({ ...plain, key: '/', shiftKey: true }), true);
+});
+
 void test('other combinations do not open Find', () => {
   assert.equal(isFindShortcut({ ...plain, key: 'f' }), false);
   assert.equal(isFindShortcut({ ...plain, key: 'f', metaKey: true, shiftKey: true }), false);

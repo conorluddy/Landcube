@@ -14,7 +14,7 @@ export function readBrowseStep(event: {
   return arrowKeySteps[event.key];
 }
 
-/** ⌘F or Ctrl+F, or a bare `/`: both move focus to Find. */
+/** ⌘F or Ctrl+F, or `/` (Shift+7 on some layouts, so Shift is allowed): both move focus to Find. */
 export function isFindShortcut(event: {
   key: string;
   altKey: boolean;
@@ -22,12 +22,12 @@ export function isFindShortcut(event: {
   metaKey: boolean;
   shiftKey: boolean;
 }): boolean {
-  if (event.altKey || event.shiftKey) {
+  if (event.altKey) {
     return false;
   }
 
   if (event.metaKey || event.ctrlKey) {
-    return event.key.toLowerCase() === 'f';
+    return !event.shiftKey && event.key.toLowerCase() === 'f';
   }
 
   return event.key === '/';

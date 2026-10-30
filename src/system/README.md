@@ -8,6 +8,8 @@ A footer link (`Design system ◧`) flips the studio into a living specimen book
 - **Foundations read live tokens.** Tokens aren't components, so `foundation-plates.tsx` draws them. Every value shown comes from `getComputedStyle` (`token-value.ts`), never from a copy.
 - **Real terrain behind plates.** `assets/terrain-plate.webp` is a greyscale frame from the real 3D renderer, captured by `npx tsx scripts/capture-terrain-plate.ts` (default location, bundled tiles, so it runs offline). Overlay specimens pick it up through `--lc-specimen-stage-background`; the catalogue keeps its flat stand-in. Recapture when the renderer's look changes.
 - **Layouts are diagrams or real components.** The desktop shell is drawn to scale from the shell's numbers. The phone is real `BottomSheet`, `FloatingBar` and `IconButton` at 390 × 800, scaled into a 210px frame, so its snaps are the sheet's own.
+- **Curated plates.** A part can list `plates` (`variant/size/state` keys) when its specimen set is mostly edge cases; the title tag then reads `06 of 33 plates`. Every specimen still renders at `/specimens.html` and in the screenshot suite. `registry.test.tsx` checks every listed key exists.
+- **Plates keep their state.** Visited pages stay mounted behind `Activity`, so a dragged slider keeps its value after browsing away and back.
 - **Lazy chunk.** `src/studio/app.tsx` loads `system-mode.tsx` with `React.lazy`. The studio entry bundle carries none of this folder (`tests/specimens-build.test.ts`).
 - **Desktop only.** Below 768px the mode falls back to the studio.
 
@@ -45,6 +47,6 @@ Add a component in `src/ui` with its specimens file, then one `part(...)` line i
 
 ## Gotchas
 
-- The studio chrome unmounts in system mode. Everything in the controller survives the round trip, but component-local state doesn't: a placed measure line and unsent place-search text are lost. This is accepted; both are throwaway.
+- Nothing unmounts on a flip: `app.tsx` hides the off-screen side with React `Activity`, so studio tools, place search, Find and plate values all survive a round trip. Hidden effects (key and pointer listeners) are torn down while hidden.
 - Text printed on the light ground sits in `.system-print`, which re-points `--lc-bone` and friends at ink, so shared components such as `Tag` and `GroupHeader` read correctly on the canvas.
 - Arrow keys browse parts unless a field has focus or a component already handled the key (`defaultPrevented`), so rail, segmented and slider arrows keep working.

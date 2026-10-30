@@ -23,10 +23,11 @@ if (address === null || address === undefined || typeof address === 'string') {
   throw new Error('Vite did not report a port; check that nothing else holds the dev server.');
 }
 
-const browser = await chromium.launch({
-  channel: 'chrome',
-  args: ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-});
+const launchArgs = ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
+// Prefer installed Chrome (as the e2e suite does); fall back to Playwright's bundled Chromium.
+const browser = await chromium
+  .launch({ channel: 'chrome', args: launchArgs })
+  .catch(() => chromium.launch({ args: launchArgs }));
 
 try {
   const page = await browser.newPage({ viewport, deviceScaleFactor: 2 });
@@ -40,7 +41,16 @@ try {
   await page.addStyleTag({
     content: '.studio-shell > :not(.studio-viewport) { display: none !important; }',
   });
-  await page.waitForTimeout(1500);
+  // The renderer marks the canvas once a morph has finished; capture only a settled frame.
+  await page.locator('canvas.terrain-3d[data-terrain-transition="settled"]').waitFor({
+    timeout: startupTimeoutMs,
+  });
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+      }),
+  );
 
   const screenshot = await page.screenshot({ type: 'png', clip: surfaceClip });
   const webpDataUrl = await page.evaluate(

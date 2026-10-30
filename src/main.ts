@@ -7,6 +7,7 @@ import { createCompareSceneStore } from './studio/compare-scene';
 import { createCropPreview } from './studio/crop-preview';
 import { mountStudio, phoneViewportQuery } from './studio/app';
 import { modeFlipTiming } from './studio/mode-flip';
+import { createCanvasSuspender } from './studio/canvas-suspend';
 import { readSystemLink, replaceSystemLink } from './system-link';
 import { applySignalAccent, readSignalAccent } from './studio/accent';
 import { browserLocalStorage, browserSessionStorage } from './studio/browser-storage';
@@ -807,8 +808,19 @@ applySignalAccent(
 // A route load, toggle or clear redraws the 3D model; 2D reads it straight from state.
 let drawnRoute = controls.getSnapshot().workspace.route;
 // Design-system mode fades the canvas out, then stops 3D drawing; returning resumes before the fade in.
-let terrainMode = controls.getSnapshot().workspace.mode;
-let terrainSuspendTimer: ReturnType<typeof setTimeout> | undefined;
+const canvasSuspender = createCanvasSuspender({
+  initialMode: controls.getSnapshot().workspace.mode,
+  fadeMs: modeFlipTiming.canvasFadeMs,
+  timers: {
+    setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
+    clearTimeout: (handle) => {
+      window.clearTimeout(handle);
+    },
+  },
+  setSuspended: (isSuspended) => {
+    terrain3d.setSuspended(isSuspended);
+  },
+});
 
 controls.subscribe(() => {
   const { route, mode } = controls.getSnapshot().workspace;
@@ -818,30 +830,23 @@ controls.subscribe(() => {
     updateTerrain3d();
   }
 
-  if (mode !== terrainMode) {
-    terrainMode = mode;
-    clearTimeout(terrainSuspendTimer);
-
-    if (mode === 'system') {
-      terrainSuspendTimer = setTimeout(() => {
-        terrain3d.setSuspended(true);
-      }, modeFlipTiming.canvasFadeMs);
-    } else {
-      terrain3d.setSuspended(false);
-    }
-  }
+  canvasSuspender.follow(mode);
 });
 // A `?mode=system` link opens the design-system gallery (desktop only); the address bar then
 // follows the part on show, so any part can be linked to.
 const openedSystemLink = readSystemLink(new URLSearchParams(location.search));
-let linkedSystemPartId = openedSystemLink?.partReference;
 
-if (openedSystemLink !== undefined && !matchMedia(phoneViewportQuery).matches) {
+if (openedSystemLink !== undefined && matchMedia(phoneViewportQuery).matches) {
+  replaceSystemLink(location.href, undefined, history);
+} else if (openedSystemLink !== undefined) {
   controls.workspace({
     mode: 'system',
     systemPartId: openedSystemLink.partReference ?? controls.getSnapshot().workspace.systemPartId,
   });
 }
+
+// What the address bar names now, so the subscriber below writes only real changes.
+let linkedSystemPartId = readSystemLink(new URLSearchParams(location.search))?.partReference;
 
 controls.subscribe(() => {
   const { mode, systemPartId } = controls.getSnapshot().workspace;

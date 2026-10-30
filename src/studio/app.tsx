@@ -1,7 +1,9 @@
 import {
+  Activity,
   Component,
   lazy,
   Suspense,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -21,6 +23,7 @@ import {
   type PanelProps,
 } from './controller';
 import { createModeFlip, type ModeFlip } from './mode-flip';
+import { isTextField } from '../system/browse-keys';
 import { DossierPanel } from './dossier-panel';
 import { ExportPanel } from './export-panel';
 import { ControlGroup } from '../ui/control-group';
@@ -194,12 +197,28 @@ function Studio({
   const state = useSyncExternalStore(c.subscribe, c.getSnapshot);
   const viewport = useRef<HTMLDivElement>(null);
   const inspectorToggle = useRef<HTMLButtonElement>(null);
+  const systemLink = useRef<HTMLButtonElement>(null);
   const active = state.workspace.sections[state.workspace.view];
   const isPhoneViewport = useSyncExternalStore(subscribeToPhoneViewport, readIsPhoneViewport);
   const [modeFlip] = useState(() => createStudioModeFlip(c));
   const flip = useSyncExternalStore(modeFlip.subscribe, modeFlip.getSnapshot);
   const isSystemShown = !isPhoneViewport && flip.shownMode === 'system';
   const previousShownMode = useRef(flip.shownMode);
+  // Mounted on first entry (the chunk is lazy), then kept: Activity hides whichever side is off
+  // screen, so studio tools, Find and plate values all survive a round trip.
+  const [isSystemMounted, setIsSystemMounted] = useState(isSystemShown);
+  // Stable, so system mode's effects that depend on it don't re-run on every studio render.
+  const selectSystemPart = useCallback(
+    (systemPartId: string) => {
+      c.workspace({ systemPartId });
+    },
+    [c],
+  );
+
+  if (isSystemShown && !isSystemMounted) {
+    setIsSystemMounted(true);
+  }
+
   // A rejected lazy import stays rejected, so a failed load swaps in a fresh one for the retry.
   const [SystemMode, setSystemMode] = useState(() => lazy(loadSystemMode));
 
@@ -219,14 +238,18 @@ function Studio({
     viewport.current?.append(terrain);
   }, [terrain]);
   useEffect(() => modeFlip.dispose, [modeFlip]);
-  // Leaving system mode unmounts the focused control; land on the link that opens it again.
+  // Leaving system mode hides the focused control; land on the link that opens it again.
   useEffect(() => {
     const wasSystem = previousShownMode.current === 'system';
 
     previousShownMode.current = flip.shownMode;
 
-    if (wasSystem && flip.shownMode === 'studio' && document.activeElement === document.body) {
-      document.querySelector<HTMLElement>('.studio-mode-link')?.focus();
+    const focused = document.activeElement;
+    // Hidden by Activity, not yet blurred: the browser moves focus off it only on its next frame.
+    const isFocusLost = focused === null || focused === document.body || !focused.checkVisibility();
+
+    if (wasSystem && flip.shownMode === 'studio' && isFocusLost) {
+      systemLink.current?.focus();
     }
   }, [flip.shownMode]);
   // System mode is desktop-only, and a mode set elsewhere (a link, a phone rotation) shows without a flip.
@@ -244,7 +267,7 @@ function Studio({
       }
 
       if (state.workspace.mode === 'system') {
-        if (!isTextEntry(event.target)) {
+        if (!isTextField(event.target)) {
           modeFlip.request('studio');
         }
       } else if (state.workspace.exporting) {
@@ -306,34 +329,37 @@ function Studio({
         className="studio-viewport"
         ref={viewport}
         aria-label={`${state.workspace.view.toUpperCase()} landscape viewport`}
-        inert={isSystemShown}
+        // From the start of the fold-out, not the swap: the canvas takes no input once leaving.
+        inert={isSystemShown || state.workspace.mode === 'system'}
       />
       <div className="studio-ground" aria-hidden="true" />
       {flip.isBusy && <div key={flip.sweepCount} className="studio-scan" aria-hidden="true" />}
-      {isSystemShown ? (
-        <SystemModeBoundary
-          onFailure={() => {
-            logOperationError(systemModeLoadError);
-            setSystemMode(() => lazy(loadSystemMode));
-            modeFlip.snapTo('studio');
-            c.workspace({ mode: 'studio' });
-            c.notify(systemModeLoadError.message);
-          }}
-        >
-          <Suspense fallback={null}>
-            <SystemMode
-              partId={state.workspace.systemPartId}
-              isFocusedOnEntry={isSystemOpenedFromStudio}
-              onSelectPart={(systemPartId) => {
-                c.workspace({ systemPartId });
-              }}
-              onExit={() => {
-                requestMode('studio');
-              }}
-            />
-          </Suspense>
-        </SystemModeBoundary>
-      ) : (
+      {isSystemMounted && (
+        <Activity mode={isSystemShown ? 'visible' : 'hidden'}>
+          <SystemModeBoundary
+            onFailure={() => {
+              logOperationError(systemModeLoadError);
+              setSystemMode(() => lazy(loadSystemMode));
+              setIsSystemMounted(false);
+              modeFlip.snapTo('studio');
+              c.workspace({ mode: 'studio' });
+              c.notify(systemModeLoadError.message);
+            }}
+          >
+            <Suspense fallback={null}>
+              <SystemMode
+                partId={state.workspace.systemPartId}
+                isFocusedOnEntry={isSystemOpenedFromStudio}
+                onSelectPart={selectSystemPart}
+                onExit={() => {
+                  requestMode('studio');
+                }}
+              />
+            </Suspense>
+          </SystemModeBoundary>
+        </Activity>
+      )}
+      <Activity mode={isSystemShown ? 'hidden' : 'visible'}>
         <>
           <StudioHeader controller={c} state={state} isPhoneViewport={isPhoneViewport} />
           <ViewportStates controller={c} state={state} />
@@ -380,17 +406,16 @@ function Studio({
                 state={state}
                 inspectorId={inspectorId}
                 inspectorToggleRef={inspectorToggle}
+                systemLinkRef={systemLink}
                 onOpenSystem={() => {
                   requestMode('system');
                 }}
-                onPreloadSystem={() => {
-                  void loadSystemMode();
-                }}
+                onPreloadSystem={preloadSystemMode}
               />
             </>
           )}
         </>
-      )}
+      </Activity>
       {state.workspace.popover !== null && (
         <Surface
           title={state.workspace.popover}
@@ -550,14 +575,6 @@ function createStudioModeFlip(c: StudioController): ModeFlip {
       },
     },
   });
-}
-
-/** Keys typed into a field belong to the field, not to shell shortcuts. */
-function isTextEntry(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-  );
 }
 
 function subscribeToPhoneViewport(onChange: () => void): () => void {

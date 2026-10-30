@@ -18,7 +18,8 @@ export interface SectionRailProps<T extends string> {
   /** Accessible name of the navigation landmark. */
   label: string;
   sections: readonly RailSection<T>[];
-  activeSectionId: T;
+  /** Null shows no section pressed, e.g. while a panel lists search results across sections. */
+  activeSectionId: T | null;
   onSelectSection: (id: T) => void;
   /** Left out of the rail; the others keep their index, so the numbering shows a gap. */
   hiddenSectionIds?: readonly T[];

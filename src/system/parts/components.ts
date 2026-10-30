@@ -13,7 +13,11 @@ function part(
   component: string,
   name: string,
   summary: string,
-  { usedIn, spec = [] }: { usedIn?: string; spec?: SpecRow[] } = {},
+  {
+    usedIn,
+    spec = [],
+    plates,
+  }: { usedIn?: string; spec?: SpecRow[]; plates?: readonly string[] } = {},
 ): ComponentPart {
   return {
     kind: 'component',
@@ -25,6 +29,7 @@ function part(
     summary,
     usedIn,
     spec,
+    plates,
   };
 }
 
@@ -38,6 +43,16 @@ const primitives: ComponentPart[] = [
     'Button',
     'One primary action per surface. Bone fill for the action, a hairline for the alternative, bare text for the way out.',
     {
+      plates: [
+        'primary/small',
+        'primary/hover',
+        'primary/extraLarge',
+        'primary/busy',
+        'secondary/small',
+        'secondary/hover',
+        'text/small',
+        'primary/disabled',
+      ],
       usedIn: '1 · 2C · 2F · 3A–3U',
       spec: [
         row('Height', '30 primary · 28 secondary · 52 mobile', '--lc-h-m, --lc-h-s, --lc-h-xl'),
@@ -69,6 +84,14 @@ const primitives: ComponentPart[] = [
     'Segmented control',
     'Single-select. On a glass bar the container is the pill; inside a panel it takes a hairline. Arrow keys move the selection.',
     {
+      plates: [
+        'two-options/bar',
+        'on-glass-bar/bar',
+        'three-options/medium',
+        'three-options/medium/hover',
+        'three-options/medium/disabled',
+        'four-options/large',
+      ],
       usedIn: '1 · 2H · 3E · 3Q',
       spec: [
         row('Container', '3px padding, 2px gap, 1px line', '--lc-line'),
@@ -85,6 +108,13 @@ const primitives: ComponentPart[] = [
     'Value chip',
     'Quick values beside a control. Pressed is styled like a selected choice tile.',
     {
+      plates: [
+        'unselected/default',
+        'selected/default',
+        'unselected/hover',
+        'selected/focus',
+        'unselected/disabled',
+      ],
       spec: [row('Pressed', 'Bone border + fill 0.10', '--lc-fill-selected')],
     },
   ),
@@ -109,6 +139,7 @@ const primitives: ComponentPart[] = [
     'Switch',
     'Two labelled cells instead of a pill. The state is readable as text, not just position.',
     {
+      plates: ['off/default', 'on/default', 'on/hover', 'on/focus', 'off/disabled', 'description'],
       usedIn: '1 · 3F · 3G',
       spec: [
         row('Box', '2px padding, 1px line, radius 2', '--lc-line'),
@@ -126,6 +157,14 @@ const primitives: ComponentPart[] = [
     'Checkbox',
     'For lists of parts you include or leave out. A drawn box over a native checkbox that keeps the hit target.',
     {
+      plates: [
+        'unchecked/default',
+        'checked/default',
+        'checked/hover',
+        'checked/focus',
+        'unchecked/disabled',
+        'detail',
+      ],
       usedIn: '3R',
       spec: [
         row('Box', '18 × 18, radius 2'),
@@ -141,6 +180,14 @@ const primitives: ComponentPart[] = [
     'Ruler slider',
     'A measuring rule, not a fader. Live value at the top right, tabular so it doesn’t jitter. Drag any of these.',
     {
+      plates: [
+        'default',
+        'default/hover',
+        'default/focus',
+        'default/disabled',
+        'unit',
+        'display-value',
+      ],
       usedIn: '1 · 3F · 3G · 3H',
       spec: [
         row('Track', '16px · rail 1px at y7, white 0.14'),
@@ -232,6 +279,7 @@ const primitives: ComponentPart[] = [
     'Choice tiles',
     'Three-up grid for picking a thing by name. Material tiles carry a swatch; colour here is data.',
     {
+      plates: ['columns-3', 'swatch', 'thumbnail', 'columns-3/hover', 'columns-3/disabled'],
       usedIn: '1 · 3J',
       spec: [
         row('Tile', 'Min 32 tall, 6px 8px, Geist 11'),
@@ -274,6 +322,14 @@ const primitives: ComponentPart[] = [
     'Signal mark',
     'Squares mean live. Diamonds mean a place: outlined for a fault, solid for a waypoint.',
     {
+      plates: [
+        'ok/default',
+        'live/default',
+        'fault/default',
+        'waypoint/default',
+        'ok/amber',
+        'ok/phosphor',
+      ],
       usedIn: '1 · 2F · 2I',
       spec: [
         row('Square', '6 × 6 · 5 in footer', '--lc-signal'),
@@ -433,6 +489,7 @@ const composites: ComponentPart[] = [
     'Control group',
     'A header and a stack of typed rows. The inspector is just a list of these, driven by data.',
     {
+      plates: ['mixed', 'mixed/pinnable', 'toggle', 'range', 'select', 'tiles', 'status', 'hint'],
       usedIn: '1 · 3F–3J',
       spec: [
         row(
@@ -496,7 +553,10 @@ const composites: ComponentPart[] = [
     'export-sheet',
     'Export sheet',
     'Summary, 2D image, 3D still and 3D model, in one dialog.',
-    { usedIn: '1 · 3R' },
+    {
+      plates: ['svg', 'png', 'stl', 'stl/jobsRunning', 'fault', 'plaque'],
+      usedIn: '1 · 3R',
+    },
   ),
   part(
     'COMP',

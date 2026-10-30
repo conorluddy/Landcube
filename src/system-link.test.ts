@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { keepSystemLink, readSystemLink, writeSystemLink } from './system-link';
+import { keepSystemLink, readSystemLink, replaceSystemLink, writeSystemLink } from './system-link';
 
 void test('a mode=system link reads its part reference, id or code', () => {
   assert.deepEqual(readSystemLink(new URLSearchParams('mode=system&part=PRIM.04')), {
@@ -39,4 +39,21 @@ void test('a rewritten design URL keeps the system link from the address bar', (
     keepSystemLink('https://landcube.test/?seed=1', 'https://landcube.test/?v=1&seed=9'),
     'https://landcube.test/?v=1&seed=9',
   );
+});
+
+void test('a blocked address-bar update logs one URL_FAILED and does not throw', (context) => {
+  const warnings: string[] = [];
+
+  context.mock.method(console, 'warn', (message: string) => {
+    warnings.push(message);
+  });
+  replaceSystemLink('https://landcube.test/', 'tag', {
+    state: null,
+    replaceState: () => {
+      throw new Error('Denied');
+    },
+  });
+
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /"code":"URL_FAILED"/);
 });

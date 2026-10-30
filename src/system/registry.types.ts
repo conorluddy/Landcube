@@ -40,6 +40,11 @@ interface PartBase {
 export interface ComponentPart extends PartBase {
   kind: 'component';
   component: string;
+  /**
+   * Plate keys (`variant/size/state`, e.g. 'primary/hover') to show, in this order, when the full
+   * specimen set is mostly edge cases. Omitted shows every specimen.
+   */
+  plates?: readonly string[];
 }
 
 /** Tokens rather than components: plates are drawn from `cells`, reading live token values. */
