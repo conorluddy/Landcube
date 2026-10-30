@@ -96,6 +96,8 @@ test('the cursor deforms terrain over the viewport but not over UI surfaces', as
 });
 
 test('glass keeps its blur while the turntable rotates by default', async ({ page }) => {
+  // Software WebGL renders every turntable frame on CI, which slows each action.
+  test.setTimeout(90_000);
   await openDefaultStudio(page);
   const shell = page.locator('.studio-shell');
 

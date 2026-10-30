@@ -49,13 +49,23 @@ jobs:
           path: dist
 
   browser:
-    name: Browser tests (${{ matrix.shard }}/3)
+    name: Browser tests (${{ matrix.group }})
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       fail-fast: false
+      # Software WebGL makes 3D journeys slow, so the heaviest files get their own runners
+      # and everything else, including new files, splits across the studio shards.
       matrix:
-        shard: [1, 2, 3]
+        include:
+          - group: 3D terrain
+            args: --grep "terrain-3d\.spec"
+          - group: 3D tools
+            args: --grep "(frame|tools|route|hud)\.spec"
+          - group: studio 1/2
+            args: --grep-invert "(terrain-3d|frame|tools|route|hud)\.spec" --shard=1/2
+          - group: studio 2/2
+            args: --grep-invert "(terrain-3d|frame|tools|route|hud)\.spec" --shard=2/2
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -75,15 +85,14 @@ jobs:
       - name: Build browser test specimens
         run: npm run build:specimens
 
-      # Serial software-WebGL journeys outgrow one runner, so shards split them across three.
       - name: Verify browser journeys and GitHub Pages subpath
-        run: npx playwright test --reporter=list --shard=${{ matrix.shard }}/3
+        run: npx playwright test --reporter=list ${{ matrix.args }}
 
       - name: Upload failure traces
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-traces-${{ matrix.shard }}
+          name: playwright-traces-${{ strategy.job-index }}
           path: test-results
           retention-days: 7
 
