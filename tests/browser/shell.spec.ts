@@ -95,15 +95,15 @@ test('the cursor deforms terrain over the viewport but not over UI surfaces', as
   await expect.poll(() => terrain.innerHTML()).not.toBe(settled);
 });
 
-test('glass drops its blur while the turntable rotates', async ({ page }) => {
+test('glass keeps its blur while the turntable rotates by default', async ({ page }) => {
   await openDefaultStudio(page);
   const shell = page.locator('.studio-shell');
 
   await expect(shell).not.toHaveAttribute('data-motion', 'active');
   await page.getByRole('button', { name: 'Orbit', exact: true }).click();
   await page.getByRole('switch', { name: 'Auto-rotate' }).check();
-  await expect(shell).toHaveAttribute('data-motion', 'active');
-  await expect(page.locator('header .lc-bar-group').first()).toHaveCSS('backdrop-filter', 'none');
+  await expect(shell).not.toHaveAttribute('data-motion', 'active');
+  await expect(page.locator('header .lc-bar-group').first()).toHaveCSS('backdrop-filter', /blur\(/);
   await page.getByRole('switch', { name: 'Auto-rotate' }).uncheck();
   await expect(shell).not.toHaveAttribute('data-motion', 'active');
 });
