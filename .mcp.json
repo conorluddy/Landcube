@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "vestige": {
+      "type": "stdio",
+      "command": "vestige",
+      "args": ["mcp"],
+      "env": {}
+    }
+  }
+}
