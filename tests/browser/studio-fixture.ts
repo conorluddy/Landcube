@@ -98,6 +98,17 @@ export async function openDefaultStudio(page: Page): Promise<void> {
   });
 }
 
+/** Switches to 3D and waits until the lazy renderer owns the viewport before anything else runs. */
+export async function enter3D(page: Page): Promise<void> {
+  const button = page.getByRole('button', { name: '3D', exact: true });
+
+  await button.click();
+  await expect(button).toHaveAttribute('aria-pressed', 'true', { timeout: defaultStudioStartupMs });
+  await expect(page.locator('canvas.terrain-3d')).toBeVisible({
+    timeout: defaultStudioStartupMs,
+  });
+}
+
 export async function loadLocation(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Coordinates', exact: true }).click();
   await expect(

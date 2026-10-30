@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { appUrl, openDefaultStudio, section, serveStudio } from './studio-fixture';
+import { appUrl, enter3D, openDefaultStudio, section, serveStudio } from './studio-fixture';
 
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 test.beforeEach(async ({ page }) => {
@@ -119,7 +119,7 @@ test('switching to 2D docks a pinned 3D-only group', async ({ page }) => {
 
   await page.getByRole('button', { name: '2D', exact: true }).click();
   await expect(panel).toBeHidden();
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await section(page, 'Contours');
   await expect(page.getByRole('button', { name: 'Pin 3D contours', exact: true })).toBeVisible();
   await expect(page.getByRole('dialog', { name: '3D contours (pinned)' })).toHaveCount(0);

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { appUrl, serveStudio } from './studio-fixture';
+import { appUrl, enter3D, serveStudio } from './studio-fixture';
 
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 test.beforeEach(async ({ page }) => {
@@ -145,13 +145,7 @@ test('Cancel and Escape restore the original design', async ({ page }) => {
 
 test('in 3D the strip stays, the wipe is hidden and a hint explains', async ({ page }) => {
   await openStrip(page);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
-  // Lazy 3D startup can exceed the default assertion timeout with software WebGL on CI.
-  await expect(page.getByRole('button', { name: '3D', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-    { timeout: 20_000 },
-  );
+  await enter3D(page);
   await expect(strip(page).getByText('A/B compare is 2D only')).toBeVisible();
   await strip(page).getByRole('button', { name: 'Paper', exact: true }).click();
   await expect(page.locator('[data-wipe]')).toHaveCount(0);

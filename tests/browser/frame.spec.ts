@@ -1,5 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
-import { appUrl, download, modelDownload, section, serveStudio, stlBounds } from './studio-fixture';
+import {
+  appUrl,
+  download,
+  enter3D,
+  modelDownload,
+  section,
+  serveStudio,
+  stlBounds,
+} from './studio-fixture';
 
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 // Software WebGL on CI runners is several times slower than local GPUs.
@@ -24,11 +32,8 @@ function navigation(page: Page) {
 test('the Frame tab shows only in 3D', async ({ page }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
   await expect(navigation(page).getByRole('button', { name: 'Frame', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
-  // Lazy 3D startup can exceed the default assertion timeout with software WebGL on CI.
-  await expect(navigation(page).getByRole('button', { name: 'Frame', exact: true })).toBeVisible({
-    timeout: 20_000,
-  });
+  await enter3D(page);
+  await expect(navigation(page).getByRole('button', { name: 'Frame', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '2D', exact: true }).click();
   await expect(navigation(page).getByRole('button', { name: 'Frame', exact: true })).toHaveCount(0);
 });
@@ -37,7 +42,7 @@ test('a tray downloads at the model size plus border and clearance, leaving the 
   page,
 }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   const before = await modelDownload(page);
 
   await section(page, 'Frame');
@@ -61,7 +66,7 @@ test('downloading selected frame parts lists each job and offers the success she
   page,
 }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await section(page, 'Frame');
   await page
     .getByRole('group', { name: 'Frame style' })
@@ -89,7 +94,7 @@ test('downloading selected frame parts lists each job and offers the success she
 
 test('switching the crop to circle rebuilds a round frame', async ({ page }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await section(page, 'Frame');
   await page
     .getByRole('group', { name: 'Frame style' })
@@ -105,7 +110,7 @@ test('switching the crop to circle rebuilds a round frame', async ({ page }) => 
 
 test('an unprintable frame shows its error and disables downloads', async ({ page }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await section(page, 'Frame');
   await page
     .getByRole('group', { name: 'Frame style' })
@@ -127,7 +132,7 @@ test('an unprintable frame shows its error and disables downloads', async ({ pag
 
 test('every stand preset offers its part as an STL download', async ({ page }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
 
   for (const preset of ['Pedestal', 'Stacked pedestal', 'Tray on a plinth']) {
     await section(page, 'Frame');
@@ -145,7 +150,7 @@ test('every stand preset offers its part as an STL download', async ({ page }) =
 
 test('pedestal recess errors name the Overhang and Edge size controls', async ({ page }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await section(page, 'Frame');
   await page
     .getByRole('group', { name: 'Frame style' })
@@ -165,7 +170,7 @@ test('pedestal recess errors name the Overhang and Edge size controls', async ({
 test('the Frame tab fits a 390 px phone without horizontal scroll', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await section(page, 'Frame');
   await page
     .getByRole('group', { name: 'Frame style' })

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { appUrl, download, section, serveStudio } from './studio-fixture';
+import { appUrl, download, enter3D, section, serveStudio } from './studio-fixture';
 
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 
@@ -33,8 +33,7 @@ test('GitHub Pages repository subpath loads the studio, lazy 3D, style links and
   });
   await page.goto(`${appUrl}landcube/?v=1&seed=123&width=320&height=240`);
   await expect(page.getByRole('heading', { name: 'LANDCU.BE Studio' })).toBeVisible();
-  await page.getByRole('button', { name: '3D', exact: true }).click();
-  await expect(page.locator('canvas.terrain-3d')).toBeVisible();
+  await enter3D(page);
   await section(page, 'Model');
   await expect(page.getByLabel('Width (X, mm)', { exact: true })).toHaveValue('150');
   await page.getByRole('button', { name: 'Copy style link', exact: true }).click();

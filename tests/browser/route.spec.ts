@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
-import { appUrl, loadLocation, modelDownload, serveStudio } from './studio-fixture';
+import { appUrl, enter3D, loadLocation, modelDownload, serveStudio } from './studio-fixture';
 
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 // Software WebGL on CI runners is several times slower than local GPUs.
@@ -44,7 +44,7 @@ test('a GPX route drapes in 3D and never changes the printable STL', async ({ pa
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`${appUrl}?v=1&seed=123`);
   await loadLocation(page);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   const canvas = page.locator('canvas.terrain-3d');
 
   await expect(canvas).toBeVisible();

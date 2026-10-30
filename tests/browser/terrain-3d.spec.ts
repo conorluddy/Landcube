@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   appUrl,
   download,
+  enter3D,
   loadLocation,
   modelDownload,
   openDefaultStudio,
@@ -55,8 +56,7 @@ test('view selection activates 3D directly and restores independent inspector se
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`${appUrl}?v=1&seed=123`);
   await section(page, 'Colour');
-  await page.getByRole('button', { name: '3D', exact: true }).click();
-  await expect(page.locator('canvas.terrain-3d')).toBeVisible();
+  await enter3D(page);
   await section(page, 'Scene');
   await page.getByLabel('Time of day').fill('2');
   await expect(page.locator('output[for="terrain-light-time"]')).toHaveText('02:00 · Night');
@@ -64,7 +64,7 @@ test('view selection activates 3D directly and restores independent inspector se
   await page.getByRole('button', { name: '2D', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Colour settings' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Model', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await expect(page.getByRole('region', { name: 'Scene settings' })).toBeVisible();
   await expect(page.getByLabel('Time of day')).toHaveValue('2');
   await expect(page.getByRole('switch', { name: 'Solid base', exact: true })).not.toBeChecked();
@@ -144,7 +144,7 @@ test('model dimensions reach the exported solid and invalid sizes are flagged', 
   page,
 }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await section(page, 'Model');
 
   for (const [label, value] of [
@@ -172,7 +172,7 @@ test('model dimensions reach the exported solid and invalid sizes are flagged', 
 
 test('circle crop gestures and terraces change printable geometry', async ({ page }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await section(page, 'Model');
   await page.getByLabel('Crop shape').selectOption('circle');
   await page.getByLabel('Diameter (mm)', { exact: true }).fill('120');
@@ -201,7 +201,7 @@ test('materials, gradient stops, engraving and water settings survive view chang
 
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await section(page, 'Colour');
   await expect(page.getByLabel('Material preset', { exact: true })).toHaveValue('natural');
   await page.getByLabel('Material preset', { exact: true }).selectOption('porcelain');
@@ -221,7 +221,7 @@ test('materials, gradient stops, engraving and water settings survive view chang
   await page.getByLabel('Treatment', { exact: true }).selectOption('engraved');
   await page.getByRole('slider', { name: 'Groove depth' }).fill('0.3');
   await page.getByRole('button', { name: '2D', exact: true }).click();
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await section(page, 'Colour');
   await expect(page.getByRole('switch', { name: 'Color by elevation' })).toBeChecked();
   await expect(page.getByLabel('Transitions', { exact: true })).toHaveValue('hard');
@@ -234,7 +234,7 @@ test('real location controls share contour intervals and export model attributio
 }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
   await loadLocation(page);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await section(page, 'Contours');
   await page.getByLabel('Interval mode').selectOption('fixed');
   await page.getByLabel('Interval (m)').fill('50');
@@ -267,7 +267,7 @@ test('cartographic floor styles repaint the floor without changing the STL', asy
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`${appUrl}?v=1&seed=123`);
   await loadLocation(page);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await page.getByRole('button', { name: 'Export ↗' }).click();
   const before = await download(page, 'Download STL');
 
@@ -292,7 +292,7 @@ test('cartographic floor styles repaint the floor without changing the STL', asy
 test('portrait mobile model and gradient editors fit the studio sheet', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await section(page, 'Model');
   await page.getByLabel('Crop shape').selectOption('circle');
   const preview = page.getByRole('img', { name: /Terrain crop preview/ });
@@ -311,7 +311,7 @@ test('3D terrain morphs between landscapes and settles on the destination', asyn
 
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   const canvas = page.locator('canvas.terrain-3d');
   const transitions = await recordTerrainTransitions(page);
   // Software WebGL can spend a whole morph inside one frame, so count recorded morphs, never poll for one.
@@ -338,7 +338,7 @@ test('3D terrain morphs between landscapes and settles on the destination', asyn
 test('reduced motion swaps 3D terrain without morphing', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   const transitions = await recordTerrainTransitions(page);
 
   await loadLocation(page);
@@ -406,7 +406,7 @@ test('mapped roads retry after a busy service, restyle without refetching and cr
   });
   await page.goto(`${appUrl}?v=1&seed=123`);
   await loadLocation(page);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await page.getByRole('button', { name: 'Overlays', exact: true }).click();
   await page.getByRole('switch', { name: 'Mapped roads', exact: true }).check();
   await expect(page.getByRole('status').filter({ hasText: 'busy' })).toBeVisible();
@@ -455,7 +455,7 @@ test('grass restyles without errors and never changes the printable STL', async 
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${appUrl}?v=1&seed=123`);
   await loadLocation(page);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   const before = await modelDownload(page);
   const canvas = page.locator('canvas.terrain-3d');
   const bare = await canvas.screenshot();
