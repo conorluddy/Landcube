@@ -43,7 +43,9 @@ import { loadBrowserRealTerrain } from '../browser-real-terrain';
 import { validateRealContourInterval } from '../real-terrain-contours';
 import type { RealTerrain } from '../real-terrain';
 import type { DesignSettings, ValidatedDesignSettings } from '../types/design';
-import type { Result } from '../types/operations';
+import type { OperationError, Result } from '../types/operations';
+import { parseGpx, routeStats, simplifyRoute } from '../gpx';
+import type { RoutePoint, RouteStats, RouteWaypoint } from '../types/route';
 import type { WaterStyle } from '../terrain-3d';
 import type { FloorStyle } from '../terrain-floor-styles';
 import type { TerrainStillScale } from '../export/still-export';
@@ -133,6 +135,18 @@ export interface RoadNetworkState {
   /** The last download failed; `status` explains why. */
   hasFailed: boolean;
 }
+/** A loaded GPX route, simplified for drawing; stats come from the recorded points. */
+export interface WorkspaceRoute {
+  name: string;
+  points: RoutePoint[];
+  waypoints: RouteWaypoint[];
+  stats: RouteStats;
+  isVisible: boolean;
+}
+
+/** Douglas-Peucker tolerance for drawn routes: below a pixel at any supported span. */
+const routeSimplifyToleranceMeters = 5;
+
 export interface TerrainSourceState {
   selected: 'generated' | 'real';
   terrain?: RealTerrain;
@@ -188,6 +202,10 @@ export interface StudioState {
     page: StudioPage;
     /** False only on a phone's first visit of the session; see `src/studio/pages/splash-session.ts`. */
     hasSeenSplash: boolean;
+    /** The GPX route over the terrain. Session-only: never in design links. */
+    route: WorkspaceRoute | null;
+    /** Why the last GPX file was refused; the previous route stays. */
+    routeFault: OperationError | null;
   };
   seedLocked: boolean;
   status: string;
@@ -245,6 +263,10 @@ export interface StudioController {
   /** Brings a pinned panel above the others. */
   raiseGroup: (id: string) => void;
   dismissManualLink: () => void;
+  /** Parses and shows a GPX route; an invalid file sets `workspace.routeFault` and keeps the old route. */
+  loadRoute: (text: string, fallbackName?: string) => void;
+  clearRoute: () => void;
+  toggleRoute: () => void;
   design: (patch: Partial<DesignSettings>) => boolean;
   newLandscape: () => void;
   lockSeed: (value: boolean) => void;
@@ -398,6 +420,8 @@ export function createStudioController(
       palette: null,
       page: 'studio',
       hasSeenSplash: true,
+      route: null,
+      routeFault: null,
     },
     seedLocked: actions.isSeedLocked,
     status: '',
@@ -686,6 +710,38 @@ export function createStudioController(
           ? pinned
           : { ...pinned, zIndex: nextZIndex(pinnedGroups) },
       );
+    },
+    loadRoute(text, fallbackName = 'GPX route') {
+      const parsed = parseGpx(text);
+
+      if (!parsed.ok) {
+        workspace({ routeFault: parsed.error });
+
+        return;
+      }
+
+      const { name, points, waypoints } = parsed.data;
+
+      workspace({
+        routeFault: null,
+        route: {
+          name: name ?? fallbackName,
+          points: simplifyRoute(points, routeSimplifyToleranceMeters),
+          waypoints,
+          stats: routeStats(points),
+          isVisible: true,
+        },
+      });
+    },
+    clearRoute() {
+      workspace({ route: null, routeFault: null });
+    },
+    toggleRoute() {
+      const { route } = state.workspace;
+
+      if (route) {
+        workspace({ route: { ...route, isVisible: !route.isVisible } });
+      }
     },
     dismissManualLink() {
       state = { ...state, manualLink: '' };

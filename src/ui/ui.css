@@ -82,6 +82,7 @@
 @import './detachable-panel.css';
 
 /* #21–23 tool overlays */
+@import './overlays/route-line.css';
 
 /* #24 dossier */
 @import './model-dossier.css';

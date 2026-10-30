@@ -1,6 +1,6 @@
 /*
  * Overlays popover groups: decorative grid and summit markers (2D); geographic decorations and
- * roads (3D); sea level (real terrain, both views). They register under SCEN (SCEN.07 to SCEN.11)
+ * roads (3D); sea level and the GPX route (real terrain, both views). They register under SCEN (SCEN.07 to SCEN.12)
  * but render in the footer popover, not the Scene inspector; see ./scene.ts for the rest.
  */
 import { summitMarkerSizes } from '../../constants/design';
@@ -9,6 +9,7 @@ import type { ControlGroupDefinition } from '../../ui/control-rows';
 import type { StudioController, StudioState } from '../controller';
 import { designRangeRow, hintRow, selectRow, toggleRow } from '../control-rows';
 import { buildRoadsGroup } from './scene-roads';
+import { buildRouteGroup } from './scene-route';
 
 // === PUBLIC API ===
 
@@ -21,7 +22,15 @@ export function buildOverlayPopoverGroups(
       ? [buildDecorativeGridGroup(controller, state), buildSummitMarkersGroup(controller, state)]
       : [buildGeographicDecorationsGroup(controller, state), buildRoadsGroup(controller, state)];
 
-  return state.source.terrain ? [...viewGroups, buildSeaLevelGroup(controller, state)] : viewGroups;
+  const { terrain } = state.source;
+
+  return terrain
+    ? [
+        ...viewGroups,
+        buildSeaLevelGroup(controller, state),
+        buildRouteGroup(controller, state, terrain),
+      ]
+    : viewGroups;
 }
 
 // === GROUPS ===

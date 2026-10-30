@@ -8,6 +8,7 @@ import type { TerrainTerraceLevels } from '../terrain-terraces';
 import type { FloorPlace } from '../floor-geo';
 import type { RoadPath } from '../types/roads';
 import type { GrassGeography } from '../grass-coverage';
+import type { TerrainRouteOverlay } from '../terrain-3d-route';
 import { getAutoRotateSpeed, type TerrainViewPreset } from '../terrain-camera';
 import { createShellMotion } from './shell-motion';
 import { createCameraPosePublisher } from './camera-pose';
@@ -40,6 +41,7 @@ interface StudioTerrainView {
     terraceLevels?: TerrainTerraceLevels,
     roads?: readonly RoadPath[],
     grassGeography?: GrassGeography,
+    route?: TerrainRouteOverlay,
   ) => void;
 }
 
@@ -266,6 +268,7 @@ export function createStudioTerrainView(
       terraceLevels?: TerrainTerraceLevels,
       roads?: readonly RoadPath[],
       grassGeography?: GrassGeography,
+      route?: TerrainRouteOverlay,
     ) {
       floorPlace = place;
       interval = contourIntervalMeters;
@@ -291,6 +294,7 @@ export function createStudioTerrainView(
           terraceLevels,
           roads,
           grassGeography,
+          route,
         );
       }
     },

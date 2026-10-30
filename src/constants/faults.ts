@@ -17,6 +17,7 @@
  * | E-203 | PLACE_SEARCH_FAILED  | Place search failed    | yes       |
  * | E-204 | tileDecodeFailed     | Tile decode failed     | yes       |
  * | E-205 | locationOutOfRange   | Location out of range  | no        |
+ * | E-206 | INVALID_ROUTE        | Route file invalid     | no        |
  * | E-301 | webglUnavailable     | WebGL unavailable      | no        |
  * | E-302 | webglContextLost     | WebGL context lost     | yes       |
  * | E-303 | previewDecodeFailed  | Preview decode failed  | yes       |
@@ -53,6 +54,7 @@ export const faultCodes: Readonly<Record<OperationErrorCode | StudioFaultKind, F
     [operationErrorCodes.placeSearchFailed]: describe('E-203', 'Place search failed', true),
     tileDecodeFailed: describe('E-204', 'Tile decode failed', true),
     locationOutOfRange: describe('E-205', 'Location out of range', false),
+    [operationErrorCodes.invalidRoute]: describe('E-206', 'Route file invalid', false),
     webglUnavailable: describe('E-301', 'WebGL unavailable', false),
     webglContextLost: describe('E-302', 'WebGL context lost', true),
     previewDecodeFailed: describe('E-303', 'Preview decode failed', true),

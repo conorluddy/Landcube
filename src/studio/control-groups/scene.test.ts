@@ -6,7 +6,13 @@ import type { RealTerrain } from '../../real-terrain';
 import { ControlGroup } from '../../ui/control-group';
 import type { ControlGroupDefinition } from '../../ui/control-rows';
 import { renderMarkup } from '../../ui/test-helpers';
-import { createStudioController, type StudioController, type StudioState } from '../controller';
+import type { OperationError } from '../../types/operations';
+import {
+  createStudioController,
+  type StudioController,
+  type StudioState,
+  type WorkspaceRoute,
+} from '../controller';
 import { getGroupCode } from '../sections';
 import { buildOverlayPopoverGroups } from './overlays';
 import { buildSceneGroups } from './scene';
@@ -64,7 +70,7 @@ void test('the preview water level slider appears only while previewing', () => 
   );
 });
 
-void test('2D overlays show grid and summit markers, plus sea level on real terrain', () => {
+void test('2D overlays show grid and summit markers, plus sea level and route on real terrain', () => {
   const generated = createContext({ view: '2d' });
   const real = createContext({ view: '2d', terrain: realTerrain });
 
@@ -76,10 +82,11 @@ void test('2D overlays show grid and summit markers, plus sea level on real terr
     'decorative-grid',
     'summit-markers',
     'sea-level',
+    'route',
   ]);
 });
 
-void test('3D overlays show geographic decorations and roads, plus sea level on real terrain', () => {
+void test('3D overlays show geographic decorations and roads, plus sea level and route on real terrain', () => {
   const generated = createContext({ view: '3d' });
   const real = createContext({ view: '3d', terrain: realTerrain });
 
@@ -91,6 +98,7 @@ void test('3D overlays show geographic decorations and roads, plus sea level on 
     'geographic-decorations',
     'roads',
     'sea-level',
+    'route',
   ]);
 });
 
@@ -136,9 +144,61 @@ void test('the retry button appears only for enabled roads that can be retried',
   );
 });
 
+void test('the route group offers a GPX file input, a disabled toggle and a disabled clear before a route loads', () => {
+  const { controller, state } = createContext({ view: '2d', terrain: realTerrain });
+  const groups = buildOverlayPopoverGroups(controller, state);
+  const markup = renderGroups(groups.filter((group) => group.id === 'route'));
+
+  assert.deepEqual(listRowIds(groups, 'route'), [
+    'route-file',
+    'route-visible',
+    'route-clear',
+    'route-hint',
+  ]);
+  assert.equal(getGroupCode('route'), 'SCEN.12');
+  assert.match(markup, /type="file"[^>]*accept="[^"]*\.gpx/);
+  assert.match(markup, /GPX file/);
+  assert.match(markup, /<button[^>]*disabled[^>]*><span[^>]*>Clear route/);
+});
+
+void test('a loaded route shows its stats and a refused file shows an E-206 fault', () => {
+  const loaded = createContext({
+    view: '2d',
+    terrain: realTerrain,
+    route: {
+      name: 'Ridge walk',
+      points: [
+        { latitude: 55, longitude: -8 },
+        { latitude: 55.1, longitude: -8 },
+      ],
+      waypoints: [],
+      stats: { distanceKm: 11.1, recordedPointCount: 9 },
+      isVisible: true,
+    },
+  });
+  const faulted = createContext({
+    view: '2d',
+    terrain: realTerrain,
+    routeFault: { code: 'INVALID_ROUTE', message: 'Bad file.', retryable: false },
+  });
+  const loadedGroups = buildOverlayPopoverGroups(loaded.controller, loaded.state);
+  const faultedMarkup = renderGroups(
+    buildOverlayPopoverGroups(faulted.controller, faulted.state).filter(
+      (group) => group.id === 'route',
+    ),
+  );
+
+  assert.ok(listRowIds(loadedGroups, 'route').includes('route-stats'));
+  assert.match(renderGroups(loadedGroups), /Ridge walk · 11\.1 km · 0 waypoints/);
+  assert.match(faultedMarkup, /E-206/);
+  assert.match(faultedMarkup, /Bad file\./);
+});
+
 // === HELPERS ===
 
 interface ContextOverrides {
+  route?: WorkspaceRoute;
+  routeFault?: OperationError;
   view: '2d' | '3d';
   terrain?: RealTerrain;
   scene?: Partial<StudioState['scene']>;
@@ -168,7 +228,12 @@ function createContext(overrides: ContextOverrides): {
     controller,
     state: {
       ...initial,
-      workspace: { ...initial.workspace, view: overrides.view },
+      workspace: {
+        ...initial.workspace,
+        view: overrides.view,
+        route: overrides.route ?? null,
+        routeFault: overrides.routeFault ?? null,
+      },
       source: { ...initial.source, terrain: overrides.terrain },
       scene: {
         ...initial.scene,

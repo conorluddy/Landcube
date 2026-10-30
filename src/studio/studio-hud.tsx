@@ -5,6 +5,7 @@ import { Crosshair } from '../ui/overlays/crosshair';
 import { HudFrame } from '../ui/overlays/hud-frame';
 import { HudLayer } from '../ui/overlays/hud-layer';
 import { ReadoutCard } from '../ui/overlays/readout-card';
+import { RouteLine } from '../ui/overlays/route-line';
 import { ScaleBar } from '../ui/overlays/scale-bar';
 import type { StudioState } from './controller';
 import { getFrameMetersPerPixel } from './hud-location';
@@ -17,6 +18,7 @@ import {
   getCanvasTone,
 } from './hud-readouts';
 import type { HudStore } from './hud-store';
+import { projectRouteToFrame } from './route-overlay';
 
 /** The card needs a desktop-sized viewport: wider than a phone and at least 700px tall. */
 const readoutCardQuery = '(min-width: 768px) and (min-height: 700px)';
@@ -52,17 +54,34 @@ export function StudioHud({ state, hud }: { state: StudioState; hud: HudStore })
       ? undefined
       : chooseScaleBar(metersPerPixel, canvasScaleBarMaximumPx);
 
+  const route = state.workspace.route;
+  const projectedRoute =
+    route !== null && route.isVisible && !is3d && viewportSize !== undefined && state.source.terrain
+      ? projectRouteToFrame(route, state.source.terrain, viewportSize)
+      : undefined;
+
   return (
     <HudLayer
       ref={layer}
       canvasTone={getCanvasTone(state)}
       inspectorState={state.workspace.collapsed ? 'collapsed' : 'expanded'}
       pointer={
-        <Crosshair position={pointer.kind === 'tracking' ? pointer : undefined}>
-          {pointer.kind === 'tracking' && pointer.location !== undefined && (
-            <CoordinateTip lines={formatMapLocation(pointer.location)} />
+        <>
+          {route !== null && projectedRoute !== undefined && viewportSize !== undefined && (
+            <RouteLine
+              widthPx={viewportSize.width}
+              heightPx={viewportSize.height}
+              points={projectedRoute.points}
+              waypoints={projectedRoute.waypoints}
+              label={`Route: ${route.name}`}
+            />
           )}
-        </Crosshair>
+          <Crosshair position={pointer.kind === 'tracking' ? pointer : undefined}>
+            {pointer.kind === 'tracking' && pointer.location !== undefined && (
+              <CoordinateTip lines={formatMapLocation(pointer.location)} />
+            )}
+          </Crosshair>
+        </>
       }
       frame={
         <HudFrame
