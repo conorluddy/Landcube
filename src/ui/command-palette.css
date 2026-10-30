@@ -1,0 +1,367 @@
+/* C-09 CommandPalette: combobox, grouped results and a preview pane on panel glass. */
+.lc-command-palette {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  width: 100%;
+  max-height: inherit;
+}
+
+.lc-command-palette[data-layout='sheet'] {
+  background: var(--lc-glass-sheet);
+  border-bottom: 0;
+  border-radius: var(--lc-r-sheet) var(--lc-r-sheet) 0 0;
+}
+
+.lc-command-palette__search {
+  display: flex;
+  gap: var(--lc-s-5);
+  align-items: center;
+  height: 48px;
+  padding: 0 var(--lc-s-8);
+  border-bottom: 1px solid var(--lc-line-subtle);
+}
+
+.lc-command-palette[data-layout='sheet'] .lc-command-palette__search {
+  height: 56px;
+}
+
+.lc-command-palette__glyph {
+  flex: none;
+  color: var(--lc-text-quiet);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-body);
+  line-height: 16px;
+}
+
+.lc-command-palette__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.lc-command-palette[data-layout='sheet'] .lc-command-palette__input {
+  font-size: var(--lc-fs-m-input);
+}
+
+/* The whole palette is the field; the caret marks focus, so no second ring. */
+.lc-command-palette__input:focus-visible {
+  outline: none;
+}
+
+.lc-command-palette__input::placeholder {
+  color: var(--lc-text-quiet);
+}
+
+.lc-command-palette__results {
+  min-height: 0;
+  max-height: 320px;
+  padding: var(--lc-s-2) var(--lc-s-2) var(--lc-s-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.lc-command-palette[data-layout='sheet'] .lc-command-palette__results {
+  max-height: none;
+}
+
+.lc-command-palette__results:empty {
+  display: none;
+}
+
+.lc-command-palette__group-title {
+  padding: var(--lc-s-5) var(--lc-s-6) var(--lc-s-2);
+  color: var(--lc-text-quiet);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-micro);
+  line-height: 12px;
+  letter-spacing: var(--lc-track-head);
+  text-transform: uppercase;
+}
+
+.lc-command-palette__option {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: var(--lc-s-5);
+  align-items: baseline;
+  padding: var(--lc-s-3) var(--lc-s-6);
+  border: 1px solid transparent;
+  border-radius: var(--lc-r-control);
+  cursor: pointer;
+}
+
+.lc-command-palette[data-layout='sheet'] .lc-command-palette__option {
+  min-height: var(--lc-h-l);
+  align-items: center;
+}
+
+.lc-command-palette__option[aria-selected='true'] {
+  background: var(--lc-fill-selected);
+  border-color: var(--lc-line-strong);
+}
+
+.lc-command-palette__code {
+  color: var(--lc-text-quiet);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-micro);
+  line-height: 12px;
+  letter-spacing: var(--lc-track-ui);
+  white-space: nowrap;
+}
+
+.lc-command-palette__label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--lc-text-body);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-body);
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-command-palette[data-layout='sheet'] .lc-command-palette__label {
+  font-size: var(--lc-fs-m-body);
+  line-height: 20px;
+}
+
+.lc-command-palette__option[aria-selected='true'] .lc-command-palette__label {
+  color: var(--lc-text-primary);
+}
+
+.lc-command-palette__detail {
+  max-width: 160px;
+  overflow: hidden;
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-value-s);
+  line-height: 14px;
+  letter-spacing: var(--lc-track-coord);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lc-command-palette__preview {
+  display: grid;
+  gap: var(--lc-s-5);
+  padding: var(--lc-s-6) var(--lc-s-8);
+  border-top: 1px solid var(--lc-line-subtle);
+}
+
+.lc-command-palette__preview:not(:has(p, input, button)) {
+  display: none;
+}
+
+.lc-command-palette__readout {
+  display: grid;
+  gap: var(--lc-s-2);
+}
+
+.lc-command-palette__readout p {
+  margin: 0;
+}
+
+.lc-command-palette__preview-label {
+  color: var(--lc-text-secondary);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-hint);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.lc-command-palette__diff {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-s-4);
+  align-items: baseline;
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-value);
+  line-height: 16px;
+  letter-spacing: var(--lc-track-coord);
+  text-transform: uppercase;
+}
+
+.lc-command-palette__arrow {
+  color: var(--lc-text-quiet);
+}
+
+.lc-command-palette__to {
+  color: var(--lc-text-primary);
+}
+
+.lc-command-palette__error,
+.lc-command-palette__status {
+  color: var(--lc-text-quiet);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  line-height: 14px;
+  letter-spacing: var(--lc-track-coord);
+}
+
+.lc-command-palette__error {
+  color: var(--lc-text-strong);
+}
+
+.lc-command-palette__value {
+  display: flex;
+  gap: var(--lc-s-4);
+  align-items: center;
+}
+
+.lc-command-palette__value-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--lc-h-m);
+  padding: 0 var(--lc-s-5);
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-value);
+  line-height: 16px;
+  background: var(--lc-fill-field);
+  border: 1px solid var(--lc-line);
+  border-radius: var(--lc-r-control);
+  outline: none;
+}
+
+.lc-command-palette[data-layout='sheet'] .lc-command-palette__value-input {
+  height: var(--lc-h-l);
+  font-size: var(--lc-fs-m-input);
+}
+
+.lc-command-palette__value-input:focus-visible {
+  border-color: var(--lc-line-focus);
+  outline: none;
+}
+
+.lc-command-palette__quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-s-3);
+}
+
+.lc-command-palette[data-layout='sheet'] .lc-command-palette__quick {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.lc-command-palette__chip {
+  flex: none;
+  height: 24px;
+  padding: 0 var(--lc-s-4);
+  color: var(--lc-text-body);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  line-height: 12px;
+  letter-spacing: var(--lc-track-ui);
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: transparent;
+  border: 1px solid var(--lc-line);
+  border-radius: var(--lc-r-control);
+  cursor: pointer;
+}
+
+.lc-command-palette[data-layout='sheet'] .lc-command-palette__chip {
+  height: 36px;
+  font-size: var(--lc-fs-m-micro);
+}
+
+.lc-command-palette__chip:hover,
+[data-force-state='hover'] .lc-command-palette__chip {
+  border-color: var(--lc-line-hover);
+}
+
+.lc-command-palette__chip:focus-visible {
+  outline: 1px solid var(--lc-line-focus);
+  outline-offset: 1px;
+}
+
+.lc-command-palette__hints {
+  display: flex;
+  gap: var(--lc-s-8);
+  align-items: center;
+  padding: var(--lc-s-4) var(--lc-s-8);
+  color: var(--lc-text-quiet);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-micro);
+  line-height: 14px;
+  letter-spacing: var(--lc-track-ui);
+  text-transform: uppercase;
+  border-top: 1px solid var(--lc-line-subtle);
+}
+
+.lc-command-palette__hint {
+  display: inline-flex;
+  gap: var(--lc-s-3);
+  align-items: center;
+}
+
+/* The host dialog: centred near the top on desktop, a bottom sheet on phones. */
+.lc-command-palette-dialog {
+  position: fixed;
+  inset: 12vh 0 auto;
+  z-index: 6;
+  width: min(560px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24vh);
+  margin: 0 auto;
+  padding: 0;
+  overflow: visible;
+  color: inherit;
+  background: transparent;
+  border: 0;
+}
+
+.lc-command-palette-dialog::backdrop {
+  background: var(--lc-scrim);
+}
+
+.lc-command-palette-dialog > .lc-command-palette {
+  max-height: calc(100dvh - 24vh);
+}
+
+@media (max-width: 767px) {
+  .lc-command-palette-dialog {
+    inset: auto 0 0;
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - 64px);
+  }
+
+  .lc-command-palette-dialog > .lc-command-palette {
+    max-height: calc(100dvh - 64px);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-command-palette__option[aria-selected='true'] {
+    border-color: Highlight;
+    forced-color-adjust: none;
+    background: Highlight;
+  }
+
+  .lc-command-palette__option[aria-selected='true'] .lc-command-palette__label,
+  .lc-command-palette__option[aria-selected='true'] .lc-command-palette__code,
+  .lc-command-palette__option[aria-selected='true'] .lc-command-palette__detail {
+    color: HighlightText;
+  }
+
+  .lc-command-palette__chip,
+  .lc-command-palette__value-input {
+    border-color: CanvasText;
+  }
+
+  .lc-command-palette__value-input:focus-visible {
+    outline: 2px solid Highlight;
+  }
+}

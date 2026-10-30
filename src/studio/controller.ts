@@ -180,6 +180,8 @@ export interface StudioState {
     sheetSnap: SheetSnap;
     /** Control groups floating outside the inspector (desktop). Session-only: never serialized. */
     pinnedGroups: readonly PinnedGroupPlacement[];
+    /** The open command palette and its query; null while closed. */
+    palette: { query: string } | null;
   };
   seedLocked: boolean;
   status: string;
@@ -387,6 +389,7 @@ export function createStudioController(
       dossierOpen: false,
       sheetSnap: 'half',
       pinnedGroups: [],
+      palette: null,
     },
     seedLocked: actions.isSeedLocked,
     status: '',
