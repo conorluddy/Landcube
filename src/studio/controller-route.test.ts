@@ -84,12 +84,39 @@ void test('loading over an existing route asks first and cancelling keeps the or
     needsConfirmation: true,
   });
   assert.equal(c.getSnapshot().workspace.route?.active.id, original);
-  assert.deepEqual(c.startRouteDrawing(), { needsConfirmation: true });
+  assert.equal(c.getSnapshot().workspace.routeReplacement?.kind, 'import');
+
+  c.cancelRouteReplacement();
+
+  assert.equal(c.getSnapshot().workspace.routeReplacement, null);
   assert.equal(c.getSnapshot().workspace.route?.active.id, original);
+});
 
-  c.startRouteDrawing({ confirmed: true });
+void test('confirming a pending import replaces the route', () => {
+  const c = setupController();
 
-  assert.equal(c.getSnapshot().workspace.route?.active.provenance, 'drawn');
+  c.loadRoute(twoPoints);
+  c.loadRoute(gpx('<trkpt lat="5" lon="5"/><trkpt lat="6" lon="6"/>', 'New'));
+  c.confirmRouteReplacement();
+
+  assert.equal(c.getSnapshot().workspace.route?.active.name, 'New');
+  assert.equal(c.getSnapshot().workspace.routeReplacement, null);
+});
+
+void test('confirming a pending drawing starts it in the Route tool', () => {
+  const c = setupController();
+
+  c.loadRoute(twoPoints);
+
+  assert.deepEqual(c.startRouteDrawing(), { needsConfirmation: true });
+
+  c.confirmRouteReplacement();
+
+  const { route, toolMode } = c.getSnapshot().workspace;
+
+  assert.equal(route?.active.provenance, 'drawn');
+  assert.equal(route.active.waypoints.length, 0);
+  assert.equal(toolMode, 'route');
 });
 
 void test('an invalid file faults without disturbing the current route', () => {

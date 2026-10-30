@@ -6,7 +6,6 @@ import type { GeoPoint } from '../types/terrain-analysis';
 import type { StudioController, StudioState } from './controller';
 import type { HudStore } from './hud-store';
 import { isRouteComplete } from './route-editing';
-import { hasPendingRouteReplacement } from './route-actions';
 import { getRouteKeyAction, getSegmentMidpoint, projectRoutePoint, toGeoPoint } from './tool-state';
 
 /** Pointer travel below this is a tap that places a waypoint, not a drag. */
@@ -168,7 +167,7 @@ function useRouteKeys(c: StudioController): void {
         event.altKey ||
         workspace.exporting ||
         workspace.palette !== null ||
-        hasPendingRouteReplacement() ||
+        workspace.routeReplacement !== null ||
         isTextEntry(event.target) ||
         (event.key === 'Enter' && isPressableOutsideHandles(event.target))
       ) {

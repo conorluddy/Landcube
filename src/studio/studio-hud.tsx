@@ -101,7 +101,7 @@ export function StudioHud({
             hud={hud}
             viewportSize={viewportSize}
           />
-          <RouteReplaceDialog />
+          <RouteReplaceDialog controller={controller} state={state} />
         </>
       }
       frame={

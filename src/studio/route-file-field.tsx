@@ -1,6 +1,5 @@
 import { useId } from 'react';
 import type { StudioController } from './controller';
-import { requestRouteReplacement } from './route-actions';
 
 /** GPX file input for the Overlays popover; an invalid file reports through `workspace.routeFault`. */
 export function RouteFileField({
@@ -33,8 +32,8 @@ export function RouteFileField({
           void file.text().then((text) => {
             const name = file.name.replace(/\.gpx$/i, '');
 
-            // A non-empty route asks first; the dialog repeats the load with `confirmed`.
-            requestRouteReplacement((options) => controller.loadRoute(text, name, options));
+            // Over a non-empty route this waits for the replace-confirm dialog.
+            controller.loadRoute(text, name);
             // Clearing lets the same file be chosen again after a fix.
             input.value = '';
           });

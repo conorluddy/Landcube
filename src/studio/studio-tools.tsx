@@ -9,7 +9,6 @@ import {
   type MeasurePointer,
 } from '../ui/overlays/measure-line';
 import { RouteTool } from './route-tool';
-import { hasPendingRouteReplacement } from './route-actions';
 import { FloatingBar } from '../ui/floating-bar';
 import { Segmented, type SegmentedOption } from '../ui/segmented';
 import type { StudioController, StudioState, ToolMode } from './controller';
@@ -144,7 +143,7 @@ function useToolShortcuts(c: StudioController): void {
         workspace.exporting ||
         workspace.palette !== null ||
         workspace.popover !== null ||
-        hasPendingRouteReplacement() ||
+        workspace.routeReplacement !== null ||
         isTextEntry(event.target)
       ) {
         return;

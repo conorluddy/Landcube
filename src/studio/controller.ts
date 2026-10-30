@@ -157,10 +157,9 @@ export interface WorkspaceRoute {
   inspectedDistanceMeters?: number;
 }
 
-/** Replacing a route needs the caller to confirm first (REQ-19); `confirmed: true` skips the ask. */
-export interface RouteReplaceOptions {
-  confirmed?: boolean;
-}
+/** A new drawing or GPX load waiting for the user to confirm discarding the current route (REQ-19). */
+export type PendingRouteReplacement =
+  { kind: 'draw' } | { kind: 'import'; text: string; fallbackName: string };
 
 export interface RouteReplaceResult {
   needsConfirmation: boolean;
@@ -230,6 +229,8 @@ export interface StudioState {
     route: WorkspaceRoute | null;
     /** Why the last GPX file was refused; the previous route stays. */
     routeFault: OperationError | null;
+    /** Shown as the replace-confirm dialog until confirmed or cancelled. */
+    routeReplacement: PendingRouteReplacement | null;
     /** The A/B preset wipe. Session-only; `null` while no preset is being compared. */
     compare: { presetId: string; dividerFraction: number } | null;
     /** The desktop preset strip. Session-only. */
@@ -293,14 +294,16 @@ export interface StudioController {
   /** Brings a pinned panel above the others. */
   raiseGroup: (id: string) => void;
   dismissManualLink: () => void;
-  /** Parses and shows a GPX route; an invalid file sets `workspace.routeFault` and keeps the old route. */
-  loadRoute: (
-    text: string,
-    fallbackName?: string,
-    options?: RouteReplaceOptions,
-  ) => RouteReplaceResult;
-  /** Starts a new empty drawn route in drawing mode. */
-  startRouteDrawing: (options?: RouteReplaceOptions) => RouteReplaceResult;
+  /**
+   * Parses and shows a GPX route; an invalid file sets `workspace.routeFault` and keeps the old
+   * route. Over a non-empty route it only sets `workspace.routeReplacement` and waits.
+   */
+  loadRoute: (text: string, fallbackName?: string) => RouteReplaceResult;
+  /** Starts a new empty drawn route in drawing mode, asking first like `loadRoute`. */
+  startRouteDrawing: () => RouteReplaceResult;
+  /** Runs the pending replacement; a confirmed drawing also hands the canvas to the Route tool. */
+  confirmRouteReplacement: () => void;
+  cancelRouteReplacement: () => void;
   placeRouteWaypoint: (point: GeoPoint) => void;
   moveRouteWaypoint: (index: number, point: GeoPoint) => void;
   /** Inserts between waypoint `segmentIndex` and the next. */
@@ -491,6 +494,7 @@ export function createStudioController(
       hasSeenSplash: true,
       route: null,
       routeFault: null,
+      routeReplacement: null,
       compare: null,
       comparePresetsOpen: false,
       toolMode: 'none',
@@ -554,10 +558,6 @@ export function createStudioController(
 
   let drawnRouteCount = 0;
 
-  // An empty drawn route has nothing to lose, so replacing it needs no confirmation.
-  const isReplacementUnconfirmed = ({ confirmed = false }: RouteReplaceOptions) =>
-    !confirmed && (state.workspace.route?.active.waypoints.length ?? 0) > 0;
-
   const installRoute = (active: ActiveRoute) => {
     workspace({
       routeFault: null,
@@ -578,6 +578,52 @@ export function createStudioController(
           ? null
           : toWorkspaceRoute(next.route, next.editing, route?.isVisible ?? true),
     });
+  };
+
+  // An empty drawn route has nothing to lose, so replacing it needs no confirmation.
+  const requestReplacement = (pending: PendingRouteReplacement): boolean => {
+    if ((state.workspace.route?.active.waypoints.length ?? 0) === 0) {
+      return false;
+    }
+
+    workspace({ routeReplacement: pending });
+
+    return true;
+  };
+
+  const importRoute = (text: string, fallbackName: string): RouteReplaceResult => {
+    const parsed = parseGpx(text);
+
+    if (!parsed.ok) {
+      workspace({ routeFault: parsed.error });
+
+      return { needsConfirmation: false };
+    }
+
+    if (requestReplacement({ kind: 'import', text, fallbackName })) {
+      return { needsConfirmation: true };
+    }
+
+    const { name, points, waypoints } = parsed.data;
+    const routeName = name ?? fallbackName;
+
+    installRoute({
+      id: createRouteId(routeName, points),
+      name: routeName,
+      provenance: 'imported',
+      waypoints: simplifyRoute(points, routeSimplifyToleranceMeters).map(toGeoPoint),
+      originalPoints: points,
+      namedWaypoints: waypoints,
+      slopeThresholdPercent: defaultSlopeThresholdPercent,
+    });
+
+    return { needsConfirmation: false };
+  };
+
+  const beginDrawing = () => {
+    drawnRouteCount += 1;
+    applyRouteAction({ type: 'start-drawing', id: `drawn-${drawnRouteCount}` });
+    workspace({ routeFault: null });
   };
 
   const updatePinnedGroup = (
@@ -811,44 +857,36 @@ export function createStudioController(
           : { ...pinned, zIndex: nextZIndex(pinnedGroups) },
       );
     },
-    loadRoute(text, fallbackName = 'GPX route', options = {}) {
-      const parsed = parseGpx(text);
-
-      if (!parsed.ok) {
-        workspace({ routeFault: parsed.error });
-
-        return { needsConfirmation: false };
-      }
-
-      if (isReplacementUnconfirmed(options)) {
+    loadRoute: (text, fallbackName = 'GPX route') => importRoute(text, fallbackName),
+    startRouteDrawing() {
+      if (requestReplacement({ kind: 'draw' })) {
         return { needsConfirmation: true };
       }
 
-      const { name, points, waypoints } = parsed.data;
-      const routeName = name ?? fallbackName;
-
-      installRoute({
-        id: createRouteId(routeName, points),
-        name: routeName,
-        provenance: 'imported',
-        waypoints: simplifyRoute(points, routeSimplifyToleranceMeters).map(toGeoPoint),
-        originalPoints: points,
-        namedWaypoints: waypoints,
-        slopeThresholdPercent: defaultSlopeThresholdPercent,
-      });
+      beginDrawing();
 
       return { needsConfirmation: false };
     },
-    startRouteDrawing(options = {}) {
-      if (isReplacementUnconfirmed(options)) {
-        return { needsConfirmation: true };
+    confirmRouteReplacement() {
+      const pending = state.workspace.routeReplacement;
+
+      if (pending === null) {
+        return;
       }
 
-      drawnRouteCount += 1;
-      applyRouteAction({ type: 'start-drawing', id: `drawn-${drawnRouteCount}` });
-      workspace({ routeFault: null });
+      workspace({ routeReplacement: null, route: null });
 
-      return { needsConfirmation: false };
+      if (pending.kind === 'import') {
+        importRoute(pending.text, pending.fallbackName);
+
+        return;
+      }
+
+      beginDrawing();
+      workspace({ toolMode: 'route' });
+    },
+    cancelRouteReplacement() {
+      workspace({ routeReplacement: null });
     },
     placeRouteWaypoint: (point) => {
       applyRouteAction({ type: 'place', point });
