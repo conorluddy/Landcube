@@ -166,6 +166,23 @@ Existing output files require `--force true` to replace. For automation, `--json
 - Real-terrain exports visibly include resolved source attribution. A companion credit file supports downstream layouts; keep the credit visible in the final published medium where reasonable.
 - Contours and grids are decorative artwork, not survey or navigation data. Real-terrain contours use meter intervals when Auto or Fixed is selected; decorative grids are not geographic coordinate grids.
 
+## Self-hosting and search metadata
+
+The production build defaults to `https://landcu.be/`. For a fork or self-hosted deployment,
+set the public URL when building, including any path prefix:
+
+```sh
+LANDCUBE_SITE_URL=https://example.com/studio/ npm run build
+```
+
+This sets the canonical URL, social metadata, structured data, and generated `robots.txt` and
+`sitemap.xml` together. Shared design URLs canonicalise to that deployment's homepage.
+Analytics still runs only on `landcu.be`. For a subdirectory deployment, serve or merge the
+generated robots rules at the domain root, since crawlers read `/robots.txt` there.
+
+The social preview is committed as `public/social-preview.png`. To regenerate it after building
+the CLI, run `node scripts/build-social-preview.mjs`.
+
 ## Install agent plugins
 
 LANDCU.BE supports Codex and Claude Code marketplaces. Both plugins bundle the same [LANDCU.BE agent skill](https://github.com/conorluddy/landcube/blob/main/skills/landcube/SKILL.md), which runs the published CLI through NPX. You need Node.js 20.19+, 22.13+, or 24+ and npm; no repository checkout, global LANDCU.BE installation, or LANDCU.BE account is required.
