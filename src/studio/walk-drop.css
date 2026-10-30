@@ -1,0 +1,63 @@
+/* Spike: matches .camera-selector__toggle so the instrument row reads as one set. */
+.walk-drop {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--lc-line);
+  border-radius: 50%;
+  color: var(--lc-text-primary);
+  background: var(--lc-glass-tip);
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.walk-drop:active {
+  cursor: grabbing;
+}
+
+.walk-drop:focus-visible {
+  outline: 2px solid var(--lc-line-focus);
+  outline-offset: 2px;
+}
+
+.walk-drop[data-missed='true'] {
+  animation: walk-drop-miss 320ms ease-in-out;
+}
+
+/* The figure's feet sit on the pointer, so it lands where it appears to stand. */
+.walk-drop__ghost {
+  position: fixed;
+  z-index: 10;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  color: var(--lc-text-primary);
+  translate: -50% -100%;
+  pointer-events: none;
+  filter: drop-shadow(var(--lc-shadow-panel));
+}
+
+.walk-drop__ghost svg {
+  width: 30px;
+  height: 30px;
+}
+
+@keyframes walk-drop-miss {
+  25% {
+    translate: -3px 0;
+  }
+
+  75% {
+    translate: 3px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .walk-drop[data-missed='true'] {
+    animation: none;
+  }
+}

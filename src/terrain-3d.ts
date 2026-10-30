@@ -79,6 +79,8 @@ import { seaLevelHatchSpacing, seaLevelHatchOpacity } from './constants/sea-leve
 import type { SeaLevelGeometry } from './sea-level';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { createTerrainWalk } from './terrain-walk';
+import { createTerrainTransitionAudio } from './terrain-transition-audio';
 import { createTerrainPostProcessing, type TerrainPostProcessing } from './terrain-post-processing';
 import type { Contour } from './types/contours';
 import type { DesignSettings } from './types/design';
@@ -152,6 +154,8 @@ export interface Terrain3d {
    * model, before a terrain update, or behind the camera.
    */
   projectCropPointToClient(point: FramePoint): { clientX: number; clientY: number } | undefined;
+  /** Spike: walks from the terrain under a viewport point, or the orbit centre when omitted; false on a miss. */
+  walkAt(metersPerUnit: number, clientX?: number, clientY?: number): boolean;
   /** Runs after every drawn frame (orbit, presets, turntable, rebuilds); returns an unsubscribe. */
   subscribeDraw(listener: () => void): () => void;
 }
@@ -173,6 +177,8 @@ export function createTerrain3d(
   onModel: (heightMm: number, layerHeightMm?: number) => void = () => undefined,
   /** Runs after every drawn frame, so camera readouts can follow orbits, presets and the turntable. */
   onDraw: () => void = () => undefined,
+  /** Spike: first-person walking started or stopped. */
+  onWalkChange: (isWalking: boolean) => void = () => undefined,
 ): Terrain3d {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
 
@@ -224,6 +230,7 @@ export function createTerrain3d(
   const contourLayer = new THREE.Group();
 
   contourLayer.add(...Object.values(lineLayers));
+  const transitionAudio = createTerrainTransitionAudio();
   let isTransitionArmed = false;
   let transition: RunningTerrainTransition | undefined;
   let pendingMapGrid: Parameters<Terrain3d['setMapGrid']> | undefined;
@@ -754,6 +761,64 @@ export function createTerrain3d(
     draw();
   });
 
+  // Spike: first person drops in at a terrain point; Esc returns to the saved orbit pose.
+  const downRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
+  let orbitPose: { position: THREE.Vector3; target: THREE.Vector3 } | undefined;
+  const walk = createTerrainWalk({
+    camera: perspectiveCamera,
+    canvas: renderer.domElement,
+    getGroundHeight(x, z) {
+      downRay.ray.origin.set(x, 50, z);
+
+      return downRay.intersectObject(surface, false)[0]?.point.y;
+    },
+    onFrame: draw,
+    onStop() {
+      if (orbitPose) {
+        camera =
+          cameraSettings.projection === 'orthographic' ? orthographicCamera : perspectiveCamera;
+        controls.object = camera;
+        perspectiveCamera.position.copy(orbitPose.position);
+        controls.target.copy(orbitPose.target);
+      }
+
+      controls.enabled = visible;
+      controls.update();
+      postProcessing?.setCamera(camera);
+      draw();
+      onWalkChange(false);
+    },
+  });
+
+  /** Flies down into first person at a world point; false when hidden or already walking. */
+  const startWalk = (dropPoint: THREE.Vector3, metersPerUnit: number): boolean => {
+    if (!visible || walk.isWalking) {
+      return false;
+    }
+
+    settleViewAnimation?.();
+    controls.enabled = false;
+
+    // The flight starts from where the orthographic view appears to be.
+    if (camera === orthographicCamera) {
+      perspectiveCamera.position
+        .copy(controls.target)
+        .addScaledVector(
+          orthographicCamera.position.clone().sub(controls.target).normalize(),
+          getViewDistance(),
+        );
+      perspectiveCamera.lookAt(controls.target);
+    }
+
+    orbitPose = { position: perspectiveCamera.position.clone(), target: controls.target.clone() };
+    camera = perspectiveCamera;
+    postProcessing?.setCamera(camera);
+    onWalkChange(true);
+    walk.start({ x: dropPoint.x, z: dropPoint.z }, metersPerUnit);
+
+    return true;
+  };
+
   const reset = () => {
     const home = new THREE.Vector3(0, 2.1, 2.5);
 
@@ -878,6 +943,7 @@ export function createTerrain3d(
     surface.frustumCulled = base.frustumCulled = false;
     advanceTransition(transition.startedAtMs);
     renderer.domElement.dataset.terrainTransition = 'morphing';
+    transitionAudio.play();
     updateLoop();
   };
 
@@ -1315,6 +1381,8 @@ export function createTerrain3d(
       if (!value) {
         finishTransition();
         cancelFocusPick?.();
+        // Leaving 3D must release the walk's frame loop, key capture and studio state.
+        walk.stop();
       }
 
       renderer.domElement.hidden = !value;
@@ -1324,6 +1392,11 @@ export function createTerrain3d(
       draw();
     },
     setHeight(value: number, shouldRebuild = true) {
+      // Spike: relief rising or sinking rumbles for as long as it keeps changing.
+      if (visible && value !== exaggeration) {
+        transitionAudio.sustain();
+      }
+
       exaggeration = value;
 
       if (shouldRebuild) {
@@ -1611,6 +1684,14 @@ export function createTerrain3d(
         clientX: bounds.left + ((ndc.x + 1) / 2) * bounds.width,
         clientY: bounds.top + ((1 - ndc.y) / 2) * bounds.height,
       };
+    },
+    walkAt(metersPerUnit, clientX, clientY) {
+      const point =
+        clientX === undefined || clientY === undefined
+          ? controls.target
+          : getTerrainPointAt(clientX, clientY);
+
+      return point !== undefined && startWalk(point, metersPerUnit);
     },
     subscribeDraw(listener) {
       drawListeners.add(listener);

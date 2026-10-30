@@ -22,12 +22,7 @@ void test('a rectangular model shows the crop preview, a width-length pair and s
     'model-base-thickness',
     'model-height-hint',
   ]);
-  assert.deepEqual(listRowIds(groups, 'shape'), [
-    'model-terrain-shape',
-    'model-auto-exaggeration',
-    'model-exaggeration',
-    'model-download-hint',
-  ]);
+  assert.deepEqual(listRowIds(groups, 'shape'), ['model-terrain-shape', 'model-download-hint']);
 
   const markup = renderGroups(groups);
 

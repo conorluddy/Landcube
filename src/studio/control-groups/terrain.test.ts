@@ -87,6 +87,39 @@ void test('loaded real terrain adds its attribution hint', () => {
   assert.match(renderGroups(groups), /Test credit/);
 });
 
+void test('in 3D, height exaggeration follows the area span, and procedural terrain gets the slider', () => {
+  const real = createContext({ selected: 'real', view: '3d' });
+  const realRows = listRowIds(buildTerrainGroups(real.controller, real.state), 'real-location');
+  const spanIndex = realRows.indexOf('terrain-span');
+
+  assert.deepEqual(realRows.slice(spanIndex, spanIndex + 3), [
+    'terrain-span',
+    'model-auto-exaggeration',
+    'model-exaggeration',
+  ]);
+
+  const generated = createContext({ view: '3d' });
+
+  assert.ok(
+    listRowIds(
+      buildTerrainGroups(generated.controller, generated.state),
+      'procedural-landscape',
+    ).includes('model-exaggeration'),
+  );
+});
+
+void test('in 2D, height exaggeration is hidden because it only shapes the 3D model', () => {
+  for (const selected of ['generated', 'real'] as const) {
+    const { controller, state } = createContext({ selected, view: '2d' });
+    const rowIds = buildTerrainGroups(controller, state).flatMap((group) =>
+      listRowIds([group], group.id),
+    );
+
+    assert.ok(!rowIds.includes('model-exaggeration'), `${selected} terrain hides the slider`);
+    assert.ok(!rowIds.includes('model-auto-exaggeration'), `${selected} terrain hides auto height`);
+  }
+});
+
 // === HELPERS ===
 
 interface ContextOverrides {
@@ -94,6 +127,7 @@ interface ContextOverrides {
   terrain?: RealTerrain;
   autoplay?: { enabled: boolean; delaySeconds: number };
   daylightEnabled?: boolean;
+  view?: '2d' | '3d';
 }
 
 function createContext(overrides: ContextOverrides = {}): {
@@ -119,6 +153,7 @@ function createContext(overrides: ContextOverrides = {}): {
     controller,
     state: {
       ...initial,
+      workspace: { ...initial.workspace, view: overrides.view ?? initial.workspace.view },
       source: {
         ...initial.source,
         selected: overrides.selected ?? 'generated',

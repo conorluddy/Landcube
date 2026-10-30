@@ -12,6 +12,7 @@ import type { TerrainRouteOverlay } from '../terrain-3d-route';
 import type { FramePoint } from '../real-terrain-projection';
 import { getAutoRotateSpeed, type TerrainViewPreset } from '../terrain-camera';
 import { createShellMotion } from './shell-motion';
+import { generatedTerrainSpanMeters } from '../constants/grass';
 import { createCameraPosePublisher } from './camera-pose';
 
 interface StudioTerrainView {
@@ -25,6 +26,7 @@ interface StudioTerrainView {
   resetCamera: () => void;
   applyViewPreset: (preset: TerrainViewPreset) => void;
   setCameraDirection: (azimuthDegrees: number, elevationDegrees: number) => void;
+  walkAt: (clientX?: number, clientY?: number) => boolean;
   pickFocus: () => Promise<boolean>;
   captureStill: (scale: number) => HTMLCanvasElement;
   /** Arms a morph for the next 3D rebuild; the 2D view and an inactive 3D view always cut. */
@@ -65,6 +67,7 @@ export function createStudioTerrainView(
   let suspended = false;
   let floorPlace: FloorPlace | undefined;
   let interval: number | undefined;
+  let wasInspectorCollapsed = false;
   // The 3D module loads lazily, so listeners live here and are fanned out from one view subscription.
   const drawListeners = new Set<() => void>();
   const motion = createShellMotion(() => document.querySelector('.studio-shell'));
@@ -192,6 +195,34 @@ export function createStudioTerrainView(
     );
   };
 
+  /** Spike: the model's longer side spans two world units, so a unit covers half the map. */
+  const walkAt = (clientX?: number, clientY?: number): boolean => {
+    const spanKm = controller.getSnapshot().source.terrain?.spanKm;
+    const metersPerUnit = (spanKm === undefined ? generatedTerrainSpanMeters : spanKm * 1000) / 2;
+
+    return active ? (view?.walkAt(metersPerUnit, clientX, clientY) ?? false) : false;
+  };
+
+  document.addEventListener('keydown', (event) => {
+    const isTyping =
+      event.target instanceof HTMLElement &&
+      event.target.closest('input, textarea, select, [contenteditable]') !== null;
+
+    // A modal owns the keyboard; F behind it would walk and grab the pointer unseen.
+    const isDialogOpen = document.querySelector('dialog[open], [role="dialog"]') !== null;
+
+    if (
+      event.code === 'KeyF' &&
+      !isTyping &&
+      !isDialogOpen &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.altKey
+    ) {
+      walkAt();
+    }
+  });
+
   return {
     isActive: () => active,
     async activate(mode: StudioView) {
@@ -205,6 +236,17 @@ export function createStudioTerrainView(
           () => {
             if (view) {
               posePublisher.offer(view.getCameraPose());
+            }
+          },
+          (isWalking) => {
+            // Spike: the inspector and crosshair get out of the way while walking.
+            document.documentElement.toggleAttribute('data-walking', isWalking);
+
+            if (isWalking) {
+              wasInspectorCollapsed = controller.getSnapshot().workspace.collapsed;
+              controller.workspace({ collapsed: true });
+            } else {
+              controller.workspace({ collapsed: wasInspectorCollapsed });
             }
           },
         );
@@ -256,6 +298,7 @@ export function createStudioTerrainView(
     resetCamera: () => view?.reset(),
     applyViewPreset: (preset) => view?.applyViewPreset(preset),
     setCameraDirection: (azimuth, elevation) => view?.setCameraDirection(azimuth, elevation),
+    walkAt,
     pickFocus: () => view?.pickFocus() ?? Promise.resolve(false),
     captureStill(scale) {
       if (!view || !active) {

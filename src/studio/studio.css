@@ -441,3 +441,24 @@ body,
 .studio-shell[data-route-profile] .lc-hud-layer__readout {
   bottom: calc(68px + var(--studio-route-profile-height) + env(safe-area-inset-bottom));
 }
+
+/* Spike: first-person walk key hint, over the 3D canvas whatever the theme. */
+.terrain-walk-hint {
+  position: absolute;
+  bottom: var(--lc-s-6);
+  left: 50%;
+  translate: -50% 0;
+  padding: var(--lc-s-2) var(--lc-s-6);
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.5);
+  color: rgb(255 255 255 / 0.9);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Spike: the map crosshair means nothing at eye level. */
+[data-walking] .lc-crosshair {
+  display: none;
+}

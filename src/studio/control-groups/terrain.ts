@@ -126,6 +126,7 @@ function buildProceduralLandscapeGroup(
       }),
       designRangeRow(controller, state, 'featureScale', 'Feature scale', ' px'),
       designRangeRow(controller, state, 'detail', 'Terrain detail'),
+      is3d(state) && buildExaggerationRow(controller, state),
     ],
   };
 }
@@ -197,6 +198,15 @@ function buildRealLocationGroup(
           controller.source({ spanKm: realTerrainSpanStopsKm[index] });
         },
       },
+      is3d(state) &&
+        toggleRow('model-auto-exaggeration', {
+          label: 'Auto height for location',
+          value: state.model.autoExaggeration,
+          onChange: (autoExaggeration) => {
+            controller.model({ autoExaggeration });
+          },
+        }),
+      is3d(state) && buildExaggerationRow(controller, state),
       numberRow('terrain-max-depth', {
         label: 'Maximum depth below sea level (m)',
         value: source.maxDepth,
@@ -311,4 +321,31 @@ function getNearestSpanStopIndex(spanKm: number): number {
         : nearest,
     0,
   );
+}
+
+// === ROWS ===
+
+/** Height exaggeration only shapes the 3D model, so its rows hide in the 2D plan. */
+function is3d(state: StudioState): boolean {
+  return state.workspace.view === '3d';
+}
+
+/** Relief scale; shared by both terrain sources. The row id stays `model-exaggeration` for e2e. */
+function buildExaggerationRow(
+  controller: StudioController,
+  state: StudioState,
+): ControlGroupDefinition['rows'][number] {
+  return {
+    kind: 'range',
+    id: 'model-exaggeration',
+    label: 'Height exaggeration',
+    value: state.model.exaggeration,
+    min: 0,
+    max: 1,
+    step: 0.05,
+    unit: '×',
+    onChange: (exaggeration) => {
+      controller.model({ exaggeration, autoExaggeration: false });
+    },
+  };
 }

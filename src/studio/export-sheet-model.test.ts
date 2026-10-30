@@ -56,6 +56,7 @@ async function createState(
     modelChanged: noop,
     resetCamera: noop,
     setCameraDirection: () => undefined,
+    walkAt: () => false,
     applyViewPreset: noop,
     pickFocus: () => Promise.resolve(false),
     downloadStill: () => Promise.resolve({ width: 1, height: 1 }),
