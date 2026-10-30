@@ -26,7 +26,7 @@ import {
   type TerrainViewPreset,
   type TurntableDirection,
 } from '../terrain-camera';
-import type { CameraShot, CapturedCameraShot } from '../terrain-camera-shots';
+import type { CameraShot, CameraShotBlocker, CapturedCameraShot } from '../terrain-camera-shots';
 import { terrainMaterialPresets, type LandFinish, type WaterFinish } from '../terrain-materials';
 import {
   copyElevationGradient,
@@ -288,11 +288,10 @@ export interface StudioEffects {
   /** Spike: drops into first person at a viewport point (the orbit centre when omitted); false on a miss. */
   walkAt(clientX?: number, clientY?: number): boolean;
   pickFocus(): Promise<boolean>;
-  /** Undefined while the 3D view is not showing. */
-  captureCameraShot(): { shot: CameraShot; thumbnailUrl: string } | undefined;
-  flyToCameraShot(shot: CameraShot): void;
-  /** False when the 3D view is not showing, so nothing started. */
-  playCameraShots(shots: readonly CameraShot[], onStop: () => void): boolean;
+  /** Shot actions return why the 3D view refused them; undefined (or a capture) when they ran. */
+  captureCameraShot(): { shot: CameraShot; thumbnailUrl: string } | CameraShotBlocker;
+  flyToCameraShot(shot: CameraShot): CameraShotBlocker | undefined;
+  playCameraShots(shots: readonly CameraShot[], onStop: () => void): CameraShotBlocker | undefined;
   stopCameraShots(): void;
   /** Resolves to the saved image's pixel size. */
   downloadStill(scale: TerrainStillScale): Promise<{ width: number; height: number }>;
@@ -452,6 +451,11 @@ export function estimateBinaryStlBytes(part: FramePart): number {
 const daylightFrameMs = 50;
 
 /** Session state is independent of controls, rendering and version-one URL serialization. */
+const cameraShotBlockerMessages: Record<CameraShotBlocker, string> = {
+  'not-3d': 'Switch to the 3D view to use shots',
+  walking: 'Stop walking to use shots',
+};
+
 export function createStudioController(
   actions: DesignControlActions,
   // Roads and place search share one fetch so tests can fake the network once.
@@ -617,15 +621,19 @@ export function createStudioController(
     setCameraShots({ shots });
   };
 
-  const playCameraShotTour = (shots: readonly CapturedCameraShot[]) => {
-    const hasStarted =
-      effects?.playCameraShots(shots, () => {
-        setCameraShots({ isPlaying: false });
-      }) ?? false;
+  /** Starts the looping tour; returns why it could not start. */
+  const playCameraShotTour = (
+    shots: readonly CapturedCameraShot[],
+  ): CameraShotBlocker | undefined => {
+    const blocker = effects
+      ? effects.playCameraShots(shots, () => {
+          setCameraShots({ isPlaying: false });
+        })
+      : 'not-3d';
 
-    setCameraShots({ isPlaying: hasStarted });
+    setCameraShots({ isPlaying: blocker === undefined });
 
-    return hasStarted;
+    return blocker;
   };
 
   /** Shots frame the old landscape, so a new one starts with an empty stack. */
@@ -1719,9 +1727,11 @@ export function createStudioController(
       effects?.resetCamera();
     },
     saveCameraShot() {
-      const captured = effects?.captureCameraShot();
+      const captured = effects?.captureCameraShot() ?? 'not-3d';
 
-      if (!captured) {
+      if (typeof captured === 'string') {
+        notify(cameraShotBlockerMessages[captured]);
+
         return;
       }
 
@@ -1744,8 +1754,10 @@ export function createStudioController(
     flyToCameraShot(id) {
       const shot = state.cameraShots.shots.find((candidate) => candidate.id === id);
 
-      if (shot) {
-        effects?.flyToCameraShot(shot);
+      const blocker = shot && effects?.flyToCameraShot(shot);
+
+      if (blocker) {
+        notify(cameraShotBlockerMessages[blocker]);
       }
     },
     toggleCameraShotPlayback() {
@@ -1763,8 +1775,10 @@ export function createStudioController(
         return;
       }
 
-      if (!playCameraShotTour(shots)) {
-        notify('Switch to the 3D view to play shots');
+      const blocker = playCameraShotTour(shots);
+
+      if (blocker) {
+        notify(cameraShotBlockerMessages[blocker]);
 
         return;
       }

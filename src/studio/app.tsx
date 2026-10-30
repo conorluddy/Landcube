@@ -304,10 +304,11 @@ function Studio({
         isTextField(event.target) ||
         workspace.mode !== 'studio' ||
         workspace.view !== '3d' ||
-        // The export sheet and confirm dialogs own the keyboard; the tour must not start behind them.
+        // Modal surfaces own the keyboard; the tour must not start behind them.
         workspace.exporting ||
+        workspace.dossierOpen ||
         workspace.palette !== null ||
-        document.querySelector('dialog[open], [aria-modal="true"]') !== null
+        workspace.routeReplacement !== null
       ) {
         return;
       }

@@ -22,6 +22,9 @@ export interface CapturedCameraShot extends CameraShot {
   thumbnailUrl: string;
 }
 
+/** Why the 3D view refused a shot action; the studio turns it into a status message. */
+export type CameraShotBlocker = 'not-3d' | 'walking';
+
 export type CameraShotPlayback =
   | { kind: 'idle' }
   | { kind: 'moving'; index: number; startedAtMs: number }

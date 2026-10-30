@@ -17,7 +17,8 @@ export function ShotStrip({
     const nextFocus =
       tiles?.item(index + 1) ??
       tiles?.item(index - 1) ??
-      document.querySelector<HTMLElement>('#director-add-shot button, button#director-add-shot');
+      // `buttonRow` puts the row id on a wrapper around the button (src/ui/control-group.tsx).
+      document.querySelector<HTMLElement>('#director-add-shot button');
 
     controller.removeCameraShot(id);
     nextFocus?.focus();

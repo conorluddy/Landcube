@@ -167,7 +167,8 @@ export interface Terrain3d {
   subscribeDraw(listener: () => void): () => void;
   /** The current view and a small preview drawn from it; undefined while walking. */
   captureCameraShot(): { shot: CameraShot; thumbnailUrl: string } | undefined;
-  flyToCameraShot(shot: CameraShot): void;
+  /** False while walking, when the camera stays put. */
+  flyToCameraShot(shot: CameraShot): boolean;
   /**
    * Tours the shots in a loop until stopped; `onStop` runs however playback ends, e.g. on a drag.
    * False while walking, when nothing starts.
@@ -805,9 +806,10 @@ export function createTerrain3d(
       playback = next;
 
       if (playback.kind === 'moving') {
-        placeCameraShot(
-          interpolateCameraShot(from, shots[playback.index], (now - playback.startedAtMs) / moveMs),
-        );
+        // A zero-length move (reduced motion) would divide by zero.
+        const progress = moveMs === 0 ? 1 : (now - playback.startedAtMs) / moveMs;
+
+        placeCameraShot(interpolateCameraShot(from, shots[playback.index], progress));
       }
 
       frame = requestAnimationFrame(step);
@@ -1905,9 +1907,13 @@ export function createTerrain3d(
       return { shot: getCameraShot(), thumbnailUrl: thumbnail.toDataURL('image/jpeg', 0.8) };
     },
     flyToCameraShot(shot: CameraShot) {
-      if (!walk.isWalking) {
-        runCameraShots([shot], false);
+      if (walk.isWalking) {
+        return false;
       }
+
+      runCameraShots([shot], false);
+
+      return true;
     },
     playCameraShots(shots: readonly CameraShot[], onStop: () => void) {
       if (walk.isWalking) {

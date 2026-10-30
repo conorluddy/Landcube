@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { parseDesignParameters } from '../design-settings';
-import type { CameraShot } from '../terrain-camera-shots';
+import type { CameraShot, CameraShotBlocker } from '../terrain-camera-shots';
 import { createStudioController, type StudioEffects } from './controller';
 
 const view: CameraShot = {
@@ -23,12 +23,29 @@ void test('saving shots numbers them and announces each one', () => {
   assert.equal(controller.getSnapshot().status, 'Shot 2 saved');
 });
 
-void test('saving outside the 3D view does nothing', () => {
-  const { controller } = setup({ isViewShowing: false });
+void test('saving outside the 3D view explains why nothing was saved', () => {
+  const { controller } = setup({ blocker: 'not-3d' });
 
   controller.saveCameraShot();
 
   assert.equal(controller.getSnapshot().cameraShots.shots.length, 0);
+  assert.equal(controller.getSnapshot().status, 'Switch to the 3D view to use shots');
+});
+
+void test('shot actions while walking ask the user to stop walking', () => {
+  const { controller, effects } = setup();
+
+  controller.saveCameraShot();
+  effects.flyToCameraShot = () => 'walking';
+  effects.playCameraShots = () => 'walking';
+  controller.flyToCameraShot(1);
+
+  assert.equal(controller.getSnapshot().status, 'Stop walking to use shots');
+
+  controller.toggleCameraShotPlayback();
+
+  assert.equal(controller.getSnapshot().cameraShots.isPlaying, false);
+  assert.equal(controller.getSnapshot().status, 'Stop walking to use shots');
 });
 
 void test('playing without shots asks for one first', () => {
@@ -45,7 +62,7 @@ void test('play stays off when the 3D view cannot start the tour', () => {
   const { controller, effects } = setup();
 
   controller.saveCameraShot();
-  effects.playCameraShots = () => false;
+  effects.playCameraShots = () => 'not-3d';
   controller.toggleCameraShotPlayback();
 
   assert.equal(controller.getSnapshot().cameraShots.isPlaying, false);
@@ -104,7 +121,7 @@ void test('a new landscape discards the shots', () => {
   assert.equal(controller.getSnapshot().cameraShots.shots.length, 0);
 });
 
-function setup({ isViewShowing = true }: { isViewShowing?: boolean } = {}) {
+function setup({ blocker }: { blocker?: CameraShotBlocker } = {}) {
   const parsed = parseDesignParameters(new URLSearchParams('v=1&seed=123'));
 
   assert.ok(parsed.ok);
@@ -122,15 +139,20 @@ function setup({ isViewShowing = true }: { isViewShowing?: boolean } = {}) {
     applyViewPreset: () => undefined,
     pickFocus: () => Promise.resolve(false),
     walkAt: () => false,
-    captureCameraShot: () => (isViewShowing ? { shot: view, thumbnailUrl: '' } : undefined),
-    flyToCameraShot: () => undefined,
+    captureCameraShot: () => blocker ?? { shot: view, thumbnailUrl: '' },
+    flyToCameraShot: () => blocker,
     playCameraShots: (shots, onStop) => {
       // Like the renderer, a new tour ends the running one first.
       onTourStop();
+
+      if (blocker) {
+        return blocker;
+      }
+
       played.push(shots);
       onTourStop = onStop;
 
-      return true;
+      return undefined;
     },
     stopCameraShots: () => {
       stops.count++;
