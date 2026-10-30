@@ -10,19 +10,6 @@ function readoutCard(page: Page) {
   return page.getByRole('region', { name: 'Target lock' });
 }
 
-/** Drags across the 3D canvas in small steps, like a hand orbiting the camera. */
-async function orbitDrag(page: Page, distancePx: number, steps: number): Promise<void> {
-  await page.mouse.move(450, 400);
-  await page.mouse.down();
-
-  for (let step = 1; step <= steps; step++) {
-    await page.mouse.move(450 + (distancePx * step) / steps, 400);
-    await page.waitForTimeout(16);
-  }
-
-  await page.mouse.up();
-}
-
 test('the Target lock card shows on desktop and leaves the page on short or phone viewports', async ({
   page,
 }) => {
@@ -83,36 +70,18 @@ test('real terrain shows its source and attribution in the card and footer', asy
   await expect(page.locator('details.mobile-attribution')).toHaveCount(1);
 });
 
-test('the compass turns with an orbit drag and pose updates stay at 20 a second', async ({
-  page,
-}) => {
+test('the compass turns with an orbit drag', async ({ page }) => {
   await openDefaultStudio(page);
   const compass = page.locator('[data-hud] .lc-compass');
 
   await expect(compass).toHaveAttribute('data-azimuth', /\d+/);
   const before = await compass.getAttribute('data-azimuth');
 
-  await compass.evaluate((element) => {
-    const times: number[] = [];
-
-    new MutationObserver(() => times.push(performance.now())).observe(element, {
-      attributes: true,
-      attributeFilter: ['data-azimuth'],
-    });
-    Object.assign(window, { compassUpdateTimes: times });
-  });
-  await orbitDrag(page, 600, 60);
+  // Rate limiting is covered with a fake clock in camera-pose.test.ts; software WebGL
+  // runners need only prove that a real pointer gesture reaches the compass.
+  await page.mouse.move(450, 400);
+  await page.mouse.down();
+  await page.mouse.move(650, 400, { steps: 4 });
+  await page.mouse.up();
   await expect.poll(() => compass.getAttribute('data-azimuth')).not.toBe(before);
-
-  const updateTimes = await page.evaluate(
-    () => (window as unknown as { compassUpdateTimes: number[] }).compassUpdateTimes,
-  );
-  const gapsMs = updateTimes.slice(1).map((time, index) => time - updateTimes[index]);
-  // Commits land a millisecond either side of the 50ms publish spacing, so check the mean rate.
-  const updatesPerSecond =
-    (gapsMs.length * 1000) / (updateTimes[updateTimes.length - 1] - updateTimes[0]);
-
-  expect(updateTimes.length).toBeGreaterThan(10);
-  expect(updatesPerSecond).toBeLessThanOrEqual(20.5);
-  expect(Math.min(...gapsMs)).toBeGreaterThan(40);
 });
