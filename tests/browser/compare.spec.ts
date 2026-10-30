@@ -146,9 +146,11 @@ test('Cancel and Escape restore the original design', async ({ page }) => {
 test('in 3D the strip stays, the wipe is hidden and a hint explains', async ({ page }) => {
   await openStrip(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
+  // Lazy 3D startup can exceed the default assertion timeout with software WebGL on CI.
   await expect(page.getByRole('button', { name: '3D', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
+    { timeout: 20_000 },
   );
   await expect(strip(page).getByText('A/B compare is 2D only')).toBeVisible();
   await strip(page).getByRole('button', { name: 'Paper', exact: true }).click();
