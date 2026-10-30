@@ -24,11 +24,17 @@ export interface HudSnapshot {
   generatedReliefMeters?: ElevationRangeMeters;
 }
 
+/** The place under a viewport (client) point: the 2D plane, or the 3D surface by ray cast. */
+export type ClientPointLocator = (clientX: number, clientY: number) => MapLocation | undefined;
+
 export interface HudStore {
   getSnapshot: () => HudSnapshot;
   subscribe: (listener: () => void) => () => void;
   setPointer: (pointer: HudPointer) => void;
   setGeneratedRelief: (relief: ElevationRangeMeters | undefined) => void;
+  /** Locates a point on demand for the measure tool; undefined until `src/main.ts` provides one. */
+  locateClientPoint: ClientPointLocator;
+  setLocator: (locator: ClientPointLocator) => void;
 }
 
 export const awayPointer: HudPointer = Object.freeze({ kind: 'away' });
@@ -37,6 +43,7 @@ export const awayPointer: HudPointer = Object.freeze({ kind: 'away' });
 
 export function createHudStore(): HudStore {
   let snapshot: HudSnapshot = { pointer: awayPointer };
+  let locator: ClientPointLocator | undefined;
   const listeners = new Set<() => void>();
 
   const update = (patch: Partial<HudSnapshot>) => {
@@ -71,6 +78,10 @@ export function createHudStore(): HudStore {
       }
 
       update({ generatedReliefMeters: relief });
+    },
+    locateClientPoint: (clientX, clientY) => locator?.(clientX, clientY),
+    setLocator(nextLocator) {
+      locator = nextLocator;
     },
   };
 }

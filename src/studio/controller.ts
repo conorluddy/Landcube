@@ -155,6 +155,8 @@ export interface TerrainSourceState {
   autoplay: { enabled: boolean; delaySeconds: number };
 }
 export type StudioPage = 'studio' | 'library' | 'presets' | 'account';
+/** The active on-canvas tool; `none` leaves every canvas pointer event to the terrain. */
+export type ToolMode = 'none' | 'crop' | 'measure' | 'presets' | 'route';
 
 export interface StudioState {
   design: ValidatedDesignSettings;
@@ -188,6 +190,8 @@ export interface StudioState {
     page: StudioPage;
     /** False only on a phone's first visit of the session; see `src/studio/pages/splash-session.ts`. */
     hasSeenSplash: boolean;
+    /** Session-only. Crop applies to the 3D model, so the crop frame shows only in 3D. */
+    toolMode: ToolMode;
   };
   seedLocked: boolean;
   status: string;
@@ -398,6 +402,7 @@ export function createStudioController(
       palette: null,
       page: 'studio',
       hasSeenSplash: true,
+      toolMode: 'none',
     },
     seedLocked: actions.isSeedLocked,
     status: '',

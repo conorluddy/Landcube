@@ -15,6 +15,7 @@ import {
 import { describeSheetReadouts, describeTarget } from './hud-readouts';
 import type { HudStore } from './hud-store';
 import { studioSections } from './sections';
+import { getActiveTool } from './studio-tools';
 import { StudioSheetStatus } from './studio-footer';
 
 /** Clears the one-row phone header (12px inset + 40px bar + 12px gap). */
@@ -87,7 +88,7 @@ export function StudioSheet({
 
 /**
  * Phone map controls (P-04 in a mobile FloatingBar) down the right edge: reset the 3D camera,
- * Overlays, the command palette, and Orbit in 3D. Hidden while the sheet is full (CSS on `[data-sheet-snap]`).
+ * Overlays, the command palette, the crop (3D) and measure tools, and Orbit in 3D. Hidden while the sheet is full (CSS on `[data-sheet-snap]`).
  */
 export function StudioMapControls({
   controller: c,
@@ -127,6 +128,23 @@ export function StudioMapControls({
           c.workspace({ palette: { query: '' } });
         }}
       />
+      <IconButton
+        glyph="◢"
+        label="Crop tool"
+        isActive={getActiveTool(state) === 'crop'}
+        disabled={!is3d}
+        onClick={() => {
+          toggleTool(c, state, 'crop');
+        }}
+      />
+      <IconButton
+        glyph="↔"
+        label="Measure tool"
+        isActive={getActiveTool(state) === 'measure'}
+        onClick={() => {
+          toggleTool(c, state, 'measure');
+        }}
+      />
       {is3d && (
         <IconButton
           glyph="⌖"
@@ -143,6 +161,15 @@ export function StudioMapControls({
 }
 
 // === HELPERS ===
+
+/** The phone mode bar: a tool drops the sheet to peek so the canvas is free to work on. */
+function toggleTool(c: StudioController, state: StudioState, tool: 'crop' | 'measure'): void {
+  if (getActiveTool(state) === tool) {
+    c.workspace({ toolMode: 'none' });
+  } else {
+    c.workspace({ toolMode: tool, sheetSnap: 'peek' });
+  }
+}
 
 /** Readouts the desktop Target lock card shows, cut to three, beside the Export action. */
 function SheetPeek({

@@ -659,9 +659,29 @@ function locatePointer(
     return previous.kind === 'tracking' ? previous.location : undefined;
   }
 
-  const fraction = terrain3d.getSurfaceFractionAt(event.clientX, event.clientY);
+  return locateModelSurfacePoint(event.clientX, event.clientY);
+}
+
+/** The place on the 3D model under a viewport point; undefined over sky or before the model. */
+function locateModelSurfacePoint(clientX: number, clientY: number): MapLocation | undefined {
+  const fraction = terrain3d.getSurfaceFractionAt(clientX, clientY);
 
   return fraction && modelPlacement ? locateModelFraction(fraction, modelPlacement) : undefined;
+}
+
+/** The measure tool locates its endpoints on demand, with the same mapping as the coordinate tip. */
+function locateClientPoint(clientX: number, clientY: number): MapLocation | undefined {
+  if (terrain3d.isActive()) {
+    return locateModelSurfacePoint(clientX, clientY);
+  }
+
+  const bounds = terrainSvgElement.getBoundingClientRect();
+
+  return locateViewportPoint(
+    { x: clientX - bounds.left, y: clientY - bounds.top },
+    { width, height },
+    realTerrain,
+  );
 }
 
 /** Generated terrain's elevation range on its nominal relief, recomputed when the field changes. */
@@ -752,6 +772,7 @@ controls.workspace({
     browserSessionStorage,
   ),
 });
+hud.setLocator(locateClientPoint);
 mountStudio(controls, terrainSvgElement, outputRenderer, cropPreview, hud);
 const viewport = getRequiredElement(document, '#studio-viewport', HTMLElement);
 

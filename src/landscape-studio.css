@@ -467,6 +467,13 @@ body,
   left: var(--lc-s-6);
   z-index: 3;
 }
+/* Crop / measure tool pill (#102): inside the HUD frame's top left, under its camera readouts. */
+.studio-tool-bar {
+  position: absolute;
+  top: 112px;
+  left: 36px;
+  z-index: 2;
+}
 #studio-inspector {
   position: absolute;
   top: 60px;
@@ -639,6 +646,10 @@ body,
     right: auto;
     bottom: calc(var(--studio-sheet-height, 0px) + var(--studio-tab-bar-height) + var(--lc-s-6));
     left: var(--lc-s-6);
+  }
+  /* The crop plane sits under the header, left of the map controls and above the sheet and scale bar. */
+  .studio-shell[data-sheet-snap] .lc-hud-layer__tools .lc-crop-frame {
+    inset: 64px 68px calc(var(--studio-sheet-height, 0px) + var(--studio-tab-bar-height) + 56px) 0;
   }
   /* The map controls' Reset view button stands in for the drawn compass. */
   .studio-shell[data-sheet-snap] .lc-hud-layer__instruments .lc-compass,

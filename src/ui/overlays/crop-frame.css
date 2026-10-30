@@ -1,0 +1,218 @@
+/*
+ * O-04 CropFrame: the source plane fitted at its own ratio, the selection with thirds at bone 0.25,
+ * a 50% darkened surround, a dimension label above and 24px handles with 3px strokes. Only the
+ * handles take the pointer.
+ */
+.lc-crop-frame {
+  --lc-crop-mark: var(--lc-bone);
+
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  padding: 28px var(--lc-s-6) var(--lc-s-6);
+  container-type: size;
+  pointer-events: none;
+}
+
+.lc-crop-frame__plane {
+  position: relative;
+  width: min(100cqw, 100cqh * var(--lc-crop-plane-ratio, 1));
+  height: min(100cqh, 100cqw / var(--lc-crop-plane-ratio, 1));
+  outline: 1px dashed color-mix(in srgb, var(--lc-crop-mark) 40%, transparent);
+}
+
+.lc-crop-frame__selection {
+  position: absolute;
+  top: var(--lc-crop-y);
+  left: var(--lc-crop-x);
+  box-sizing: border-box;
+  width: var(--lc-crop-width);
+  height: var(--lc-crop-height);
+  border: 1px solid var(--lc-crop-mark);
+  box-shadow: 0 0 0 100vmax var(--lc-crop-surround);
+}
+
+.lc-crop-frame[data-shape='circle'] .lc-crop-frame__selection {
+  border-radius: 50%;
+}
+
+.lc-crop-frame__thirds {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      90deg,
+      transparent calc(100% / 3 - 0.5px),
+      var(--lc-crop-thirds) 0 calc(100% / 3 + 0.5px),
+      transparent 0 calc(200% / 3 - 0.5px),
+      var(--lc-crop-thirds) 0 calc(200% / 3 + 0.5px),
+      transparent 0
+    ),
+    linear-gradient(
+      180deg,
+      transparent calc(100% / 3 - 0.5px),
+      var(--lc-crop-thirds) 0 calc(100% / 3 + 0.5px),
+      transparent 0 calc(200% / 3 - 0.5px),
+      var(--lc-crop-thirds) 0 calc(200% / 3 + 0.5px),
+      transparent 0
+    );
+
+  --lc-crop-thirds: color-mix(in srgb, var(--lc-crop-mark) 25%, transparent);
+}
+
+.lc-crop-frame__label {
+  position: absolute;
+  bottom: calc(100% + var(--lc-s-4));
+  left: 50%;
+  padding: 3px var(--lc-s-3);
+  background: var(--lc-glass-tip);
+  color: var(--lc-text-strong);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--lc-track-ui);
+  line-height: 12px;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.lc-crop-frame__handle {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: none;
+  transform: translate(-50%, -50%);
+}
+
+.lc-crop-frame__handle::before {
+  position: absolute;
+  box-sizing: border-box;
+  border: 0 solid var(--lc-crop-mark);
+  content: '';
+}
+
+.lc-crop-frame__handle:focus-visible {
+  outline: 1px solid var(--lc-line-focus);
+  outline-offset: 0;
+}
+
+.lc-crop-frame__handle[data-handle='top-left'] {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+
+.lc-crop-frame__handle[data-handle='top'] {
+  top: 0;
+  left: 50%;
+  cursor: ns-resize;
+}
+
+.lc-crop-frame__handle[data-handle='top-right'] {
+  top: 0;
+  left: 100%;
+  cursor: nesw-resize;
+}
+
+.lc-crop-frame__handle[data-handle='right'] {
+  top: 50%;
+  left: 100%;
+  cursor: ew-resize;
+}
+
+.lc-crop-frame__handle[data-handle='bottom-right'] {
+  top: 100%;
+  left: 100%;
+  cursor: nwse-resize;
+}
+
+.lc-crop-frame__handle[data-handle='bottom'] {
+  top: 100%;
+  left: 50%;
+  cursor: ns-resize;
+}
+
+.lc-crop-frame__handle[data-handle='bottom-left'] {
+  top: 100%;
+  left: 0;
+  cursor: nesw-resize;
+}
+
+.lc-crop-frame__handle[data-handle='left'] {
+  top: 50%;
+  left: 0;
+  cursor: ew-resize;
+}
+
+/* Corner marks are 12px Ls whose outer corner sits on the selection's corner. */
+.lc-crop-frame__handle[data-handle$='left']:not([data-handle='left'])::before,
+.lc-crop-frame__handle[data-handle$='right']:not([data-handle='right'])::before {
+  width: 12px;
+  height: 12px;
+}
+
+.lc-crop-frame__handle[data-handle='top-left']::before {
+  top: 11px;
+  left: 11px;
+  border-top-width: 3px;
+  border-left-width: 3px;
+}
+
+.lc-crop-frame__handle[data-handle='top-right']::before {
+  top: 11px;
+  right: 11px;
+  border-top-width: 3px;
+  border-right-width: 3px;
+}
+
+.lc-crop-frame__handle[data-handle='bottom-right']::before {
+  right: 11px;
+  bottom: 11px;
+  border-right-width: 3px;
+  border-bottom-width: 3px;
+}
+
+.lc-crop-frame__handle[data-handle='bottom-left']::before {
+  bottom: 11px;
+  left: 11px;
+  border-bottom-width: 3px;
+  border-left-width: 3px;
+}
+
+.lc-crop-frame__handle[data-handle='top']::before,
+.lc-crop-frame__handle[data-handle='bottom']::before {
+  top: 10px;
+  left: 4px;
+  width: 16px;
+  height: 3px;
+  background: var(--lc-crop-mark);
+}
+
+.lc-crop-frame__handle[data-handle='left']::before,
+.lc-crop-frame__handle[data-handle='right']::before {
+  top: 4px;
+  left: 10px;
+  width: 3px;
+  height: 16px;
+  background: var(--lc-crop-mark);
+}
+
+@media (forced-colors: active) {
+  .lc-crop-frame {
+    --lc-crop-mark: CanvasText;
+  }
+
+  .lc-crop-frame__label {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+}

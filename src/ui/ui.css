@@ -82,6 +82,9 @@
 @import './detachable-panel.css';
 
 /* #21–23 tool overlays */
+@import './overlays/crop-frame.css';
+@import './overlays/measure-line.css';
+@import './overlays/callout-label.css';
 
 /* #24 dossier */
 @import './model-dossier.css';

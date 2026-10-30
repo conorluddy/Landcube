@@ -23,6 +23,7 @@ import { StudioFooter } from './studio-footer';
 import { StudioMapControls, StudioSheet } from './studio-sheet';
 import { ViewportStates } from './viewport-states';
 import { StudioHud } from './studio-hud';
+import { StudioToolBar } from './studio-tools';
 import type { HudStore } from './hud-store';
 import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
@@ -239,7 +240,7 @@ function Studio({
         aria-label={`${state.workspace.view.toUpperCase()} landscape viewport`}
       />
       <ViewportStates controller={c} state={state} />
-      <StudioHud state={state} hud={hud} />
+      <StudioHud controller={c} state={state} hud={hud} />
       {isPhoneViewport ? (
         <>
           <StudioMapControls controller={c} state={state} />
@@ -275,6 +276,7 @@ function Studio({
             }
           />
           <StudioPinnedPanels controller={c} state={state} cropPreview={cropPreview} />
+          <StudioToolBar controller={c} state={state} />
           <StudioFooter
             controller={c}
             state={state}
