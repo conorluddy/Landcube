@@ -3,8 +3,11 @@ import * as THREE from 'three';
 /** Spike: a pointer-locked WASD stroll that keeps the camera standing on the terrain. */
 export interface TerrainWalk {
   readonly isWalking: boolean;
-  /** Flies down to stand at world x/z (the centre when off the model), then hands over the controls. */
-  start(dropPoint: { x: number; z: number }): void;
+  /**
+   * Flies down to stand at world x/z (the centre when off the model), then hands over the controls.
+   * `metersPerUnit` is the real ground distance one world unit covers, for a human eye height.
+   */
+  start(dropPoint: { x: number; z: number }, metersPerUnit: number): void;
   stop(): void;
 }
 
@@ -17,17 +20,21 @@ interface TerrainWalkOptions {
   onStop: () => void;
 }
 
-const eyeHeight = 0.004;
-const walkSpeedPerSecond = 0.04;
-// A floaty hop: peaks at three quarters of eye height and lands after 0.6 s.
-const jumpPeakHeight = eyeHeight * 0.75;
-const jumpAirtimeSeconds = 0.6;
-const gravityPerSecondSquared = (8 * jumpPeakHeight) / jumpAirtimeSeconds ** 2;
-const jumpSpeedPerSecond = (gravityPerSecondSquared * jumpAirtimeSeconds) / 2;
+const eyeHeightMeters = 1.7;
+/**
+ * Big maps have coarse triangles a real eye would sink into, so the eye never drops below this many
+ * world units: real height up to roughly an 11 km map, then a rising drone.
+ */
+const minimumEyeHeightUnits = 0.0003;
+// Speed and jump scale with the eye, so a stroll feels the same on any map: about 5 m/s at 1.7 m.
+const walkEyeHeightsPerSecond = 3;
 const sprintMultiplier = 4;
+// A floaty hop: peaks at three quarters of eye height and lands after 0.6 s.
+const jumpPeakEyeHeights = 0.75;
+const jumpAirtimeSeconds = 0.6;
 const lookRadiansPerPixel = 0.002;
-// A tight near/far ratio keeps depth precision at eye level.
-const walkNearPlane = 0.0002;
+// A near plane a fraction of the eye height keeps the ground unclipped with a tight near/far ratio.
+const nearPlaneEyeHeights = 0.2;
 const walkFarPlane = 6;
 // Wider than the studio lens, like a game's eye; about an 18 mm full-frame lens.
 const walkFovDegrees = 70;
@@ -36,10 +43,32 @@ const landingDurationMs = 1200;
 interface Landing {
   startedAtMs: number;
   from: { position: THREE.Vector3; quaternion: THREE.Quaternion; near: number; fov: number };
-  to: { position: THREE.Vector3; quaternion: THREE.Quaternion };
+  to: { position: THREE.Vector3; quaternion: THREE.Quaternion; near: number };
+}
+
+/** World-unit sizes for one walk, derived from the map's real scale. */
+export interface WalkScale {
+  eyeHeight: number;
+  walkSpeedPerSecond: number;
+  jumpSpeedPerSecond: number;
+  gravityPerSecondSquared: number;
+  nearPlane: number;
 }
 
 // === PUBLIC API ===
+
+export function getWalkScale(metersPerUnit: number): WalkScale {
+  const eyeHeight = Math.max(eyeHeightMeters / metersPerUnit, minimumEyeHeightUnits);
+  const gravityPerSecondSquared = (8 * jumpPeakEyeHeights * eyeHeight) / jumpAirtimeSeconds ** 2;
+
+  return {
+    eyeHeight,
+    walkSpeedPerSecond: walkEyeHeightsPerSecond * eyeHeight,
+    jumpSpeedPerSecond: (gravityPerSecondSquared * jumpAirtimeSeconds) / 2,
+    gravityPerSecondSquared,
+    nearPlane: nearPlaneEyeHeights * eyeHeight,
+  };
+}
 
 export function createTerrainWalk(options: TerrainWalkOptions): TerrainWalk {
   const { camera, canvas } = options;
@@ -50,6 +79,7 @@ export function createTerrainWalk(options: TerrainWalkOptions): TerrainWalk {
   let savedLens = { near: camera.near, far: camera.far, fov: camera.fov };
   let isWalking = false;
   let landing: Landing | undefined;
+  let scale = getWalkScale(1);
   let isLookInverted = false;
   /** Height above the ground while airborne; undefined when standing. */
   let jump: { height: number; speedPerSecond: number } | undefined;
@@ -81,7 +111,7 @@ export function createTerrainWalk(options: TerrainWalkOptions): TerrainWalk {
     if (event.key === 'Escape') {
       stop();
     } else if (event.code === 'Space' && !jump && !landing) {
-      jump = { height: 0, speedPerSecond: jumpSpeedPerSecond };
+      jump = { height: 0, speedPerSecond: scale.jumpSpeedPerSecond };
     } else if (event.code === 'KeyI' && !event.repeat) {
       isLookInverted = !isLookInverted;
       updateHint();
@@ -113,28 +143,29 @@ export function createTerrainWalk(options: TerrainWalkOptions): TerrainWalk {
       flyLanding(camera, landing, nowMs);
       landing = nowMs - landing.startedAtMs >= landingDurationMs ? undefined : landing;
     } else {
-      stepCamera(camera, heldKeys, elapsedSeconds, options.getGroundHeight);
-      jump = advanceJump(jump, elapsedSeconds);
+      stepCamera(camera, heldKeys, elapsedSeconds, options.getGroundHeight, scale);
+      jump = advanceJump(jump, elapsedSeconds, scale.gravityPerSecondSquared);
       // Standing still, the walker rides the ground as a new landscape morphs underneath.
-      followGround(camera, options.getGroundHeight, jump?.height ?? 0);
+      followGround(camera, options.getGroundHeight, jump?.height ?? 0, scale.eyeHeight);
     }
 
     options.onFrame();
     frame = requestAnimationFrame(tick);
   };
 
-  const start = (dropPoint: { x: number; z: number }) => {
+  const start = (dropPoint: { x: number; z: number }, metersPerUnit: number) => {
     if (isWalking) {
       return;
     }
 
     isWalking = true;
+    scale = getWalkScale(metersPerUnit);
     savedLens = { near: camera.near, far: camera.far, fov: camera.fov };
     camera.far = walkFarPlane;
     camera.updateProjectionMatrix();
     updateHint();
     canvas.parentElement?.append(hint);
-    landing = planLanding(camera, dropPoint, options.getGroundHeight);
+    landing = planLanding(camera, dropPoint, options.getGroundHeight, scale);
     void canvas.requestPointerLock();
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('keydown', onKeyDown, true);
@@ -187,6 +218,7 @@ function stepCamera(
   heldKeys: ReadonlySet<string>,
   elapsedSeconds: number,
   getGroundHeight: TerrainWalkOptions['getGroundHeight'],
+  scale: WalkScale,
 ) {
   const isHeld = (...codes: string[]) => codes.some((code) => heldKeys.has(code));
   const forwardInput = Number(isHeld('KeyW', 'ArrowUp')) - Number(isHeld('KeyS', 'ArrowDown'));
@@ -198,7 +230,8 @@ function stepCamera(
 
   const forward = camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize();
   const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
-  const speed = walkSpeedPerSecond * (isHeld('ShiftLeft', 'ShiftRight') ? sprintMultiplier : 1);
+  const speed =
+    scale.walkSpeedPerSecond * (isHeld('ShiftLeft', 'ShiftRight') ? sprintMultiplier : 1);
   const step = forward
     .multiplyScalar(forwardInput)
     .addScaledVector(right, strafeInput)
@@ -221,6 +254,7 @@ function followGround(
   camera: THREE.PerspectiveCamera,
   getGroundHeight: TerrainWalkOptions['getGroundHeight'],
   jumpHeight: number,
+  eyeHeight: number,
 ) {
   const ground = getGroundHeight(camera.position.x, camera.position.z);
 
@@ -233,6 +267,7 @@ function followGround(
 function advanceJump(
   jump: { height: number; speedPerSecond: number } | undefined,
   elapsedSeconds: number,
+  gravityPerSecondSquared: number,
 ) {
   if (!jump) {
     return undefined;
@@ -249,6 +284,7 @@ function planLanding(
   camera: THREE.PerspectiveCamera,
   dropPoint: { x: number; z: number },
   getGroundHeight: TerrainWalkOptions['getGroundHeight'],
+  { eyeHeight, nearPlane }: WalkScale,
 ): Landing {
   const ground = getGroundHeight(dropPoint.x, dropPoint.z);
   const standing = camera.clone();
@@ -275,7 +311,7 @@ function planLanding(
       near: camera.near,
       fov: camera.fov,
     },
-    to: { position: standing.position, quaternion: standing.quaternion },
+    to: { position: standing.position, quaternion: standing.quaternion, near: nearPlane },
   };
 }
 
@@ -288,7 +324,7 @@ function flyLanding(camera: THREE.PerspectiveCamera, landing: Landing, nowMs: nu
   camera.position.lerpVectors(landing.from.position, landing.to.position, eased);
   camera.quaternion.slerpQuaternions(landing.from.quaternion, landing.to.quaternion, levelling);
   // Shrinks the near plane geometrically so depth precision tracks the camera's distance.
-  camera.near = landing.from.near * (walkNearPlane / landing.from.near) ** eased;
+  camera.near = landing.from.near * (landing.to.near / landing.from.near) ** eased;
   // Widening from the studio lens to the eye reads as zooming out into first person.
   camera.fov = THREE.MathUtils.lerp(landing.from.fov, walkFovDegrees, eased);
   camera.updateProjectionMatrix();

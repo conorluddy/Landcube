@@ -12,6 +12,7 @@ import type { TerrainRouteOverlay } from '../terrain-3d-route';
 import type { FramePoint } from '../real-terrain-projection';
 import { getAutoRotateSpeed, type TerrainViewPreset } from '../terrain-camera';
 import { createShellMotion } from './shell-motion';
+import { generatedTerrainSpanMeters } from '../constants/grass';
 import { createCameraPosePublisher } from './camera-pose';
 
 interface StudioTerrainView {
@@ -194,6 +195,24 @@ export function createStudioTerrainView(
     );
   };
 
+  /** Spike: the model's longer side spans two world units, so a unit covers half the map. */
+  const walkAt = (clientX?: number, clientY?: number): boolean => {
+    const spanKm = controller.getSnapshot().source.terrain?.spanKm;
+    const metersPerUnit = (spanKm === undefined ? generatedTerrainSpanMeters : spanKm * 1000) / 2;
+
+    return active ? (view?.walkAt(metersPerUnit, clientX, clientY) ?? false) : false;
+  };
+
+  document.addEventListener('keydown', (event) => {
+    const isTyping =
+      event.target instanceof HTMLElement &&
+      event.target.closest('input, textarea, select, [contenteditable]') !== null;
+
+    if (event.code === 'KeyF' && !isTyping && !event.metaKey && !event.ctrlKey) {
+      walkAt();
+    }
+  });
+
   return {
     isActive: () => active,
     async activate(mode: StudioView) {
@@ -269,7 +288,7 @@ export function createStudioTerrainView(
     resetCamera: () => view?.reset(),
     applyViewPreset: (preset) => view?.applyViewPreset(preset),
     setCameraDirection: (azimuth, elevation) => view?.setCameraDirection(azimuth, elevation),
-    walkAt: (clientX, clientY) => (active ? (view?.walkAt(clientX, clientY) ?? false) : false),
+    walkAt,
     pickFocus: () => view?.pickFocus() ?? Promise.resolve(false),
     captureStill(scale) {
       if (!view || !active) {

@@ -155,7 +155,7 @@ export interface Terrain3d {
    */
   projectCropPointToClient(point: FramePoint): { clientX: number; clientY: number } | undefined;
   /** Spike: walks from the terrain under a viewport point, or the orbit centre when omitted; false on a miss. */
-  walkAt(clientX?: number, clientY?: number): boolean;
+  walkAt(metersPerUnit: number, clientX?: number, clientY?: number): boolean;
   /** Runs after every drawn frame (orbit, presets, turntable, rebuilds); returns an unsubscribe. */
   subscribeDraw(listener: () => void): () => void;
 }
@@ -761,7 +761,7 @@ export function createTerrain3d(
     draw();
   });
 
-  // Spike: F drops into first person at the orbit target; Esc returns to the saved orbit pose.
+  // Spike: first person drops in at a terrain point; Esc returns to the saved orbit pose.
   const downRay = new THREE.Raycaster();
   let orbitPose: { position: THREE.Vector3; target: THREE.Vector3 } | undefined;
   const walk = createTerrainWalk({
@@ -790,18 +790,8 @@ export function createTerrain3d(
     },
   });
 
-  document.addEventListener('keydown', (event) => {
-    const isTyping =
-      event.target instanceof HTMLElement &&
-      event.target.closest('input, textarea, select, [contenteditable]') !== null;
-
-    if (event.code === 'KeyF' && !isTyping && !event.metaKey && !event.ctrlKey) {
-      startWalk(controls.target);
-    }
-  });
-
   /** Flies down into first person at a world point; false when hidden or already walking. */
-  const startWalk = (dropPoint: THREE.Vector3): boolean => {
+  const startWalk = (dropPoint: THREE.Vector3, metersPerUnit: number): boolean => {
     if (!visible || walk.isWalking) {
       return false;
     }
@@ -824,7 +814,7 @@ export function createTerrain3d(
     camera = perspectiveCamera;
     postProcessing?.setCamera(camera);
     onWalkChange(true);
-    walk.start({ x: dropPoint.x, z: dropPoint.z });
+    walk.start({ x: dropPoint.x, z: dropPoint.z }, metersPerUnit);
 
     return true;
   };
@@ -1688,13 +1678,13 @@ export function createTerrain3d(
         clientY: bounds.top + ((1 - ndc.y) / 2) * bounds.height,
       };
     },
-    walkAt(clientX, clientY) {
+    walkAt(metersPerUnit, clientX, clientY) {
       const point =
         clientX === undefined || clientY === undefined
           ? controls.target
           : getTerrainPointAt(clientX, clientY);
 
-      return point !== undefined && startWalk(point);
+      return point !== undefined && startWalk(point, metersPerUnit);
     },
     subscribeDraw(listener) {
       drawListeners.add(listener);
