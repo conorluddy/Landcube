@@ -131,6 +131,7 @@ export interface Terrain3d {
   setRotating(value: boolean): void;
   setRotationSpeed(value: number): void;
   applyViewPreset(preset: TerrainViewPreset): void;
+  setCameraDirection(azimuthDegrees: number, elevationDegrees: number): void;
   /** Waits for a click on the terrain; resolves false if cancelled with Escape or a miss. */
   pickFocus(): Promise<boolean>;
   /** Renders the current view at `scale` × its on-screen CSS size into a new 2D canvas. */
@@ -1684,6 +1685,15 @@ export function createTerrain3d(
         new THREE.Vector3().setFromSphericalCoords(
           1,
           THREE.MathUtils.degToRad(polarDegrees),
+          THREE.MathUtils.degToRad(azimuthDegrees),
+        ),
+      );
+    },
+    setCameraDirection(azimuthDegrees: number, elevationDegrees: number) {
+      animateCameraDirection(
+        new THREE.Vector3().setFromSphericalCoords(
+          1,
+          THREE.MathUtils.degToRad(90 - elevationDegrees),
           THREE.MathUtils.degToRad(azimuthDegrees),
         ),
       );

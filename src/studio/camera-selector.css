@@ -1,0 +1,85 @@
+.camera-selector {
+  position: relative;
+  pointer-events: auto;
+}
+
+.camera-selector__toggle {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--lc-line);
+  border-radius: 50%;
+  color: var(--lc-text-primary);
+  background: var(--lc-glass-tip);
+  cursor: pointer;
+}
+
+.camera-selector__toggle:focus-visible {
+  outline: 2px solid var(--lc-line-focus);
+  outline-offset: 2px;
+}
+
+.camera-selector__dial {
+  position: absolute;
+  right: 0;
+  bottom: 44px;
+  width: 220px;
+  height: 220px;
+  overflow: visible;
+  filter: drop-shadow(var(--lc-shadow-panel));
+  transform-origin: calc(100% - 18px) calc(100% + 18px);
+  animation: camera-selector-open 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes camera-selector-open {
+  from {
+    opacity: 0;
+    transform: scale(0.16);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .camera-selector__dial {
+    animation: none;
+  }
+}
+
+.camera-selector__dial path,
+.camera-selector__dial circle {
+  fill: var(--lc-glass-tip);
+  stroke: var(--lc-line-strong);
+  stroke-width: 1;
+  cursor: pointer;
+  outline: none;
+}
+
+.camera-selector__dial path:hover,
+.camera-selector__dial path:focus,
+.camera-selector__dial circle:hover,
+.camera-selector__dial circle:focus {
+  fill: var(--lc-ink-4);
+  stroke: var(--lc-line-focus);
+  outline: none;
+}
+
+.camera-selector__dial text {
+  fill: var(--lc-text-primary);
+  font: 9px var(--lc-font-mono);
+  pointer-events: none;
+}
+
+/* On phones the instruments sit at the left above the sheet, so the dial opens rightward and upward. */
+@media (max-width: 767px) {
+  .camera-selector__dial {
+    right: auto;
+    left: 0;
+    transform-origin: 18px calc(100% + 18px);
+  }
+}

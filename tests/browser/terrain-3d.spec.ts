@@ -483,3 +483,45 @@ test('grass restyles without errors and never changes the printable STL', async 
   expect((await modelDownload(page)).equals(before)).toBe(true);
   expect(errors).toEqual([]);
 });
+
+test('the camera dial stays inside a phone viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await enter3D(page);
+  await page.getByRole('button', { name: 'Camera angle shortcuts' }).click();
+
+  const box = await page.locator('.camera-selector__dial').boundingBox();
+
+  if (box === null) {
+    throw new Error('Camera dial is not laid out.');
+  }
+
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(390);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+});
+
+test('camera shortcuts move to cardinal positions and a north-up overhead view', async ({
+  page,
+}) => {
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await enter3D(page);
+  const toggle = page.getByRole('button', { name: 'Camera angle shortcuts' });
+
+  await toggle.click();
+  await page.getByRole('button', { name: 'View from east, 30° elevation' }).click();
+  await expect(page.getByText('AZ 270°', { exact: true })).toBeVisible();
+  await expect(page.getByText('EL 30°', { exact: true })).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await page.getByRole('button', { name: 'View from northeast, 60° elevation' }).click();
+  await expect(page.getByText('AZ 225°', { exact: true })).toBeVisible();
+  await expect(page.getByText('EL 60°', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'North-up overhead view' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('AZ 0°', { exact: true })).toBeVisible();
+  await expect(page.getByText('EL 90°', { exact: true })).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await page.keyboard.press('Escape');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).toBeFocused();
+});
