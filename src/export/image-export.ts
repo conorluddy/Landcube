@@ -127,7 +127,7 @@ export async function createExportFile(
       ok: true,
       data: {
         blob,
-        filename: `topogra-${settings.seed}-${dimensions.data.width}x${dimensions.data.height}.${settings.format}`,
+        filename: `landcube-${settings.seed}-${dimensions.data.width}x${dimensions.data.height}.${settings.format}`,
       },
     };
   } catch {

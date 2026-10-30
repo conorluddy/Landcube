@@ -104,7 +104,7 @@ test('SVG and PNG exports preserve settled dimensions and transparency', async (
   await page.getByLabel('Transparent background').check();
   const transparent = await download(page, 'Download SVG');
 
-  expect(transparent.filename).toBe('topogra-123-320x240.svg');
+  expect(transparent.filename).toBe('landcube-123-320x240.svg');
   expect(transparent.bytes.toString()).not.toContain('fill="#202326"');
   const preview = page.getByAltText('Settled landscape export preview');
 

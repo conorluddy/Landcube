@@ -8,7 +8,7 @@ test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 test('GitHub Pages repository subpath loads the studio, lazy 3D, style links and exports', async ({
   page,
 }) => {
-  await serveStudio(page, 'Topogra/');
+  await serveStudio(page, 'landcube/');
   const errors: string[] = [];
   const assets: string[] = [];
 
@@ -31,7 +31,7 @@ test('GitHub Pages repository subpath loads the studio, lazy 3D, style links and
       },
     });
   });
-  await page.goto(`${appUrl}Topogra/?v=1&seed=123&width=320&height=240`);
+  await page.goto(`${appUrl}landcube/?v=1&seed=123&width=320&height=240`);
   await expect(page.getByRole('heading', { name: 'LANDCU.BE Studio' })).toBeVisible();
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await expect(page.locator('canvas.terrain-3d')).toBeVisible();
@@ -46,7 +46,7 @@ test('GitHub Pages repository subpath loads the studio, lazy 3D, style links and
     throw new Error('Style link unavailable');
   }
 
-  expect(new URL(copied).pathname).toBe('/Topogra/');
+  expect(new URL(copied).pathname).toBe('/landcube/');
   await page.getByRole('button', { name: 'Export ↗' }).click();
   await expect(page.getByAltText('Settled landscape export preview')).toBeVisible();
   const svg = await download(page, 'Download SVG');
@@ -54,7 +54,7 @@ test('GitHub Pages repository subpath loads the studio, lazy 3D, style links and
   expect(svg.bytes.toString()).toContain('viewBox="0 0 320 240"');
   expect((await download(page, 'Download STL')).bytes.readUInt32LE(80)).toBeGreaterThan(0);
   expect(assets.length).toBeGreaterThanOrEqual(3);
-  expect(assets.every((url) => new URL(url).pathname.startsWith('/Topogra/assets/'))).toBe(true);
+  expect(assets.every((url) => new URL(url).pathname.startsWith('/landcube/assets/'))).toBe(true);
   expect(assets.some((url) => url.includes('/terrain-3d-'))).toBe(true);
   expect(errors).toEqual([]);
 });
@@ -91,16 +91,16 @@ test('analytics loads only on the hosted site and never sees the design-link que
   await page.route('https://www.googletagmanager.com/**', (route) =>
     route.fulfill({ body: '', contentType: 'text/javascript' }),
   );
-  await page.route('https://conorluddy.github.io/Topogra/**', async (route) => {
+  await page.route('https://conorluddy.github.io/landcube/**', async (route) => {
     const filename =
-      new URL(route.request().url()).pathname.replace('/Topogra/', '') || 'index.html';
+      new URL(route.request().url()).pathname.replace('/landcube/', '') || 'index.html';
 
     await route.fulfill({
       body: await readFile(resolve('dist', filename)),
       contentType: filename.endsWith('.js') ? 'text/javascript' : 'text/html',
     });
   });
-  await page.goto('https://conorluddy.github.io/Topogra/?v=1&seed=123');
+  await page.goto('https://conorluddy.github.io/landcube/?v=1&seed=123');
   await page.getByRole('button', { name: 'New landscape' }).click();
   await expect(page).not.toHaveURL(/seed=123/);
   const dataLayer = JSON.stringify(
@@ -112,6 +112,6 @@ test('analytics loads only on the hosted site and never sees the design-link que
   );
 
   expect(dataLayer).toContain('G-09DGBRV9NB');
-  expect(dataLayer).toContain('"page_location":"https://conorluddy.github.io/Topogra/"');
+  expect(dataLayer).toContain('"page_location":"https://conorluddy.github.io/landcube/"');
   expect(dataLayer).not.toContain('seed=123');
 });

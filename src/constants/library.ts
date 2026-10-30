@@ -8,4 +8,5 @@ export const savedDesignThumbnailMaxBytes = 8 * 1024;
 export const splashSeenStorageKey = 'landcube-splash-seen';
 export const signalAccentStorageKey = 'landcube-signal-accent';
 /** Account > Clear local storage removes every localStorage key with one of these prefixes. */
+// Legacy prefix kept across the landcube rename so existing data survives.
 export const clearableStoragePrefixes = ['landcube-', 'topogra-'] as const;

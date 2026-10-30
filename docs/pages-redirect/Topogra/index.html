@@ -1,0 +1,13 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Moved to LANDCU.BE</title>
+<meta name="robots" content="noindex" />
+<script>
+  // Forwards /Topogra/<rest>?<query>#<hash> to the new project site, preserving design links.
+  const remainder = location.pathname.replace(/^\/Topogra\/?/, '');
+  location.replace(
+    `https://conorluddy.github.io/landcube/${remainder}${location.search}${location.hash}`,
+  );
+</script>
+<meta http-equiv="refresh" content="0; url=https://conorluddy.github.io/landcube/" />
+<p>Topogra is now <a href="https://conorluddy.github.io/landcube/">LANDCU.BE</a>.</p>

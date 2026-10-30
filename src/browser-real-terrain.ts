@@ -6,6 +6,7 @@ import { TerrainLoadError } from './terrain-load-error';
 
 const terrainTileSizePixels = 256;
 /** Terrarium tiles are immutable; bump the version only if the cached format changes. */
+// Legacy cache name kept across the landcube rename so existing data survives.
 const terrainTileCacheName = 'topogra-terrain-tiles-v1';
 const terrainTileKeyPattern = /\/terrarium\/(\d+\/\d+\/\d+)\.png$/;
 

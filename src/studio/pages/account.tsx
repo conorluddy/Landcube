@@ -147,7 +147,7 @@ export function AccountPage({
         />
       </SettingsGroup>
       <SettingsGroup title="About" code="SET.04">
-        <ListRow title="LANDCU.BE Studio" detail="Topogra" meta={version} />
+        <ListRow title="LANDCU.BE Studio" detail="landcube" meta={version} />
       </SettingsGroup>
     </section>
   );

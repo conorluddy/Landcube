@@ -19,7 +19,7 @@ function design(id: string): SavedDesign {
     id,
     name: `Design ${id}`,
     savedAt: '2026-01-01T00:00:00.000Z',
-    link: `https://topogra.test/?v=1&seed=${id}`,
+    link: `https://landcube.test/?v=1&seed=${id}`,
     thumbnailSvg: '<svg/>',
     source: 'procedural',
     seedOrPlace: id,

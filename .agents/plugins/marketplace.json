@@ -1,11 +1,11 @@
 {
-  "name": "topogra",
+  "name": "landcube",
   "interface": {
-    "displayName": "Topogra"
+    "displayName": "LANDCU.BE"
   },
   "plugins": [
     {
-      "name": "topogra",
+      "name": "landcube",
       "source": {
         "source": "local",
         "path": "./"

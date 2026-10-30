@@ -48,7 +48,7 @@ test('a tray downloads at the model size plus border and clearance, leaving the 
   const frame = await frameDownload(page);
   const bounds = stlBounds(frame.bytes);
 
-  const header = 'Topogra frame | units: millimeters | Z up';
+  const header = 'landcube frame | units: millimeters | Z up';
 
   expect(frame.bytes.subarray(0, header.length).toString()).toBe(header);
   expect(frame.filename).toMatch(/-frame-171x171mm\.stl$/);

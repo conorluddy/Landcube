@@ -190,7 +190,7 @@ controls.connect({
 
     downloadBlob(
       await encodeTerrainStill(frame, getStillAttribution()),
-      `topogra-${settings.seed}-3d-${scale}x.png`,
+      `landcube-${settings.seed}-3d-${scale}x.png`,
     );
 
     return { width: frame.width, height: frame.height };
@@ -198,9 +198,9 @@ controls.connect({
   frameChanged: terrain3d.frameChanged,
   downloadFrameStl: (part) => {
     downloadBlob(
-      new Blob([createBinaryStl(part.solid, `Topogra ${part.id}`)], { type: 'model/stl' }),
+      new Blob([createBinaryStl(part.solid, `landcube ${part.id}`)], { type: 'model/stl' }),
       // Size in the name keeps parts for different frames apart in one downloads folder.
-      `topogra-${settings.seed}-${part.id}-${Math.round(part.sizeMm.x)}x${Math.round(part.sizeMm.z)}mm.stl`,
+      `landcube-${settings.seed}-${part.id}-${Math.round(part.sizeMm.x)}x${Math.round(part.sizeMm.z)}mm.stl`,
     );
   },
   downloadStl: () => {
@@ -209,8 +209,8 @@ controls.connect({
     downloadBlob(
       new Blob([terrain3d.getStl()], { type: 'model/stl' }),
       model.cropShape === 'circle'
-        ? `topogra-${settings.seed}-circle-${model.widthMm}mm.stl`
-        : `topogra-${settings.seed}-${model.widthMm}x${model.lengthMm}mm.stl`,
+        ? `landcube-${settings.seed}-circle-${model.widthMm}mm.stl`
+        : `landcube-${settings.seed}-${model.widthMm}x${model.lengthMm}mm.stl`,
     );
   },
   roadsChanged: updateTerrain3d,

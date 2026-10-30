@@ -30,11 +30,11 @@ void test('Node exports SVG and scaled PNG without browser globals', () => {
 
   assert.ok(svg.ok);
   assert.equal(svg.data.mimeType, 'image/svg+xml');
-  assert.equal(svg.data.filename, 'topogra-745-320x240.svg');
+  assert.equal(svg.data.filename, 'landcube-745-320x240.svg');
   assert.match(new TextDecoder().decode(svg.data.bytes), /viewBox="0 0 320 240"/);
   assert.ok(png.ok);
   assert.equal(png.data.mimeType, 'image/png');
-  assert.equal(png.data.filename, 'topogra-745-640x480.png');
+  assert.equal(png.data.filename, 'landcube-745-640x480.png');
 
   const decoded = PNG.sync.read(Buffer.from(png.data.bytes));
 

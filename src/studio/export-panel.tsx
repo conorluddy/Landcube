@@ -265,7 +265,7 @@ export function ExportPanel({
       downloadAttribution: () => {
         downloadBlob(
           new Blob([s.source.terrain?.attribution ?? ''], { type: 'text/plain' }),
-          `topogra-${settings.seed}-attribution.txt`,
+          `landcube-${settings.seed}-attribution.txt`,
         );
       },
     },
@@ -310,7 +310,7 @@ function buildSuccessRows(c: PanelProps['controller']): SuccessRow[] {
             label: 'Share',
             onClick: () => {
               void navigator
-                .share({ title: 'Topogra', url: window.location.href })
+                .share({ title: 'LANDCU.BE', url: window.location.href })
                 .catch((failure: unknown) => {
                   // Dismissing the share sheet is not a failure.
                   if (!(failure instanceof DOMException && failure.name === 'AbortError')) {

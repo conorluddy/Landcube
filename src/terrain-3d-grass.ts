@@ -205,7 +205,7 @@ function createGrassMaterial(uniforms: Record<string, THREE.IUniform>): THREE.Me
     metalness: 0,
   });
 
-  material.customProgramCacheKey = () => 'topogra-grass-shells-v1';
+  material.customProgramCacheKey = () => 'landcube-grass-shells-v1';
 
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);

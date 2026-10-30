@@ -1,10 +1,12 @@
-# Topogra
+# LANDCU.BE
 
-Topogra creates topographic artwork from generated landscapes or real-world elevation data. Design backgrounds for websites, presentations, and print in the browser, ask an agent to generate them, or export reproducible SVG and PNG assets from the command line.
+> Formerly published as `topogra`; `npx topogra` keeps working through the deprecated package.
 
-**[Open the web app](https://conorluddy.github.io/Topogra/)** · [Install agent plugins](#install-agent-plugins) · [Use with an agent](#use-with-an-agent) · [Use with NPX](#use-with-npx)
+LANDCU.BE creates topographic artwork from generated landscapes or real-world elevation data. Design backgrounds for websites, presentations, and print in the browser, ask an agent to generate them, or export reproducible SVG and PNG assets from the command line.
 
-<img width="1512" height="830" alt="Topogra browser editor showing topographic artwork and style controls" src="https://github.com/user-attachments/assets/6bb628c7-cc4b-424b-a004-409b6e4c09ef" />
+**[Open the web app](https://conorluddy.github.io/landcube/)** · [Install agent plugins](#install-agent-plugins) · [Use with an agent](#use-with-an-agent) · [Use with NPX](#use-with-npx)
+
+<img width="1512" height="830" alt="LANDCU.BE browser editor showing topographic artwork and style controls" src="https://github.com/user-attachments/assets/6bb628c7-cc4b-424b-a004-409b6e4c09ef" />
 
 ## Features
 
@@ -19,7 +21,7 @@ No account or backend is needed. The hosted web app (not local, forked or self-h
 
 ## Use the web app
 
-1. Open **[Topogra](https://conorluddy.github.io/Topogra/)**. The studio starts in **3D** on **Errigal**, loaded as real terrain from tiles bundled with the site, so the first view needs no tile downloads. Browsers without WebGL 2 fall back to 2D. A shared style link opens the 2D design it encodes instead.
+1. Open **[LANDCU.BE](https://conorluddy.github.io/landcube/)**. The studio starts in **3D** on **Errigal**, loaded as real terrain from tiles bundled with the site, so the first view needs no tile downloads. Browsers without WebGL 2 fall back to 2D. A shared style link opens the 2D design it encodes instead.
 2. In **Terrain**, choose another preset or enter coordinates, set the **Area span** slider (2–200 km), then select **Load terrain**. Select **Procedural** in the header for synthetic landscapes: adjust generated scale and detail, select **New landscape**, or lock the seed to retain a landscape while styling it. Select **Coordinates** to restore the last loaded place instantly. Presets set a suggested span that you can adjust before loading, and downloaded elevation tiles are cached in the browser.
 3. Use **Contours** for density or real-terrain meter intervals, line appearance and index contours. **Colour** contains canvas colour and palette presets. Palette presets also change contour colours and weights.
 4. Switch directly between **2D / 3D** in the header. **Scene** contains cursor interaction in 2D and lighting, floor, surface visibility and water presentation in 3D. Lighting is driven by a **Time of day** slider that sets sun height, colour and studio tint, from golden hour to moonlit night, with direction, intensity, fill, **Flat light** and **Haze** alongside. **Camera**, available in 3D, contains the lens (perspective or orthographic, and a 14–300 mm focal length that keeps the terrain framed while changing perspective), focus effects (**Tilt-shift** or **Depth of field** with f-stop aperture and click-to-pick focus) and exposure. **Model**, available in 3D, contains crop, physical dimensions and terrain shape.
@@ -55,11 +57,11 @@ Ask for the image you want and where to save it. The skill generates an image an
 
 Then ask, for example:
 
-> Use Topogra to create a transparent Blueprint contour background at 1920 × 1080 as an SVG. Save it and its reproducible configuration in public/assets/.
+> Use LANDCU.BE to create a transparent Blueprint contour background at 1920 × 1080 as an SVG. Save it and its reproducible configuration in public/assets/.
 
 Or request a real location:
 
-> Use Topogra to create a Paper-style PNG of the Wicklow Mountains for a presentation. Save the image, configuration, and attribution text in assets/.
+> Use LANDCU.BE to create a Paper-style PNG of the Wicklow Mountains for a presentation. Save the image, configuration, and attribution text in assets/.
 
 The skill saves and validates the configuration, reports the output paths and generation command, and includes a companion credit file for real terrain.
 
@@ -110,7 +112,7 @@ The skill saves and validates the configuration, reports the output paths and ge
 Requires Node.js 20.19+, 22.13+, or 24+. Run the published CLI without installing it globally:
 
 ```sh
-npx --yes topogra generate --palette Blueprint --seed 42 \
+npx --yes landcube generate --palette Blueprint --seed 42 \
   --width 1920 --height 1080 --output background.svg \
   --save-config background.json
 ```
@@ -118,15 +120,15 @@ npx --yes topogra generate --palette Blueprint --seed 42 \
 Regenerate the saved design, or export it as PNG:
 
 ```sh
-npx --yes topogra generate --config background.json --output copy.svg
-npx --yes topogra generate --config background.json \
+npx --yes landcube generate --config background.json --output copy.svg
+npx --yes landcube generate --config background.json \
   --format png --png-scale 2 --output background.png
 ```
 
 Generate real terrain using a named location:
 
 ```sh
-npx --yes topogra generate --terrain-preset "Wicklow Mountains" \
+npx --yes landcube generate --terrain-preset "Wicklow Mountains" \
   --span-km 25 --palette Paper --output wicklow.svg \
   --save-config wicklow.json --attribution-file wicklow-attribution.txt
 ```
@@ -140,7 +142,7 @@ New real-terrain designs default to `--max-depth 0`, flattening elevations below
 Coastal tiles combine land elevation and bathymetry and can contain stepped source boundaries. Use an explicit elevation floor to omit affected low elevations, for example:
 
 ```sh
-npx --yes topogra generate --terrain real --latitude 54.651738 --longitude=-8.707332 --span-km 8 --elevation-floor 250 --palette Paper --format png --size 2560x1440 --output slieve-league.png --save-config slieve-league.json --attribution-file slieve-league-attribution.txt
+npx --yes landcube generate --terrain real --latitude 54.651738 --longitude=-8.707332 --span-km 8 --elevation-floor 250 --palette Paper --format png --size 2560x1440 --output slieve-league.png --save-config slieve-league.json --attribution-file slieve-league-attribution.txt
 ```
 
 `--elevation-floor` clips source elevations before normalization. It removes low terrain rather than reconstructing a shoreline, and is saved in the CLI terrain configuration. The browser has the same optional **Elevation floor (m)** control. Omit it to retain all terrain above the selected depth limit. Inspect coastal output before publishing; a cutoff suitable for one location may not suit another.
@@ -148,14 +150,14 @@ npx --yes topogra generate --terrain real --latitude 54.651738 --longitude=-8.70
 Discover palettes, output sizes, locations, and all design flags:
 
 ```sh
-npx --yes topogra presets --json true
-npx --yes topogra --help --verbose
-npx --yes topogra validate --config background.json
+npx --yes landcube presets --json true
+npx --yes landcube --help --verbose
+npx --yes landcube validate --config background.json
 ```
 
 Every design setting has a kebab-case flag, such as `--transparent true` or `--grid-style crosses`. Palette names are case-sensitive. Settings apply in this order: defaults, configuration or browser URL, palette/size, then explicit flags. Use `--url 'COPIED_DESIGN_URL'` instead of `--config` to start from a browser design.
 
-Existing output files require `--force true` to replace. For automation, `--json true` returns structured generation metadata; `--output -` writes image bytes to stdout and cannot be combined with JSON output. You can also install globally with `npm install --global topogra` and run `topogra` directly.
+Existing output files require `--force true` to replace. For automation, `--json true` returns structured generation metadata; `--output -` writes image bytes to stdout and cannot be combined with JSON output. You can also install globally with `npm install --global landcube` and run `landcube` directly.
 
 ## Sharing and output details
 
@@ -166,44 +168,44 @@ Existing output files require `--force true` to replace. For automation, `--json
 
 ## Install agent plugins
 
-Topogra supports Codex and Claude Code marketplaces. Both plugins bundle the same [Topogra agent skill](https://github.com/conorluddy/Topogra/blob/main/skills/topogra/SKILL.md), which runs the published CLI through NPX. You need Node.js 20.19+, 22.13+, or 24+ and npm; no repository checkout, global Topogra installation, or Topogra account is required.
+LANDCU.BE supports Codex and Claude Code marketplaces. Both plugins bundle the same [LANDCU.BE agent skill](https://github.com/conorluddy/landcube/blob/main/skills/landcube/SKILL.md), which runs the published CLI through NPX. You need Node.js 20.19+, 22.13+, or 24+ and npm; no repository checkout, global LANDCU.BE installation, or LANDCU.BE account is required.
 
 ### Codex
 
 Add the marketplace and install the plugin with a Codex CLI that supports plugins:
 
 ```sh
-codex plugin marketplace add conorluddy/Topogra
-codex plugin add topogra@topogra
+codex plugin marketplace add conorluddy/landcube
+codex plugin add landcube@landcube
 ```
 
-Alternatively, add `conorluddy/Topogra` in Codex's plugin marketplace picker, then install **Topogra** from that marketplace. Start a new conversation and ask the agent to use Topogra.
+Alternatively, add `conorluddy/landcube` in Codex's plugin marketplace picker, then install **LANDCU.BE** from that marketplace. Start a new conversation and ask the agent to use LANDCU.BE.
 
 ### Claude Code
 
 Add the marketplace and install the plugin:
 
 ```sh
-claude plugin marketplace add conorluddy/Topogra
-claude plugin install topogra@topogra
+claude plugin marketplace add conorluddy/landcube
+claude plugin install landcube@landcube
 ```
 
 Start a new conversation, then invoke the skill with your brief:
 
 ```text
-/topogra:topogra Create a transparent Blueprint SVG at 1920 × 1080 in public/assets/.
+/landcube:landcube Create a transparent Blueprint SVG at 1920 × 1080 in public/assets/.
 ```
 
-You can also ask Claude to use Topogra in natural language.
+You can also ask Claude to use LANDCU.BE in natural language.
 
 ### Install only the skill
 
-Copy the repository's `skills/topogra/` directory into your agent's skills directory:
+Copy the repository's `skills/landcube/` directory into your agent's skills directory:
 
-| Agent       | Destination                 |
-| ----------- | --------------------------- |
-| Codex       | `~/.codex/skills/topogra/`  |
-| Claude Code | `~/.claude/skills/topogra/` |
+| Agent       | Destination                  |
+| ----------- | ---------------------------- |
+| Codex       | `~/.codex/skills/landcube/`  |
+| Claude Code | `~/.claude/skills/landcube/` |
 
 Start a new conversation after copying. For testing a local marketplace checkout, run `codex plugin marketplace add .` or `claude plugin marketplace add .` from the repository instead of adding the GitHub source, then use the corresponding install command above.
 
@@ -211,7 +213,7 @@ Start a new conversation after copying. For testing a local marketplace checkout
 
 The React studio UI lives in `src/studio/`: shared fields and panels read typed controller snapshots, while a renderer adapter handles lazy WebGL activation. Shared design settings and version-one URL serialization remain independent of the UI. Model geometry and scene appearance are separate state domains so future project saving, presets and printable parts can extend the editor without changing the terrain pipeline.
 
-For development: `npm install`, then `npm run dev`. Use `npm run check` for source checks, tests, production builds, and package validation; `npm run test:e2e` runs browser journeys with Google Chrome. The [GitHub Actions workflow](https://github.com/conorluddy/Topogra/blob/main/.github/workflows/build.yml) defines deployment and npm publishing.
+For development: `npm install`, then `npm run dev`. Use `npm run check` for source checks, tests, production builds, and package validation; `npm run test:e2e` runs browser journeys with Google Chrome. The [GitHub Actions workflow](https://github.com/conorluddy/landcube/blob/main/.github/workflows/build.yml) defines deployment and npm publishing.
 
 Location presets include Reine in Lofoten, Ibiza and Es Vedrà, Cape Town, Uluru (Ayers Rock), Kata Tjuta, coastal Rio, Jamaica’s Blue Mountains, Dubrovnik, Makhachkala, Sulak Canyon, the Mach Loop low-flying valleys in Wales, Pikes Peak in Colorado, and landmark calderas, canyons, fjords and karst such as Santorini, Crater Lake, the Grand Canyon, Geirangerfjord and Guilin. Suggested crop sizes range from 4 km for Es Vedrà to 55 km for Ibiza; these are starting compositions rather than guaranteed shoreline or feature boundaries. CLI `--terrain-preset` uses the same suggested span unless overridden with `--span-km`. Existing presets retain their 25 km default.
 
