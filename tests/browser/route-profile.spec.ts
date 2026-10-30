@@ -77,7 +77,7 @@ test('on a phone the profile sits inside the bottom sheet (REQ-25)', async ({ pa
   await expect(page.locator('.lc-bottom-sheet [data-route-profile]')).toHaveCount(1);
 });
 
-test('keyboard and pointer inspection set the 2D and 3D highlights (REQ-26)', async ({ page }) => {
+test('keyboard and pointer inspection set the 2D highlight (REQ-26)', async ({ page }) => {
   await loadGpxRoute(page);
   await expect(page.locator('[data-route-cursor]')).toHaveCount(0);
 
@@ -98,7 +98,10 @@ test('keyboard and pointer inspection set the 2D and 3D highlights (REQ-26)', as
   await expect(page.locator('.lc-route-line [data-route-cursor]')).toHaveCount(1);
   await page.mouse.move(plot.x + plot.width / 2, plot.y - 120);
   await expect(page.locator('.lc-route-line [data-route-cursor]')).toHaveCount(0);
+});
 
+test('keyboard inspection shows the 3D marker (REQ-26)', async ({ page }) => {
+  await loadGpxRoute(page);
   await enter3D(page);
   await chart(page).focus();
   await page.keyboard.press('PageUp');

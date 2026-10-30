@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { appUrl, openDefaultStudio, section, serveStudio } from './studio-fixture';
+import { appUrl, serveStudio } from './studio-fixture';
 
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 test.beforeEach(async ({ page }) => {
@@ -95,15 +95,10 @@ test('the cursor deforms terrain over the viewport but not over UI surfaces', as
   await expect.poll(() => terrain.innerHTML()).not.toBe(settled);
 });
 
-test('glass keeps its blur while the turntable rotates by default', async ({ page }) => {
-  await openDefaultStudio(page);
-  const shell = page.locator('.studio-shell');
+// The turntable and morph holds are covered without WebGL in src/studio/shell-motion.test.ts.
+test('glass keeps its blur by default', async ({ page }) => {
+  await page.goto(`${appUrl}?v=1&seed=123`);
 
-  await expect(shell).not.toHaveAttribute('data-motion', 'active');
-  await section(page, 'Orbit');
-  await page.getByRole('switch', { name: 'Auto-rotate' }).check();
-  await expect(shell).not.toHaveAttribute('data-motion', 'active');
+  await expect(page.locator('.studio-shell')).not.toHaveAttribute('data-motion', 'active');
   await expect(page.locator('header .lc-bar-group').first()).toHaveCSS('backdrop-filter', /blur\(/);
-  await page.getByRole('switch', { name: 'Auto-rotate' }).uncheck();
-  await expect(shell).not.toHaveAttribute('data-motion', 'active');
 });
