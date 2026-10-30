@@ -10,6 +10,11 @@ export interface HudLayerProps {
   inspectorState: HudInspectorState;
   /** Full-bleed pointer overlays such as the Crosshair. */
   pointer?: ReactNode;
+  /**
+   * Full-bleed tool overlays (crop frame, measure line). Unlike the other slots their handles take
+   * the pointer; everything else in them stays click-through.
+   */
+  tools?: ReactNode;
   /** The HudFrame, laid out between the bars and beside the inspector. */
   frame?: ReactNode;
   /** Compass and scale bar, at the frame's bottom right (top right on phones). */
@@ -27,6 +32,7 @@ export function HudLayer({
   canvasTone,
   inspectorState,
   pointer,
+  tools,
   frame,
   instruments,
   readout,
@@ -41,6 +47,7 @@ export function HudLayer({
       data-inspector={inspectorState}
     >
       {pointer}
+      {tools !== undefined && <div className="lc-hud-layer__tools">{tools}</div>}
       {frame !== undefined && <div className="lc-hud-layer__frame">{frame}</div>}
       {instruments !== undefined && <div className="lc-hud-layer__instruments">{instruments}</div>}
       {readout !== undefined && <div className="lc-hud-layer__readout">{readout}</div>}

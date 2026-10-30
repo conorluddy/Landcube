@@ -35,6 +35,17 @@
   left: var(--lc-hud-inset-left);
 }
 
+.lc-hud-layer__tools {
+  position: absolute;
+  inset: 0;
+}
+
+/* The crop plane fits the frame box, clear of the bars and the inspector. */
+.lc-hud-layer__tools .lc-crop-frame {
+  inset: var(--lc-hud-inset-top) var(--lc-hud-inset-right) var(--lc-hud-inset-bottom)
+    var(--lc-hud-inset-left);
+}
+
 .lc-hud-layer__instruments {
   position: absolute;
   right: calc(var(--lc-hud-inset-right) + 28px);

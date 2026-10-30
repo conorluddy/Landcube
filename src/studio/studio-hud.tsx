@@ -7,7 +7,7 @@ import { HudLayer } from '../ui/overlays/hud-layer';
 import { ReadoutCard } from '../ui/overlays/readout-card';
 import { RouteLine } from '../ui/overlays/route-line';
 import { ScaleBar } from '../ui/overlays/scale-bar';
-import type { StudioState } from './controller';
+import type { StudioController, StudioState } from './controller';
 import { getFrameMetersPerPixel } from './hud-location';
 import {
   chooseScaleBar,
@@ -19,6 +19,7 @@ import {
 } from './hud-readouts';
 import type { HudStore } from './hud-store';
 import { projectRouteToFrame } from './route-overlay';
+import { StudioToolOverlays } from './studio-tools';
 
 /** The card needs a desktop-sized viewport: wider than a phone and at least 700px tall. */
 const readoutCardQuery = '(min-width: 768px) and (min-height: 700px)';
@@ -27,10 +28,18 @@ const cardScaleBarMaximumPx = 272;
 const canvasScaleBarMaximumPx = 120;
 
 /**
- * Canvas overlays for the studio: HUD frame, crosshair with coordinate tip, compass, scale bar
- * and the Target lock card. Pointer and relief come from the HUD store; everything else from state.
+ * Canvas overlays for the studio: HUD frame, crosshair with coordinate tip, the crop and measure
+ * tools, compass, scale bar and the Target lock card. Pointer and relief come from the HUD store; everything else from state.
  */
-export function StudioHud({ state, hud }: { state: StudioState; hud: HudStore }): ReactNode {
+export function StudioHud({
+  controller,
+  state,
+  hud,
+}: {
+  controller: StudioController;
+  state: StudioState;
+  hud: HudStore;
+}): ReactNode {
   const { pointer, generatedReliefMeters } = useSyncExternalStore(hud.subscribe, hud.getSnapshot);
   const isReadoutCardShown = useSyncExternalStore(
     subscribeToReadoutCardQuery,
@@ -82,6 +91,14 @@ export function StudioHud({ state, hud }: { state: StudioState; hud: HudStore })
             )}
           </Crosshair>
         </>
+      }
+      tools={
+        <StudioToolOverlays
+          controller={controller}
+          state={state}
+          hud={hud}
+          viewportSize={viewportSize}
+        />
       }
       frame={
         <HudFrame

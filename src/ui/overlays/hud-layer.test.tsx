@@ -36,3 +36,16 @@ void test('HudLayer is never a UI surface itself', () => {
     ),
   );
 });
+
+void test('HudLayer puts tool overlays in their own full-bleed box after the pointer slot', () => {
+  const markup = renderMarkup(
+    <HudLayer
+      canvasTone="dark"
+      inspectorState="expanded"
+      pointer={<i>pointer</i>}
+      tools={<i>tools</i>}
+    />,
+  );
+
+  assert.ok(markup.includes('<i>pointer</i><div class="lc-hud-layer__tools"><i>tools</i></div>'));
+});

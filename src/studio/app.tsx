@@ -25,6 +25,7 @@ import { ViewportStates } from './viewport-states';
 import { StudioHud } from './studio-hud';
 import { CompareHost } from './compare-host';
 import type { CompareSceneStore } from './compare-scene';
+import { StudioToolBar } from './studio-tools';
 import type { HudStore } from './hud-store';
 import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
@@ -248,7 +249,7 @@ function Studio({
       />
       <ViewportStates controller={c} state={state} />
       {!isPhoneViewport && <CompareHost controller={c} state={state} scenes={compareScenes} />}
-      <StudioHud state={state} hud={hud} />
+      <StudioHud controller={c} state={state} hud={hud} />
       {isPhoneViewport ? (
         <>
           <StudioMapControls controller={c} state={state} />
@@ -284,6 +285,7 @@ function Studio({
             }
           />
           <StudioPinnedPanels controller={c} state={state} cropPreview={cropPreview} />
+          <StudioToolBar controller={c} state={state} />
           <StudioFooter
             controller={c}
             state={state}

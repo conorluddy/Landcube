@@ -19,7 +19,7 @@ LANDCU.BE design-system components. Each is a React component plus a CSS file, a
 
 ## Canvas overlays
 
-`overlays/` holds the HUD (O-01 HudFrame, O-02/03 Crosshair + CoordinateTip, O-07 ScaleBar + Compass, C-07 ReadoutCard) with the same file set per component. Overlays are `pointer-events: none` and never carry `data-ui-surface`; only the glass ReadoutCard takes the pointer. `HudLayer` (`[data-hud]`) positions them over the viewport through slots (`pointer`, `frame`, `instruments`, `readout`) and sets `--lc-hud-mark` / `--lc-hud-hairline` from `data-canvas-tone`. Later map overlays (crop, measure, wipe, route) belong in the `pointer` slot or a new slot there.
+`overlays/` holds the HUD (O-01 HudFrame, O-02/03 Crosshair + CoordinateTip, O-07 ScaleBar + Compass, C-07 ReadoutCard) with the same file set per component. Overlays are `pointer-events: none` and never carry `data-ui-surface`; only the glass ReadoutCard takes the pointer. `HudLayer` (`[data-hud]`) positions them over the viewport through slots (`pointer`, `frame`, `instruments`, `readout`) and sets `--lc-hud-mark` / `--lc-hud-hairline` from `data-canvas-tone`. The `tools` slot (full-bleed, after `pointer`) holds the tool overlays (O-04 CropFrame, O-05 MeasureLine with O-06 CalloutLabel): their handles, endpoints and the measuring surface are the only overlay parts with `pointer-events: auto`, and only while a tool is active. Later map overlays (wipe, route) belong there too.
 
 ## Forced states
 

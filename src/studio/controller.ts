@@ -175,6 +175,8 @@ export interface TerrainSourceState {
   autoplay: { enabled: boolean; delaySeconds: number };
 }
 export type StudioPage = 'studio' | 'library' | 'presets' | 'account';
+/** The active on-canvas tool; `none` leaves every canvas pointer event to the terrain. */
+export type ToolMode = 'none' | 'crop' | 'measure' | 'presets' | 'route';
 
 export interface StudioState {
   design: ValidatedDesignSettings;
@@ -216,6 +218,8 @@ export interface StudioState {
     compare: { presetId: string; dividerFraction: number } | null;
     /** The desktop preset strip. Session-only. */
     comparePresetsOpen: boolean;
+    /** Session-only. Crop applies to the 3D model, so the crop frame shows only in 3D. */
+    toolMode: ToolMode;
   };
   seedLocked: boolean;
   status: string;
@@ -441,6 +445,7 @@ export function createStudioController(
       routeFault: null,
       compare: null,
       comparePresetsOpen: false,
+      toolMode: 'none',
     },
     seedLocked: actions.isSeedLocked,
     status: '',
