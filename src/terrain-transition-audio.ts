@@ -1,9 +1,12 @@
 import { terrainTransitionDurationMs } from './constants/terrain-transition';
 import { isSoundMuted, subscribeToSoundMuted } from './sound-preference';
 
-/** Spike: a tectonic rumble under each landscape morph, faded out as the terrain settles. */
+/** Spike: tectonic rumbles for landscape morphs and relief changes, faded out as the terrain settles. */
 export interface TerrainTransitionAudio {
+  /** A one-off rumble for a landscape morph; crossfades over any rumble already playing. */
   play(): void;
+  /** Keeps a rumble going while something (a dragged slider) keeps changing; it fades once calls stop. */
+  sustain(): void;
 }
 
 // tectonic_01–04 crossfaded into one mono 64 kbps file: one request, a third of the bytes.
@@ -13,31 +16,34 @@ const fadeInSeconds = 0.15;
 const fadeOutSeconds = 1.1;
 // A random window half again as long as the morph, so the rumble trails off after it settles.
 const sliceSeconds = (terrainTransitionDurationMs / 1000) * 1.5;
+// How long a sustained rumble holds at full strength after the last change before fading.
+const sustainHoldSeconds = 0.25;
+
+interface Rumble {
+  source: AudioBufferSourceNode;
+  gain: GainNode;
+}
 
 // === PUBLIC API ===
 
 export function createTerrainTransitionAudio(): TerrainTransitionAudio {
   let context: AudioContext | undefined;
-  let rumble: Promise<AudioBuffer> | undefined;
-  let current: { source: AudioBufferSourceNode; gain: GainNode } | undefined;
-  // Bumped by every play, so only the newest morph's rumble starts once loading finishes.
-  let playGeneration = 0;
+  let buffer: Promise<AudioBuffer> | undefined;
+  let current: Rumble | undefined;
+  // Bumped whenever the current rumble is let go, so a start still loading for it is dropped.
+  let generation = 0;
+  let isStarting = false;
 
   const fadeOut = () => {
-    playGeneration += 1;
+    generation += 1;
+    isStarting = false;
 
     if (!context || !current) {
       return;
     }
 
-    const { source, gain } = current;
-    const now = context.currentTime;
-
+    scheduleEnd(current, context.currentTime, context.currentTime + fadeOutSeconds);
     current = undefined;
-    gain.gain.cancelScheduledValues(now);
-    gain.gain.setValueAtTime(gain.gain.value, now);
-    gain.gain.linearRampToValueAtTime(0, now + fadeOutSeconds);
-    source.stop(now + fadeOutSeconds);
   };
 
   // Muting mid-rumble fades it rather than letting it run out.
@@ -47,48 +53,56 @@ export function createTerrainTransitionAudio(): TerrainTransitionAudio {
     }
   });
 
-  const play = () => {
-    if (isSoundMuted()) {
-      return;
-    }
-
+  /** Starts a fresh rumble that ends `durationSeconds` after it begins. */
+  const start = (durationSeconds: number) => {
     context ??= new AudioContext();
-    rumble ??= loadRumble(context);
+    buffer ??= loadRumble(context);
     void context.resume();
-    // A morph that supersedes another crossfades rather than stacking rumbles.
-    fadeOut();
 
     const audioContext = context;
-    const generation = playGeneration;
+    const startGeneration = generation;
 
-    void rumble.then(
-      (buffer) => {
-        if (generation !== playGeneration) {
+    isStarting = true;
+    void buffer.then(
+      (loaded) => {
+        if (startGeneration !== generation) {
           return;
         }
 
-        const source = audioContext.createBufferSource();
-        const gain = audioContext.createGain();
-        const now = audioContext.currentTime;
-        const offsetSeconds = Math.random() * Math.max(0, buffer.duration - sliceSeconds);
-        const endSeconds = now + sliceSeconds;
-
-        source.buffer = buffer;
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(peakGain, now + fadeInSeconds);
-        gain.gain.setValueAtTime(peakGain, endSeconds - fadeOutSeconds);
-        gain.gain.linearRampToValueAtTime(0, endSeconds);
-        source.connect(gain).connect(audioContext.destination);
-        source.start(now, offsetSeconds, sliceSeconds);
-        current = { source, gain };
+        isStarting = false;
+        current = startRumble(audioContext, loaded);
+        scheduleEnd(current, audioContext.currentTime, audioContext.currentTime + durationSeconds);
       },
       (error: unknown) => {
+        isStarting = false;
         console.warn('Terrain transition audio failed to load; morphs stay silent.', error);
       },
     );
   };
 
-  return { play };
+  return {
+    play() {
+      if (isSoundMuted()) {
+        return;
+      }
+
+      fadeOut();
+      start(sliceSeconds);
+    },
+    sustain() {
+      if (isSoundMuted() || isStarting) {
+        return;
+      }
+
+      const durationSeconds = sustainHoldSeconds + fadeOutSeconds;
+
+      if (context && current) {
+        scheduleEnd(current, context.currentTime, context.currentTime + durationSeconds);
+      } else {
+        start(fadeInSeconds + durationSeconds);
+      }
+    },
+  };
 }
 
 // === HELPERS ===
@@ -101,4 +115,39 @@ async function loadRumble(context: AudioContext): Promise<AudioBuffer> {
   }
 
   return context.decodeAudioData(await response.arrayBuffer());
+}
+
+/** Plays from a random point, looping so a long sustain never runs off the end of the file. */
+function startRumble(context: AudioContext, buffer: AudioBuffer): Rumble {
+  const source = context.createBufferSource();
+  const gain = context.createGain();
+  const now = context.currentTime;
+
+  source.buffer = buffer;
+  source.loop = true;
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(peakGain, now + fadeInSeconds);
+  source.connect(gain).connect(context.destination);
+  source.start(now, Math.random() * buffer.duration);
+
+  return { source, gain };
+}
+
+/** Holds (or rises back to) full strength, then fades to silence and stops at `endSeconds`. */
+function scheduleEnd({ source, gain }: Rumble, nowSeconds: number, endSeconds: number) {
+  const fadeStartSeconds = Math.max(nowSeconds, endSeconds - fadeOutSeconds);
+
+  gain.gain.cancelScheduledValues(nowSeconds);
+  gain.gain.setValueAtTime(gain.gain.value, nowSeconds);
+
+  if (fadeStartSeconds > nowSeconds) {
+    gain.gain.linearRampToValueAtTime(
+      peakGain,
+      Math.min(fadeStartSeconds, nowSeconds + fadeInSeconds),
+    );
+    gain.gain.setValueAtTime(peakGain, fadeStartSeconds);
+  }
+
+  gain.gain.linearRampToValueAtTime(0, endSeconds);
+  source.stop(endSeconds);
 }

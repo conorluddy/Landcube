@@ -1390,6 +1390,11 @@ export function createTerrain3d(
       draw();
     },
     setHeight(value: number, shouldRebuild = true) {
+      // Spike: relief rising or sinking rumbles for as long as it keeps changing.
+      if (visible && value !== exaggeration) {
+        transitionAudio.sustain();
+      }
+
       exaggeration = value;
 
       if (shouldRebuild) {

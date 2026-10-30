@@ -1,12 +1,13 @@
 /*
- * Model section (MODL.01 to MODL.02): printable footprint and the shape of the terrain. The crop
+ * Model section (MODL.01 to MODL.02): printable footprint and the shape of the terrain; height
+ * exaggeration lives with the terrain source in ./terrain.ts. The crop
  * preview widget is mounted by the host row; its mount logic stays in `crop-preview.ts`. The
  * pattern is in ./README.md.
  */
 import { createElement } from 'react';
 import type { ControlGroupDefinition } from '../../ui/control-rows';
 import type { StudioController, StudioState } from '../controller';
-import { customRow, hintRow, numberRow, selectRow, toggleRow } from '../control-rows';
+import { customRow, hintRow, numberRow, selectRow } from '../control-rows';
 import type { CropPreview } from '../crop-preview';
 import { CropPreviewHost } from '../crop-preview-host';
 
@@ -100,26 +101,6 @@ function buildShapeGroup(controller: StudioController, state: StudioState): Cont
           controller.dimensions({ terrainShape });
         },
       }),
-      toggleRow('model-auto-exaggeration', {
-        label: 'Auto height for location',
-        value: model.autoExaggeration,
-        onChange: (autoExaggeration) => {
-          controller.model({ autoExaggeration });
-        },
-      }),
-      {
-        kind: 'range',
-        id: 'model-exaggeration',
-        label: 'Height exaggeration',
-        value: model.exaggeration,
-        min: 0,
-        max: 1,
-        step: 0.05,
-        unit: '×',
-        onChange: (exaggeration) => {
-          controller.model({ exaggeration, autoExaggeration: false });
-        },
-      },
       model.dimensions.terrainShape === 'terraced' &&
         hintRow(
           'model-terraced-hint',

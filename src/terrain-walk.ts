@@ -22,11 +22,12 @@ interface TerrainWalkOptions {
 
 const eyeHeightMeters = 1.7;
 /**
- * Big maps have coarse triangles a real eye would sink into, so the eye never drops below this many
- * world units: real height up to roughly an 11 km map, then a rising drone.
+ * The mesh has a fixed vertex grid, so its facets grow with the map span; an eye nearer than a few
+ * facets sees flat triangles. This floor (about 40 m on an 8 km map) wins on all but sub-kilometre
+ * maps, where the real 1.7 m eye applies. Dialled in by comparing 1.7, 20 and 60 m on Errigal.
  */
-const minimumEyeHeightUnits = 0.0003;
-// Speed and jump scale with the eye, so a stroll feels the same on any map: about 5 m/s at 1.7 m.
+const minimumEyeHeightUnits = 0.01;
+// Speed and jump scale with the eye, so a stroll feels the same on any map: about a minute across.
 const walkEyeHeightsPerSecond = 3;
 const sprintMultiplier = 4;
 // A floaty hop: peaks at three quarters of eye height and lands after 0.6 s.
@@ -166,7 +167,8 @@ export function createTerrainWalk(options: TerrainWalkOptions): TerrainWalk {
     updateHint();
     canvas.parentElement?.append(hint);
     landing = planLanding(camera, dropPoint, options.getGroundHeight, scale);
-    void canvas.requestPointerLock();
+    // Refused without a user gesture (scripted input); keys still walk, only mouse look is lost.
+    canvas.requestPointerLock().catch(() => undefined);
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('keydown', onKeyDown, true);
     document.addEventListener('keyup', onKeyUp, true);
