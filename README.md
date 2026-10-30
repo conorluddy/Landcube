@@ -4,7 +4,7 @@
 
 LANDCU.BE creates topographic artwork from generated landscapes or real-world elevation data. Design backgrounds for websites, presentations, and print in the browser, ask an agent to generate them, or export reproducible SVG and PNG assets from the command line.
 
-**[Open the web app](https://conorluddy.github.io/landcube/)** · [Install agent plugins](#install-agent-plugins) · [Use with an agent](#use-with-an-agent) · [Use with NPX](#use-with-npx)
+**[Open the web app](https://landcu.be/)** · [Install agent plugins](#install-agent-plugins) · [Use with an agent](#use-with-an-agent) · [Use with NPX](#use-with-npx)
 
 <img width="1512" height="830" alt="LANDCU.BE browser editor showing topographic artwork and style controls" src="https://github.com/user-attachments/assets/6bb628c7-cc4b-424b-a004-409b6e4c09ef" />
 
@@ -21,7 +21,7 @@ No account or backend is needed. The hosted web app (not local, forked or self-h
 
 ## Use the web app
 
-1. Open **[LANDCU.BE](https://conorluddy.github.io/landcube/)**. The studio starts in **3D** on **Errigal**, loaded as real terrain from tiles bundled with the site, so the first view needs no tile downloads. Browsers without WebGL 2 fall back to 2D. A shared style link opens the 2D design it encodes instead.
+1. Open **[LANDCU.BE](https://landcu.be/)**. The studio starts in **3D** on **Errigal**, loaded as real terrain from tiles bundled with the site, so the first view needs no tile downloads. Browsers without WebGL 2 fall back to 2D. A shared style link opens the 2D design it encodes instead.
 2. In **Terrain**, choose another preset or enter coordinates, set the **Area span** slider (2–200 km), then select **Load terrain**. Select **Procedural** in the header for synthetic landscapes: adjust generated scale and detail, select **New landscape**, or lock the seed to retain a landscape while styling it. Select **Coordinates** to restore the last loaded place instantly. Presets set a suggested span that you can adjust before loading, and downloaded elevation tiles are cached in the browser.
 3. Use **Contours** for density or real-terrain meter intervals, line appearance and index contours. **Colour** contains canvas colour and palette presets. Palette presets also change contour colours and weights.
 4. Switch directly between **2D / 3D** in the header. **Scene** contains cursor interaction in 2D and lighting, floor, surface visibility and water presentation in 3D. Lighting is driven by a **Time of day** slider that sets sun height, colour and studio tint, from golden hour to moonlit night, with direction, intensity, fill, **Flat light** and **Haze** alongside. **Camera**, available in 3D, contains the lens (perspective or orthographic, and a 14–300 mm focal length that keeps the terrain framed while changing perspective), focus effects (**Tilt-shift** or **Depth of field** with f-stop aperture and click-to-pick focus) and exposure. **Model**, available in 3D, contains crop, physical dimensions and terrain shape.

@@ -3,7 +3,7 @@
   "version": "0.3.0",
   "description": "LANDCU.BE generates reproducible topographic SVG and PNG artwork from the command line.",
   "license": "MIT",
-  "homepage": "https://conorluddy.github.io/landcube/",
+  "homepage": "https://landcu.be/",
   "bugs": {
     "url": "https://github.com/conorluddy/landcube/issues"
   },

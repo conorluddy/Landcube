@@ -24,7 +24,7 @@ import {
 import type { RealTerrain } from './real-terrain';
 
 const cliConfigVersion = 1;
-const browserBaseUrl = 'https://conorluddy.github.io/landcube/';
+const browserBaseUrl = 'https://landcu.be/';
 const designKeys = Object.keys(versionOneDesignDefaults) as (keyof DesignSettings)[];
 const booleanKeys = new Set<keyof DesignSettings>([
   'summitTrianglesEnabled',

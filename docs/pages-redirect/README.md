@@ -1,22 +1,17 @@
 # Pages redirect kit
 
-Keeps old `https://conorluddy.github.io/Topogra/?…` design links working after the rename to `landcube`.
+Keeps old `https://conorluddy.github.io/Topogra/?…` design links working after the repo rename to `landcube`.
 
 ## Why this is needed
 
-Renaming a GitHub repository redirects git and web traffic, but **not the project Pages URL**. Without this kit every shared `conorluddy.github.io/Topogra/…` link returns 404. Do not create a new repo named `Topogra`: it ends the git redirects.
+The site is served at `https://landcu.be/` (custom domain on the repo's Pages settings). While the repo is named `Topogra`, GitHub 301-redirects `conorluddy.github.io/Topogra/…` to `landcu.be`. That redirect is keyed on the repo name, so after the rename every old `conorluddy.github.io/Topogra/…` link returns 404. Do not create a new repo named `Topogra`: it ends the git redirects.
 
 ## Manual steps (in order)
 
-1. Merge the rename PR, then publish: `npm publish` (first `landcube` release, 0.3.0).
-2. `npm deprecate topogra "Renamed to landcube"`. `npx topogra` keeps working through the deprecated package.
-3. Rename the repo on GitHub to `conorluddy/landcube` (Settings > General), then check Pages is served at `https://conorluddy.github.io/landcube/`.
-4. Create the user-site repo `conorluddy/conorluddy.github.io` (none exists yet).
-5. Copy `docs/pages-redirect/Topogra/index.html` and `docs/pages-redirect/Topogra/404.html` into its `Topogra/` directory, push, and enable Pages from the default branch.
-6. Test: `https://conorluddy.github.io/Topogra/?v=1&seed=123#x` lands on `…/landcube/?v=1&seed=123#x`.
+1. Merge the release PR; confirm `https://landcu.be/` serves the new build.
+2. Stage the user-site repo `conorluddy/conorluddy.github.io` (it exists: private, 2017 content, Pages off) with `Topogra/index.html` from this kit. It must be public, or on a plan that allows Pages for private repos.
+3. Rename the repo to `conorluddy/landcube` (Settings > General), then immediately enable Pages on the user-site repo from its default branch.
+4. Test: `https://conorluddy.github.io/Topogra/?v=1&seed=123#x` lands on `https://landcu.be/?v=1&seed=123#x`, and `https://landcu.be/` still serves (the custom domain moves with the repo).
+5. `npm publish` (first `landcube` release, 0.3.0), then `npm deprecate topogra "Renamed to landcube"`. `npx topogra` keeps working through the deprecated package.
 
-Both files forward the path remainder, `location.search` and `location.hash`; the meta refresh is the no-JavaScript fallback. `404.html` covers deep links that have no matching file.
-
-## Host decision
-
-Final host for now: `conorluddy.github.io/landcube/`. A `landcu.be` custom domain via `public/CNAME` is a follow-up; `browserBaseUrl` in `src/cli.ts`, the analytics hostname in `index.html` and README links would then change with it.
+`index.html` forwards the path remainder, `location.search` and `location.hash`; the meta refresh is the no-JavaScript fallback and drops the query, so v1 design links depend on JavaScript. There is no `404.html`: GitHub Pages only serves a 404 page from the site root, and shared links all target `/Topogra/?…`.
