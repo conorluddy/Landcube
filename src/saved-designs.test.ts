@@ -123,3 +123,74 @@ void test('fitThumbnail keeps small previews and drops oversized ones', () => {
   assert.equal(fitThumbnail('<svg/>'), '<svg/>');
   assert.equal(fitThumbnail('x'.repeat(savedDesignThumbnailMaxBytes + 1)), null);
 });
+
+const savedRoute = {
+  version: 1,
+  id: 'route-1',
+  name: 'Ridge',
+  provenance: 'drawn',
+  waypoints: [
+    { latitude: 55.01, longitude: -8.14 },
+    { latitude: 55.02, longitude: -8.13 },
+  ],
+  namedWaypoints: [{ name: 'Hut', latitude: 55.01, longitude: -8.14 }],
+  slopeThresholdPercent: 15,
+} as const;
+const savedTerrain = { latitude: 55.01, longitude: -8.14, spanKm: 12, maxDepth: 40 };
+
+function readBack(entry: unknown): SavedDesign | undefined {
+  const result = readSavedDesigns(memoryStorage(JSON.stringify([entry])));
+
+  assert.ok(result.ok);
+
+  return result.data[0];
+}
+
+void test('a design with terrain and a route round-trips through storage unchanged', () => {
+  const withRoute: SavedDesign = {
+    ...design('1'),
+    source: 'real',
+    terrain: savedTerrain,
+    route: {
+      ...savedRoute,
+      waypoints: [...savedRoute.waypoints],
+      namedWaypoints: [...savedRoute.namedWaypoints],
+    },
+  };
+  const storage = memoryStorage();
+
+  writeSavedDesigns(storage, [withRoute]);
+
+  assert.deepEqual(readSavedDesigns(storage), { ok: true, data: [withRoute] });
+});
+
+void test('entries saved before routes existed still load without terrain or route', () => {
+  assert.deepEqual(readBack(design('1')), design('1'));
+});
+
+void test('a malformed route is dropped but the design and its terrain survive', () => {
+  const entry = {
+    ...design('1'),
+    terrain: savedTerrain,
+    route: { ...savedRoute, waypoints: [{ latitude: 'x' }] },
+  };
+
+  assert.deepEqual(readBack(entry), { ...design('1'), terrain: savedTerrain });
+});
+
+void test('a route with an unknown version or out-of-range threshold is dropped', () => {
+  assert.equal(
+    readBack({ ...design('1'), route: { ...savedRoute, version: 2 } })?.route,
+    undefined,
+  );
+  assert.equal(
+    readBack({ ...design('1'), route: { ...savedRoute, slopeThresholdPercent: 500 } })?.route,
+    undefined,
+  );
+});
+
+void test('malformed terrain is dropped but the design survives', () => {
+  const entry = { ...design('1'), terrain: { ...savedTerrain, latitude: 120 } };
+
+  assert.deepEqual(readBack(entry), design('1'));
+});

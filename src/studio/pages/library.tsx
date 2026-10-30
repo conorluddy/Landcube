@@ -1,13 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { getDesignUrl, parseDesignParameters } from '../../design-settings';
+import { getDesignUrl } from '../../design-settings';
 import {
   addSavedDesign,
   readSavedDesigns,
   removeSavedDesign,
   writeSavedDesigns,
   type SavedDesign,
+  type SavedRoute,
+  type SavedTerrain,
 } from '../../saved-designs';
 import type { OutputRenderer } from '../../types/export';
+import type { ActiveRoute } from '../../types/terrain-analysis';
 import { Button } from '../../ui/button';
 import { EmptyState } from '../../ui/empty-state';
 import { ModelCard } from '../../ui/model-card';
@@ -75,19 +78,15 @@ export function LibraryPage({
   };
 
   const open = (design: SavedDesign): void => {
-    const settings = readDesignLink(design.link);
+    void c.restoreSavedDesign(design).then((result) => {
+      if (!result.ok) {
+        setNotice({ kind: 'fault', text: result.error.message });
 
-    if (settings === null) {
-      setNotice({
-        kind: 'fault',
-        text: `${design.name} could not be opened because its saved link is invalid. Delete it and save again.`,
-      });
+        return;
+      }
 
-      return;
-    }
-
-    c.design(settings);
-    c.workspace({ page: 'studio' });
+      c.workspace({ page: 'studio' });
+    });
   };
 
   return (
@@ -148,6 +147,7 @@ function createSavedDesign(state: StudioState, renderer: OutputRenderer): SavedD
   const isReal = state.source.terrain !== undefined;
   const placeName = describeTarget(state, undefined).title;
   const now = new Date();
+  const route = state.workspace.route?.active;
 
   return {
     id: `${now.getTime().toString(36)}-${state.design.seed.toString(36)}`,
@@ -157,18 +157,28 @@ function createSavedDesign(state: StudioState, renderer: OutputRenderer): SavedD
     thumbnailSvg: createDesignThumbnailSvg(state.design, renderer),
     source: isReal ? 'real' : 'procedural',
     seedOrPlace: isReal ? placeName : String(state.design.seed),
+    ...(isReal && { terrain: getSavedTerrain(state) }),
+    ...(route && { route: toSavedRoute(route) }),
   };
 }
 
-/** Parses a stored design link exactly as a pasted URL would be; null when it is not a valid link. */
-function readDesignLink(link: string) {
-  try {
-    const result = parseDesignParameters(new URL(link).searchParams);
+function getSavedTerrain(state: StudioState): SavedTerrain {
+  const { latitude, longitude, spanKm, elevationFloor, maxDepth } = state.source;
 
-    return result.ok ? result.data.settings : null;
-  } catch {
-    return null;
-  }
+  return {
+    latitude,
+    longitude,
+    spanKm,
+    maxDepth,
+    ...(elevationFloor !== undefined && { elevationFloor }),
+  };
+}
+
+/** Drops session-only `originalPoints`; the simplified waypoints are the saved geometry. */
+function toSavedRoute(route: ActiveRoute): SavedRoute {
+  const { id, name, provenance, waypoints, namedWaypoints, slopeThresholdPercent } = route;
+
+  return { version: 1, id, name, provenance, waypoints, namedWaypoints, slopeThresholdPercent };
 }
 
 function describeSavedDesign(design: SavedDesign): string {
