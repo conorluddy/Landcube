@@ -67,6 +67,7 @@ import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js
 import { terrain3dElevationScale } from './terrain-surface';
 import {
   createTerrainModel,
+  defaultHeightExaggeration,
   defaultTerrainModelSettings,
   getFrameUnitsPerMm,
   type TerrainModelSettings,
@@ -380,7 +381,7 @@ export function createTerrain3d(
   applyLighting();
   scene.add(fillLight, sunlight);
   let modelSettings: TerrainModelSettings = { ...defaultTerrainModelSettings };
-  let exaggeration = 0.3;
+  let exaggeration = defaultHeightExaggeration;
   let model: TerrainModel | undefined;
   let modelKey = '';
   let terracedContours: Contour[] | undefined;
