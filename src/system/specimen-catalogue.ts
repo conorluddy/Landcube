@@ -1,5 +1,5 @@
 import type { Specimen } from '../ui/specimens';
-import type { CodedPart } from './registry.types';
+import type { CodedPart, ComponentPart } from './registry.types';
 
 /**
  * Every `src/ui` specimen, the same definitions `/specimens.html` and the screenshot suite use.
@@ -38,9 +38,33 @@ export function getComponentSpecimens(component: string): ComponentSpecimens {
   return found;
 }
 
-/** How many plates a part shows: its specimens, or its drawn cells. */
+/** The specimens a component part shows: its curated `plates` in order, or every specimen. */
+export function getPartSpecimens(part: ComponentPart): readonly Specimen[] {
+  const { specimens } = getComponentSpecimens(part.component);
+
+  if (part.plates === undefined) {
+    return specimens;
+  }
+
+  return part.plates.map((key) => {
+    const specimen = specimens.find((candidate) => plateKey(candidate) === key);
+
+    if (!specimen) {
+      throw new Error(
+        `Part "${part.id}" lists plate "${key}", which ${part.component}.specimens.tsx doesn't define.`,
+      );
+    }
+
+    return specimen;
+  });
+}
+
+/** How many plates a part shows: its (curated) specimens, or its drawn cells. */
 export function countPlates(part: CodedPart): number {
-  return part.kind === 'component'
-    ? getComponentSpecimens(part.component).specimens.length
-    : part.cells.length;
+  return part.kind === 'component' ? getPartSpecimens(part).length : part.cells.length;
+}
+
+/** 'primary/hover': a specimen's key without its component, as `plates` lists it. */
+export function plateKey(specimen: Specimen): string {
+  return [specimen.variant, specimen.size, specimen.state].filter(Boolean).join('/');
 }

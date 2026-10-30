@@ -22,6 +22,22 @@ void test('every src/ui component with specimens has exactly one part, and every
   assert.equal(new Set(partComponents).size, partComponents.length, 'A component has two parts.');
 });
 
+void test('curated plates name real specimens of their component, once each', async () => {
+  const keysByComponent = await loadSpecimenKeys();
+
+  for (const part of systemParts) {
+    if (part.kind !== 'component' || part.plates === undefined) {
+      continue;
+    }
+
+    const known = keysByComponent.get(part.component) ?? [];
+    const unknown = part.plates.filter((key) => !known.includes(key));
+
+    assert.deepEqual(unknown, [], `${part.id} lists plates its specimens file doesn't define`);
+    assert.equal(new Set(part.plates).size, part.plates.length, `${part.id} repeats a plate`);
+  }
+});
+
 void test('part ids are unique', () => {
   const ids = systemParts.map((part) => part.id);
 
@@ -74,6 +90,11 @@ void test('every drawn cell renders as a plate', () => {
 // === HELPERS ===
 
 async function loadSpecimenComponentNames(): Promise<string[]> {
+  return [...(await loadSpecimenKeys()).keys()];
+}
+
+/** Each component's plate keys (`variant/size/state`), read from its specimens file. */
+async function loadSpecimenKeys(): Promise<Map<string, string[]>> {
   const files = [
     ...readdirSync(uiDirectory).map((name) => new URL(name, uiDirectory)),
     ...readdirSync(new URL('overlays/', uiDirectory)).map(
@@ -84,5 +105,12 @@ async function loadSpecimenComponentNames(): Promise<string[]> {
     files.map(async (url) => (await import(url.href)) as { default: Specimen[] }),
   );
 
-  return modules.map((module) => module.default[0].component);
+  return new Map(
+    modules.map((module) => [
+      module.default[0].component,
+      module.default.map((specimen) =>
+        [specimen.variant, specimen.size, specimen.state].filter(Boolean).join('/'),
+      ),
+    ]),
+  );
 }

@@ -49,9 +49,11 @@ export default function SystemMode({
     setNavSectionId(part.section);
   }, [part.section]);
 
-  // The control that opened this mode unmounted with the studio chrome; keep keyboard users in place.
+  // The control that opened this mode is hidden with the studio chrome; keep keyboard users in place.
   useEffect(() => {
-    const isFocusLost = document.activeElement === null || document.activeElement === document.body;
+    const focused = document.activeElement;
+    // Hidden by Activity, not yet blurred: the browser moves focus off it only on its next frame.
+    const isFocusLost = focused === null || focused === document.body || !focused.checkVisibility();
 
     if (isFocusedOnEntry && isFocusLost) {
       document
@@ -104,13 +106,7 @@ export default function SystemMode({
         onExit={onExit}
       />
       <SystemHud part={part} plateCount={countPlates(part)} />
-      <SystemStage
-        part={part}
-        section={section}
-        previousPart={stepPart(systemParts, part.id, -1)}
-        nextPart={stepPart(systemParts, part.id, 1)}
-        onSelectPart={onSelectPart}
-      />
+      <SystemStage part={part} onSelectPart={onSelectPart} />
       <SystemNav
         sections={systemSections}
         parts={systemParts}

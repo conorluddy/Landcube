@@ -74,3 +74,25 @@ void test('hidden sections leave the rail and stay hidden even when active', () 
 void test('section ids lower-case the registry id', () => {
   assert.equal(getInspectorSectionId('Model'), 'inspector-model');
 });
+
+void test('InspectorPanel can show no rail section pressed while keeping its body section', () => {
+  const markup = renderMarkup(
+    <InspectorPanel
+      id="inspector"
+      label="Parts"
+      railLabel="Section"
+      sections={[
+        { id: 'A', index: 1, code: 'AAAA', title: 'Alpha' },
+        { id: 'B', index: 2, code: 'BBBB', title: 'Beta' },
+      ]}
+      activeSectionId="A"
+      railSelectionId={null}
+      onSelectSection={() => undefined}
+      isCollapsed={false}
+      renderSection={(id) => `Body ${id}`}
+    />,
+  );
+
+  assert.ok(!markup.includes('aria-pressed="true"'));
+  assert.match(markup, /Body A/);
+});

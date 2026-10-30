@@ -30,6 +30,8 @@ export interface InspectorPanelProps<T extends string> {
   header?: InspectorHeader;
   /** Pinned to the bottom of the vertical rail, e.g. a keyboard hint. */
   railFooter?: ReactNode;
+  /** The section the rail shows pressed when it differs from the body's; null for none. */
+  railSelectionId?: T | null;
 }
 
 export interface InspectorHeader {
@@ -56,6 +58,7 @@ export function InspectorPanel<T extends string>({
   renderSection,
   header,
   railFooter,
+  railSelectionId = activeSectionId,
 }: InspectorPanelProps<T>): React.JSX.Element {
   const activeSection = sections.find((section) => section.id === activeSectionId);
   const shownHeader: InspectorHeader | undefined =
@@ -81,7 +84,7 @@ export function InspectorPanel<T extends string>({
       <SectionRail
         label={railLabel}
         sections={sections}
-        activeSectionId={activeSectionId}
+        activeSectionId={railSelectionId}
         onSelectSection={onSelectSection}
         hiddenSectionIds={hiddenSectionIds}
         orientation={railOrientation}

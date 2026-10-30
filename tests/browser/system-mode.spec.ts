@@ -148,3 +148,52 @@ test('a deep link on a phone opens the studio and clears the link', async ({ pag
   await expect(page.getByRole('complementary', { name: 'Design system parts' })).toHaveCount(0);
   await expect(page).not.toHaveURL(/mode=system/);
 });
+
+test('a plate keeps its value after browsing away and back', async ({ page }) => {
+  await page.goto(`${appUrl}?mode=system&part=ruler-slider`);
+  const slider = page
+    .getByRole('region', { name: 'Ruler slider specimens' })
+    .getByRole('slider')
+    .first();
+
+  await slider.focus();
+  await page.keyboard.press('End');
+  const moved = await slider.inputValue();
+
+  await currentPart(page).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('heading', { level: 1, name: 'Select' })).toBeVisible();
+  await page.keyboard.press('ArrowUp');
+  await expect(page.getByRole('heading', { level: 1, name: 'Ruler slider' })).toBeVisible();
+  await expect(slider).toHaveValue(moved);
+});
+
+test('studio and system state both survive a round trip', async ({ page }) => {
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: 'Coordinates' }).click();
+  const placeSearch = page.getByRole('combobox', { name: /Search/ });
+
+  await placeSearch.fill('Ben Nevis');
+  await page.getByRole('button', { name: 'Design system ◧' }).click();
+  await page.getByRole('searchbox').fill('glass');
+  await page.getByRole('searchbox').blur();
+  await page.keyboard.press('Escape');
+  await expect(placeSearch).toHaveValue('Ben Nevis');
+
+  await page.getByRole('button', { name: 'Design system ◧' }).click();
+  await expect(page.getByRole('searchbox')).toHaveValue('glass');
+});
+
+test('the rail shows no section pressed while Find lists results', async ({ page }) => {
+  await openSystemMode(page);
+  const rail = partsNav(page).getByRole('navigation', { name: 'Design system section' });
+
+  await expect(rail.locator('[aria-pressed="true"]')).toHaveCount(1);
+  await page.getByRole('searchbox').fill('glass');
+  await expect(rail.locator('[aria-pressed="true"]')).toHaveCount(0);
+});
+
+test('a curated part says how many of its specimens it shows', async ({ page }) => {
+  await page.goto(`${appUrl}?mode=system&part=button`);
+  await expect(page.getByText('08 of 33 plates')).toBeVisible();
+});

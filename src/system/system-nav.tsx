@@ -52,6 +52,7 @@ export function SystemNav({
       railLabel="Design system section"
       sections={sections}
       activeSectionId={activeSectionId}
+      railSelectionId={hits === undefined ? activeSectionId : null}
       onSelectSection={onSelectSection}
       isCollapsed={false}
       headerTag={`${formatCount(sectionParts.length)} parts`}

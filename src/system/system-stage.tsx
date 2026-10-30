@@ -1,39 +1,37 @@
-import { useEffect, useRef, useState } from 'react';
+import { Activity, useEffect, useRef, useState } from 'react';
 import { GroupHeader } from '../ui/group-header';
 import { GlassPanel } from '../ui/glass-panel';
 import { Tag } from '../ui/tag';
 import { specimenKey, type Specimen } from '../ui/specimens';
 import { FoundationPlate } from './foundation-plates';
 import { LayoutPlate } from './layout-plates';
-import { formatCount } from './part-search';
+import { formatCount, stepPart } from './part-search';
+import { systemParts, systemSections } from './registry';
 import { Plate } from './plate';
-import type { CodedPart, SpecRow, SystemSection } from './registry.types';
-import { countPlates, getComponentSpecimens } from './specimen-catalogue';
+import type { CodedPart, SpecRow, SystemSection, SystemSectionId } from './registry.types';
+import { countPlates, getComponentSpecimens, getPartSpecimens } from './specimen-catalogue';
 import { useTokenValue } from './token-value';
 
 const forceableStates = new Set(['hover', 'focus', 'active']);
 const fadeOutMs = 140;
 
 /**
- * The specimen book page for one part: title block printed on the ground, the plates, the spec
- * table and prev / next. Fades out, swaps and scrolls to the top when the part changes.
+ * The specimen book: one page per part, with the title block printed on the ground, the plates,
+ * the spec table and prev / next. Fades out, swaps and scrolls to the top when the part changes.
+ * Visited pages stay mounted but hidden (`Activity`), so a slider dragged on one part keeps its
+ * value after browsing away and back.
  */
 export function SystemStage({
   part,
-  section,
-  previousPart,
-  nextPart,
   onSelectPart,
 }: {
   part: CodedPart;
-  section: SystemSection;
-  previousPart: CodedPart;
-  nextPart: CodedPart;
   onSelectPart: (id: string) => void;
 }): React.JSX.Element {
   const stage = useRef<HTMLDivElement>(null);
-  const [shown, setShown] = useState({ part, section, previousPart, nextPart });
-  const isFadingOut = shown.part.id !== part.id;
+  const [shownPart, setShownPart] = useState(part);
+  const [visitedParts, setVisitedParts] = useState<readonly CodedPart[]>([part]);
+  const isFadingOut = shownPart.id !== part.id;
 
   useEffect(() => {
     if (!isFadingOut) {
@@ -41,26 +39,37 @@ export function SystemStage({
     }
 
     const timer = window.setTimeout(() => {
-      setShown({ part, section, previousPart, nextPart });
+      setShownPart(part);
+      setVisitedParts((visited) => (visited.includes(part) ? visited : [...visited, part]));
       stage.current?.scrollTo({ top: 0 });
     }, fadeOutMs);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [isFadingOut, part, section, previousPart, nextPart]);
+  }, [isFadingOut, part]);
 
   return (
     <div
       ref={stage}
       className="system-stage"
       data-fading={isFadingOut ? 'true' : undefined}
-      aria-label={`${shown.part.name} specimens`}
+      aria-label={`${shownPart.name} specimens`}
       role="region"
     >
-      <article className="system-stage__page">
-        <StagePage {...shown} onSelectPart={onSelectPart} />
-      </article>
+      {visitedParts.map((visited) => (
+        <Activity key={visited.id} mode={visited.id === shownPart.id ? 'visible' : 'hidden'}>
+          <article className="system-stage__page">
+            <StagePage
+              part={visited}
+              section={findSection(visited.section)}
+              previousPart={stepPart(systemParts, visited.id, -1)}
+              nextPart={stepPart(systemParts, visited.id, 1)}
+              onSelectPart={onSelectPart}
+            />
+          </article>
+        </Activity>
+      ))}
     </div>
   );
 }
@@ -94,7 +103,11 @@ function StagePage({
         <h1 className="system-title__name">{part.name}</h1>
         <p className="system-title__summary">{part.summary}</p>
         <div className="system-title__tags">
-          <Tag variant="outlineMuted">{`${formatCount(plateCount)} plates`}</Tag>
+          <Tag variant="outlineMuted">
+            {component !== undefined && plateCount < component.specimens.length
+              ? `${formatCount(plateCount)} of ${formatCount(component.specimens.length)} plates`
+              : `${formatCount(plateCount)} plates`}
+          </Tag>
           {part.usedIn !== undefined && (
             <Tag variant="outlineMuted">{`Used in ${part.usedIn}`}</Tag>
           )}
@@ -124,7 +137,7 @@ function StagePage({
 function renderPlates(part: CodedPart): React.ReactNode {
   switch (part.kind) {
     case 'component':
-      return getComponentSpecimens(part.component).specimens.map((specimen) => (
+      return getPartSpecimens(part).map((specimen) => (
         <SpecimenPlate
           key={specimenKey(specimen)}
           specimen={specimen}
@@ -228,4 +241,8 @@ function StepButton({
       <span className="system-step__name">{part.name}</span>
     </button>
   );
+}
+
+function findSection(id: SystemSectionId): SystemSection {
+  return systemSections.find((section) => section.id === id) ?? systemSections[0];
 }

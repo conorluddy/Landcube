@@ -37,6 +37,7 @@ export function StudioFooter({
   state,
   inspectorId,
   inspectorToggleRef,
+  systemLinkRef,
   onOpenSystem,
   onPreloadSystem,
 }: {
@@ -44,6 +45,8 @@ export function StudioFooter({
   state: StudioState;
   inspectorId: string;
   inspectorToggleRef: Ref<HTMLButtonElement>;
+  /** The Design system link, so focus can return to it when the gallery closes. */
+  systemLinkRef: Ref<HTMLButtonElement>;
   /** Flips the studio into design-system mode. */
   onOpenSystem: () => void;
   /** Fetches the system chunk ahead of a likely click, so the flip lands on loaded content. */
@@ -141,6 +144,7 @@ export function StudioFooter({
         <DataSources state={state} />
         <ThemeToggle />
         <button
+          ref={systemLinkRef}
           type="button"
           className="studio-mode-link"
           onClick={onOpenSystem}
