@@ -1,19 +1,22 @@
 import { componentParts } from './parts/components';
 import { foundationParts } from './parts/foundations';
+import { layoutParts } from './parts/layouts';
 import type { CodedPart, SystemPart, SystemSection, SystemSectionId } from './registry.types';
 
-/** Rail order. A section with no parts yet still shows, so the numbering never shifts. */
+/** Rail order. */
 export const systemSections: readonly SystemSection[] = [
   section(1, 'FNDN', 'Foundations'),
   section(2, 'PRIM', 'Primitives'),
   section(3, 'COMP', 'Composites'),
   section(4, 'OVLY', 'Map overlays'),
+  section(5, 'LYOT', 'Layouts'),
 ];
 
 /** Every part in browse order, coded per section in that order (`PRIM.04`). */
 export const systemParts: readonly CodedPart[] = assignCodes([
   ...foundationParts,
   ...componentParts,
+  ...layoutParts,
 ]);
 
 export function findPartById(id: string): CodedPart | undefined {

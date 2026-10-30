@@ -50,7 +50,15 @@ export interface FoundationPart extends PartBase {
   cells: FoundationCell[];
 }
 
-export type SystemPart = ComponentPart | FoundationPart;
+/** Shell layouts: diagrams of the desktop frame and a scaled phone built from real components. */
+export interface LayoutPart extends PartBase {
+  kind: 'layout';
+  /** Where the layout lives, e.g. 'src/studio/studio.css'. */
+  source: string;
+  cells: LayoutCell[];
+}
+
+export type SystemPart = ComponentPart | FoundationPart | LayoutPart;
 
 /** A part with its section code assigned in registry order, e.g. 'PRIM.04'. */
 export type CodedPart = SystemPart & { code: string };
@@ -90,3 +98,7 @@ export type FoundationCell = CellCaption &
   );
 
 export type FoundationKind = FoundationCell['k'];
+
+// === LAYOUT CELLS ===
+
+export type LayoutCell = CellCaption & ({ k: 'desktopShell' } | { k: 'mobileShell' });

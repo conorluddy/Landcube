@@ -89,3 +89,19 @@ test('a system chunk that fails to load returns to the studio with a message', a
   await expect(page.getByRole('heading', { name: 'LANDCU.BE Studio' })).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'Landscape controls' })).toBeVisible();
 });
+
+test('the mobile layout snaps its real sheet and hides map controls when full', async ({
+  page,
+}) => {
+  await openSystemMode(page);
+  await partsNav(page).getByRole('button', { name: 'Layouts' }).click();
+  await partsNav(page)
+    .getByRole('button', { name: /Mobile studio/ })
+    .click();
+
+  const phone = page.locator('.system-mobile-shell');
+
+  await phone.getByRole('button', { name: 'Full' }).click();
+  await expect(phone.locator('[data-sheet-snap="full"]')).toBeVisible();
+  await expect(phone.locator('.system-mobile-shell__controls')).toHaveCSS('opacity', '0');
+});

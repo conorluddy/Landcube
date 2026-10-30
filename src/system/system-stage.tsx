@@ -4,6 +4,7 @@ import { GlassPanel } from '../ui/glass-panel';
 import { Tag } from '../ui/tag';
 import { specimenKey, type Specimen } from '../ui/specimens';
 import { FoundationPlate } from './foundation-plates';
+import { LayoutPlate } from './layout-plates';
 import { formatCount } from './part-search';
 import { Plate } from './plate';
 import type { CodedPart, SpecRow, SystemSection } from './registry.types';
@@ -81,7 +82,7 @@ function StagePage({
 }): React.JSX.Element {
   const component = part.kind === 'component' ? getComponentSpecimens(part.component) : undefined;
   const plateCount = countPlates(part);
-  const source = component?.sourcePath ?? (part.kind === 'foundation' ? part.source : '');
+  const source = component?.sourcePath ?? (part.kind === 'component' ? '' : part.source);
 
   return (
     <>
@@ -103,20 +104,7 @@ function StagePage({
       <section className="system-stage__block system-print" aria-label="Specimens">
         <GroupHeader title="Specimens" trailing={`${part.code}.A`} />
       </section>
-      <div className="system-plates">
-        {component !== undefined
-          ? component.specimens.map((specimen) => (
-              <SpecimenPlate
-                key={specimenKey(specimen)}
-                specimen={specimen}
-                isFlush={part.section === 'OVLY'}
-              />
-            ))
-          : part.kind === 'foundation' &&
-            part.cells.map((cell, index) => (
-              <FoundationPlate key={`${cell.k}-${cell.label}-${String(index)}`} cell={cell} />
-            ))}
-      </div>
+      <div className="system-plates">{renderPlates(part)}</div>
       {part.spec.length > 0 && (
         <>
           <div className="system-stage__block system-print">
@@ -131,6 +119,25 @@ function StagePage({
       </nav>
     </>
   );
+}
+
+function renderPlates(part: CodedPart): React.ReactNode {
+  switch (part.kind) {
+    case 'component':
+      return getComponentSpecimens(part.component).specimens.map((specimen) => (
+        <SpecimenPlate
+          key={specimenKey(specimen)}
+          specimen={specimen}
+          isFlush={part.section === 'OVLY'}
+        />
+      ));
+    case 'foundation':
+      return part.cells.map((cell, index) => (
+        <FoundationPlate key={`${cell.k}-${cell.label}-${String(index)}`} cell={cell} />
+      ));
+    case 'layout':
+      return part.cells.map((cell) => <LayoutPlate key={cell.k} cell={cell} />);
+  }
 }
 
 function SpecimenPlate({
