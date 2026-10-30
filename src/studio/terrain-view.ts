@@ -25,6 +25,7 @@ interface StudioTerrainView {
   resetCamera: () => void;
   applyViewPreset: (preset: TerrainViewPreset) => void;
   setCameraDirection: (azimuthDegrees: number, elevationDegrees: number) => void;
+  walkAt: (clientX?: number, clientY?: number) => boolean;
   pickFocus: () => Promise<boolean>;
   captureStill: (scale: number) => HTMLCanvasElement;
   /** Arms a morph for the next 3D rebuild; the 2D view and an inactive 3D view always cut. */
@@ -65,6 +66,7 @@ export function createStudioTerrainView(
   let suspended = false;
   let floorPlace: FloorPlace | undefined;
   let interval: number | undefined;
+  let wasInspectorCollapsed = false;
   // The 3D module loads lazily, so listeners live here and are fanned out from one view subscription.
   const drawListeners = new Set<() => void>();
   const motion = createShellMotion(() => document.querySelector('.studio-shell'));
@@ -207,6 +209,17 @@ export function createStudioTerrainView(
               posePublisher.offer(view.getCameraPose());
             }
           },
+          (isWalking) => {
+            // Spike: the inspector and crosshair get out of the way while walking.
+            document.documentElement.toggleAttribute('data-walking', isWalking);
+
+            if (isWalking) {
+              wasInspectorCollapsed = controller.getSnapshot().workspace.collapsed;
+              controller.workspace({ collapsed: true });
+            } else {
+              controller.workspace({ collapsed: wasInspectorCollapsed });
+            }
+          },
         );
         view.subscribeDraw(() => {
           for (const listener of drawListeners) {
@@ -256,6 +269,7 @@ export function createStudioTerrainView(
     resetCamera: () => view?.reset(),
     applyViewPreset: (preset) => view?.applyViewPreset(preset),
     setCameraDirection: (azimuth, elevation) => view?.setCameraDirection(azimuth, elevation),
+    walkAt: (clientX, clientY) => (active ? (view?.walkAt(clientX, clientY) ?? false) : false),
     pickFocus: () => view?.pickFocus() ?? Promise.resolve(false),
     captureStill(scale) {
       if (!view || !active) {

@@ -29,6 +29,7 @@ function setup(fetchRoads?: typeof fetch, placeStorage?: Pick<Storage, 'getItem'
     },
     resetCamera: () => undefined,
     setCameraDirection: () => undefined,
+    walkAt: () => false,
     applyViewPreset: () => undefined,
     pickFocus: () => Promise.resolve(false),
     downloadStill: () => Promise.resolve({ width: 1, height: 1 }),

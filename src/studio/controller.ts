@@ -280,6 +280,8 @@ export interface StudioEffects {
   resetCamera(): void;
   applyViewPreset(preset: TerrainViewPreset): void;
   setCameraDirection(azimuthDegrees: number, elevationDegrees: number): void;
+  /** Spike: drops into first person at a viewport point (the orbit centre when omitted); false on a miss. */
+  walkAt(clientX?: number, clientY?: number): boolean;
   pickFocus(): Promise<boolean>;
   /** Resolves to the saved image's pixel size. */
   downloadStill(scale: TerrainStillScale): Promise<{ width: number; height: number }>;
@@ -371,6 +373,7 @@ export interface StudioController {
   resetCameraSettings: () => void;
   applyViewPreset: (preset: TerrainViewPreset) => void;
   setCameraDirection: (azimuthDegrees: number, elevationDegrees: number) => void;
+  walkAt: (clientX?: number, clientY?: number) => boolean;
   /** Arms a one-off terrain click that sets the depth-of-field focus point. */
   pickFocus: () => Promise<void>;
   model: (patch: Partial<StudioState['model']>) => boolean;
@@ -1202,6 +1205,9 @@ export function createStudioController(
     },
     setCameraDirection(azimuth, elevation) {
       effects?.setCameraDirection(azimuth, elevation);
+    },
+    walkAt(clientX, clientY) {
+      return effects?.walkAt(clientX, clientY) ?? false;
     },
     async pickFocus() {
       const pickId = ++latestFocusPickId;
