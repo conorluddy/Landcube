@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { maximumRouteSamples } from './constants/route-analysis';
-import { measureGroundMeters, sampleRoute } from './route-sampling';
+import { locateRouteDistance, measureGroundMeters, sampleRoute } from './route-sampling';
 import type { GeoPoint } from './types/terrain-analysis';
 
 const metersPerDegreeLatitude = (6371008.8 * Math.PI) / 180;
@@ -107,4 +107,39 @@ void test('a segment across the antimeridian is sampled the short way round', ()
     samples.every(({ point }) => Math.abs(point.longitude) > 179.99),
     JSON.stringify(samples),
   );
+});
+
+void test('locating a distance lands on the profile sample at that distance', () => {
+  const waypoints = [northOf(0), northOf(95), { latitude: 55.001, longitude: -7.998 }];
+  const { samples } = sampleRoute(waypoints, 10);
+
+  for (const { distanceMeters, point } of samples) {
+    const located = locateRouteDistance(waypoints, distanceMeters);
+
+    assert.ok(located);
+    assert.ok(measureGroundMeters(located, point) < 1e-6, `at ${distanceMeters} m`);
+  }
+});
+
+void test('locating a distance interpolates within a segment', () => {
+  const located = locateRouteDistance([northOf(0), northOf(100)], 25);
+
+  assert.ok(located);
+  assert.ok(Math.abs(measureGroundMeters(origin, located) - 25) < 1e-6);
+});
+
+void test('distances beyond the route clamp to its ends', () => {
+  const waypoints = [northOf(0), northOf(40), northOf(100)];
+
+  assert.deepEqual(locateRouteDistance(waypoints, -5), waypoints[0]);
+  assert.deepEqual(locateRouteDistance(waypoints, 1_000), waypoints[2]);
+});
+
+void test('a route with fewer than two points has nowhere to locate', () => {
+  assert.equal(locateRouteDistance([], 0), undefined);
+  assert.equal(locateRouteDistance([origin], 0), undefined);
+});
+
+void test('a non-finite distance is rejected', () => {
+  assert.throws(() => locateRouteDistance([northOf(0), northOf(10)], Number.NaN), RangeError);
 });

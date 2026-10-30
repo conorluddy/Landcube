@@ -9,6 +9,7 @@ import type { FloorPlace } from '../floor-geo';
 import type { RoadPath } from '../types/roads';
 import type { GrassGeography } from '../grass-coverage';
 import type { TerrainRouteOverlay } from '../terrain-3d-route';
+import type { FramePoint } from '../real-terrain-projection';
 import { getAutoRotateSpeed, type TerrainViewPreset } from '../terrain-camera';
 import { createShellMotion } from './shell-motion';
 import { createCameraPosePublisher } from './camera-pose';
@@ -28,6 +29,8 @@ interface StudioTerrainView {
   getStl: () => ArrayBuffer;
   /** The model point under a viewport position while 3D is active, as fractions across the model. */
   getSurfaceFractionAt: (clientX: number, clientY: number) => { x: number; y: number } | undefined;
+  /** The profile-inspection marker, in model-crop units; main re-sends it after each 3D update. */
+  setRouteMarker: (point: FramePoint | undefined) => void;
   update: (
     contours: Contour[],
     width: number,
@@ -248,6 +251,7 @@ export function createStudioTerrainView(
     },
     getSurfaceFractionAt: (clientX, clientY) =>
       active ? view?.getSurfaceFractionAt(clientX, clientY) : undefined,
+    setRouteMarker: (point) => view?.setRouteMarker(point),
     getStl() {
       if (!view || !active) {
         throw new Error('Select the 3D view before downloading STL.');

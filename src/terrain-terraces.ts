@@ -298,6 +298,73 @@ export function createTerracedTerrainBuffers(
   };
 }
 
+/** Shelf height at a plan point, in the buffers' units; undefined off the model footprint. */
+export type TerraceHeightSampler = (x: number, z: number) => number | undefined;
+
+/**
+ * Looks up the displayed height of a terraced surface by finding the shelf under a plan point,
+ * so overlays sit on exactly the steps `createTerracedTerrainBuffers` cut rather than re-deriving
+ * them. Risers are vertical and have no plan area; a point on a riser line resolves to the upper
+ * shelf so anything resting there stays out of the step.
+ */
+export function createTerraceHeightSampler(surface: TerrainSurfaceBuffers): TerraceHeightSampler {
+  const { positions, indices } = surface;
+  const shelves: number[] = [];
+  let minimumX = Infinity;
+  let minimumZ = Infinity;
+  let maximumX = -Infinity;
+  let maximumZ = -Infinity;
+
+  for (let offset = 0; offset < indices.length; offset += 3) {
+    const [a, b, c] = [indices[offset], indices[offset + 1], indices[offset + 2]];
+
+    if (Math.abs(getPlanArea(positions, a, b, c)) > 1e-12) {
+      shelves.push(a, b, c);
+
+      for (const id of [a, b, c]) {
+        minimumX = Math.min(minimumX, positions[id * 3]);
+        maximumX = Math.max(maximumX, positions[id * 3]);
+        minimumZ = Math.min(minimumZ, positions[id * 3 + 2]);
+        maximumZ = Math.max(maximumZ, positions[id * 3 + 2]);
+      }
+    }
+  }
+
+  // About two shelves per bucket keeps lookups constant time on any terrace density.
+  const columns = Math.max(1, Math.min(1024, Math.ceil(Math.sqrt(shelves.length / 6))));
+  const cellX = (maximumX - minimumX) / columns || 1;
+  const cellZ = (maximumZ - minimumZ) / columns || 1;
+  const toColumn = (x: number) =>
+    Math.min(columns - 1, Math.max(0, Math.floor((x - minimumX) / cellX)));
+  const toRow = (z: number) =>
+    Math.min(columns - 1, Math.max(0, Math.floor((z - minimumZ) / cellZ)));
+  const buckets = createShelfBuckets(positions, shelves, columns, toColumn, toRow);
+  // Relative to the footprint, so float32 vertices on shared edges always match a shelf.
+  const tolerance = Math.max(maximumX - minimumX, maximumZ - minimumZ) * 1e-9;
+
+  return (x, z) => {
+    if (
+      !(x >= minimumX - tolerance && x <= maximumX + tolerance) ||
+      !(z >= minimumZ - tolerance && z <= maximumZ + tolerance)
+    ) {
+      return undefined;
+    }
+
+    const cell = toRow(z) * columns + toColumn(x);
+    let height: number | undefined;
+
+    for (let entry = buckets.starts[cell]; entry < buckets.starts[cell + 1]; entry++) {
+      const shelf = buckets.shelves[entry] * 3;
+
+      if (isInsideShelf(positions, shelves, shelf, x, z, tolerance)) {
+        height = Math.max(height ?? -Infinity, positions[shelves[shelf] * 3 + 1]);
+      }
+    }
+
+    return height;
+  };
+}
+
 /** Draw contours along the real upper edges of the risers, rather than over the former slopes. */
 export function createTerraceContours(
   edges: TerracedTerrainBuffers['contourEdges'],
@@ -332,4 +399,91 @@ export function createTerraceContours(
   }
 
   return contours;
+}
+
+// === HELPERS ===
+
+/** Twice the signed plan (x, z) area of a triangle. */
+function getPlanArea(positions: Float32Array, a: number, b: number, c: number): number {
+  return (
+    (positions[b * 3] - positions[a * 3]) * (positions[c * 3 + 2] - positions[a * 3 + 2]) -
+    (positions[b * 3 + 2] - positions[a * 3 + 2]) * (positions[c * 3] - positions[a * 3])
+  );
+}
+
+/** Shelf ids by grid cell, flattened: cell `i` holds `shelves[starts[i]..starts[i + 1])`. */
+function createShelfBuckets(
+  positions: Float32Array,
+  shelves: readonly number[],
+  columns: number,
+  toColumn: (x: number) => number,
+  toRow: (z: number) => number,
+): { starts: Uint32Array; shelves: Uint32Array } {
+  const ranges: [number, number, number, number][] = [];
+  const starts = new Uint32Array(columns * columns + 1);
+
+  for (let shelf = 0; shelf < shelves.length; shelf += 3) {
+    const xs = [0, 1, 2].map((corner) => positions[shelves[shelf + corner] * 3]);
+    const zs = [0, 1, 2].map((corner) => positions[shelves[shelf + corner] * 3 + 2]);
+    const range: [number, number, number, number] = [
+      toColumn(Math.min(...xs)),
+      toColumn(Math.max(...xs)),
+      toRow(Math.min(...zs)),
+      toRow(Math.max(...zs)),
+    ];
+
+    ranges.push(range);
+    forEachCell(range, columns, (cell) => {
+      starts[cell + 1]++;
+    });
+  }
+
+  for (let cell = 0; cell < columns * columns; cell++) {
+    starts[cell + 1] += starts[cell];
+  }
+
+  const filled = starts.slice(0, -1);
+  const bucketed = new Uint32Array(starts[columns * columns]);
+
+  ranges.forEach((range, shelf) => {
+    forEachCell(range, columns, (cell) => {
+      bucketed[filled[cell]++] = shelf;
+    });
+  });
+
+  return { starts, shelves: bucketed };
+}
+
+function forEachCell(
+  [firstColumn, lastColumn, firstRow, lastRow]: readonly [number, number, number, number],
+  columns: number,
+  visit: (cell: number) => void,
+): void {
+  for (let row = firstRow; row <= lastRow; row++) {
+    for (let column = firstColumn; column <= lastColumn; column++) {
+      visit(row * columns + column);
+    }
+  }
+}
+
+/** Edge tests in plan, accepting points within `tolerance` of an edge so seams never leak. */
+function isInsideShelf(
+  positions: Float32Array,
+  shelves: readonly number[],
+  shelf: number,
+  x: number,
+  z: number,
+  tolerance: number,
+): boolean {
+  const corners = [shelves[shelf], shelves[shelf + 1], shelves[shelf + 2]];
+  const orientation = Math.sign(getPlanArea(positions, corners[0], corners[1], corners[2]));
+
+  return corners.every((from, side) => {
+    const to = corners[(side + 1) % 3];
+    const edgeX = positions[to * 3] - positions[from * 3];
+    const edgeZ = positions[to * 3 + 2] - positions[from * 3 + 2];
+    const cross = edgeX * (z - positions[from * 3 + 2]) - edgeZ * (x - positions[from * 3]);
+
+    return cross * orientation >= -tolerance * Math.hypot(edgeX, edgeZ);
+  });
 }
