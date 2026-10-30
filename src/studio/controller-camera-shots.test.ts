@@ -91,6 +91,18 @@ void test('saving a shot mid-tour adds it to the running tour', () => {
   assert.equal(played.at(-1)?.length, 2);
 });
 
+void test('a tour that cannot restart after an edit says why', () => {
+  const { controller, effects } = setup();
+
+  controller.saveCameraShot();
+  controller.toggleCameraShotPlayback();
+  effects.playCameraShots = () => 'walking';
+  controller.saveCameraShot();
+
+  assert.equal(controller.getSnapshot().cameraShots.isPlaying, false);
+  assert.equal(controller.getSnapshot().status, 'Stop walking to use shots');
+});
+
 void test('removing the last shot stops the tour', () => {
   const { controller, stops } = setup();
 
