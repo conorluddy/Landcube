@@ -35,7 +35,7 @@ const artwork = terrain.replace(
       <stop offset="1" stop-color="#161b1e" stop-opacity="0.15"/></linearGradient>
   </defs>
   <rect width="1200" height="630" fill="url(#shade)"/>
-  <g fill="#edf4ee" font-family="Arial, sans-serif">
+  <g fill="#edf4ee" font-family="Geist">
     <text x="72" y="110" font-size="24" letter-spacing="5">LANDCU.BE</text>
     <text x="68" y="280" font-size="76" font-weight="700">Terrain into art.</text>
     <text x="72" y="350" font-size="28" fill="#b9cbbf">Real places. Seeded landscapes. Your style.</text>
@@ -44,4 +44,15 @@ const artwork = terrain.replace(
 </svg>`,
 );
 
-writeFileSync('public/social-preview.png', new Resvg(artwork).render().asPng());
+writeFileSync(
+  'public/social-preview.png',
+  new Resvg(artwork, {
+    font: {
+      fontFiles: ['scripts/assets/Geist-Regular.ttf', 'scripts/assets/Geist-Bold.ttf'],
+      loadSystemFonts: false,
+      defaultFontFamily: 'Geist',
+    },
+  })
+    .render()
+    .asPng(),
+);

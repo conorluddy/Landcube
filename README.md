@@ -181,7 +181,9 @@ Analytics still runs only on `landcu.be`. For a subdirectory deployment, serve o
 generated robots rules at the domain root, since crawlers read `/robots.txt` there.
 
 The social preview is committed as `public/social-preview.png`. To regenerate it after building
-the CLI, run `node scripts/build-social-preview.mjs`.
+the CLI, run `node scripts/build-social-preview.mjs`. The script uses bundled static Geist
+fonts in `scripts/assets/`, instantiated from `src/ui/fonts/Geist-Variable.woff2` at weights
+400 and 700; their license is in `public/fonts/LICENSE-Geist.txt`. System fonts are disabled.
 
 ## Install agent plugins
 

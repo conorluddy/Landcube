@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -16,6 +16,7 @@ for (const siteUrl of ['https://landcu.be/', 'https://example.com/studio/']) {
         {
           env: { ...process.env, LANDCUBE_SITE_URL: siteUrl },
           stdio: 'pipe',
+          timeout: 60_000,
         },
       );
       const html = readFileSync(join(directory, 'index.html'), 'utf8');
@@ -50,5 +51,27 @@ for (const siteUrl of ['https://landcu.be/', 'https://example.com/studio/']) {
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
+  });
+}
+
+for (const siteUrl of [
+  'example.com',
+  'ftp://example.com/',
+  'https://example.com/?design=123',
+  'https://example.com/#fragment',
+  'https://user@example.com/',
+  'https://:password@example.com/',
+]) {
+  void test(`production build rejects invalid deployment URL ${siteUrl}`, () => {
+    const result = spawnSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build'], {
+      env: { ...process.env, LANDCUBE_SITE_URL: siteUrl },
+      encoding: 'utf8',
+      timeout: 60_000,
+    });
+
+    assert.equal(result.error, undefined);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Invalid LANDCUBE_SITE_URL/);
+    assert.match(result.stderr, /https:\/\/example.com\/studio\//);
   });
 }
