@@ -1,0 +1,114 @@
+/* Studio surfaces beside the shell: the preset compare strip, the Model crop preview and the Copy style link dialog. */
+
+/* === PRESET COMPARE STRIP: bottom-centre of the visible viewport, clear of the readout card and compass === */
+.studio-compare {
+  position: absolute;
+  right: 500px;
+  bottom: 60px;
+  left: 324px;
+  z-index: 2;
+  display: flex;
+  gap: var(--lc-s-6);
+  align-items: center;
+  justify-content: center;
+  padding: var(--lc-s-4) var(--lc-s-6);
+  border: 1px solid var(--lc-line-panel);
+  border-radius: var(--lc-r-panel);
+  box-shadow: var(--lc-shadow-panel);
+}
+
+.studio-compare[data-inspector='collapsed'] {
+  right: 196px;
+}
+
+.studio-compare .lc-preset-strip {
+  min-width: 0;
+  margin-inline: 0;
+  padding-inline: 0;
+}
+
+.studio-compare__card {
+  display: flex;
+  flex: none;
+  scroll-snap-align: start;
+}
+
+.studio-compare__actions {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--lc-s-3);
+}
+
+.studio-compare .lc-status-message {
+  position: absolute;
+  bottom: calc(100% + var(--lc-s-4));
+  left: 0;
+}
+
+/* === MODEL CROP PREVIEW: markup from terrain-crop-controls.ts === */
+.select-row {
+  display: flex;
+  gap: var(--lc-s-6);
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+  margin: 0 0 16px;
+}
+
+.range-control {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 20px;
+  font-size: 12px;
+}
+
+.terrain-crop-preview {
+  display: block;
+  width: 100%;
+  max-height: 240px;
+  margin: 12px 0 18px;
+  overflow: visible;
+  border: 1px solid var(--lc-line);
+  border-radius: var(--lc-r-panel);
+  background: var(--lc-ink-0);
+  color: var(--lc-text-primary);
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+.terrain-crop-preview [data-crop-handle] {
+  cursor: nwse-resize;
+}
+
+.terrain-crop-preview .crop-north {
+  fill: var(--lc-white);
+  stroke: var(--lc-theme-color);
+  stroke-width: 2px;
+  paint-order: stroke;
+}
+
+.text-button {
+  color: var(--lc-text-secondary);
+}
+
+.export-hint {
+  margin: 12px 0 16px;
+  color: var(--lc-text-tertiary);
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+/* === COPY STYLE LINK DIALOG === */
+.studio-copy-link {
+  display: grid;
+  gap: var(--lc-s-6);
+}
+
+.studio-copy-link > .lc-button {
+  justify-self: start;
+}

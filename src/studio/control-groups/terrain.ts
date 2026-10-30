@@ -1,7 +1,7 @@
 /*
  * Terrain section (TERR.01 to TERR.03): autoplay and daylight, plus either the procedural seed
  * controls or the real-location search and coordinates, whichever matches the terrain source.
- * Row ids are the legacy field ids the e2e tests bind to. The pattern is in ./README.md.
+ * Row ids are the original field ids the e2e tests bind to. The pattern is in ./README.md.
  */
 import { createElement } from 'react';
 import {

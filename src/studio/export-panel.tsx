@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ExportSheet } from '../ui/export-sheet';
 import { SuccessSheet, type SuccessRow } from '../ui/success-sheet';
 import { terrainStillScales, type TerrainStillScale } from '../export/still-export';
-import type { PanelProps } from './panels';
+import type { PanelProps } from './controller';
 import type { OutputRenderer } from '../types/export';
 import type { FramePartId } from '../types/frame';
 import { createExportFile, createExportPreviewSvg, downloadExport } from '../export/image-export';

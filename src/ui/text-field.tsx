@@ -3,7 +3,9 @@ import { useId } from 'react';
 export interface TextFieldProps {
   label: string;
   value: string;
-  onChange: (value: string) => void;
+  onChange?: (value: string) => void;
+  /** Read-only fields select their whole value on focus, ready to copy. */
+  isReadOnly?: boolean;
   placeholder?: string;
   id?: string;
   disabled?: boolean;
@@ -17,6 +19,7 @@ export function TextField({
   label,
   value,
   onChange,
+  isReadOnly = false,
   placeholder = '—',
   id,
   disabled = false,
@@ -41,11 +44,17 @@ export function TextField({
         value={value}
         placeholder={placeholder}
         disabled={disabled}
+        readOnly={isReadOnly}
         data-mono={isMonospace}
         aria-invalid={error === undefined ? undefined : true}
         aria-describedby={error === undefined ? undefined : errorId}
         onChange={(event) => {
-          onChange(event.target.value);
+          onChange?.(event.target.value);
+        }}
+        onFocus={(event) => {
+          if (isReadOnly) {
+            event.target.select();
+          }
         }}
       />
       {error !== undefined && (

@@ -3,7 +3,7 @@ import { getDesignUrl } from '../design-settings';
 import { createExportPreviewSvg } from '../export/image-export';
 import type { OutputRenderer } from '../types/export';
 import { ModelDossier } from '../ui/model-dossier';
-import type { PanelProps } from './panels';
+import type { PanelProps } from './controller';
 import { buildDossierModel } from './dossier-model';
 import type { HudStore } from './hud-store';
 

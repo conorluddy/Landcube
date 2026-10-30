@@ -342,6 +342,12 @@ export interface StudioController {
   downloadStill: (scale: TerrainStillScale) => Promise<void>;
 }
 
+/** The controller and its current snapshot, passed to the studio panels. */
+export interface PanelProps {
+  controller: StudioController;
+  state: StudioState;
+}
+
 /** Pause between part downloads so each job paints and the browser sees separate saves. */
 const exportJobPaceMs = 120;
 

@@ -1,0 +1,252 @@
+/* Studio on phones: bottom-sheet inspector, map controls, root pages, tab bar and splash. Loaded after studio.css and studio-surfaces.css. */
+
+/*
+ * One header row, the inspector as a bottom sheet (BottomSheet in src/ui), 44px map controls
+ * down the right edge and the scale bar above the sheet. Sheet heights mirror bottom-sheet.css:
+ * peek 190px, half 55%, full 64px from the top.
+ */
+@media (max-width: 767px) {
+  .studio-brand,
+  .studio-github,
+  .studio-status .attribution,
+  .source-label {
+    display: none;
+  }
+
+  /* The tab bar sits below the sheet; a full sheet covers it and drops the offset. */
+  .studio-shell {
+    --studio-tab-bar-height: 84px;
+  }
+
+  .studio-shell > .lc-bottom-sheet {
+    top: auto;
+    right: 0;
+    bottom: var(--studio-tab-bar-height);
+    left: 0;
+    transition-property: height, bottom;
+  }
+
+  .studio-shell[data-sheet-snap='full'] > .lc-bottom-sheet {
+    bottom: 0;
+  }
+
+  .studio-shell[data-sheet-snap='peek'] {
+    --studio-sheet-height: 190px;
+  }
+
+  .studio-shell[data-sheet-snap='half'] {
+    --studio-sheet-height: min(55%, calc(100% - 64px));
+  }
+
+  .studio-map-controls {
+    position: absolute;
+    top: 64px;
+    right: var(--lc-s-6);
+    z-index: 3;
+    flex-direction: column;
+    height: auto;
+  }
+
+  .studio-shell[data-sheet-snap] .lc-hud-layer__instruments {
+    top: auto;
+    right: auto;
+    bottom: calc(var(--studio-sheet-height, 0px) + var(--studio-tab-bar-height) + var(--lc-s-6));
+    left: var(--lc-s-6);
+  }
+
+  /* The crop plane sits under the header, left of the map controls and above the sheet and scale bar. */
+  .studio-shell[data-sheet-snap] .lc-hud-layer__tools .lc-crop-frame {
+    inset: 64px 68px calc(var(--studio-sheet-height, 0px) + var(--studio-tab-bar-height) + 56px) 0;
+  }
+
+  /* The map controls' Reset view button stands in for the drawn compass. */
+  .studio-shell[data-sheet-snap] .lc-hud-layer__instruments .lc-compass,
+  .studio-shell[data-sheet-snap='full'] .lc-hud-layer__instruments,
+  .studio-shell[data-sheet-snap='full'] .studio-map-controls {
+    display: none;
+  }
+
+  .studio-compare {
+    display: none;
+  }
+
+  .studio-sheet-peek {
+    display: grid;
+    gap: var(--lc-s-3);
+  }
+
+  .studio-sheet-peek__row {
+    display: flex;
+    gap: var(--lc-s-6);
+    align-items: center;
+    min-width: 0;
+  }
+
+  .studio-sheet-peek .lc-readout-grid {
+    flex: 1 1 auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-width: 0;
+  }
+
+  .studio-sheet-peek .lc-readout-cell {
+    border-bottom: 0;
+  }
+
+  .studio-sheet-status {
+    position: relative;
+    display: flex;
+    gap: var(--lc-s-4);
+    align-items: center;
+    min-width: 0;
+    height: 20px;
+    color: var(--lc-text-quiet);
+    font-family: var(--lc-font-mono);
+    font-size: var(--lc-fs-label);
+    letter-spacing: var(--lc-track-label);
+    line-height: 12px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .studio-sheet-status .studio-status-message {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-attribution {
+    display: block;
+    flex: none;
+  }
+
+  .mobile-attribution-summary {
+    color: var(--lc-text-strong);
+    cursor: pointer;
+  }
+
+  .mobile-attribution-sources {
+    position: absolute;
+    top: calc(100% + var(--lc-s-3));
+    right: 0;
+    z-index: 1;
+    width: max-content;
+    max-width: min(320px, calc(100vw - 2 * var(--lc-s-8)));
+    padding: var(--lc-s-6);
+    color: var(--lc-text-secondary);
+    font-family: var(--lc-font-sans);
+    font-size: var(--lc-fs-hint);
+    letter-spacing: 0;
+    line-height: 18px;
+    text-transform: none;
+    white-space: normal;
+  }
+
+  .mobile-attribution-text {
+    margin: 0 0 var(--lc-s-4);
+  }
+
+  .mobile-attribution-link {
+    color: inherit;
+  }
+}
+
+/* === ROOT PAGES: Library, Presets and Account === */
+
+/* Hidden, not display:none: the canvas keeps its size so switching pages never resizes or redraws it. */
+.studio-shell[data-page-hidden] {
+  visibility: hidden;
+}
+
+.studio-page {
+  --lc-page-inset: 22px;
+
+  position: absolute;
+  inset: 0 0 var(--studio-tab-bar-height, 84px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-10);
+  padding: var(--lc-s-10) var(--lc-page-inset) var(--lc-s-9);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  visibility: visible;
+  background: var(--lc-page-ground);
+  color: var(--lc-text-primary);
+}
+
+.studio-page__header {
+  display: flex;
+  gap: var(--lc-s-6);
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--lc-h-xl);
+}
+
+.studio-page__title {
+  margin: 0;
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-m-h1);
+  font-weight: 300;
+}
+
+.studio-page__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--lc-s-5);
+}
+
+.studio-page__confirm {
+  display: grid;
+  gap: var(--lc-s-6);
+  padding: var(--lc-s-6) 0;
+  border-bottom: 1px solid var(--lc-line);
+}
+
+.studio-page__confirm-text {
+  margin: 0;
+  color: var(--lc-text-secondary);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-m-body);
+  line-height: 1.5;
+}
+
+.studio-page__confirm-actions {
+  display: flex;
+  gap: var(--lc-s-4);
+}
+
+.studio-tab-bar {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 6;
+  visibility: visible;
+}
+
+.studio-tab-bar[data-covered] {
+  display: none;
+}
+
+.studio-splash {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-8);
+  align-items: stretch;
+  justify-content: flex-end;
+  padding: var(--lc-s-10) 26px 56px;
+  visibility: visible;
+  background:
+    linear-gradient(var(--lc-line-subtle) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(90deg, var(--lc-line-subtle) 1px, transparent 1px) 0 0 / 32px 32px,
+    var(--lc-page-ground);
+}
+
+.studio-splash__tagline {
+  margin: 0;
+  color: var(--lc-text-secondary);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-m-body);
+}

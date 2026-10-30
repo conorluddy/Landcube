@@ -1,7 +1,7 @@
 /*
  * Colour section (COLR.01 to COLR.06): palette presets and canvas colour, then in 3D the material,
  * land, elevation gradient and water groups, and finally the style reset.
- * Row ids are the legacy field ids the e2e tests bind to. The pattern is in ./README.md.
+ * Row ids are the original field ids the e2e tests bind to. The pattern is in ./README.md.
  */
 import { createElement } from 'react';
 import { designPalettePresets } from '../../constants/palettes';
@@ -26,7 +26,6 @@ import {
   tilesRow,
   toggleRow,
 } from '../control-rows';
-import { namedOptions } from '../fields';
 import { GradientEditor } from '../gradient-editor';
 
 type PaletteName = keyof typeof designPalettePresets;
@@ -324,4 +323,10 @@ function selectGradientPreset(controller: StudioController, state: StudioState, 
       gradientSource: 'user',
     });
   }
+}
+
+function namedOptions(
+  values: Record<string, { label: string }>,
+): { value: string; label: string }[] {
+  return Object.entries(values).map(([value, { label }]) => ({ value, label }));
 }
