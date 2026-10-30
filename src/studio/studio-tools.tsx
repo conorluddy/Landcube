@@ -8,6 +8,8 @@ import {
   type MeasurePoint,
   type MeasurePointer,
 } from '../ui/overlays/measure-line';
+import { RouteTool } from './route-tool';
+import { hasPendingRouteReplacement } from './route-actions';
 import { FloatingBar } from '../ui/floating-bar';
 import { Segmented, type SegmentedOption } from '../ui/segmented';
 import type { StudioController, StudioState, ToolMode } from './controller';
@@ -19,6 +21,7 @@ import {
   formatDistance,
   getCropFractionBox,
   getNudgeDelta,
+  getRouteKeyAction,
   resizeCrop,
   type CropFrameSource,
 } from './tool-state';
@@ -36,15 +39,19 @@ type Measurement =
 
 /** Pointer travel below this is a tap that places one endpoint, not a drag. */
 const tapSlopPx = 4;
-const toolShortcuts: Partial<Record<string, ToolMode>> = { c: 'crop', m: 'measure' };
+const toolShortcuts: Partial<Record<string, ToolMode>> = { c: 'crop', m: 'measure', r: 'route' };
 
 // === PUBLIC API ===
 
-/** The tool the canvas shows: crop exists only in 3D, and other issues own presets and route. */
-export function getActiveTool(state: StudioState): 'none' | 'crop' | 'measure' {
+/** The tool the canvas shows: crop exists only in 3D, route only on real terrain; presets belong to another issue. */
+export function getActiveTool(state: StudioState): 'none' | 'crop' | 'measure' | 'route' {
   const { toolMode, view } = state.workspace;
 
-  if (toolMode === 'measure' || (toolMode === 'crop' && view === '3d')) {
+  if (
+    toolMode === 'measure' ||
+    (toolMode === 'crop' && view === '3d') ||
+    (toolMode === 'route' && state.source.terrain !== undefined)
+  ) {
     return toolMode;
   }
 
@@ -60,10 +67,13 @@ export function StudioToolBar({
   state: StudioState;
 }): ReactNode {
   const is3d = state.workspace.view === '3d';
-  const options: SegmentedOption<'none' | 'crop' | 'measure'>[] = [
+  const options: SegmentedOption<'none' | 'crop' | 'measure' | 'route'>[] = [
     { value: 'none', label: 'Select', description: 'Select (Esc)' },
     ...(is3d ? [{ value: 'crop' as const, label: 'Crop', description: 'Crop the model (C)' }] : []),
     { value: 'measure', label: 'Measure', description: 'Measure a distance (M)' },
+    ...(state.source.terrain === undefined
+      ? []
+      : [{ value: 'route' as const, label: 'Route', description: 'Draw a route (R)' }]),
   ];
 
   return (
@@ -106,6 +116,10 @@ export function StudioToolOverlays({
     return <MeasureTool key={state.workspace.view} hud={hud} />;
   }
 
+  if (activeTool === 'route') {
+    return <RouteTool controller={c} state={state} hud={hud} viewportSize={viewportSize} />;
+  }
+
   return null;
 }
 
@@ -130,12 +144,24 @@ function useToolShortcuts(c: StudioController): void {
         workspace.exporting ||
         workspace.palette !== null ||
         workspace.popover !== null ||
+        hasPendingRouteReplacement() ||
         isTextEntry(event.target)
       ) {
         return;
       }
 
       if (event.key === 'Escape') {
+        // Escape first leaves drawing or editing (keeping the route); the next one leaves the tool.
+        if (
+          getActiveTool(state) === 'route' &&
+          getRouteKeyAction(event.key, workspace.route?.editing ?? { mode: 'viewing' }) === 'escape'
+        ) {
+          event.preventDefault();
+          c.escapeRoute();
+
+          return;
+        }
+
         if (workspace.toolMode !== 'none') {
           event.preventDefault();
           c.workspace({ toolMode: 'none' });
@@ -146,7 +172,11 @@ function useToolShortcuts(c: StudioController): void {
 
       const shortcut = toolShortcuts[event.key.toLowerCase()];
 
-      if (shortcut === undefined || (shortcut === 'crop' && workspace.view !== '3d')) {
+      if (
+        shortcut === undefined ||
+        (shortcut === 'crop' && workspace.view !== '3d') ||
+        (shortcut === 'route' && state.source.terrain === undefined)
+      ) {
         return;
       }
 

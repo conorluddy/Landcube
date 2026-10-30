@@ -8,6 +8,10 @@ import {
   formatDistance,
   getCropFractionBox,
   getNudgeDelta,
+  getRouteKeyAction,
+  getSegmentMidpoint,
+  projectRoutePoint,
+  toGeoPoint,
   resizeCrop,
 } from './tool-state';
 
@@ -103,4 +107,49 @@ void test('distances read in metres below a kilometre and bearings as three digi
   assert.equal(formatDistance(12_340), '12.3 km');
   assert.equal(formatBearing(7.4), '007°');
   assert.equal(formatBearing(359.6), '000°');
+});
+
+void test('Enter finishes, Escape escapes and Delete removes only a selected waypoint', () => {
+  const drawing = { mode: 'drawing' } as const;
+  const selected = { mode: 'editing', selectedIndex: 1 } as const;
+
+  assert.equal(getRouteKeyAction('Enter', drawing), 'finish');
+  assert.equal(getRouteKeyAction('Escape', selected), 'escape');
+  assert.equal(getRouteKeyAction('Delete', drawing), undefined);
+  assert.equal(getRouteKeyAction('Backspace', selected), 'delete');
+  assert.equal(getRouteKeyAction('Enter', { mode: 'viewing' }), undefined);
+});
+
+void test('only geographic locations become waypoints and a midpoint sits halfway', () => {
+  assert.deepEqual(toGeoPoint({ kind: 'geographic', latitude: 1, longitude: 2 }), {
+    latitude: 1,
+    longitude: 2,
+  });
+  assert.equal(toGeoPoint({ kind: 'local', eastMeters: 1, southMeters: 2 }), undefined);
+  assert.equal(toGeoPoint(undefined), undefined);
+  assert.deepEqual(
+    getSegmentMidpoint({ latitude: 0, longitude: 10 }, { latitude: 2, longitude: 14 }),
+    { latitude: 1, longitude: 12 },
+  );
+});
+
+void test('route points project in 2D to the frame centre for the terrain centre, and not in 3D', () => {
+  const terrain = { location: { latitude: 50, longitude: 10 }, spanKm: 10 };
+  const frame = { width: 400, height: 400 };
+  const centre = projectRoutePoint(
+    { latitude: 50, longitude: 10 },
+    { is3d: false, terrain },
+    frame,
+  );
+
+  assert.ok(centre !== undefined);
+  assert.ok(Math.abs(centre.xPx - 200) < 0.001 && Math.abs(centre.yPx - 200) < 0.001);
+  assert.equal(
+    projectRoutePoint({ latitude: 50, longitude: 10 }, { is3d: true, terrain }, frame),
+    undefined,
+  );
+  assert.equal(
+    projectRoutePoint({ latitude: 50, longitude: 10 }, { is3d: false, terrain }, undefined),
+    undefined,
+  );
 });
