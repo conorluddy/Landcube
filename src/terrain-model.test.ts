@@ -17,7 +17,7 @@ void test('suggested height lifts flat wide places and calms steep crops', () =>
 
   assert.ok(ibiza < everest);
   assert.ok(ibiza >= 0.05 && everest <= 0.6);
-  assert.equal(getSuggestedExaggeration(0, 25), 0.3);
+  assert.equal(getSuggestedExaggeration(0, 25), 0.35);
 });
 
 const field: HeightField = {

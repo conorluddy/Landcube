@@ -28,6 +28,8 @@ export const defaultTerrainModelSettings: Readonly<TerrainModelSettings> = Objec
   baseThicknessMm: 3,
 });
 
+export const defaultHeightExaggeration = 0.35;
+
 export interface TerrainModel {
   surface: TerrainSurfaceBuffers;
   base: TerrainSurfaceBuffers;
@@ -102,7 +104,7 @@ export function getSuggestedExaggeration(reliefMeters: number, spanKm: number): 
   const reliefRatio = reliefMeters / (spanKm * 1000);
 
   if (!Number.isFinite(reliefRatio) || reliefRatio <= 0) {
-    return 0.3;
+    return defaultHeightExaggeration;
   }
 
   const suggested = 0.25 * (reliefRatio / 0.2) ** 0.35;
