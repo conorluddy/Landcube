@@ -152,23 +152,25 @@ jobs:
           node --input-type=module <<'NODE'
           import { appendFileSync, readFileSync } from 'node:fs';
           const { name, version } = JSON.parse(readFileSync('package.json', 'utf8'));
-          // Trusted publishing only works for a package that already exists on npm.
-          const pkg = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}`, {
-            signal: AbortSignal.timeout(30_000),
-          });
-          if (pkg.status === 404) {
-            console.log(`::warning::${name} is not on npm yet. Publish it once by hand and add this workflow as its trusted publisher; until then CI skips publishing.`);
-            process.exit(0);
+          // Returns true when the registry has `path`, false on 404, and fails on any other status.
+          async function registryHas(path) {
+            const response = await fetch(`https://registry.npmjs.org/${path}`, {
+              signal: AbortSignal.timeout(30_000),
+            });
+            if (response.ok || response.status === 404) {
+              return response.ok;
+            }
+            throw new Error(`npm registry check failed for ${path}: HTTP ${response.status}`);
           }
-          const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}/${encodeURIComponent(version)}`, {
-            signal: AbortSignal.timeout(30_000),
-          });
-          if (response.ok) {
+          // Trusted publishing only works for a package that already exists on npm.
+          if (!(await registryHas(encodeURIComponent(name)))) {
+            const message = `${name} is not on npm yet, so this run published nothing. Publish it once by hand and add this workflow as its trusted publisher.`;
+            console.log(`::warning::${message}`);
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### npm release skipped\n\n${message}\n`);
+          } else if (await registryHas(`${encodeURIComponent(name)}/${encodeURIComponent(version)}`)) {
             console.log(`${name}@${version} is already published; skipping.`);
-          } else if (response.status === 404) {
-            appendFileSync(process.env.GITHUB_OUTPUT, 'should-publish=true\n');
           } else {
-            throw new Error(`npm registry check failed: HTTP ${response.status}`);
+            appendFileSync(process.env.GITHUB_OUTPUT, 'should-publish=true\n');
           }
           NODE
 
