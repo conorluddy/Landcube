@@ -63,7 +63,7 @@ test('search result span shortcuts load the selected place at that span', async 
   const search = page.locator('.header-place-search').getByRole('combobox');
 
   await search.fill('Ben');
-  const shortcut = page.getByRole('button', { name: 'Load Ben Nevis at 50 km' });
+  const shortcut = page.getByRole('button', { name: 'Load Ben Nevis at 100 km' });
 
   await expect(shortcut).toBeVisible();
   const pointerDownAccepted = await shortcut.evaluate((button) =>
@@ -79,7 +79,7 @@ test('search result span shortcuts load the selected place at that span', async 
   await shortcut.click();
   await expect(page.locator('#terrain-place')).toHaveValue('56.7969,-5.0035');
   await expect(search).toHaveAttribute('aria-expanded', 'false');
-  await expect(page.getByText('50 km', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('100 km', { exact: true }).first()).toBeVisible();
   await search.fill('Ben ');
   await expect(shortcut).toBeVisible();
   await search.press('Tab');

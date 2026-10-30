@@ -167,7 +167,7 @@ export function PlaceSearchField({ controller }: { controller: StudioController 
                   role="group"
                   aria-label={`Area span for ${place.name}${place.detail ? `, ${place.detail}` : ''}`}
                 >
-                  {[10, 25, 50].map((spanKm) => (
+                  {[10, 25, 50, 100].map((spanKm) => (
                     <button
                       key={spanKm}
                       type="button"
