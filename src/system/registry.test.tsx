@@ -114,3 +114,21 @@ async function loadSpecimenKeys(): Promise<Map<string, string[]>> {
     ]),
   );
 }
+
+void test('the mobile layout is built from the real sheet, snap control and map controls', () => {
+  const markup = renderMarkup(<LayoutPlate cell={{ k: 'mobileShell', label: 'Sheet snaps' }} />);
+
+  assert.match(markup, /lc-bottom-sheet/);
+  assert.match(markup, /lc-segmented/);
+  assert.match(markup, /data-sheet-snap="half"/);
+  assert.match(markup, /aria-label="Reset view"/);
+});
+
+void test('the desktop diagram names every box in its accessible label', () => {
+  const markup = renderMarkup(<LayoutPlate cell={{ k: 'desktopShell', label: 'Desktop' }} />);
+
+  assert.match(
+    markup,
+    /aria-label="Desktop shell layout, 1440 × 810: Brand, .*Inspector · 396.*Status"/,
+  );
+});

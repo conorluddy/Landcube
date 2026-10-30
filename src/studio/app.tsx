@@ -3,6 +3,7 @@ import {
   Component,
   lazy,
   Suspense,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -22,6 +23,7 @@ import {
   type PanelProps,
 } from './controller';
 import { createModeFlip, type ModeFlip } from './mode-flip';
+import { isTextField } from '../system/browse-keys';
 import { DossierPanel } from './dossier-panel';
 import { ExportPanel } from './export-panel';
 import { ControlGroup } from '../ui/control-group';
@@ -205,6 +207,13 @@ function Studio({
   // Mounted on first entry (the chunk is lazy), then kept: Activity hides whichever side is off
   // screen, so studio tools, Find and plate values all survive a round trip.
   const [isSystemMounted, setIsSystemMounted] = useState(isSystemShown);
+  // Stable, so system mode's effects that depend on it don't re-run on every studio render.
+  const selectSystemPart = useCallback(
+    (systemPartId: string) => {
+      c.workspace({ systemPartId });
+    },
+    [c],
+  );
 
   if (isSystemShown && !isSystemMounted) {
     setIsSystemMounted(true);
@@ -258,7 +267,7 @@ function Studio({
       }
 
       if (state.workspace.mode === 'system') {
-        if (!isTextEntry(event.target)) {
+        if (!isTextField(event.target)) {
           modeFlip.request('studio');
         }
       } else if (state.workspace.exporting) {
@@ -320,7 +329,8 @@ function Studio({
         className="studio-viewport"
         ref={viewport}
         aria-label={`${state.workspace.view.toUpperCase()} landscape viewport`}
-        inert={isSystemShown}
+        // From the start of the fold-out, not the swap: the canvas takes no input once leaving.
+        inert={isSystemShown || state.workspace.mode === 'system'}
       />
       <div className="studio-ground" aria-hidden="true" />
       {flip.isBusy && <div key={flip.sweepCount} className="studio-scan" aria-hidden="true" />}
@@ -340,9 +350,7 @@ function Studio({
               <SystemMode
                 partId={state.workspace.systemPartId}
                 isFocusedOnEntry={isSystemOpenedFromStudio}
-                onSelectPart={(systemPartId) => {
-                  c.workspace({ systemPartId });
-                }}
+                onSelectPart={selectSystemPart}
                 onExit={() => {
                   requestMode('studio');
                 }}
@@ -567,14 +575,6 @@ function createStudioModeFlip(c: StudioController): ModeFlip {
       },
     },
   });
-}
-
-/** Keys typed into a field belong to the field, not to shell shortcuts. */
-function isTextEntry(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-  );
 }
 
 function subscribeToPhoneViewport(onChange: () => void): () => void {

@@ -151,7 +151,7 @@ export function StudioFooter({
           onPointerEnter={onPreloadSystem}
           onFocus={onPreloadSystem}
         >
-          Design system ◧
+          Design system <span aria-hidden="true">◧</span>
         </button>
         <a className="studio-credit" href="https://conor.fyi" target="_blank" rel="noreferrer">
           conor.fyi ↗

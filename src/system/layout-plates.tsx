@@ -59,7 +59,7 @@ interface DesktopBox {
 
 function DesktopShellDiagram(): React.JSX.Element {
   return (
-    <div className="system-desktop-shell" role="img" aria-label="Desktop shell layout">
+    <div className="system-desktop-shell" role="img" aria-label={describeDesktopShell()}>
       <span className="system-desktop-shell__frame" />
       {desktopBoxes.map((box) => (
         <span key={box.label} className="system-desktop-shell__box" style={toPercentages(box)}>
@@ -68,6 +68,11 @@ function DesktopShellDiagram(): React.JSX.Element {
       ))}
     </div>
   );
+}
+
+/** The diagram's content as text, since the boxes are hidden behind one image role. */
+function describeDesktopShell(): string {
+  return `Desktop shell layout, ${String(desktopWidthPx)} × ${String(desktopHeightPx)}: ${desktopBoxes.map((box) => box.label).join(', ')}`;
 }
 
 function toPercentages(box: DesktopBox): CSSProperties {
@@ -96,7 +101,7 @@ const snapOptions = [
   { value: 'full', label: 'Full' },
 ] as const satisfies readonly { value: SheetSnap; label: string }[];
 
-/** A 390 × 800 phone of real components, scaled into a 210px frame; the sheet snaps live. */
+/** A phone of real components at real size, so the sheet drags and snaps exactly as it ships. */
 function MobileShell(): React.JSX.Element {
   const [snap, setSnap] = useState<SheetSnap>('half');
 
@@ -110,51 +115,49 @@ function MobileShell(): React.JSX.Element {
         options={snapOptions}
         onChange={setSnap}
       />
-      <div className="system-mobile-shell__device">
-        <div className="system-mobile-shell__screen" data-sheet-snap={snap}>
-          <FloatingBar size="mobile" className="system-mobile-shell__header">
-            <BarGroup>
-              <BrandLockup context="Studio" />
-            </BarGroup>
-            <BarGroup isSpacer />
-            <BarGroup>
-              <Button variant="text" size="small">
-                Link
-              </Button>
-            </BarGroup>
+      <div className="system-mobile-shell__device" data-sheet-snap={snap}>
+        <FloatingBar size="mobile" className="system-mobile-shell__header">
+          <BarGroup>
+            <BrandLockup context="Studio" />
+          </BarGroup>
+          <BarGroup isSpacer />
+          <BarGroup>
+            <Button variant="text" size="small">
+              Link
+            </Button>
+          </BarGroup>
+        </FloatingBar>
+        {/* Shown for placement only: there is no map here for them to act on. */}
+        <div className="system-mobile-shell__controls" inert>
+          <FloatingBar size="mobile">
+            <IconButton glyph="N" label="Reset view" onClick={ignore} />
+            <IconButton glyph="◫" label="Overlays" onClick={ignore} />
+            <IconButton glyph="↔" label="Measure tool" onClick={ignore} />
           </FloatingBar>
-          {/* Shown for placement only: there is no map here for them to act on. */}
-          <div className="system-mobile-shell__controls" inert>
-            <FloatingBar size="mobile">
-              <IconButton glyph="N" label="Reset view" onClick={ignore} />
-              <IconButton glyph="◫" label="Overlays" onClick={ignore} />
-              <IconButton glyph="↔" label="Measure tool" onClick={ignore} />
-            </FloatingBar>
-          </div>
-          <BottomSheet
-            as="div"
-            label="Landscape controls"
-            snap={snap}
-            onSnapChange={setSnap}
-            peek={
-              <div className="system-mobile-shell__peek">
-                <ReadoutGrid>
-                  <ReadoutCell label="High" value="751" unit="m" />
-                  <ReadoutCell label="Span" value="5.09" unit="km" />
-                </ReadoutGrid>
-                <Button variant="primary" size="small">
-                  Export ↗
-                </Button>
-              </div>
-            }
-          >
-            {['Terrain', 'Contours', 'Colour', 'Scene'].map((section, index) => (
-              <StatusMessage key={section} kind="ok" code={`0${String(index + 1)} · ${section}`}>
-                Section controls.
-              </StatusMessage>
-            ))}
-          </BottomSheet>
         </div>
+        <BottomSheet
+          as="div"
+          label="Landscape controls"
+          snap={snap}
+          onSnapChange={setSnap}
+          peek={
+            <div className="system-mobile-shell__peek">
+              <ReadoutGrid>
+                <ReadoutCell label="High" value="751" unit="m" />
+                <ReadoutCell label="Span" value="5.09" unit="km" />
+              </ReadoutGrid>
+              <Button variant="primary" size="small">
+                Export ↗
+              </Button>
+            </div>
+          }
+        >
+          {['Terrain', 'Contours', 'Colour', 'Scene'].map((section, index) => (
+            <StatusMessage key={section} kind="ok" code={`0${String(index + 1)} · ${section}`}>
+              Section controls.
+            </StatusMessage>
+          ))}
+        </BottomSheet>
       </div>
     </div>
   );

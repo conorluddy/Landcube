@@ -45,3 +45,7 @@ void test('groups keep consecutive parts together in order', () => {
     ['Colour', 'Surface', 'Type', 'Measure', 'Motion'],
   );
 });
+
+void test('find matches a layout by its source file', () => {
+  assert.ok(findParts(systemParts, 'studio-phone.css').some((part) => part.id === 'mobile-shell'));
+});

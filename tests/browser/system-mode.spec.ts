@@ -15,7 +15,7 @@ function currentPart(page: Page) {
 
 async function openSystemMode(page: Page): Promise<void> {
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: 'Design system ◧' }).click();
+  await page.getByRole('button', { name: 'Design system', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'LANDCU.BE System · Rev A' })).toBeVisible();
 }
 
@@ -35,7 +35,7 @@ test('the footer link flips into system mode, arrows browse, and Esc flips back'
 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('heading', { name: 'LANDCU.BE Studio' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Design system ◧' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Design system', exact: true })).toBeFocused();
   await expect(page.getByRole('complementary', { name: 'Landscape controls' })).toBeVisible();
 });
 
@@ -83,7 +83,7 @@ test('Esc in Find clears the query first, then leaves system mode', async ({ pag
 test('a system chunk that fails to load returns to the studio with a message', async ({ page }) => {
   await page.route('**/assets/system-mode-*.js', (route) => route.abort());
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: 'Design system ◧' }).click();
+  await page.getByRole('button', { name: 'Design system', exact: true }).click();
 
   await expect(page.getByRole('status').filter({ hasText: 'could not load' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'LANDCU.BE Studio' })).toBeVisible();
@@ -174,13 +174,13 @@ test('studio and system state both survive a round trip', async ({ page }) => {
   const placeSearch = page.getByRole('combobox', { name: /Search/ });
 
   await placeSearch.fill('Ben Nevis');
-  await page.getByRole('button', { name: 'Design system ◧' }).click();
+  await page.getByRole('button', { name: 'Design system', exact: true }).click();
   await page.getByRole('searchbox').fill('glass');
   await page.getByRole('searchbox').blur();
   await page.keyboard.press('Escape');
   await expect(placeSearch).toHaveValue('Ben Nevis');
 
-  await page.getByRole('button', { name: 'Design system ◧' }).click();
+  await page.getByRole('button', { name: 'Design system', exact: true }).click();
   await expect(page.getByRole('searchbox')).toHaveValue('glass');
 });
 
@@ -196,4 +196,42 @@ test('the rail shows no section pressed while Find lists results', async ({ page
 test('a curated part says how many of its specimens it shows', async ({ page }) => {
   await page.goto(`${appUrl}?mode=system&part=button`);
   await expect(page.getByText('08 of 33 plates')).toBeVisible();
+});
+
+test('the mobile layout sheet follows a drag of its handle', async ({ page }) => {
+  await page.goto(`${appUrl}?mode=system&part=mobile-shell`);
+  const phone = page.locator('.system-mobile-shell__device');
+  const sheetBody = phone.locator('.lc-bottom-sheet');
+  const handle = phone.getByRole('button', { name: 'Resize sheet' });
+
+  await handle.scrollIntoViewIfNeeded();
+  const grip = await handle.boundingBox();
+  const halfHeight = (await sheetBody.boundingBox())?.height ?? 0;
+
+  if (grip === null) {
+    throw new Error('Sheet handle is not laid out.');
+  }
+
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2 - 60, { steps: 5 });
+  expect((await sheetBody.boundingBox())?.height ?? 0).toBeCloseTo(halfHeight + 60, 0);
+  await page.mouse.up();
+});
+
+test('shrinking to a phone in system mode returns to the studio sheet', async ({ page }) => {
+  await openSystemMode(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await expect(page.getByRole('complementary', { name: 'Landscape controls' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Design system parts' })).toBeHidden();
+  await expect(page).not.toHaveURL(/mode=system/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+test('a bare system link on a phone is cleared too', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${appUrl}?v=1&seed=123&mode=system`);
+  await expect(page.getByRole('complementary', { name: 'Landscape controls' })).toBeVisible();
+  await expect(page).not.toHaveURL(/mode=system/);
 });

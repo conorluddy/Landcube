@@ -30,7 +30,17 @@ export default function SystemMode({
   onExit,
 }: SystemModeProps): React.JSX.Element {
   const part = findPartById(partId) ?? findPartByCode(partId) ?? systemParts[0];
-  const [navSectionId, setNavSectionId] = useState<SystemSectionId>(part.section);
+  // The rail can browse another section; stepping across sections takes it back to the part's.
+  const [navChoice, setNavChoice] = useState({
+    partSection: part.section,
+    sectionId: part.section,
+  });
+
+  if (navChoice.partSection !== part.section) {
+    setNavChoice({ partSection: part.section, sectionId: part.section });
+  }
+
+  const navSectionId = navChoice.partSection === part.section ? navChoice.sectionId : part.section;
   const [query, setQuery] = useState('');
   const findInput = useRef<HTMLInputElement>(null);
   const hits = query.trim() === '' ? undefined : findParts(systemParts, query);
@@ -43,11 +53,6 @@ export default function SystemMode({
       onSelectPart(part.id);
     }
   }, [part.id, partId, onSelectPart]);
-
-  // Stepping across a section boundary takes the nav along with it.
-  useEffect(() => {
-    setNavSectionId(part.section);
-  }, [part.section]);
 
   // The control that opened this mode is hidden with the studio chrome; keep keyboard users in place.
   useEffect(() => {
@@ -69,10 +74,16 @@ export default function SystemMode({
         return;
       }
 
-      if (isFindShortcut(event) && !(event.key === '/' && isTextField(event.target))) {
-        event.preventDefault();
-        findInput.current?.focus();
-        findInput.current?.select();
+      if (isFindShortcut(event)) {
+        // `/` types into fields, and a second ⌘F from Find falls through to the browser's find.
+        const isTypedSlash = event.key === '/' && isTextField(event.target);
+        const isRepeatFromFind = event.target === findInput.current;
+
+        if (!isTypedSlash && !isRepeatFromFind) {
+          event.preventDefault();
+          findInput.current?.focus();
+          findInput.current?.select();
+        }
 
         return;
       }
@@ -114,8 +125,8 @@ export default function SystemMode({
         activePartId={part.id}
         hits={hits}
         query={query}
-        onSelectSection={(id) => {
-          setNavSectionId(id);
+        onSelectSection={(id: SystemSectionId) => {
+          setNavChoice({ partSection: part.section, sectionId: id });
           setQuery('');
         }}
         onSelectPart={onSelectPart}
