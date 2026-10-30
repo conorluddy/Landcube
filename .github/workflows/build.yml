@@ -43,6 +43,9 @@ jobs:
       - name: Build static site
         run: npm run build
 
+      - name: Build browser test specimens
+        run: npm run build:specimens
+
       - name: Verify browser journeys and GitHub Pages subpath
         run: npx playwright test --reporter=list
 
