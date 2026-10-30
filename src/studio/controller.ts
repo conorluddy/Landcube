@@ -45,7 +45,13 @@ import type { RealTerrain } from '../real-terrain';
 import type { DesignSettings, ValidatedDesignSettings } from '../types/design';
 import type { OperationError, Result } from '../types/operations';
 import { parseGpx, routeStats, simplifyRoute } from '../gpx';
-import type { RoutePoint, RouteStats, RouteWaypoint } from '../types/route';
+import type { RouteStats } from '../types/route';
+import type { ActiveRoute, GeoPoint, RouteEditing } from '../types/terrain-analysis';
+import {
+  defaultSlopeThresholdPercent,
+  reduceRouteEditing,
+  type RouteEditingAction,
+} from './route-editing';
 import type { WaterStyle } from '../terrain-3d';
 import type { FloorStyle } from '../terrain-floor-styles';
 import type { TerrainStillScale } from '../export/still-export';
@@ -141,13 +147,24 @@ export interface RoadNetworkState {
   /** The last download failed; `status` explains why. */
   hasFailed: boolean;
 }
-/** A loaded GPX route, simplified for drawing; stats come from the recorded points. */
+/** The session's one route: geometry, editing mode and view state. Session-only, never in links. */
 export interface WorkspaceRoute {
-  name: string;
-  points: RoutePoint[];
-  waypoints: RouteWaypoint[];
-  stats: RouteStats;
+  active: ActiveRoute;
+  editing: RouteEditing;
   isVisible: boolean;
+  /** Recorded-point stats; imported routes only (drawn routes get terrain analysis instead). */
+  stats?: RouteStats;
+  /** Profile cursor: distance along the route being inspected. */
+  inspectedDistanceMeters?: number;
+}
+
+/** Replacing a route needs the caller to confirm first (REQ-19); `confirmed: true` skips the ask. */
+export interface RouteReplaceOptions {
+  confirmed?: boolean;
+}
+
+export interface RouteReplaceResult {
+  needsConfirmation: boolean;
 }
 
 /** Douglas-Peucker tolerance for drawn routes: below a pixel at any supported span. */
@@ -278,8 +295,29 @@ export interface StudioController {
   raiseGroup: (id: string) => void;
   dismissManualLink: () => void;
   /** Parses and shows a GPX route; an invalid file sets `workspace.routeFault` and keeps the old route. */
-  loadRoute: (text: string, fallbackName?: string) => void;
+  loadRoute: (
+    text: string,
+    fallbackName?: string,
+    options?: RouteReplaceOptions,
+  ) => RouteReplaceResult;
+  /** Starts a new empty drawn route in drawing mode. */
+  startRouteDrawing: (options?: RouteReplaceOptions) => RouteReplaceResult;
+  placeRouteWaypoint: (point: GeoPoint) => void;
+  moveRouteWaypoint: (index: number, point: GeoPoint) => void;
+  /** Inserts between waypoint `segmentIndex` and the next. */
+  insertRouteWaypoint: (segmentIndex: number, point: GeoPoint) => void;
+  selectRouteWaypoint: (index: number | undefined) => void;
+  /** Deletes the selected waypoint. */
+  deleteRouteWaypoint: () => void;
+  finishRoute: () => void;
+  editRoute: () => void;
+  escapeRoute: () => void;
+  reverseRoute: () => void;
   clearRoute: () => void;
+  setRouteSlopeThreshold: (percent: number) => void;
+  inspectRoute: (distanceMeters: number | undefined) => void;
+  /** Library restore: installs a route in viewing mode, replacing any current one. */
+  setRoute: (route: ActiveRoute) => void;
   toggleRoute: () => void;
   design: (patch: Partial<DesignSettings>) => boolean;
   /** Starts (or retargets) the A/B wipe against a palette preset; unknown ids are ignored. */
@@ -508,6 +546,34 @@ export function createStudioController(
   const workspace = (patch: Partial<StudioState['workspace']>) => {
     state = { ...state, workspace: { ...state.workspace, ...patch } };
     publish();
+  };
+
+  let drawnRouteCount = 0;
+
+  // An empty drawn route has nothing to lose, so replacing it needs no confirmation.
+  const isReplacementUnconfirmed = ({ confirmed = false }: RouteReplaceOptions) =>
+    !confirmed && (state.workspace.route?.active.waypoints.length ?? 0) > 0;
+
+  const installRoute = (active: ActiveRoute) => {
+    workspace({
+      routeFault: null,
+      route: toWorkspaceRoute(active, { mode: 'viewing' }, true),
+    });
+  };
+
+  const applyRouteAction = (action: RouteEditingAction) => {
+    const { route } = state.workspace;
+    const next = reduceRouteEditing(
+      { route: route?.active ?? null, editing: route?.editing ?? { mode: 'viewing' } },
+      action,
+    );
+
+    workspace({
+      route:
+        next.route === null
+          ? null
+          : toWorkspaceRoute(next.route, next.editing, route?.isVisible ?? true),
+    });
   };
 
   const updatePinnedGroup = (
@@ -741,30 +807,89 @@ export function createStudioController(
           : { ...pinned, zIndex: nextZIndex(pinnedGroups) },
       );
     },
-    loadRoute(text, fallbackName = 'GPX route') {
+    loadRoute(text, fallbackName = 'GPX route', options = {}) {
       const parsed = parseGpx(text);
 
       if (!parsed.ok) {
         workspace({ routeFault: parsed.error });
 
-        return;
+        return { needsConfirmation: false };
+      }
+
+      if (isReplacementUnconfirmed(options)) {
+        return { needsConfirmation: true };
       }
 
       const { name, points, waypoints } = parsed.data;
+      const routeName = name ?? fallbackName;
 
-      workspace({
-        routeFault: null,
-        route: {
-          name: name ?? fallbackName,
-          points: simplifyRoute(points, routeSimplifyToleranceMeters),
-          waypoints,
-          stats: routeStats(points),
-          isVisible: true,
-        },
+      installRoute({
+        id: createRouteId(routeName, points),
+        name: routeName,
+        provenance: 'imported',
+        waypoints: simplifyRoute(points, routeSimplifyToleranceMeters).map(toGeoPoint),
+        originalPoints: points,
+        namedWaypoints: waypoints,
+        slopeThresholdPercent: defaultSlopeThresholdPercent,
       });
+
+      return { needsConfirmation: false };
+    },
+    startRouteDrawing(options = {}) {
+      if (isReplacementUnconfirmed(options)) {
+        return { needsConfirmation: true };
+      }
+
+      drawnRouteCount += 1;
+      applyRouteAction({ type: 'start-drawing', id: `drawn-${drawnRouteCount}` });
+      workspace({ routeFault: null });
+
+      return { needsConfirmation: false };
+    },
+    placeRouteWaypoint: (point) => {
+      applyRouteAction({ type: 'place', point });
+    },
+    moveRouteWaypoint: (index, point) => {
+      applyRouteAction({ type: 'drag', index, point });
+    },
+    insertRouteWaypoint: (segmentIndex, point) => {
+      applyRouteAction({ type: 'insert', segmentIndex, point });
+    },
+    selectRouteWaypoint: (index) => {
+      applyRouteAction({ type: 'select', index });
+    },
+    deleteRouteWaypoint: () => {
+      applyRouteAction({ type: 'delete' });
+    },
+    finishRoute: () => {
+      applyRouteAction({ type: 'finish' });
+    },
+    editRoute: () => {
+      applyRouteAction({ type: 'edit' });
+    },
+    escapeRoute: () => {
+      applyRouteAction({ type: 'escape' });
+    },
+    reverseRoute: () => {
+      applyRouteAction({ type: 'reverse' });
     },
     clearRoute() {
       workspace({ route: null, routeFault: null });
+    },
+    setRouteSlopeThreshold: (percent) => {
+      applyRouteAction({ type: 'set-threshold', percent });
+    },
+    inspectRoute(distanceMeters) {
+      const { route } = state.workspace;
+
+      if (route && route.inspectedDistanceMeters !== distanceMeters) {
+        workspace({
+          route: toWorkspaceRoute(route.active, route.editing, route.isVisible, distanceMeters),
+        });
+      }
+    },
+    setRoute(active) {
+      installRoute(active);
     },
     toggleRoute() {
       const { route } = state.workspace;
@@ -1500,6 +1625,40 @@ export function describeRoadNetwork(network: RoadNetwork, style: RoadStyle): str
 }
 
 /** "1 bridge", "2 bridges", "1,204 mapped roads". */
+// Stats come from recorded points, so they are recomputed (a reversal swaps ascent and descent) and
+// vanish once an edit turns the route into a drawn one. A stale profile cursor is dropped too.
+function toWorkspaceRoute(
+  active: ActiveRoute,
+  editing: RouteEditing,
+  isVisible: boolean,
+  inspectedDistanceMeters?: number,
+): WorkspaceRoute {
+  return {
+    active,
+    editing,
+    isVisible,
+    ...(inspectedDistanceMeters === undefined ? {} : { inspectedDistanceMeters }),
+    ...(active.originalPoints === undefined ? {} : { stats: routeStats(active.originalPoints) }),
+  };
+}
+
+function toGeoPoint({ latitude, longitude }: GeoPoint): GeoPoint {
+  return { latitude, longitude };
+}
+
+/** FNV-1a over name and coordinates: the same file always gets the same id, with no randomness. */
+function createRouteId(name: string, points: readonly GeoPoint[]): string {
+  let hash = 0x811c9dc5;
+
+  const text = `${name}|${points.map((p) => `${p.latitude},${p.longitude}`).join(';')}`;
+
+  for (let index = 0; index < text.length; index++) {
+    hash = Math.imul(hash ^ text.charCodeAt(index), 0x01000193) >>> 0;
+  }
+
+  return `imported-${hash.toString(16).padStart(8, '0')}`;
+}
+
 function countOf(count: number, noun: string): string {
   return `${count.toLocaleString('en')} ${noun}${count === 1 ? '' : 's'}`;
 }

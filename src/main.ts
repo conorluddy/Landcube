@@ -526,12 +526,18 @@ function getCroppedRoute(
     return noRouteOverlay;
   }
 
-  const key = [route, location, spanKm, frame, crop, shape];
+  const key = [route.active, location, spanKm, frame, crop, shape];
 
   if (key.some((value, index) => value !== routeOverlay.key[index])) {
     routeOverlay = {
       key,
-      overlay: clipRouteToCrop(route, { location, spanKm }, frame, crop, shape),
+      overlay: clipRouteToCrop(
+        { points: route.active.waypoints, waypoints: route.active.namedWaypoints },
+        { location, spanKm },
+        frame,
+        crop,
+        shape,
+      ),
     };
   }
 

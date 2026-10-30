@@ -10,6 +10,7 @@ import {
   type FramePoint,
 } from '../real-terrain-projection';
 import type { WorkspaceRoute } from './controller';
+import type { ActiveRoute } from '../types/terrain-analysis';
 
 export interface ProjectedRoute {
   points: FramePoint[];
@@ -20,7 +21,7 @@ export interface ProjectedRoute {
 
 /** Places the route where the 2D terrain draws the same latitude and longitude. */
 export function projectRouteToFrame(
-  route: Pick<WorkspaceRoute, 'points' | 'waypoints'>,
+  route: Pick<ActiveRoute, 'waypoints' | 'namedWaypoints'>,
   terrain: Pick<RealTerrain, 'location' | 'spanKm'>,
   frame: { width: number; height: number },
 ): ProjectedRoute | undefined {
@@ -33,10 +34,10 @@ export function projectRouteToFrame(
   const placement = { location, spanKm };
 
   return {
-    points: route.points.map((point) =>
+    points: route.waypoints.map((point) =>
       projectToRealTerrainFrame(placement, point.latitude, point.longitude, frame),
     ),
-    waypoints: route.waypoints.map((waypoint) => ({
+    waypoints: route.namedWaypoints.map((waypoint) => ({
       name: waypoint.name,
       ...projectToRealTerrainFrame(placement, waypoint.latitude, waypoint.longitude, frame),
     })),
@@ -61,8 +62,15 @@ export function countRoutePointsInside(
 
 /** "Ridge walk · 6.2 km · ascent 130 m · descent 90 m · 2 waypoints" */
 export function describeRoute(route: WorkspaceRoute): string {
-  const { stats, waypoints } = route;
-  const parts = [route.name, `${stats.distanceKm.toFixed(1)} km`];
+  const { stats, active } = route;
+  const waypoints = active.namedWaypoints;
+
+  // Drawn routes have no recorded stats; terrain analysis reports their length elsewhere.
+  if (stats === undefined) {
+    return `${active.name} · ${active.waypoints.length} points`;
+  }
+
+  const parts = [active.name, `${stats.distanceKm.toFixed(1)} km`];
 
   if (stats.ascentMeters !== undefined && stats.descentMeters !== undefined) {
     parts.push(

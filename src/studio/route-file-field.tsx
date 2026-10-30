@@ -30,7 +30,8 @@ export function RouteFileField({
           }
 
           void file.text().then((text) => {
-            controller.loadRoute(text, file.name.replace(/\.gpx$/i, ''));
+            // Wave 2 adds the replace-confirm UI; until then a new file replaces the route as before.
+            controller.loadRoute(text, file.name.replace(/\.gpx$/i, ''), { confirmed: true });
             // Clearing lets the same file be chosen again after a fix.
             input.value = '';
           });

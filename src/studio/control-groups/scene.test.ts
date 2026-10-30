@@ -166,12 +166,18 @@ void test('a loaded route shows its stats and a refused file shows an E-206 faul
     view: '2d',
     terrain: realTerrain,
     route: {
-      name: 'Ridge walk',
-      points: [
-        { latitude: 55, longitude: -8 },
-        { latitude: 55.1, longitude: -8 },
-      ],
-      waypoints: [],
+      active: {
+        id: 'imported-test',
+        name: 'Ridge walk',
+        provenance: 'imported',
+        waypoints: [
+          { latitude: 55, longitude: -8 },
+          { latitude: 55.1, longitude: -8 },
+        ],
+        namedWaypoints: [],
+        slopeThresholdPercent: 15,
+      },
+      editing: { mode: 'viewing' },
       stats: { distanceKm: 11.1, recordedPointCount: 9 },
       isVisible: true,
     },
