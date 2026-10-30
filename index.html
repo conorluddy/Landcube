@@ -7,8 +7,43 @@
     <link rel="icon" href="./favicon.ico" sizes="48x48" />
     <link rel="icon" href="./icon.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
-    <meta name="description" content="A quiet, locally generated topographic background." />
-    <title>LANDCU.BE</title>
+    <meta
+      name="description"
+      content="Create topographic art from real terrain or seeded landscapes. Explore in 3D, customise contours and colours, and export SVG, PNG or STL with LANDCU.BE."
+    />
+    <title>Topographic Art &amp; Terrain Generator | LANDCU.BE</title>
+    <link rel="canonical" href="https://landcu.be/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="LANDCU.BE" />
+    <meta property="og:url" content="https://landcu.be/" />
+    <meta property="og:title" content="Topographic Art &amp; Terrain Generator | LANDCU.BE" />
+    <meta
+      property="og:description"
+      content="Create topographic art from real terrain or seeded landscapes. Explore in 3D, customise contours and colours, and export SVG, PNG or STL with LANDCU.BE."
+    />
+    <meta property="og:image" content="https://landcu.be/icon.png" />
+    <meta property="og:image:width" content="192" />
+    <meta property="og:image:height" content="192" />
+    <meta property="og:image:alt" content="LANDCU.BE logo" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Topographic Art &amp; Terrain Generator | LANDCU.BE" />
+    <meta
+      name="twitter:description"
+      content="Create topographic art from real terrain or seeded landscapes. Explore in 3D, customise contours and colours, and export SVG, PNG or STL with LANDCU.BE."
+    />
+    <meta name="twitter:image" content="https://landcu.be/icon.png" />
+    <meta name="twitter:image:alt" content="LANDCU.BE logo" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "LANDCU.BE",
+        "alternateName": "landcube",
+        "url": "https://landcu.be/",
+        "description": "Create topographic art from real terrain or seeded landscapes. Explore in 3D, customise contours and colours, and export SVG, PNG or STL with LANDCU.BE.",
+        "inLanguage": "en"
+      }
+    </script>
     <!-- Google tag (gtag.js): hosted site only, so dev servers, forks and self-hosts stay silent -->
     <script>
       const analyticsHostname = 'landcu.be';
@@ -32,6 +67,18 @@
     </script>
   </head>
   <body>
+    <noscript>
+      <h1>LANDCU.BE — Topographic art and terrain generator</h1>
+      <p>
+        Create topographic artwork from seeded landscapes or real-world elevation data. Customise
+        contours and colours, explore terrain in 3D, and export SVG, PNG or STL files.
+      </p>
+      <p>
+        Enable JavaScript to use the browser editor, or use the
+        <a href="https://github.com/conorluddy/landcube#use-with-npx">LANDCU.BE command-line tool</a
+        >.
+      </p>
+    </noscript>
     <svg id="terrain" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"></svg>
     <script type="module" src="/src/main.ts"></script>
   </body>
