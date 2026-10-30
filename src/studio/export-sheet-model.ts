@@ -41,6 +41,7 @@ export interface ExportPanelHandlers {
   setPartSelected: (partId: FramePartId, isSelected: boolean) => void;
   downloadSelectedParts: () => void;
   downloadAttribution: () => void;
+  openDossier: () => void;
 }
 
 export interface ExportSheetInput {
@@ -229,6 +230,7 @@ export function buildExportSheetModel({ state, ui, handlers }: ExportSheetInput)
           action: { label: 'Download attribution', onClick: handlers.downloadAttribution },
         }
       : undefined,
+    dossierAction: { label: 'Model dossier', onClick: handlers.openDossier },
     success: ui.success,
   };
 }

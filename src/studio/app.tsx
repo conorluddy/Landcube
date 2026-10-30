@@ -5,6 +5,7 @@ import { InspectorPanel } from '../ui/inspector-panel';
 import { threeDOnlySections, type StudioController, type InspectorSection } from './controller';
 import type { PanelProps } from './panels';
 import { Button, Hint } from './fields';
+import { DossierPanel } from './dossier-panel';
 import { ExportPanel } from './export-panel';
 import { ControlGroup } from '../ui/control-group';
 import { GlassPanel } from '../ui/glass-panel';
@@ -278,6 +279,18 @@ function Studio({
           }}
         >
           <ExportPanel {...props} renderer={renderer} />
+        </Surface>
+      )}
+      {state.workspace.dossierOpen && (
+        <Surface
+          modal
+          isGlass
+          title="Model dossier"
+          close={() => {
+            c.workspace({ dossierOpen: false });
+          }}
+        >
+          <DossierPanel {...props} renderer={renderer} hud={hud} />
         </Surface>
       )}
       {state.manualLink !== '' && (

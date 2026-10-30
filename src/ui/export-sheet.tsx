@@ -105,6 +105,8 @@ export interface ExportSheetModel {
   faults: readonly ExportFault[];
   /** Real terrain only: the credit line and its text download. */
   attribution?: { text: string; action: ExportAction };
+  /** Opens the printable model dossier. */
+  dossierAction?: ExportAction;
   /** The success sheet, shown after a download starts. */
   success?: ReactNode;
 }
@@ -133,6 +135,7 @@ export function ExportSheet({ model }: { model: ExportSheetModel }): React.JSX.E
           <ActionButton action={model.attribution.action} />
         </section>
       )}
+      {model.dossierAction && <ActionButton action={model.dossierAction} isSecondary />}
       {model.success}
     </div>
   );

@@ -175,6 +175,7 @@ export interface StudioState {
     sections: Record<StudioView, InspectorSection>;
     popover: 'Overlays' | 'Orbit' | null;
     exporting: boolean;
+    dossierOpen: boolean;
     /** Phone bottom-sheet height. Session-only: never serialized into links. */
     sheetSnap: SheetSnap;
     /** Control groups floating outside the inspector (desktop). Session-only: never serialized. */
@@ -383,6 +384,7 @@ export function createStudioController(
       sections: { '2d': 'Terrain', '3d': 'Terrain' },
       popover: null,
       exporting: false,
+      dossierOpen: false,
       sheetSnap: 'half',
       pinnedGroups: [],
     },

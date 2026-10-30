@@ -29,6 +29,7 @@ const handlers: ExportPanelHandlers = {
   setPartSelected: noop,
   downloadSelectedParts: noop,
   downloadAttribution: noop,
+  openDossier: noop,
 };
 const idleUi: ExportPanelUiState = {
   previewUrl: 'blob:preview',

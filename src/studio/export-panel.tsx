@@ -259,6 +259,9 @@ export function ExportPanel({
           }
         });
       },
+      openDossier: () => {
+        c.workspace({ dossierOpen: true });
+      },
       downloadAttribution: () => {
         downloadBlob(
           new Blob([s.source.terrain?.attribution ?? ''], { type: 'text/plain' }),
