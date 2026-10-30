@@ -67,6 +67,12 @@
 @import './bottom-sheet.css';
 
 /* #17 mobile pages */
+@import './tab-bar.css';
+@import './list-row.css';
+@import './model-card.css';
+@import './preset-card.css';
+@import './settings-group.css';
+@import './signal-accent.css';
 
 /* #18 palette */
 

@@ -148,6 +148,8 @@ export interface TerrainSourceState {
   /** Steps through preset locations in menu order, waiting after each load settles. */
   autoplay: { enabled: boolean; delaySeconds: number };
 }
+export type StudioPage = 'studio' | 'library' | 'presets' | 'account';
+
 export interface StudioState {
   design: ValidatedDesignSettings;
   source: TerrainSourceState;
@@ -171,6 +173,10 @@ export interface StudioState {
     exporting: boolean;
     /** Phone bottom-sheet height. Session-only: never serialized into links. */
     sheetSnap: SheetSnap;
+    /** Phone root page; `studio` keeps the WebGL canvas visible. Session-only, no router. */
+    page: StudioPage;
+    /** False only on a phone's first visit of the session; see `src/studio/pages/splash-session.ts`. */
+    hasSeenSplash: boolean;
   };
   seedLocked: boolean;
   status: string;
@@ -368,6 +374,8 @@ export function createStudioController(
       popover: null,
       exporting: false,
       sheetSnap: 'half',
+      page: 'studio',
+      hasSeenSplash: true,
     },
     seedLocked: actions.isSeedLocked,
     status: '',

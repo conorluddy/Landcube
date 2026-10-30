@@ -1,0 +1,70 @@
+/* C-13 TabBar: 84px including the home-indicator inset; the active item carries a 24x2 bar on its top edge. */
+.lc-tab-bar {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  height: 84px;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid var(--lc-line-panel);
+  background: var(--lc-glass-sheet);
+  -webkit-backdrop-filter: var(--lc-glass-filter);
+  backdrop-filter: var(--lc-glass-filter);
+}
+
+.lc-tab-bar__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-3);
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lc-text-quiet);
+  cursor: pointer;
+  font-family: var(--lc-font-mono);
+}
+
+.lc-tab-bar__item[aria-current='page'] {
+  color: var(--lc-bone);
+}
+
+.lc-tab-bar__item[aria-current='page']::before {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 24px;
+  height: 2px;
+  background: var(--lc-bone);
+  content: '';
+  transform: translateX(-50%);
+}
+
+.lc-tab-bar__glyph {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.lc-tab-bar__label {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--lc-fs-micro);
+  letter-spacing: var(--lc-track-label);
+  line-height: 12px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+@media (forced-colors: active) {
+  .lc-tab-bar {
+    border-color: CanvasText;
+    background: Canvas;
+  }
+
+  .lc-tab-bar__item[aria-current='page']::before {
+    background: CanvasText;
+  }
+}

@@ -1,0 +1,20 @@
+/* C-21 SettingsGroup: group header over rows; the last row drops its hairline. */
+.lc-settings-group {
+  min-width: 0;
+}
+
+.lc-settings-group__rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lc-settings-group__rows > .lc-list-row:last-child {
+  border-bottom: 0;
+}
+
+/* Control rows (Segmented) sit in the same rhythm as list rows. */
+.lc-settings-group__rows > .lc-segmented-row {
+  padding-block: var(--lc-s-5);
+  border-bottom: 1px solid var(--lc-line);
+}

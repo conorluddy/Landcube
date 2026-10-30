@@ -1,0 +1,66 @@
+/* C-12 PresetCard and strip: 112px cards that snap to the strip's start edge. */
+.lc-preset-strip {
+  display: flex;
+  gap: var(--lc-s-5);
+  margin-inline: calc(-1 * var(--lc-page-inset, var(--lc-s-8)));
+  padding: var(--lc-s-2) var(--lc-page-inset, var(--lc-s-8));
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: var(--lc-page-inset, var(--lc-s-8));
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.lc-preset-card {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--lc-s-4);
+  width: 112px;
+  padding: var(--lc-s-3);
+  border: 1px solid var(--lc-line);
+  border-radius: var(--lc-r-panel);
+  background: var(--lc-fill-field);
+  color: var(--lc-text-secondary);
+  cursor: pointer;
+  scroll-snap-align: start;
+}
+
+.lc-preset-card[aria-pressed='true'] {
+  border-color: var(--lc-bone);
+  background: var(--lc-fill-selected);
+  color: var(--lc-bone);
+}
+
+.lc-preset-card__swatches {
+  display: flex;
+  height: 64px;
+  overflow: hidden;
+  border-radius: var(--lc-r-control);
+}
+
+.lc-preset-card__swatches > span {
+  flex: 1 1 0;
+}
+
+.lc-preset-card__name {
+  overflow: hidden;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-ui);
+  letter-spacing: var(--lc-track-ui);
+  line-height: 14px;
+  text-align: left;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+@media (forced-colors: active) {
+  .lc-preset-card {
+    border-color: CanvasText;
+  }
+
+  .lc-preset-card[aria-pressed='true'] {
+    outline: 2px solid Highlight;
+  }
+}
