@@ -21,6 +21,7 @@
  * | E-301 | webglUnavailable     | WebGL unavailable      | no        |
  * | E-302 | webglContextLost     | WebGL context lost     | yes       |
  * | E-303 | previewDecodeFailed  | Preview decode failed  | yes       |
+ * | E-304 | MODULE_LOAD_FAILED   | Module load failed     | yes       |
  * | E-401 | EXPORT_FAILED        | Export failed          | yes       |
  */
 import { operationErrorCodes } from './operations';
@@ -58,6 +59,7 @@ export const faultCodes: Readonly<Record<OperationErrorCode | StudioFaultKind, F
     webglUnavailable: describe('E-301', 'WebGL unavailable', false),
     webglContextLost: describe('E-302', 'WebGL context lost', true),
     previewDecodeFailed: describe('E-303', 'Preview decode failed', true),
+    [operationErrorCodes.moduleLoadFailed]: describe('E-304', 'Module load failed', true),
     [operationErrorCodes.exportFailed]: describe('E-401', 'Export failed', true),
   };
 

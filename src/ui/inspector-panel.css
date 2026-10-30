@@ -22,6 +22,28 @@
   scrollbar-width: none;
 }
 
+/* The vertical rail and its footer share the first grid cell; the footer pins to the bottom edge. */
+.lc-inspector[data-rail-orientation='vertical'] > .lc-section-rail {
+  grid-area: 1 / 1;
+}
+
+.lc-inspector[data-rail-orientation='vertical'] > .lc-inspector__panel {
+  grid-area: 1 / 2;
+}
+
+.lc-inspector__rail-footer {
+  grid-area: 1 / 1;
+  align-self: end;
+  padding: var(--lc-s-6);
+  color: var(--lc-text-disabled);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-micro);
+  letter-spacing: var(--lc-track-ui);
+  line-height: 1.5;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
 .lc-inspector__panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

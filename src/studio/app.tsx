@@ -1,13 +1,26 @@
-import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
+import {
+  Component,
+  lazy,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { InspectorPanel } from '../ui/inspector-panel';
 import {
   threeDOnlySections,
   type StudioController,
+  type StudioMode,
   type InspectorSection,
   type PanelProps,
 } from './controller';
+import { createModeFlip, type ModeFlip } from './mode-flip';
 import { DossierPanel } from './dossier-panel';
 import { ExportPanel } from './export-panel';
 import { ControlGroup } from '../ui/control-group';
@@ -36,8 +49,19 @@ import type { HudStore } from './hud-store';
 import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
 import { PhonePages } from './pages/phone-pages';
+import { operationErrorCodes } from '../constants/operations';
+import { logOperationError } from '../operation-logging';
+import type { OperationError } from '../types/operations';
 
 const inspectorId = 'studio-inspector';
+
+// The design-system gallery is its own chunk: the studio bundle never carries the registry or specimens.
+const loadSystemMode = () => import('../system/system-mode');
+const systemModeLoadError: OperationError = {
+  code: operationErrorCodes.moduleLoadFailed,
+  message: 'The design system could not load. Check your connection, then try again.',
+  retryable: true,
+};
 
 /** Below this the inspector becomes a bottom sheet with a horizontal section strip. */
 export const phoneViewportQuery = '(max-width: 767px)';
@@ -172,17 +196,54 @@ function Studio({
   const inspectorToggle = useRef<HTMLButtonElement>(null);
   const active = state.workspace.sections[state.workspace.view];
   const isPhoneViewport = useSyncExternalStore(subscribeToPhoneViewport, readIsPhoneViewport);
+  const [modeFlip] = useState(() => createStudioModeFlip(c));
+  const flip = useSyncExternalStore(modeFlip.subscribe, modeFlip.getSnapshot);
+  const isSystemShown = !isPhoneViewport && flip.shownMode === 'system';
+  const previousShownMode = useRef(flip.shownMode);
+  // A rejected lazy import stays rejected, so a failed load swaps in a fresh one for the retry.
+  const [SystemMode, setSystemMode] = useState(() => lazy(loadSystemMode));
+
+  const requestMode = (mode: StudioMode) => {
+    if (mode === 'system') {
+      preloadSystemMode();
+    }
+
+    modeFlip.request(mode);
+  };
 
   useLayoutEffect(() => {
     viewport.current?.append(terrain);
   }, [terrain]);
+  useEffect(() => modeFlip.dispose, [modeFlip]);
+  // Leaving system mode unmounts the focused control; land on the link that opens it again.
+  useEffect(() => {
+    const wasSystem = previousShownMode.current === 'system';
+
+    previousShownMode.current = flip.shownMode;
+
+    if (wasSystem && flip.shownMode === 'studio' && document.activeElement === document.body) {
+      document.querySelector<HTMLElement>('.studio-mode-link')?.focus();
+    }
+  }, [flip.shownMode]);
+  // System mode is desktop-only, and a mode set elsewhere (a link, a phone rotation) shows without a flip.
+  useEffect(() => {
+    if (isPhoneViewport && state.workspace.mode === 'system') {
+      c.workspace({ mode: 'studio' });
+    } else if (!flip.isBusy && flip.shownMode !== state.workspace.mode) {
+      modeFlip.snapTo(state.workspace.mode);
+    }
+  }, [c, modeFlip, isPhoneViewport, state.workspace.mode, flip.isBusy, flip.shownMode]);
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) {
         return;
       }
 
-      if (state.workspace.exporting) {
+      if (state.workspace.mode === 'system') {
+        if (!isTextEntry(event.target)) {
+          modeFlip.request('studio');
+        }
+      } else if (state.workspace.exporting) {
         c.workspace({ exporting: false });
       } else if (state.workspace.compare !== null) {
         c.endCompare();
@@ -201,10 +262,10 @@ function Studio({
     return () => {
       document.removeEventListener('keydown', escape);
     };
-  }, [c, state.workspace, isPhoneViewport]);
+  }, [c, modeFlip, state.workspace, isPhoneViewport]);
   useEffect(() => {
     const openPalette = (event: KeyboardEvent) => {
-      if (!isCommandPaletteShortcut(event)) {
+      if (!isCommandPaletteShortcut(event) || c.getSnapshot().workspace.mode === 'system') {
         return;
       }
 
@@ -228,59 +289,101 @@ function Studio({
       className="studio-shell"
       data-sheet-snap={isPhoneViewport ? state.workspace.sheetSnap : undefined}
       data-page-hidden={isPhoneViewport && state.workspace.page !== 'studio' ? true : undefined}
+      data-mode-target={isPhoneViewport ? 'studio' : state.workspace.mode}
+      data-flip={flip.isBusy ? flip.transition : undefined}
+      style={
+        flip.isBusy
+          ? ({ '--lc-mode-flip-angle': `${String(flip.angleDegrees)}deg` } as CSSProperties)
+          : undefined
+      }
     >
-      <StudioHeader controller={c} state={state} isPhoneViewport={isPhoneViewport} />
       <main
         id="studio-viewport"
         className="studio-viewport"
         ref={viewport}
         aria-label={`${state.workspace.view.toUpperCase()} landscape viewport`}
+        inert={isSystemShown}
       />
-      <ViewportStates controller={c} state={state} />
-      {!isPhoneViewport && <CompareHost controller={c} state={state} scenes={compareScenes} />}
-      <StudioHud controller={c} state={state} hud={hud} />
-      {isPhoneViewport ? (
-        <>
-          <StudioMapControls controller={c} state={state} />
-          <StudioSheet
-            controller={c}
-            state={state}
-            hud={hud}
-            id={inspectorId}
-            renderSection={(section) => renderSectionBody(section, props, cropPreview)}
-          />
-          <PhonePages controller={c} state={state} renderer={renderer} />
-        </>
+      <div className="studio-ground" aria-hidden="true" />
+      {flip.isBusy && <div key={flip.sweepCount} className="studio-scan" aria-hidden="true" />}
+      {isSystemShown ? (
+        <SystemModeBoundary
+          onFailure={() => {
+            logOperationError(systemModeLoadError);
+            setSystemMode(() => lazy(loadSystemMode));
+            modeFlip.snapTo('studio');
+            c.workspace({ mode: 'studio' });
+            c.notify(systemModeLoadError.message);
+          }}
+        >
+          <Suspense fallback={null}>
+            <SystemMode
+              partId={state.workspace.systemPartId}
+              onSelectPart={(systemPartId) => {
+                c.workspace({ systemPartId });
+              }}
+              onExit={() => {
+                requestMode('studio');
+              }}
+            />
+          </Suspense>
+        </SystemModeBoundary>
       ) : (
         <>
-          <InspectorPanel
-            id={inspectorId}
-            label="Landscape controls"
-            railLabel="Editing section"
-            sections={studioSections}
-            activeSectionId={active}
-            onSelectSection={(section) => {
-              c.selectSection(section);
-            }}
-            hiddenSectionIds={state.workspace.view === '3d' ? [] : threeDOnlySections}
-            isCollapsed={state.workspace.collapsed}
-            headerTag={`Src · ${state.source.terrain ? 'Real' : 'Procedural'}`}
-            renderSection={(section) =>
-              renderSectionBody(section, props, cropPreview, {
-                pinnedGroupIds: new Set(state.workspace.pinnedGroups.map(({ id }) => id)),
-                pin: c.pinGroup,
-                dock: c.dockGroup,
-              })
-            }
-          />
-          <StudioPinnedPanels controller={c} state={state} cropPreview={cropPreview} />
-          <StudioToolBar controller={c} state={state} />
-          <StudioFooter
-            controller={c}
-            state={state}
-            inspectorId={inspectorId}
-            inspectorToggleRef={inspectorToggle}
-          />
+          <StudioHeader controller={c} state={state} isPhoneViewport={isPhoneViewport} />
+          <ViewportStates controller={c} state={state} />
+          {!isPhoneViewport && <CompareHost controller={c} state={state} scenes={compareScenes} />}
+          <StudioHud controller={c} state={state} hud={hud} />
+          {isPhoneViewport ? (
+            <>
+              <StudioMapControls controller={c} state={state} />
+              <StudioSheet
+                controller={c}
+                state={state}
+                hud={hud}
+                id={inspectorId}
+                renderSection={(section) => renderSectionBody(section, props, cropPreview)}
+              />
+              <PhonePages controller={c} state={state} renderer={renderer} />
+            </>
+          ) : (
+            <>
+              <InspectorPanel
+                id={inspectorId}
+                label="Landscape controls"
+                railLabel="Editing section"
+                sections={studioSections}
+                activeSectionId={active}
+                onSelectSection={(section) => {
+                  c.selectSection(section);
+                }}
+                hiddenSectionIds={state.workspace.view === '3d' ? [] : threeDOnlySections}
+                isCollapsed={state.workspace.collapsed}
+                headerTag={`Src · ${state.source.terrain ? 'Real' : 'Procedural'}`}
+                renderSection={(section) =>
+                  renderSectionBody(section, props, cropPreview, {
+                    pinnedGroupIds: new Set(state.workspace.pinnedGroups.map(({ id }) => id)),
+                    pin: c.pinGroup,
+                    dock: c.dockGroup,
+                  })
+                }
+              />
+              <StudioPinnedPanels controller={c} state={state} cropPreview={cropPreview} />
+              <StudioToolBar controller={c} state={state} />
+              <StudioFooter
+                controller={c}
+                state={state}
+                inspectorId={inspectorId}
+                inspectorToggleRef={inspectorToggle}
+                onOpenSystem={() => {
+                  requestMode('system');
+                }}
+                onPreloadSystem={() => {
+                  void loadSystemMode();
+                }}
+              />
+            </>
+          )}
         </>
       )}
       {state.workspace.popover !== null && (
@@ -401,6 +504,55 @@ function renderSectionBody(
       />
     );
   });
+}
+
+/** Starts fetching the system chunk early; a failure surfaces through SystemModeBoundary on render. */
+function preloadSystemMode(): void {
+  loadSystemMode().catch(() => undefined);
+}
+
+/** Catches a system chunk that fails to load, so the shell never goes blank. */
+class SystemModeBoundary extends Component<
+  { onFailure: () => void; children: ReactNode },
+  { hasFailed: boolean }
+> {
+  override state = { hasFailed: false };
+
+  static getDerivedStateFromError(): { hasFailed: boolean } {
+    return { hasFailed: true };
+  }
+
+  override componentDidCatch(): void {
+    this.props.onFailure();
+  }
+
+  override render(): ReactNode {
+    return this.state.hasFailed ? null : this.props.children;
+  }
+}
+
+function createStudioModeFlip(c: StudioController): ModeFlip {
+  return createModeFlip({
+    initialMode: c.getSnapshot().workspace.mode,
+    commit: (mode) => {
+      c.workspace({ mode });
+    },
+    prefersReducedMotion: () => matchMedia('(prefers-reduced-motion: reduce)').matches,
+    timers: {
+      setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      clearTimeout: (handle) => {
+        window.clearTimeout(handle);
+      },
+    },
+  });
+}
+
+/** Keys typed into a field belong to the field, not to shell shortcuts. */
+function isTextEntry(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+  );
 }
 
 function subscribeToPhoneViewport(onChange: () => void): () => void {

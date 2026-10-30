@@ -1,0 +1,86 @@
+/* P-23 PartRow: 62px code | name | count. Hover fills; active adds a 2px bone bar inset 5px. */
+.lc-part-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) auto;
+  gap: var(--lc-s-4);
+  align-items: baseline;
+  width: calc(100% + 2 * var(--lc-s-9));
+  margin: 0 calc(-1 * var(--lc-s-9));
+  padding: var(--lc-s-4) var(--lc-s-9);
+  border: 0;
+  background: transparent;
+  color: var(--lc-text-body);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--lc-dur-fast) var(--lc-ease);
+}
+
+.lc-part-row__code,
+.lc-part-row__count {
+  color: var(--lc-text-disabled);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-micro);
+  letter-spacing: var(--lc-track-coord);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lc-part-row__name {
+  overflow: hidden;
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-part-row:hover,
+[data-force-state='hover'] .lc-part-row {
+  background: var(--lc-fill-field);
+}
+
+.lc-part-row:hover .lc-part-row__name,
+[data-force-state='hover'] .lc-part-row .lc-part-row__name,
+.lc-part-row[aria-current='true'] .lc-part-row__name {
+  color: var(--lc-text-primary);
+}
+
+.lc-part-row:focus-visible,
+[data-force-state='focus'] .lc-part-row {
+  outline: 1px solid var(--lc-line-focus);
+  outline-offset: -1px;
+}
+
+.lc-part-row[aria-current='true'] {
+  background: var(--lc-fill-active);
+}
+
+.lc-part-row[aria-current='true']::before {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 0;
+  width: 2px;
+  background: var(--lc-bone);
+  content: '';
+}
+
+.lc-part-row[aria-current='true'] .lc-part-row__code {
+  color: var(--lc-text-secondary);
+}
+
+.lc-part-row[aria-current='true'] .lc-part-row__count {
+  color: var(--lc-text-tertiary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-part-row {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-part-row[aria-current='true']::before {
+    background: Highlight;
+  }
+}

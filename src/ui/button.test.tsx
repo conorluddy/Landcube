@@ -38,3 +38,15 @@ void test('Button passes aria attributes through and marks full width', () => {
   assert.match(markup, /data-full-width="true"/);
   assert.match(markup, /disabled=""/);
 });
+
+void test('Button with href renders a new-tab link carrying the button styling', () => {
+  const markup = renderMarkup(
+    <Button variant="primary" size="small" href="https://example.com/" trailingGlyph="↗">
+      Source
+    </Button>,
+  );
+
+  assert.match(markup, /^<a href="https:\/\/example.com\/" target="_blank" rel="noreferrer"/);
+  assert.match(markup, /class="lc-button" data-variant="primary" data-size="small"/);
+  assert.ok(!markup.includes('type="button"'));
+});

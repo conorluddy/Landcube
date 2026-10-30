@@ -7,7 +7,7 @@
  */
 @media (max-width: 767px) {
   .studio-brand,
-  .studio-github,
+  .studio-credit,
   .studio-status .attribution,
   .source-label {
     display: none;

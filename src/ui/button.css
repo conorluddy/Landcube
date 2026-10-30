@@ -15,6 +15,7 @@
   font-size: var(--lc-fs-ui);
   font-weight: 500;
   letter-spacing: var(--lc-track-label);
+  text-decoration: none;
   text-transform: uppercase;
   white-space: nowrap;
 }
