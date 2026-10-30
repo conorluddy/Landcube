@@ -28,9 +28,9 @@ export function StudioSheetStatus({ state }: { state: StudioState }): ReactNode 
 }
 
 /**
- * Bottom bar: viewport tools (inspector toggle, Tour) and a status pill with the
- * source, live status and data attribution. Real-terrain and road credits always stay reachable:
- * inline on desktop, behind "Data sources" on phones.
+ * Bottom bar: a status pill with the source, live status and data attribution, then viewport tools
+ * (compare, Tour, and the inspector toggle last so it sits under the inspector). Real-terrain and
+ * road credits always stay reachable: inline on desktop, behind "Data sources" on phones.
  */
 export function StudioFooter({
   controller: c,
@@ -48,42 +48,6 @@ export function StudioFooter({
 
   return (
     <FloatingBar as="footer" size="footer" className="studio-footer">
-      <BarGroup className="studio-tools" role="group" label="Viewport tools">
-        <Button
-          variant="text"
-          size="small"
-          ref={inspectorToggleRef}
-          aria-expanded={!workspace.collapsed}
-          aria-controls={inspectorId}
-          aria-label={workspace.collapsed ? 'Expand controls' : 'Collapse controls'}
-          onClick={() => {
-            c.workspace({ collapsed: !workspace.collapsed });
-          }}
-        >
-          {workspace.collapsed ? 'Controls ↑' : 'Controls ↓'}
-        </Button>
-        <Button
-          variant="text"
-          size="small"
-          aria-pressed={source.autoplay.enabled}
-          aria-label="Tour"
-          title={source.autoplay.enabled ? 'Pause tour' : 'Play tour'}
-          onClick={() => {
-            void c.autoplay({ enabled: !source.autoplay.enabled });
-          }}
-        >
-          {source.autoplay.enabled ? '❚❚ Tour' : '▶ Tour'}
-        </Button>
-        <IconButton
-          glyph="◧"
-          label="Compare presets"
-          isActive={workspace.comparePresetsOpen}
-          onClick={() => {
-            c.endCompare();
-            c.workspace({ comparePresetsOpen: !workspace.comparePresetsOpen });
-          }}
-        />
-      </BarGroup>
       <BarGroup className="studio-status">
         <SignalMark kind={workspace.activating ? 'live' : 'ok'} size="footer" />
         <span className="source-label">
@@ -118,6 +82,42 @@ export function StudioFooter({
         >
           GitHub ↗
         </a>
+      </BarGroup>
+      <BarGroup className="studio-tools" role="group" label="Viewport tools">
+        <Button
+          variant="text"
+          size="small"
+          aria-pressed={source.autoplay.enabled}
+          aria-label="Tour"
+          title={source.autoplay.enabled ? 'Pause tour' : 'Play tour'}
+          onClick={() => {
+            void c.autoplay({ enabled: !source.autoplay.enabled });
+          }}
+        >
+          {source.autoplay.enabled ? '❚❚ Tour' : '▶ Tour'}
+        </Button>
+        <IconButton
+          glyph="◧"
+          label="Compare presets"
+          isActive={workspace.comparePresetsOpen}
+          onClick={() => {
+            c.endCompare();
+            c.workspace({ comparePresetsOpen: !workspace.comparePresetsOpen });
+          }}
+        />
+        <Button
+          variant="text"
+          size="small"
+          ref={inspectorToggleRef}
+          aria-expanded={!workspace.collapsed}
+          aria-controls={inspectorId}
+          aria-label={workspace.collapsed ? 'Expand controls' : 'Collapse controls'}
+          onClick={() => {
+            c.workspace({ collapsed: !workspace.collapsed });
+          }}
+        >
+          {workspace.collapsed ? 'Controls ↑' : 'Controls ↓'}
+        </Button>
       </BarGroup>
     </FloatingBar>
   );
