@@ -25,11 +25,18 @@ A footer link (`Design system ◧`) flips the studio into a living specimen book
 
 The flip itself lives in `src/studio/mode-flip.ts`. It is timer-driven, not rAF, so a background tab can't leave the panel edge-on. A toggle made mid-flip is held and runs as the flip finishes, so an early Esc is never dropped. `src/main.ts` suspends 3D drawing once the canvas has faded out.
 
+## Links
+
+`?mode=system&part=<id>` opens straight into a part, for example `?mode=system&part=ruler-slider`. It works on desktop only; on a phone the link is dropped. Codes (`PRIM.08`) are accepted too, and the address bar settles on the id, because codes shift whenever a part is added. The address bar follows the part on show. Leaving the mode drops both keys, and design parameters (`v`, `seed`, …) are left untouched. `src/system-link.ts` reads and writes the keys. `replaceDesignUrl` keeps them in the address bar but never puts them in a share link.
+
+`/system` paths aren't supported: static hosting with `base: './'` has no fallback route.
+
 ## Keys and focus
 
 - `↑ ↓ ← →` step through parts, wrapping. Modified arrows belong to the browser (Alt+← is Back). Fields, plates and ARIA widgets keep their own arrows (`browse-keys.ts`).
 - `Esc` flips back to the studio. In Find, the first Esc clears the query; the next one exits.
-- Entering focuses the current part row; leaving focuses the `Design system ◧` link.
+- `⌘F` / `Ctrl+F` or `/` focuses Find.
+- Entering from the studio focuses the current part row; a link straight in leaves focus alone. Leaving focuses the `Design system ◧` link.
 - If the chunk fails to load, the studio comes back with an E-304 status, and the next click retries.
 
 ## Adding a part

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type Ref } from 'react';
 import { BarGroup, FloatingBar } from '../ui/floating-bar';
 import { BrandLockup } from '../ui/brand-lockup';
 import { Button } from '../ui/button';
@@ -18,6 +18,7 @@ export function SystemHeader({
   part,
   section,
   query,
+  findInputRef,
   matchCount,
   onQueryChange,
   onExit,
@@ -25,6 +26,8 @@ export function SystemHeader({
   part: CodedPart;
   section: SystemSection;
   query: string;
+  /** ⌘F and `/` focus this. */
+  findInputRef: Ref<HTMLInputElement>;
   /** Undefined while Find is blank. */
   matchCount: number | undefined;
   onQueryChange: (query: string) => void;
@@ -52,6 +55,7 @@ export function SystemHeader({
           popover={null}
           input={
             <input
+              ref={findInputRef}
               type="search"
               className={searchFieldInputClassName}
               placeholder="Slider, glass, ink-6…"

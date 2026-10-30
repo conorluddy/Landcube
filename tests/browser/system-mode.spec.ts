@@ -105,3 +105,46 @@ test('the mobile layout snaps its real sheet and hides map controls when full', 
   await expect(phone.locator('[data-sheet-snap="full"]')).toBeVisible();
   await expect(phone.locator('.system-mobile-shell__controls')).toHaveCSS('opacity', '0');
 });
+
+test('a deep link by code opens straight onto that part and settles the URL on its id', async ({
+  page,
+}) => {
+  await page.goto(`${appUrl}?mode=system&part=prim.08`);
+  await expect(page.getByRole('heading', { level: 1, name: 'Ruler slider' })).toBeVisible();
+  await expect(page).toHaveURL(/[?&]mode=system&part=ruler-slider(&|$)/);
+  await expect(currentPart(page), 'a cold load leaves focus alone').not.toBeFocused();
+
+  await page.keyboard.press('ArrowDown');
+  await expect(page).toHaveURL(/part=select/);
+});
+
+test('leaving system mode drops the link and keeps the design parameters', async ({ page }) => {
+  await page.goto(`${appUrl}?v=1&seed=123&mode=system&part=tag`);
+  await expect(page.getByRole('heading', { level: 1, name: 'Tag' })).toBeVisible();
+
+  await page.getByRole('button', { name: '← Back to studio' }).click();
+  await expect(page.getByRole('heading', { name: 'LANDCU.BE Studio' })).toBeVisible();
+  await expect(page).not.toHaveURL(/mode=|part=/);
+  await expect(page).toHaveURL(/seed=123/);
+});
+
+test('Cmd+F and slash focus Find', async ({ page }) => {
+  await openSystemMode(page);
+  const find = page.getByRole('searchbox');
+
+  await page.keyboard.press('ControlOrMeta+f');
+  await expect(find).toBeFocused();
+  await find.press('Escape');
+  await currentPart(page).focus();
+  await page.keyboard.press('/');
+  await expect(find).toBeFocused();
+  await expect(find).toHaveValue('');
+});
+
+test('a deep link on a phone opens the studio and clears the link', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${appUrl}?v=1&seed=123&mode=system&part=tag`);
+  await expect(page.getByRole('complementary', { name: 'Landscape controls' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Design system parts' })).toHaveCount(0);
+  await expect(page).not.toHaveURL(/mode=system/);
+});

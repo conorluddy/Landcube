@@ -3,6 +3,7 @@ import { operationErrorCodes } from './constants/operations';
 import { lockedSeedStorageKey } from './constants/sharing';
 import { clampOutputDimensionPixels, getDesignUrl, parseDesignParameters } from './design-settings';
 import { logOperationError } from './operation-logging';
+import { keepSystemLink } from './system-link';
 import type { LoadedDesign } from './types/design';
 import type { ImageDimensions } from './types/dimensions';
 import type { Result } from './types/operations';
@@ -123,7 +124,10 @@ export async function copyDesignLink(
   }
 }
 
-/** Updates the current history entry while preserving a usable share URL. */
+/**
+ * Updates the current history entry while preserving a usable share URL. The address bar keeps
+ * any design-system link; the returned share URL never carries one.
+ */
 export function replaceDesignUrl(
   baseUrl: string,
   settings: LoadedDesign['settings'],
@@ -132,7 +136,7 @@ export function replaceDesignUrl(
   const url = getDesignUrl(baseUrl, settings);
 
   try {
-    history.replaceState(history.state, '', url);
+    history.replaceState(history.state, '', keepSystemLink(baseUrl, url));
   } catch {
     logOperationError({
       code: operationErrorCodes.urlFailed,

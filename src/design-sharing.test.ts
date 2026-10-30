@@ -171,6 +171,33 @@ await test('a blocked address-bar update still provides the complete share link 
   assert.equal(warning.code, 'URL_FAILED');
 });
 
+void test('design URL sync keeps a design-system link in the address bar but not the share URL', () => {
+  const parsed = parseDesignParameters(new URLSearchParams('seed=7'));
+
+  assert.ok(parsed.ok);
+  const calls: unknown[][] = [];
+  const url = replaceDesignUrl(
+    'https://landcube.example/?mode=system&part=tag',
+    parsed.data.settings,
+    {
+      state: null,
+      replaceState: (...args: unknown[]) => {
+        calls.push(args);
+      },
+    },
+  );
+  const addressBar = new URL(String(calls[0][2]));
+
+  assert.equal(addressBar.searchParams.get('mode'), 'system');
+  assert.equal(addressBar.searchParams.get('part'), 'tag');
+  assert.equal(addressBar.searchParams.get('seed'), '7');
+  assert.equal(new URL(url).searchParams.has('mode'), false);
+});
+
+void test('a design-system link alone is not a design link', () => {
+  assert.equal(hasDesignParameters(new URLSearchParams('mode=system&part=PRIM.04')), false);
+});
+
 void test('only design parameters turn a visit into a design link', () => {
   assert.equal(hasDesignParameters(new URLSearchParams('v=1')), true);
   assert.equal(hasDesignParameters(new URLSearchParams('seed=234')), true);
