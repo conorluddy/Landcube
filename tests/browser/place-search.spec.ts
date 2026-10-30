@@ -66,10 +66,22 @@ test('search result span shortcuts load the selected place at that span', async 
   const shortcut = page.getByRole('button', { name: 'Load Ben Nevis at 50 km' });
 
   await expect(shortcut).toBeVisible();
-  await search.press('Tab');
-  await expect(page.getByRole('button', { name: 'Load Ben Nevis at 10 km' })).toBeFocused();
+  const pointerDownAccepted = await shortcut.evaluate((button) =>
+    button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })),
+  );
+  const mouseDownAccepted = await shortcut.evaluate((button) =>
+    button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true })),
+  );
+
+  expect(pointerDownAccepted).toBe(false);
+  expect(mouseDownAccepted).toBe(false);
+  await expect(search).toBeFocused();
   await shortcut.click();
   await expect(page.locator('#terrain-place')).toHaveValue('56.7969,-5.0035');
   await expect(search).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByText('50 km', { exact: true }).first()).toBeVisible();
+  await search.fill('Ben ');
+  await expect(shortcut).toBeVisible();
+  await search.press('Tab');
+  await expect(page.getByRole('button', { name: 'Load Ben Nevis at 10 km' })).toBeFocused();
 });

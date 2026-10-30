@@ -172,6 +172,13 @@ export function PlaceSearchField({ controller }: { controller: StudioController 
                       key={spanKm}
                       type="button"
                       aria-label={`Load ${place.name}${place.detail ? `, ${place.detail}` : ''} at ${spanKm} km`}
+                      onPointerDown={(event) => {
+                        // Safari may blur the input without focusing the button, unmounting it before click.
+                        event.preventDefault();
+                      }}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                      }}
                       onClick={() => {
                         choosePlace(place, spanKm);
                       }}
