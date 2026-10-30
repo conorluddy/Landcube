@@ -74,10 +74,10 @@ test('Route is offered with real terrain on desktop and phone, not with generate
   await expect(page.getByRole('button', { name: 'Route tool' })).toBeEnabled();
 });
 
-test('the phone Route button is disabled until real terrain loads', async ({ page }) => {
+test('the phone Route button is absent until real terrain loads', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await expect(page.getByRole('button', { name: 'Route tool' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Route tool' })).toHaveCount(0);
 });
 
 test('three taps place three handles joined by two insert targets', async ({ page }) => {

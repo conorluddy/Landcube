@@ -149,15 +149,17 @@ export function StudioMapControls({
           toggleTool(c, state, 'measure');
         }}
       />
-      <IconButton
-        glyph="⌇"
-        label="Route tool"
-        isActive={getActiveTool(state) === 'route'}
-        disabled={state.source.terrain === undefined}
-        onClick={() => {
-          toggleTool(c, state, 'route');
-        }}
-      />
+      {/* Like the desktop toolbar, Route exists only on real terrain; a dead button would also push the column into the sheet. */}
+      {state.source.terrain !== undefined && (
+        <IconButton
+          glyph="⌇"
+          label="Route tool"
+          isActive={getActiveTool(state) === 'route'}
+          onClick={() => {
+            toggleTool(c, state, 'route');
+          }}
+        />
+      )}
       {is3d && (
         <IconButton
           glyph="⌖"
