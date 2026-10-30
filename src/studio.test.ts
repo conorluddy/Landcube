@@ -71,6 +71,12 @@ function setup(fetchRoads?: typeof fetch, placeStorage?: Pick<Storage, 'getItem'
   return { controller, effects, modelChanges: () => modelChanges };
 }
 
+void test('studio starts with 0.35 height exaggeration', () => {
+  const { controller } = setup();
+
+  assert.equal(controller.getSnapshot().model.exaggeration, 0.35);
+});
+
 void test('studio switches views without losing independent sections or project edits', async () => {
   const { controller: c } = setup();
 
