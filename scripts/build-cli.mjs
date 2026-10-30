@@ -9,5 +9,5 @@ await build({
   format: 'esm',
   external: ['@resvg/resvg-js', 'pngjs'],
   banner: { js: '#!/usr/bin/env node' },
-  outfile: 'dist-cli/topogra.mjs',
+  outfile: 'dist-cli/landcube.mjs',
 });

@@ -4,8 +4,11 @@ import {
   placeSearchDebounceMs,
   placeSearchMinimumQueryLength,
 } from '../constants/place-search';
+import { getFault } from '../constants/faults';
+import { operationErrorCodes } from '../constants/operations';
 import type { PlaceMatch } from '../place-search';
 import type { StudioController } from './controller';
+import { SearchField, searchFieldInputClassName } from '../ui/search-field';
 
 type SearchState =
   | { kind: 'idle' }
@@ -13,14 +16,11 @@ type SearchState =
   | { kind: 'results'; places: PlaceMatch[] }
   | { kind: 'failed'; message: string };
 
-/** Autocompleting place search; choosing a match loads its terrain and saves it to the menu. */
-export function PlaceSearchField({
-  controller,
-  compact = false,
-}: {
-  controller: StudioController;
-  compact?: boolean;
-}): ReactNode {
+/**
+ * Autocompleting place search; choosing a match loads its terrain and saves it to the menu.
+ * Framed as the glass SearchField, in the header and in the Terrain section.
+ */
+export function PlaceSearchField({ controller }: { controller: StudioController }): ReactNode {
   const id = useId();
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState<SearchState>({ kind: 'idle' });
@@ -76,94 +76,83 @@ export function PlaceSearchField({
     void controller.loadSearchedPlace(place);
   };
 
-  return (
-    <div className="place-search">
-      <label className="field-row">
-        <span className={compact ? 'visually-hidden' : undefined}>Search</span>
-        {compact && (
-          <svg className="header-search-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="1.7" />
-            <path
-              d="m15.5 15.5 4 4"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              strokeLinecap="round"
-            />
-          </svg>
-        )}
-        <input
-          id={`${id}-search`}
-          type="text"
-          role="combobox"
-          autoComplete="off"
-          placeholder="Mountain, town, lake…"
-          aria-expanded={isOpen}
-          aria-controls={`${id}-results`}
-          aria-activedescendant={activeIndex >= 0 ? `${id}-result-${activeIndex}` : undefined}
-          value={query}
-          onFocus={() => {
-            setIsOpen(true);
-          }}
-          onBlur={() => {
-            setIsOpen(false);
-          }}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setIsOpen(true);
-          }}
-          onKeyDown={(event) => {
-            if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && places.length > 0) {
-              event.preventDefault();
-              const step = event.key === 'ArrowDown' ? 1 : -1;
+  const input = (
+    <input
+      id={`${id}-search`}
+      className={searchFieldInputClassName}
+      type="text"
+      role="combobox"
+      autoComplete="off"
+      placeholder="Mountain, town, lake…"
+      aria-expanded={isOpen}
+      aria-controls={`${id}-results`}
+      aria-activedescendant={activeIndex >= 0 ? `${id}-result-${activeIndex}` : undefined}
+      value={query}
+      onFocus={() => {
+        setIsOpen(true);
+      }}
+      onBlur={() => {
+        setIsOpen(false);
+      }}
+      onChange={(event) => {
+        setQuery(event.target.value);
+        setIsOpen(true);
+      }}
+      onKeyDown={(event) => {
+        if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && places.length > 0) {
+          event.preventDefault();
+          const step = event.key === 'ArrowDown' ? 1 : -1;
 
-              setIsOpen(true);
-              setActiveIndex((index) =>
-                index < 0 && step < 0
-                  ? places.length - 1
-                  : (index + step + places.length) % places.length,
-              );
-            } else if (event.key === 'Enter' && activeIndex >= 0 && activeIndex < places.length) {
-              event.preventDefault();
-              choosePlace(places[activeIndex]);
-            } else if (event.key === 'Escape') {
-              setSearch({ kind: 'idle' });
-              setActiveIndex(-1);
-              setIsOpen(false);
-            }
-          }}
-        />
-      </label>
-      <div className="place-search-popover" data-open={isOpen}>
-        {isOpen && places.length > 0 && (
-          <ul id={`${id}-results`} className="place-search-results" role="listbox">
-            {places.map((place, index) => (
-              <li
-                id={`${id}-result-${index}`}
-                key={`${place.latitude},${place.longitude},${place.name}`}
-                role="option"
-                aria-selected={index === activeIndex}
-                onMouseDown={(event) => {
-                  // Keeps focus in the input so the click lands before any blur.
-                  event.preventDefault();
-                  choosePlace(place);
-                }}
-              >
-                <strong>{place.name}</strong>
-                {place.detail !== '' && <span>{place.detail}</span>}
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="export-hint" role="status">
-          {search.kind === 'loading'
-            ? 'Searching…'
-            : search.kind === 'failed'
-              ? search.message
-              : search.kind === 'results' && places.length === 0
-                ? 'No places found.'
-                : placeSearchAttribution}
-        </p>
-      </div>
+          setIsOpen(true);
+          setActiveIndex((index) =>
+            index < 0 && step < 0
+              ? places.length - 1
+              : (index + step + places.length) % places.length,
+          );
+        } else if (event.key === 'Enter' && activeIndex >= 0 && activeIndex < places.length) {
+          event.preventDefault();
+          choosePlace(places[activeIndex]);
+        } else if (event.key === 'Escape') {
+          setSearch({ kind: 'idle' });
+          setActiveIndex(-1);
+          setIsOpen(false);
+        }
+      }}
+    />
+  );
+  const popover = (
+    <div className="place-search-popover" data-open={isOpen}>
+      {isOpen && places.length > 0 && (
+        <ul id={`${id}-results`} className="place-search-results" role="listbox">
+          {places.map((place, index) => (
+            <li
+              id={`${id}-result-${index}`}
+              key={`${place.latitude},${place.longitude},${place.name}`}
+              role="option"
+              aria-selected={index === activeIndex}
+              onMouseDown={(event) => {
+                // Keeps focus in the input so the click lands before any blur.
+                event.preventDefault();
+                choosePlace(place);
+              }}
+            >
+              <strong>{place.name}</strong>
+              {place.detail !== '' && <span>{place.detail}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p role="status">
+        {search.kind === 'loading'
+          ? 'Searching…'
+          : search.kind === 'failed'
+            ? `${getFault(operationErrorCodes.placeSearchFailed).code} · ${search.message}`
+            : search.kind === 'results' && places.length === 0
+              ? 'No places found.'
+              : placeSearchAttribution}
+      </p>
     </div>
   );
+
+  return <SearchField label="Search" isOpen={isOpen} input={input} popover={popover} />;
 }

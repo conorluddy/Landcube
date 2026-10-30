@@ -2,7 +2,7 @@
 
 > Context is finite. Write for humans with limited working memory and agents with bounded context windows. Maximize signal, minimize noise.
 
-Adapted from [conorluddy/Codestyle](https://github.com/conorluddy/Codestyle) for Topogra.
+Adapted from [conorluddy/Codestyle](https://github.com/conorluddy/Codestyle) for LANDCU.BE.
 
 ## Philosophy
 
@@ -13,7 +13,7 @@ Adapted from [conorluddy/Codestyle](https://github.com/conorluddy/Codestyle) for
 
 ## Determinism and reproducibility
 
-Topogra's output is a pure function of seed and settings. Shared design links depend on it.
+LANDCU.BE's output is a pure function of seed and settings. Shared design links depend on it.
 
 - The rendering pipeline takes randomness as a parameter (`createSeededRandomGenerator` in `src/terrain-generation.ts`). Never call `Math.random` or read the clock inside it.
 - `Math.random` is allowed only at the edges, to pick a fresh seed or palette, and is injected (see `createRandomPalette`).

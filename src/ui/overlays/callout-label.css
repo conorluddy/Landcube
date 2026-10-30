@@ -1,0 +1,81 @@
+/* O-06 CalloutLabel: a 1px leader 20px tall under a tip-glass box; position travels as custom properties. */
+.lc-callout-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  transform: translate(var(--lc-callout-x, 0), var(--lc-callout-y, 0));
+}
+
+.lc-callout-label__leader {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 20px;
+  background: var(--lc-hud-mark, var(--lc-ink-3));
+}
+
+.lc-callout-label__box {
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-1);
+  width: max-content;
+  padding: 5px 7px;
+  border: 1px solid var(--lc-line);
+  background: var(--lc-glass-tip);
+  -webkit-backdrop-filter: blur(var(--lc-blur-sm));
+  backdrop-filter: blur(var(--lc-blur-sm));
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.lc-callout-label__value {
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-value);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--lc-track-coord);
+  line-height: 14px;
+}
+
+.lc-callout-label__meta {
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-ui);
+  line-height: 11px;
+  text-transform: uppercase;
+}
+
+[data-motion='active'] .lc-callout-label__box {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .lc-callout-label__box {
+    background: var(--lc-glass-sheet);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-callout-label__leader {
+    background: CanvasText;
+  }
+
+  .lc-callout-label__box {
+    border-color: CanvasText;
+    background: Canvas;
+  }
+
+  .lc-callout-label__value,
+  .lc-callout-label__meta {
+    color: CanvasText;
+  }
+}

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { PNG } from 'pngjs';
 
-export const appUrl = 'https://topogra.test/';
+export const appUrl = 'https://landcube.test/';
 export const terrainTileUrl = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/**';
 
 const analyticsUrl = 'https://www.googletagmanager.com/**';
@@ -94,6 +94,17 @@ export async function openDefaultStudio(page: Page): Promise<void> {
     { timeout: defaultStudioStartupMs },
   );
   await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible({
+    timeout: defaultStudioStartupMs,
+  });
+}
+
+/** Switches to 3D and waits until the lazy renderer owns the viewport before anything else runs. */
+export async function enter3D(page: Page): Promise<void> {
+  const button = page.getByRole('button', { name: '3D', exact: true });
+
+  await button.click();
+  await expect(button).toHaveAttribute('aria-pressed', 'true', { timeout: defaultStudioStartupMs });
+  await expect(page.locator('canvas.terrain-3d')).toBeVisible({
     timeout: defaultStudioStartupMs,
   });
 }

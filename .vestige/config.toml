@@ -1,0 +1,22 @@
+project_id = "proj_41e23bc18315"
+project_name = "Topogra"
+scope = "project"
+
+[storage]
+mode = "user_data"
+path = "~/.vestige/projects/proj_41e23bc18315/memory.sqlite"
+
+[recall]
+default_depth = "one_liner"
+max_results = 8
+include_global_preferences = false
+
+[mcp]
+allow_record_observation = true
+allow_record_decision = true
+allow_forget = false
+allow_propose_candidate = true
+allow_candidate_approval = false
+allow_candidate_rejection = false
+allow_scan_sessions = false
+allow_revise = true

@@ -1,7 +1,0 @@
-interface:
-  display_name: 'Topogra'
-  short_description: 'Generate reproducible topographic assets'
-  default_prompt: 'Use $topogra to generate a topographic asset and its reusable configuration.'
-
-policy:
-  allow_implicit_invocation: true

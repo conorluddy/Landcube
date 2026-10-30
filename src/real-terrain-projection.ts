@@ -46,6 +46,27 @@ export function projectToRealTerrainFrame(
   };
 }
 
+/** The geographic point `RealTerrain.sample` reads at a frame point; inverse of `projectToRealTerrainFrame`. */
+export function locateRealTerrainFramePoint(
+  placement: RealTerrainPlacement,
+  point: FramePoint,
+  frame: { width: number; height: number },
+): { latitude: number; longitude: number } {
+  const { location, spanKm } = placement;
+  const frameSize = Math.max(frame.width, frame.height);
+  const spanFraction = getMercatorSpanFraction(location.latitude, spanKm);
+  const longitude = getLongitude(
+    getMercatorX(location.longitude) + ((point.x - frame.width / 2) / frameSize) * spanFraction,
+  );
+
+  return {
+    latitude: getLatitude(
+      getMercatorY(location.latitude) + ((point.y - frame.height / 2) / frameSize) * spanFraction,
+    ),
+    longitude: ((((longitude + 180) % 360) + 360) % 360) - 180,
+  };
+}
+
 /**
  * Geographic edges of the square source patch, so a feature query covers every possible crop.
  * Near the antimeridian `west` or `east` runs past ±180°; queries split such a patch in two.

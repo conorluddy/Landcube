@@ -16,14 +16,14 @@ function readHeader(stl: ArrayBuffer): string {
 void test('model STLs keep their original header', () => {
   assert.equal(
     readHeader(createBinaryStl(tetrahedron)),
-    'Topogra terrain model | units: millimeters | Z up',
+    'landcube terrain model | units: millimeters | Z up',
   );
 });
 
 void test('a label names the part in the header without touching the triangle count', () => {
-  const stl = createBinaryStl(tetrahedron, 'Topogra frame-2');
+  const stl = createBinaryStl(tetrahedron, 'landcube frame-2');
 
-  assert.equal(readHeader(stl), 'Topogra frame-2 | units: millimeters | Z up');
+  assert.equal(readHeader(stl), 'landcube frame-2 | units: millimeters | Z up');
   assert.equal(new DataView(stl).getUint32(80, true), 4);
 });
 

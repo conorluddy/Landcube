@@ -52,7 +52,7 @@ export function createTerrainStage(): {
       );
   };
 
-  groundMaterial.customProgramCacheKey = () => 'topogra-shadowed-studio-v2';
+  groundMaterial.customProgramCacheKey = () => 'landcube-shadowed-studio-v2';
 
   // An enclosing studio box keeps the floor, walls, and ceiling the same color.
   const ground = new THREE.Mesh(new THREE.BoxGeometry(400, 200, 400), groundMaterial);

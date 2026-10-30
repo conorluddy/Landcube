@@ -24,7 +24,7 @@ export function createTerrainRoadMaterial(color: string): TerrainRoadMaterial {
   });
   const texture = { value: 0.5 };
 
-  material.customProgramCacheKey = () => 'topogra-road-v1';
+  material.customProgramCacheKey = () => 'landcube-road-v1';
 
   material.onBeforeCompile = (shader) => {
     shader.uniforms.roadTexture = texture;

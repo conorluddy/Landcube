@@ -32,6 +32,11 @@ import {
 } from './terrain-lighting';
 import { createTerrainLineBuffers } from './terrain-3d-lines';
 import { createTerrainRoadLayer } from './terrain-3d-roads';
+import {
+  createTerrainRouteLayer,
+  noRouteOverlay,
+  type TerrainRouteOverlay,
+} from './terrain-3d-route';
 import { createTerrainGrassLayer } from './terrain-3d-grass';
 import { getGrassRoads, type GrassGeography, type GrassSite } from './grass-coverage';
 import type { GrassStyle } from './types/grass';
@@ -46,6 +51,7 @@ import {
   getOrthographicHalfHeight,
   getVerticalFovDegrees,
   terrainViewPresets,
+  type CameraPose,
   type TerrainCameraSettings,
   type TerrainViewPreset,
 } from './terrain-camera';
@@ -89,6 +95,7 @@ export interface Terrain3d {
     terraceLevels?: TerrainTerraceLevels,
     roads?: readonly RoadPath[],
     grassGeography?: GrassGeography,
+    route?: TerrainRouteOverlay,
   ): void;
   setVisible(value: boolean): void;
   /** Pass false when a terrain update follows, so the new height morphs with it. */
@@ -131,6 +138,9 @@ export interface Terrain3d {
   /** Morphs the next rebuilt landscape from the current one instead of cutting to it. */
   requestTransition(): void;
   reset(): void;
+  getCameraPose(): CameraPose;
+  /** The terrain point under a viewport position, as fractions across the model (0,0 = north-west). */
+  getSurfaceFractionAt(clientX: number, clientY: number): { x: number; y: number } | undefined;
 }
 
 type GradientRange = readonly [minimum: number, maximum: number];
@@ -148,6 +158,8 @@ interface RunningTerrainTransition {
 
 export function createTerrain3d(
   onModel: (heightMm: number, layerHeightMm?: number) => void = () => undefined,
+  /** Runs after every drawn frame, so camera readouts can follow orbits, presets and the turntable. */
+  onDraw: () => void = () => undefined,
 ): Terrain3d {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
 
@@ -439,6 +451,7 @@ export function createTerrain3d(
   const landscape = new THREE.Group();
 
   const roads = createTerrainRoadLayer();
+  const route = createTerrainRouteLayer();
   const grass = createTerrainGrassLayer();
   let roadStyle: Readonly<RoadStyle> = defaultRoadStyle;
   let grassTerrain:
@@ -492,7 +505,7 @@ export function createTerrain3d(
     updateLoop();
   };
 
-  landscape.add(surface, base, contourLayer, roads.mesh, grass.mesh, sea, waterSides);
+  landscape.add(surface, base, contourLayer, roads.mesh, route.object, grass.mesh, sea, waterSides);
   scene.add(landscape);
   const framePreview = createTerrainFramePreview(renderer);
 
@@ -532,6 +545,7 @@ export function createTerrain3d(
   const draw = () => {
     if (visible && !document.hidden) {
       render();
+      onDraw();
     }
   };
 
@@ -752,6 +766,22 @@ export function createTerrain3d(
     );
   };
 
+  /** Test hooks: what the route layer drew, on the canvas wrapper like `data-terrain-transition`. */
+  const syncRouteHooks = () => {
+    const { points, waypoints } = route.getCounts();
+    const { dataset } = renderer.domElement;
+
+    if (points === 0) {
+      delete dataset.routePoints;
+      delete dataset.routeWaypoints;
+
+      return;
+    }
+
+    dataset.routePoints = String(points);
+    dataset.routeWaypoints = String(waypoints);
+  };
+
   const syncDecorations = () => {
     const opacity = strokeOpacity * (transition?.incomingOpacity ?? 1);
 
@@ -762,6 +792,8 @@ export function createTerrain3d(
     syncContourTreatment();
     syncWater();
     roads.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
+    route.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
+    syncRouteHooks();
     const wasAnimated = grass.isAnimated();
 
     grass.setSuppressed(shouldHideDecorations() || modelSettings.terrainShape === 'terraced');
@@ -936,6 +968,7 @@ export function createTerrain3d(
       terraceLevels?: TerrainTerraceLevels,
       roadPaths: readonly RoadPath[] = noRoadPaths,
       grassGeography?: GrassGeography,
+      routeOverlay: TerrainRouteOverlay = noRouteOverlay,
     ) {
       lastUpdate = [
         contours,
@@ -947,6 +980,7 @@ export function createTerrain3d(
         terraceLevels,
         roadPaths,
         grassGeography,
+        routeOverlay,
       ];
       // Terrace levels follow the contour interval but only shape terraced models.
       const morphKey = JSON.stringify([
@@ -1115,6 +1149,16 @@ export function createTerrain3d(
         exaggeration,
         elevationOffset,
       });
+      route.update({
+        ...routeOverlay,
+        field,
+        width,
+        height,
+        modelSettings,
+        exaggeration,
+        elevationOffset,
+      });
+      syncRouteHooks();
       grassTerrain = grassGeography && {
         field,
         width,
@@ -1470,6 +1514,42 @@ export function createTerrain3d(
       }
 
       return frame;
+    },
+    getCameraPose() {
+      const orbit = new THREE.Spherical().setFromVector3(
+        camera.position.clone().sub(controls.target),
+      );
+
+      // North is -z, so a camera at azimuth theta looks along bearing -theta.
+      return {
+        azimuthDegrees: THREE.MathUtils.euclideanModulo(
+          -THREE.MathUtils.radToDeg(orbit.theta),
+          360,
+        ),
+        elevationDegrees: 90 - THREE.MathUtils.radToDeg(orbit.phi),
+        fovDegrees: perspectiveCamera.fov,
+      };
+    },
+    getSurfaceFractionAt(clientX, clientY) {
+      const point = getTerrainPointAt(clientX, clientY);
+
+      // Rebuilds replace the geometry, and morphs keep its footprint, so one box per geometry holds.
+      if (!surface.geometry.boundingBox) {
+        surface.geometry.computeBoundingBox();
+      }
+
+      const bounds = surface.geometry.boundingBox;
+
+      if (!point || !bounds || bounds.isEmpty()) {
+        return undefined;
+      }
+
+      const local = surface.worldToLocal(point.clone());
+
+      return {
+        x: THREE.MathUtils.clamp((local.x - bounds.min.x) / (bounds.max.x - bounds.min.x), 0, 1),
+        y: THREE.MathUtils.clamp((local.z - bounds.min.z) / (bounds.max.z - bounds.min.z), 0, 1),
+      };
     },
     pickFocus() {
       const canvas = renderer.domElement;

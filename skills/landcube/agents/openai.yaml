@@ -1,0 +1,7 @@
+interface:
+  display_name: 'LANDCU.BE'
+  short_description: 'Generate reproducible topographic assets'
+  default_prompt: 'Use $landcube to generate a topographic asset and its reusable configuration.'
+
+policy:
+  allow_implicit_invocation: true

@@ -58,7 +58,7 @@ function setup(fetchRoads?: typeof fetch, placeStorage?: Pick<Storage, 'getItem'
       },
       isSeedLocked: false,
       lockSeed: () => undefined,
-      getShareUrl: () => `https://topogra.test/?${serializeDesignParameters(design).toString()}`,
+      getShareUrl: () => `https://landcube.test/?${serializeDesignParameters(design).toString()}`,
       copyLink: () => Promise.resolve({ ok: true, data: undefined }),
     },
     fetchRoads,
@@ -87,6 +87,16 @@ void test('studio switches views without losing independent sections or project 
   assert.equal(c.getSnapshot().workspace.sections['3d'], 'Model');
   assert.equal(c.getSnapshot().model.dimensions.widthMm, 180);
   assert.equal(c.getSnapshot().scene.ground, false);
+});
+
+void test('the phone sheet opens at half and its snap never reaches the style link', () => {
+  const { controller: c } = setup();
+  const linkBefore = c.getSnapshot().design;
+
+  assert.equal(c.getSnapshot().workspace.sheetSnap, 'half');
+  c.workspace({ sheetSnap: 'full' });
+  assert.equal(c.getSnapshot().workspace.sheetSnap, 'full');
+  assert.equal(c.getSnapshot().design, linkBefore);
 });
 
 void test('failed view activation preserves all settings and releases the activation lock', async () => {
@@ -243,7 +253,7 @@ void test('default location loads bundled tiles and credits only their recorded 
   await c.loadTerrain();
 
   assert.ok(requestedUrls.length > 0);
-  assert.ok(requestedUrls.every((url) => url.startsWith('https://topogra.test/terrain-tiles/')));
+  assert.ok(requestedUrls.every((url) => url.startsWith('https://landcube.test/terrain-tiles/')));
   assert.match(c.getSnapshot().source.terrain?.attribution ?? '', /Copernicus/);
   assert.doesNotMatch(c.getSnapshot().source.terrain?.attribution ?? '', /Geological Survey/);
 });
@@ -549,7 +559,7 @@ function stubBrowserTileDecoding(t: TestContext): void {
   Object.assign(globalThis, {
     createImageBitmap: () => Promise.resolve({ close: () => undefined }),
     document: {
-      baseURI: 'https://topogra.test/',
+      baseURI: 'https://landcube.test/',
       createElement: () => ({
         getContext: () => ({ drawImage: () => undefined, getImageData: () => ({ data: pixels }) }),
       }),
@@ -661,4 +671,73 @@ void test('grass presets apply their look until a look value is set by hand', ()
   assert.equal(c.getSnapshot().scene.grass.preset, 'custom');
   assert.equal(c.getSnapshot().scene.grass.lengthMm, 2);
   assert.equal(c.getSnapshot().scene.grass.baseColor, grassPresets.alpine.baseColor);
+});
+
+void test('downloading frame parts lists a job that runs queued, meshing, then done', async () => {
+  const { controller: c, effects } = setup();
+  const statusesSeen: string[] = [];
+
+  effects.downloadFrameStl = () => {
+    statusesSeen.push(...c.getSnapshot().exportJobs.map(({ status }) => status));
+  };
+
+  c.metrics(24);
+  c.frame({ preset: 'tray' });
+  const queued = c.downloadFrameStlParts(['frame']);
+
+  assert.equal(c.getSnapshot().exportJobs[0].status, 'meshing');
+  await queued;
+
+  assert.deepEqual(statusesSeen, ['meshing']);
+  const [job] = c.getSnapshot().exportJobs;
+
+  assert.equal(job.label, 'frame STL');
+  assert.equal(job.status, 'done');
+  assert.equal(job.fraction, 1);
+  assert.ok((job.sizeBytes ?? 0) > 84);
+});
+
+void test('a failing part download marks its job failed with the reason', async () => {
+  const { controller: c, effects } = setup();
+
+  effects.downloadFrameStl = () => {
+    throw new Error('Mesh is open.');
+  };
+
+  c.metrics(24);
+  c.frame({ preset: 'tray' });
+  await c.downloadFrameStlParts(['frame']);
+
+  assert.equal(c.getSnapshot().exportJobs[0].status, 'failed');
+  assert.equal(c.getSnapshot().exportJobs[0].message, 'Mesh is open.');
+});
+
+void test('part downloads are skipped while a batch is still running', async () => {
+  const { controller: c, effects } = setup();
+  let downloads = 0;
+
+  effects.downloadFrameStl = () => {
+    downloads++;
+  };
+
+  c.metrics(24);
+  c.frame({ preset: 'tray' });
+  const first = c.downloadFrameStlParts(['frame']);
+
+  await c.downloadFrameStlParts(['frame']);
+  await first;
+  assert.equal(downloads, 1);
+});
+
+void test('single downloads report whether they started', () => {
+  const { controller: c, effects } = setup();
+
+  assert.equal(c.downloadStl(), true);
+  assert.equal(c.downloadFrameStl('frame'), false);
+
+  effects.downloadStl = () => {
+    throw new Error('No model yet.');
+  };
+
+  assert.equal(c.downloadStl(), false);
 });

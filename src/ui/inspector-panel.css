@@ -1,0 +1,99 @@
+/* C-02 InspectorPanel: 396 wide, a 92px rail beside the body. The caller places it (desktop: top 60 / right 12 / bottom 60). */
+.lc-inspector {
+  --lc-inspector-rail-width: 92px;
+
+  display: grid;
+  grid-template-columns: var(--lc-inspector-rail-width) minmax(0, 1fr);
+  width: 396px;
+  max-width: 100%;
+  min-height: 0;
+  margin: 0;
+}
+
+.lc-inspector[data-collapsed='true'] {
+  grid-template-columns: var(--lc-inspector-rail-width);
+  width: var(--lc-inspector-rail-width);
+}
+
+.lc-inspector > .lc-section-rail {
+  padding: var(--lc-s-4) 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--lc-line-subtle);
+  scrollbar-width: none;
+}
+
+.lc-inspector__panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.lc-inspector__header {
+  display: flex;
+  gap: var(--lc-s-5);
+  align-items: baseline;
+  min-width: 0;
+  padding: var(--lc-s-8) var(--lc-s-9) var(--lc-s-7);
+  border-bottom: 1px solid var(--lc-line-subtle);
+}
+
+.lc-inspector__index,
+.lc-inspector__tag {
+  flex: none;
+  color: var(--lc-text-quiet);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-micro);
+  letter-spacing: var(--lc-track-label);
+  white-space: nowrap;
+}
+
+.lc-inspector__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-lead);
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-inspector__tag {
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+}
+
+.lc-inspector__body {
+  min-height: 0;
+  padding: var(--lc-s-2) var(--lc-s-9) var(--lc-s-9);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.lc-inspector__section {
+  padding-top: var(--lc-s-8);
+}
+
+/* Horizontal rail: the mobile tab strip sits above the body. */
+.lc-inspector[data-rail-orientation='horizontal'],
+.lc-inspector[data-rail-orientation='horizontal'][data-collapsed='true'] {
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+}
+
+.lc-inspector[data-rail-orientation='horizontal'] > .lc-section-rail {
+  padding: var(--lc-s-5) var(--lc-s-6);
+  border-right: 0;
+  border-bottom: 1px solid var(--lc-line-subtle);
+}
+
+.lc-inspector[data-rail-orientation='horizontal'][data-collapsed='true'] > .lc-section-rail {
+  border-bottom: 0;
+}

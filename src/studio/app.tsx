@@ -1,49 +1,60 @@
 import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { roadAttributionUrl } from '../constants/roads';
+import { InspectorPanel } from '../ui/inspector-panel';
 import {
-  areRoadsDrawn,
   threeDOnlySections,
   type StudioController,
   type InspectorSection,
-} from './controller';
-import { CameraPanel, OrbitPanel } from './camera-panel';
-import {
-  ColourPanel,
-  ContoursPanel,
-  OverlaysPanel,
-  ScenePanel,
-  TerrainPanel,
   type PanelProps,
-} from './panels';
-import { Button, Group, Hint, NumberField, Range, Select, Toggle } from './fields';
+} from './controller';
+import { DossierPanel } from './dossier-panel';
 import { ExportPanel } from './export-panel';
-import { FramePanel } from './frame-panel';
-import { PlaceSearchField } from './place-search-field';
+import { ControlGroup } from '../ui/control-group';
+import { GlassPanel } from '../ui/glass-panel';
+import { Button } from '../ui/button';
+import { StatusMessage } from '../ui/status-message';
+import { TextField } from '../ui/text-field';
+import { IconButton } from '../ui/icon-button';
+import { createPinnedPlaceholder } from '../ui/layout-manager';
+import { buildOverlayPopoverGroups } from './control-groups/overlays';
+import { buildOrbitGroup } from './control-groups/camera';
+import { buildSectionGroups } from './control-groups';
+import { StudioPinnedPanels } from './pinned-panels';
+import { getGroupCode, studioSections } from './sections';
+import { CommandPaletteHost, isCommandPaletteShortcut } from './command-palette-host';
+import { commandPaletteDialogClassName } from '../ui/command-palette';
+import { StudioHeader } from './studio-header';
+import { StudioFooter } from './studio-footer';
+import { StudioMapControls, StudioSheet } from './studio-sheet';
+import { ViewportStates } from './viewport-states';
+import { StudioHud } from './studio-hud';
+import { CompareHost } from './compare-host';
+import type { CompareSceneStore } from './compare-scene';
+import { StudioToolBar } from './studio-tools';
+import type { HudStore } from './hud-store';
 import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
+import { PhonePages } from './pages/phone-pages';
 
-const sections: InspectorSection[] = [
-  'Terrain',
-  'Contours',
-  'Colour',
-  'Scene',
-  'Camera',
-  'Model',
-  'Frame',
-];
+const inspectorId = 'studio-inspector';
+
+/** Below this the inspector becomes a bottom sheet with a horizontal section strip. */
+export const phoneViewportQuery = '(max-width: 767px)';
 
 function Surface({
   title,
   close,
   children,
   modal = false,
+  bareClassName,
 }: {
   title: string;
   close: () => void;
   children: ReactNode;
   modal?: boolean;
+  /** Renders the children with no heading, in a dialog with this class; they bring their own panel. */
+  bareClassName?: string;
 }): ReactNode {
   const ref = useRef<HTMLDialogElement>(null);
   const closeRef = useRef(close);
@@ -72,7 +83,7 @@ function Surface({
         !modal &&
         event.target instanceof Node &&
         !dialog.contains(event.target) &&
-        !(event.target instanceof Element && event.target.closest('[data-popover-trigger]'))
+        !(event.target instanceof Element && event.target.closest('[aria-haspopup="dialog"]'))
       ) {
         closeRef.current();
       }
@@ -93,7 +104,8 @@ function Surface({
   return (
     <dialog
       ref={ref}
-      className={modal ? 'studio-dialog' : 'studio-popover'}
+      className={bareClassName ?? `lc-popover${modal ? ' lc-popover--modal' : ''}`}
+      data-ui-surface
       aria-label={title}
       onCancel={(event) => {
         event.preventDefault();
@@ -125,95 +137,18 @@ function Surface({
         }
       }}
     >
-      <div className="surface-heading">
-        <h2>{title}</h2>
-        <button type="button" aria-label={`Close ${title}`} onClick={close}>
-          ×
-        </button>
-      </div>
-      <div className="surface-body">{children}</div>
+      {bareClassName !== undefined ? (
+        children
+      ) : (
+        <GlassPanel padding="none" className="lc-popover__panel">
+          <div className="lc-popover__heading">
+            <h2 className="lc-popover__title">{title}</h2>
+            <IconButton glyph="×" label={`Close ${title}`} onClick={close} />
+          </div>
+          <div className="lc-popover__body">{children}</div>
+        </GlassPanel>
+      )}
     </dialog>
-  );
-}
-
-function ModelPanel({
-  controller: c,
-  state: s,
-  cropPreview,
-}: PanelProps & { cropPreview: CropPreview }): ReactNode {
-  const host = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (host.current) {
-      return cropPreview.attach(host.current);
-    }
-  }, [cropPreview]);
-  const model = s.model;
-
-  return (
-    <>
-      <div ref={host} />
-      <Group title="Model dimensions">
-        <div className="control-grid">
-          <NumberField
-            label={model.dimensions.cropShape === 'circle' ? 'Diameter (mm)' : 'Width (X, mm)'}
-            value={model.dimensions.widthMm}
-            min={1}
-            max={1000}
-            onChange={(value) => value !== undefined && c.dimensions({ widthMm: value })}
-          />
-          {model.dimensions.cropShape !== 'circle' && (
-            <NumberField
-              label="Length (Y, mm)"
-              value={model.dimensions.lengthMm}
-              min={1}
-              max={1000}
-              onChange={(value) => value !== undefined && c.dimensions({ lengthMm: value })}
-            />
-          )}
-        </div>
-        <NumberField
-          label="Base thickness (mm)"
-          value={model.dimensions.baseThicknessMm}
-          min={0.1}
-          max={100}
-          onChange={(value) => value !== undefined && c.dimensions({ baseThicknessMm: value })}
-        />
-        <Hint>
-          Minimum material below the lowest valley. Overall height:{' '}
-          <output>{s.metrics.height?.toFixed(2) ?? '—'} mm</output>.
-        </Hint>
-      </Group>
-      <Group title="Shape">
-        <Select
-          label="Terrain shape"
-          value={model.dimensions.terrainShape ?? 'smooth'}
-          options={['smooth', 'terraced']}
-          onChange={(value) => c.dimensions({ terrainShape: value })}
-        />
-        <Toggle
-          label="Auto height for location"
-          value={model.autoExaggeration}
-          onChange={(value) => c.model({ autoExaggeration: value })}
-        />
-        <Range
-          label="Height exaggeration"
-          value={model.exaggeration}
-          min={0}
-          max={1}
-          step={0.05}
-          suffix="×"
-          onChange={(value) => c.model({ exaggeration: value, autoExaggeration: false })}
-        />
-        {model.dimensions.terrainShape === 'terraced' && (
-          <Hint>
-            Flat shelves follow the contour interval and are included in STL. Layer height:{' '}
-            {s.metrics.layerHeight?.toFixed(3) ?? '—'} mm.
-          </Hint>
-        )}
-        <Hint>Download the prepared model from Export → STL.</Hint>
-      </Group>
-    </>
   );
 }
 
@@ -222,16 +157,21 @@ function Studio({
   terrain,
   renderer,
   cropPreview,
+  hud,
+  compareScenes,
 }: {
   controller: StudioController;
   terrain: SVGSVGElement;
   renderer: OutputRenderer;
   cropPreview: CropPreview;
+  hud: HudStore;
+  compareScenes: CompareSceneStore;
 }): ReactNode {
   const state = useSyncExternalStore(c.subscribe, c.getSnapshot);
   const viewport = useRef<HTMLDivElement>(null);
   const inspectorToggle = useRef<HTMLButtonElement>(null);
   const active = state.workspace.sections[state.workspace.view];
+  const isPhoneViewport = useSyncExternalStore(subscribeToPhoneViewport, readIsPhoneViewport);
 
   useLayoutEffect(() => {
     viewport.current?.append(terrain);
@@ -244,9 +184,13 @@ function Studio({
 
       if (state.workspace.exporting) {
         c.workspace({ exporting: false });
+      } else if (state.workspace.compare !== null) {
+        c.endCompare();
+      } else if (state.workspace.comparePresetsOpen) {
+        c.workspace({ comparePresetsOpen: false });
       } else if (state.workspace.popover !== null) {
         c.workspace({ popover: null });
-      } else if (!state.workspace.collapsed) {
+      } else if (!isPhoneViewport && !state.workspace.collapsed) {
         c.workspace({ collapsed: true });
         inspectorToggle.current?.focus();
       }
@@ -257,230 +201,88 @@ function Studio({
     return () => {
       document.removeEventListener('keydown', escape);
     };
-  }, [c, state.workspace]);
+  }, [c, state.workspace, isPhoneViewport]);
+  useEffect(() => {
+    const openPalette = (event: KeyboardEvent) => {
+      if (!isCommandPaletteShortcut(event)) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (c.getSnapshot().workspace.palette === null) {
+        c.workspace({ palette: { query: '' } });
+      }
+    };
+
+    document.addEventListener('keydown', openPalette);
+
+    return () => {
+      document.removeEventListener('keydown', openPalette);
+    };
+  }, [c]);
   const props = { controller: c, state };
 
   return (
-    <div className={`studio-shell${state.workspace.collapsed ? ' inspector-collapsed' : ''}`}>
-      <header className="studio-header">
-        <div className="studio-brand">
-          <span aria-hidden="true">≋</span>
-          <h1>
-            Topogra <small>Landscape studio</small>
-          </h1>
-        </div>
-        <div className="view-switch" role="group" aria-label="View">
-          {(['2d', '3d'] as const).map((view) => (
-            <button
-              type="button"
-              key={view}
-              aria-pressed={state.workspace.view === view}
-              disabled={state.workspace.activating}
-              onClick={() => {
-                void c.selectView(view);
-              }}
-            >
-              {view.toUpperCase()}
-            </button>
-          ))}
-        </div>
-        <div className="view-switch" role="group" aria-label="Terrain source">
-          <button
-            type="button"
-            aria-pressed={state.source.selected === 'generated'}
-            onClick={() => {
-              c.useGenerated();
-            }}
-          >
-            Procedural
-          </button>
-          <button
-            type="button"
-            aria-pressed={state.source.selected === 'real'}
-            onClick={() => {
-              void c.useCoordinates();
-            }}
-          >
-            Coordinates
-          </button>
-        </div>
-        <div
-          className={`header-place-search${state.source.selected === 'real' ? ' is-open' : ''}`}
-          inert={state.source.selected !== 'real'}
-        >
-          <PlaceSearchField controller={c} compact />
-        </div>
-        <div className="header-actions">
-          <button
-            type="button"
-            title="Copies shared design settings. Location and 3D setup are excluded."
-            onClick={() => {
-              void c.copyLink();
-            }}
-          >
-            Copy style link
-          </button>
-          <button
-            type="button"
-            className="primary-button"
-            aria-haspopup="dialog"
-            onClick={() => {
-              c.workspace({ exporting: true, popover: null });
-            }}
-          >
-            Export ↗
-          </button>
-        </div>
-      </header>
+    <div
+      className="studio-shell"
+      data-sheet-snap={isPhoneViewport ? state.workspace.sheetSnap : undefined}
+      data-page-hidden={isPhoneViewport && state.workspace.page !== 'studio' ? true : undefined}
+    >
+      <StudioHeader controller={c} state={state} isPhoneViewport={isPhoneViewport} />
       <main
         id="studio-viewport"
+        className="studio-viewport"
         ref={viewport}
         aria-label={`${state.workspace.view.toUpperCase()} landscape viewport`}
       />
-      <aside
-        id="studio-inspector"
-        className="studio-inspector control-panel"
-        aria-label="Landscape controls"
-        hidden={state.workspace.collapsed}
-      >
-        <nav className="inspector-sections" aria-label="Editing section">
-          {sections
-            .filter(
-              (section) => !threeDOnlySections.includes(section) || state.workspace.view === '3d',
-            )
-            .map((section) => (
-              <button
-                key={section}
-                type="button"
-                aria-pressed={active === section}
-                aria-controls={`inspector-${section.toLowerCase()}`}
-                onClick={() => {
-                  c.selectSection(section);
-                }}
-              >
-                {section}
-              </button>
-            ))}
-        </nav>
-        <div className="inspector-body">
-          {sections.map((section) => (
-            <section
-              key={section}
-              id={`inspector-${section.toLowerCase()}`}
-              aria-label={`${section} settings`}
-              hidden={
-                active !== section ||
-                (threeDOnlySections.includes(section) && state.workspace.view !== '3d')
-              }
-            >
-              <h2>{section}</h2>
-              {section === 'Terrain' && <TerrainPanel {...props} />}
-              {section === 'Contours' && <ContoursPanel {...props} />}
-              {section === 'Colour' && <ColourPanel {...props} />}
-              {section === 'Scene' && <ScenePanel {...props} />}
-              {section === 'Camera' && <CameraPanel {...props} />}
-              {section === 'Model' && <ModelPanel {...props} cropPreview={cropPreview} />}
-              {section === 'Frame' && <FramePanel {...props} />}
-            </section>
-          ))}
-        </div>
-      </aside>
-      <footer className="studio-footer">
-        <div className="viewport-tools">
-          <button
-            type="button"
-            ref={inspectorToggle}
-            aria-expanded={!state.workspace.collapsed}
-            aria-controls="studio-inspector"
-            aria-label={state.workspace.collapsed ? 'Expand controls' : 'Collapse controls'}
-            onClick={() => {
-              c.workspace({ collapsed: !state.workspace.collapsed });
+      <ViewportStates controller={c} state={state} />
+      {!isPhoneViewport && <CompareHost controller={c} state={state} scenes={compareScenes} />}
+      <StudioHud controller={c} state={state} hud={hud} />
+      {isPhoneViewport ? (
+        <>
+          <StudioMapControls controller={c} state={state} />
+          <StudioSheet
+            controller={c}
+            state={state}
+            hud={hud}
+            id={inspectorId}
+            renderSection={(section) => renderSectionBody(section, props, cropPreview)}
+          />
+          <PhonePages controller={c} state={state} renderer={renderer} />
+        </>
+      ) : (
+        <>
+          <InspectorPanel
+            id={inspectorId}
+            label="Landscape controls"
+            railLabel="Editing section"
+            sections={studioSections}
+            activeSectionId={active}
+            onSelectSection={(section) => {
+              c.selectSection(section);
             }}
-          >
-            {state.workspace.collapsed ? 'Controls ↑' : 'Controls ↓'}
-          </button>
-          <button
-            type="button"
-            data-popover-trigger
-            aria-haspopup="dialog"
-            aria-expanded={state.workspace.popover === 'Overlays'}
-            onClick={() => {
-              c.workspace({ popover: state.workspace.popover === 'Overlays' ? null : 'Overlays' });
-            }}
-          >
-            Overlays
-          </button>
-          {state.workspace.view === '3d' && (
-            <button
-              type="button"
-              data-popover-trigger
-              aria-haspopup="dialog"
-              aria-expanded={state.workspace.popover === 'Orbit'}
-              onClick={() => {
-                c.workspace({ popover: state.workspace.popover === 'Orbit' ? null : 'Orbit' });
-              }}
-            >
-              Orbit
-            </button>
-          )}
-          <button
-            type="button"
-            aria-pressed={state.source.autoplay.enabled}
-            aria-label="Tour"
-            title={state.source.autoplay.enabled ? 'Pause tour' : 'Play tour'}
-            onClick={() => {
-              void c.autoplay({ enabled: !state.source.autoplay.enabled });
-            }}
-          >
-            {state.source.autoplay.enabled ? '❚❚ Tour' : '▶ Tour'}
-          </button>
-        </div>
-        <div className="studio-status">
-          <span className="source-label">
-            {state.source.terrain ? 'Real terrain' : `Procedural · ${state.design.seed}`}
-          </span>
-          <span role="status" aria-live="polite">
-            {state.workspace.activating ? 'Starting 3D…' : state.status}
-          </span>
-          {state.source.terrain && (
-            <span title={state.source.terrain.attribution} className="attribution">
-              {state.source.terrain.attribution}
-            </span>
-          )}
-          {areRoadsDrawn(state) && (
-            <a
-              className="attribution"
-              href={roadAttributionUrl}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={`${state.roads.network?.attribution ?? ''} (opens in a new tab)`}
-            >
-              {state.roads.network?.attribution}
-            </a>
-          )}
-          {(state.source.terrain !== undefined || areRoadsDrawn(state)) && (
-            <details className="mobile-attribution">
-              <summary>Data sources</summary>
-              <div>
-                {state.source.terrain && <p>{state.source.terrain.attribution}</p>}
-                {areRoadsDrawn(state) && (
-                  <a href={roadAttributionUrl} target="_blank" rel="noreferrer">
-                    {state.roads.network?.attribution} ↗
-                  </a>
-                )}
-              </div>
-            </details>
-          )}
-        </div>
-        <a
-          className="studio-github"
-          href="https://github.com/conorluddy/Topogra"
-          target="_blank"
-          rel="noreferrer"
-        >
-          GitHub ↗
-        </a>
-      </footer>
+            hiddenSectionIds={state.workspace.view === '3d' ? [] : threeDOnlySections}
+            isCollapsed={state.workspace.collapsed}
+            headerTag={`Src · ${state.source.terrain ? 'Real' : 'Procedural'}`}
+            renderSection={(section) =>
+              renderSectionBody(section, props, cropPreview, {
+                pinnedGroupIds: new Set(state.workspace.pinnedGroups.map(({ id }) => id)),
+                pin: c.pinGroup,
+                dock: c.dockGroup,
+              })
+            }
+          />
+          <StudioPinnedPanels controller={c} state={state} cropPreview={cropPreview} />
+          <StudioToolBar controller={c} state={state} />
+          <StudioFooter
+            controller={c}
+            state={state}
+            inspectorId={inspectorId}
+            inspectorToggleRef={inspectorToggle}
+          />
+        </>
+      )}
       {state.workspace.popover !== null && (
         <Surface
           title={state.workspace.popover}
@@ -489,9 +291,11 @@ function Studio({
           }}
         >
           {state.workspace.popover === 'Overlays' ? (
-            <OverlaysPanel {...props} />
+            buildOverlayPopoverGroups(c, state).map((group) => (
+              <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
+            ))
           ) : (
-            <OrbitPanel {...props} />
+            <ControlGroup group={buildOrbitGroup(c, state, false)} code={getGroupCode('orbit')} />
           )}
         </Surface>
       )}
@@ -506,6 +310,29 @@ function Studio({
           <ExportPanel {...props} renderer={renderer} />
         </Surface>
       )}
+      {state.workspace.dossierOpen && (
+        <Surface
+          modal
+          title="Model dossier"
+          close={() => {
+            c.workspace({ dossierOpen: false });
+          }}
+        >
+          <DossierPanel {...props} renderer={renderer} hud={hud} />
+        </Surface>
+      )}
+      {state.workspace.palette !== null && (
+        <Surface
+          modal
+          bareClassName={commandPaletteDialogClassName}
+          title="Command palette"
+          close={() => {
+            c.workspace({ palette: null });
+          }}
+        >
+          <CommandPaletteHost controller={c} state={state} isMobile={isPhoneViewport} />
+        </Surface>
+      )}
       {state.manualLink !== '' && (
         <Surface
           modal
@@ -514,32 +341,80 @@ function Studio({
             c.dismissManualLink();
           }}
         >
-          <Hint>
-            Clipboard access is unavailable. Select and copy this link. Location and 3D settings are
-            excluded.
-          </Hint>
-          <label>
-            Copy this link
-            <input
-              type="text"
-              readOnly
-              value={state.manualLink}
-              onFocus={(event) => {
-                event.target.select();
+          <div className="studio-copy-link">
+            <StatusMessage kind="info">
+              Clipboard access is unavailable. Select and copy this link. Location and 3D settings
+              are excluded.
+            </StatusMessage>
+            <TextField label="Copy this link" value={state.manualLink} isReadOnly />
+            <Button
+              variant="primary"
+              onClick={() => {
+                c.dismissManualLink();
               }}
-            />
-          </label>
-          <Button
-            onClick={() => {
-              c.dismissManualLink();
-            }}
-          >
-            Done
-          </Button>
+            >
+              Done
+            </Button>
+          </div>
         </Surface>
       )}
     </div>
   );
+}
+
+/** Desktop only: groups can float out of the inspector, leaving a placeholder behind. */
+interface GroupPinning {
+  pinnedGroupIds: ReadonlySet<string>;
+  pin: (id: string) => void;
+  dock: (id: string) => void;
+}
+
+/** A section's control groups; with `pinning`, pinnable groups get a pin button. */
+function renderSectionBody(
+  section: InspectorSection,
+  props: PanelProps,
+  cropPreview: CropPreview,
+  pinning?: GroupPinning,
+): ReactNode {
+  return buildSectionGroups(section, props.controller, props.state, cropPreview).map((group) => {
+    const code = getGroupCode(group.id);
+
+    if (pinning?.pinnedGroupIds.has(group.id) === true) {
+      const placeholder = createPinnedPlaceholder(group, () => {
+        pinning.dock(group.id);
+      });
+
+      return <ControlGroup key={group.id} group={placeholder} code={code} />;
+    }
+
+    return (
+      <ControlGroup
+        key={group.id}
+        group={group}
+        code={code}
+        onPin={
+          pinning &&
+          (() => {
+            pinning.pin(group.id);
+          })
+        }
+      />
+    );
+  });
+}
+
+function subscribeToPhoneViewport(onChange: () => void): () => void {
+  const query = matchMedia(phoneViewportQuery);
+
+  query.addEventListener('change', onChange);
+
+  return () => {
+    query.removeEventListener('change', onChange);
+  };
+}
+
+function readIsPhoneViewport(): boolean {
+  return matchMedia(phoneViewportQuery).matches;
 }
 
 export function mountStudio(
@@ -547,6 +422,8 @@ export function mountStudio(
   terrain: SVGSVGElement,
   renderer: OutputRenderer,
   cropPreview: CropPreview,
+  hud: HudStore,
+  compareScenes: CompareSceneStore,
 ): void {
   const root = document.createElement('div');
 
@@ -559,6 +436,8 @@ export function mountStudio(
         terrain={terrain}
         renderer={renderer}
         cropPreview={cropPreview}
+        hud={hud}
+        compareScenes={compareScenes}
       />,
     );
   });

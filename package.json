@@ -1,11 +1,15 @@
 {
-  "name": "topogra",
-  "version": "0.2.0",
-  "description": "Generate reproducible topographic SVG and PNG backgrounds from the command line.",
+  "name": "landcube",
+  "version": "0.3.0",
+  "description": "LANDCU.BE generates reproducible topographic SVG and PNG artwork from the command line.",
   "license": "MIT",
+  "homepage": "https://landcu.be/",
+  "bugs": {
+    "url": "https://github.com/conorluddy/landcube/issues"
+  },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/conorluddy/Topogra.git"
+    "url": "git+https://github.com/conorluddy/landcube.git"
   },
   "files": [
     "dist-cli",
@@ -22,15 +26,17 @@
     "build:cli": "node scripts/build-cli.mjs",
     "bundle:terrain": "tsx scripts/bundle-terrain-tiles.ts",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node --import tsx --test tests/*.test.ts src/*.test.ts src/export/*.test.ts src/frame/*.test.ts src/color/*.test.ts src/studio/*.test.ts",
+    "test": "node --import tsx --test tests/*.test.ts src/*.test.ts src/export/*.test.ts src/frame/*.test.ts src/color/*.test.ts src/studio/*.test.ts src/studio/pages/*.test.ts src/studio/pages/*.test.tsx src/studio/control-groups/*.test.ts src/ui/*.test.ts src/ui/*.test.tsx src/ui/overlays/*.test.tsx",
     "test:package": "node scripts/test-package.mjs",
-    "test:coverage": "node --import tsx --experimental-test-coverage --test tests/*.test.ts src/*.test.ts src/export/*.test.ts src/frame/*.test.ts src/color/*.test.ts src/studio/*.test.ts",
-    "test:e2e": "npm run build && playwright test",
+    "test:coverage": "node --import tsx --experimental-test-coverage --test tests/*.test.ts src/*.test.ts src/export/*.test.ts src/frame/*.test.ts src/color/*.test.ts src/studio/*.test.ts src/studio/pages/*.test.ts src/studio/pages/*.test.tsx src/studio/control-groups/*.test.ts src/ui/*.test.ts src/ui/*.test.tsx src/ui/overlays/*.test.tsx",
+    "build:specimens": "node scripts/build-specimens.mjs",
+    "test:e2e": "npm run build && npm run build:specimens && playwright test",
+    "test:e2e:update-snapshots": "npm run build && npm run build:specimens && playwright test --update-snapshots",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "npm run lint -- --fix",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "ci:local": "npm run format:check && npm run lint && npm test && npm run build && playwright test --reporter=list && npm run test:package",
+    "ci:local": "npm run format:check && npm run lint && npm test && npm run build && npm run build:specimens && playwright test --reporter=list && npm run test:package",
     "check:source": "npm run lint && npm run format:check && npm test && tsc --noEmit",
     "check": "npm run check:source && npm run build && npm run test:package",
     "prepack": "npm run build:cli",
@@ -62,7 +68,7 @@
     "node": "^20.19.0 || ^22.13.0 || >=24"
   },
   "bin": {
-    "topogra": "./dist-cli/topogra.mjs"
+    "landcube": "./dist-cli/landcube.mjs"
   },
   "lint-staged": {
     "*": "prettier --write --ignore-unknown"

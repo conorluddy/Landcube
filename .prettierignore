@@ -1,7 +1,9 @@
 dist/
 dist-cli/
+dist-specimens/
 .cache/
 test-results/
 playwright-report/
 validation/
 package-lock.json
+.claude/settings.local.json

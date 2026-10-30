@@ -31,6 +31,8 @@ test('studio separates view, inspector and shortcuts while retaining settings', 
   await section(page, 'Contours');
   await page.getByRole('slider', { name: 'Weight', exact: true }).fill('1.5');
   await page.getByRole('button', { name: 'Collapse controls' }).click();
+  await expect(page.getByRole('region', { name: 'Contours settings' })).toBeHidden();
+  await expect(page.getByRole('navigation', { name: 'Editing section' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Overlays', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Overlays', exact: true }).click();
   await page.getByLabel('Grid style').selectOption('crosses');
@@ -98,10 +100,11 @@ test('SVG and PNG exports preserve settled dimensions and transparency', async (
   const opaque = await download(page, 'Download SVG');
 
   expect(opaque.bytes.toString()).toContain('fill="#202326"');
+  await expect(page.getByRole('status', { name: 'SVG downloaded' })).toBeVisible();
   await page.getByLabel('Transparent background').check();
   const transparent = await download(page, 'Download SVG');
 
-  expect(transparent.filename).toBe('topogra-123-320x240.svg');
+  expect(transparent.filename).toBe('landcube-123-320x240.svg');
   expect(transparent.bytes.toString()).not.toContain('fill="#202326"');
   const preview = page.getByAltText('Settled landscape export preview');
 
@@ -227,7 +230,7 @@ test('real terrain interval, overlays and failed loading retain the current land
   expect((await download(page, 'Download SVG')).bytes.equals(original.bytes)).toBe(true);
   await page.getByRole('button', { name: 'Close Export' }).click();
   await page.getByRole('button', { name: 'Procedural', exact: true }).click();
-  await expect(page.getByText('Procedural landscape')).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Procedural landscape' })).toBeVisible();
   await section(page, 'Contours');
   await expect(page.getByRole('slider', { name: 'Density' })).toBeVisible();
 });

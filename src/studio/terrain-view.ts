@@ -8,7 +8,10 @@ import type { TerrainTerraceLevels } from '../terrain-terraces';
 import type { FloorPlace } from '../floor-geo';
 import type { RoadPath } from '../types/roads';
 import type { GrassGeography } from '../grass-coverage';
+import type { TerrainRouteOverlay } from '../terrain-3d-route';
 import { getAutoRotateSpeed, type TerrainViewPreset } from '../terrain-camera';
+import { createShellMotion } from './shell-motion';
+import { createCameraPosePublisher } from './camera-pose';
 
 interface StudioTerrainView {
   isActive: () => boolean;
@@ -23,6 +26,8 @@ interface StudioTerrainView {
   /** Arms a morph for the next 3D rebuild; the 2D view and an inactive 3D view always cut. */
   requestTransition: () => void;
   getStl: () => ArrayBuffer;
+  /** The model point under a viewport position while 3D is active, as fractions across the model. */
+  getSurfaceFractionAt: (clientX: number, clientY: number) => { x: number; y: number } | undefined;
   update: (
     contours: Contour[],
     width: number,
@@ -36,6 +41,7 @@ interface StudioTerrainView {
     terraceLevels?: TerrainTerraceLevels,
     roads?: readonly RoadPath[],
     grassGeography?: GrassGeography,
+    route?: TerrainRouteOverlay,
   ) => void;
 }
 
@@ -48,6 +54,19 @@ export function createStudioTerrainView(
   let active = false;
   let floorPlace: FloorPlace | undefined;
   let interval: number | undefined;
+  const motion = createShellMotion(() => document.querySelector('.studio-shell'));
+  const posePublisher = createCameraPosePublisher(
+    (pose) => {
+      controller.cameraPose(pose);
+    },
+    {
+      now: () => performance.now(),
+      setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      clearTimeout: (timer) => {
+        window.clearTimeout(timer);
+      },
+    },
+  );
 
   const syncFrame = () => {
     const { frame, model } = controller.getSnapshot();
@@ -141,6 +160,7 @@ export function createStudioTerrainView(
 
     if (differs('rotating')) {
       view.setRotating(scene.rotating);
+      motion.setHeld('turntable', active && scene.rotating);
     }
 
     if (differs('camera')) {
@@ -165,13 +185,27 @@ export function createStudioTerrainView(
       if (mode === '3d' && !view) {
         const module = await import('../terrain-3d');
 
-        view = module.createTerrain3d((height, layerHeight) => {
-          controller.metrics(height, layerHeight);
-        });
+        view = module.createTerrain3d(
+          (height, layerHeight) => {
+            controller.metrics(height, layerHeight);
+          },
+          () => {
+            if (view) {
+              posePublisher.offer(view.getCameraPose());
+            }
+          },
+        );
+        const canvas = document.querySelector<HTMLCanvasElement>('canvas.terrain-3d');
+
+        if (canvas) {
+          motion.watchCanvas(canvas);
+        }
+
         syncScene();
       }
 
       active = mode === '3d';
+      motion.setHeld('turntable', active && controller.getSnapshot().scene.rotating);
       document.querySelector('#terrain')?.toggleAttribute('hidden', active);
       view?.setVisible(active);
 
@@ -212,6 +246,8 @@ export function createStudioTerrainView(
         view?.requestTransition();
       }
     },
+    getSurfaceFractionAt: (clientX, clientY) =>
+      active ? view?.getSurfaceFractionAt(clientX, clientY) : undefined,
     getStl() {
       if (!view || !active) {
         throw new Error('Select the 3D view before downloading STL.');
@@ -232,6 +268,7 @@ export function createStudioTerrainView(
       terraceLevels?: TerrainTerraceLevels,
       roads?: readonly RoadPath[],
       grassGeography?: GrassGeography,
+      route?: TerrainRouteOverlay,
     ) {
       floorPlace = place;
       interval = contourIntervalMeters;
@@ -257,6 +294,7 @@ export function createStudioTerrainView(
           terraceLevels,
           roads,
           grassGeography,
+          route,
         );
       }
     },

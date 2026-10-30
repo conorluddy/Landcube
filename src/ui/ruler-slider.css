@@ -1,0 +1,202 @@
+/* P-07 RulerSlider: drawn ruler over an invisible native range (the hit target). */
+.lc-ruler-slider {
+  --lc-ruler-track-h: 16px;
+  --lc-ruler-rail-y: 7px;
+  --lc-ruler-tick-y: 10px;
+  --lc-ruler-tick-h: 4px;
+  --lc-ruler-thumb-w: 7px;
+  --lc-ruler-thumb-h: 13px;
+  --lc-ruler-thumb-y: 1px;
+  --lc-ruler-ring: var(--lc-ring-thumb);
+  --lc-ruler-hit-h: 24px;
+
+  display: block;
+  min-width: 0;
+}
+
+.lc-ruler-slider__head {
+  display: flex;
+  gap: var(--lc-s-5);
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.lc-ruler-slider__label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--lc-text-body);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-ruler-slider__value {
+  flex: none;
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-value-s);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-ruler-slider__unit {
+  margin-left: var(--lc-s-2);
+  color: var(--lc-text-quiet);
+}
+
+.lc-ruler-slider__track {
+  position: relative;
+  height: var(--lc-ruler-track-h);
+  margin-top: var(--lc-s-2);
+}
+
+.lc-ruler-slider__rail,
+.lc-ruler-slider__fill {
+  position: absolute;
+  top: var(--lc-ruler-rail-y);
+  left: 0;
+  height: 1px;
+  background: var(--lc-line-strong);
+}
+
+.lc-ruler-slider__rail {
+  right: 0;
+}
+
+.lc-ruler-slider__fill {
+  width: calc(var(--lc-slider-fraction) * 100%);
+  background: var(--lc-bone);
+}
+
+.lc-ruler-slider__ticks {
+  position: absolute;
+  top: var(--lc-ruler-tick-y);
+  right: 0;
+  left: 0;
+  display: flex;
+  height: var(--lc-ruler-tick-h);
+}
+
+.lc-ruler-slider__tick {
+  flex: 1 1 0;
+  border-left: 1px solid var(--lc-line-strong);
+}
+
+.lc-ruler-slider__thumb {
+  position: absolute;
+  top: var(--lc-ruler-thumb-y);
+  left: calc(var(--lc-slider-fraction) * (100% - var(--lc-ruler-thumb-w)));
+  width: var(--lc-ruler-thumb-w);
+  height: var(--lc-ruler-thumb-h);
+  background: var(--lc-bone);
+  border-radius: var(--lc-r-inner);
+  box-shadow: var(--lc-ruler-ring);
+  transition: background var(--lc-dur-fast) var(--lc-ease);
+}
+
+/* The real control: invisible, full width, thumb sized to match the drawn one. */
+.lc-ruler-slider__input {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: var(--lc-ruler-hit-h);
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  opacity: 0;
+  transform: translateY(-50%);
+  appearance: none;
+  cursor: pointer;
+}
+
+.lc-ruler-slider__input::-webkit-slider-thumb {
+  width: var(--lc-ruler-thumb-w);
+  height: var(--lc-ruler-hit-h);
+  appearance: none;
+}
+
+.lc-ruler-slider__input::-moz-range-thumb {
+  width: var(--lc-ruler-thumb-w);
+  height: var(--lc-ruler-hit-h);
+  border: 0;
+}
+
+/* The invisible input cannot show a ring itself, so the drawn track does. */
+.lc-ruler-slider__track:has(.lc-ruler-slider__input:focus-visible),
+[data-force-state='focus'] .lc-ruler-slider__track {
+  outline: 2px solid var(--lc-line-focus);
+  outline-offset: 2px;
+}
+
+.lc-ruler-slider__input:focus-visible {
+  outline: none;
+}
+
+.lc-ruler-slider__track:hover .lc-ruler-slider__thumb,
+[data-force-state='hover'] .lc-ruler-slider__thumb {
+  background: var(--lc-white);
+}
+
+.lc-ruler-slider__track:has(.lc-ruler-slider__input:active) .lc-ruler-slider__thumb,
+[data-force-state='active'] .lc-ruler-slider__thumb {
+  background: var(--lc-ink-8);
+}
+
+.lc-ruler-slider:has(.lc-ruler-slider__input:disabled) .lc-ruler-slider__label,
+.lc-ruler-slider:has(.lc-ruler-slider__input:disabled) .lc-ruler-slider__value {
+  color: var(--lc-text-disabled);
+}
+
+.lc-ruler-slider:has(.lc-ruler-slider__input:disabled) .lc-ruler-slider__fill,
+.lc-ruler-slider:has(.lc-ruler-slider__input:disabled) .lc-ruler-slider__thumb {
+  background: var(--lc-ink-4);
+}
+
+.lc-ruler-slider__input:disabled {
+  cursor: not-allowed;
+}
+
+@media (max-width: 767px) {
+  .lc-ruler-slider {
+    --lc-ruler-track-h: 36px;
+    --lc-ruler-rail-y: 17px;
+    --lc-ruler-tick-y: 20px;
+    --lc-ruler-tick-h: 6px;
+    --lc-ruler-thumb-w: 10px;
+    --lc-ruler-thumb-h: 24px;
+    --lc-ruler-thumb-y: 6px;
+    --lc-ruler-ring: 0 0 0 3px color-mix(in srgb, var(--lc-ink-1) 80%, transparent);
+    --lc-ruler-hit-h: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-ruler-slider__thumb {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-ruler-slider__rail,
+  .lc-ruler-slider__ticks,
+  .lc-ruler-slider__fill,
+  .lc-ruler-slider__thumb {
+    display: none;
+  }
+
+  .lc-ruler-slider__input {
+    opacity: 1;
+    appearance: auto;
+  }
+
+  .lc-ruler-slider__input::-webkit-slider-thumb,
+  .lc-ruler-slider__input::-moz-range-thumb {
+    appearance: auto;
+  }
+
+  .lc-ruler-slider__input:focus-visible {
+    outline: 2px solid CanvasText;
+  }
+}

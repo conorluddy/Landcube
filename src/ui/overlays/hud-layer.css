@@ -1,0 +1,85 @@
+/*
+ * HudLayer: full-bleed overlay above the viewport and below the glass chrome (header and footer
+ * z 3, inspector z 2). Insets mirror the desktop shell: bars 12px from the edge, 40px header and
+ * 36px footer, a 396px inspector (92px rail collapsed) 12px from the right.
+ */
+.lc-hud-layer {
+  --lc-hud-inset-top: 72px;
+  --lc-hud-inset-bottom: 72px;
+  --lc-hud-inset-left: var(--lc-s-10);
+  --lc-hud-inset-right: 420px;
+  --lc-hud-mark: var(--lc-ink-3);
+  --lc-hud-hairline: color-mix(in srgb, var(--lc-ink-2) 28%, transparent);
+
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.lc-hud-layer[data-inspector='collapsed'] {
+  --lc-hud-inset-right: 116px;
+}
+
+.lc-hud-layer[data-canvas-tone='dark'] {
+  --lc-hud-mark: var(--lc-ink-5);
+  --lc-hud-hairline: color-mix(in srgb, var(--lc-bone) 28%, transparent);
+}
+
+.lc-hud-layer__frame {
+  position: absolute;
+  top: var(--lc-hud-inset-top);
+  right: var(--lc-hud-inset-right);
+  bottom: var(--lc-hud-inset-bottom);
+  left: var(--lc-hud-inset-left);
+}
+
+.lc-hud-layer__tools {
+  position: absolute;
+  inset: 0;
+}
+
+/* The crop plane fits the frame box, clear of the bars and the inspector. */
+.lc-hud-layer__tools .lc-crop-frame {
+  inset: var(--lc-hud-inset-top) var(--lc-hud-inset-right) var(--lc-hud-inset-bottom)
+    var(--lc-hud-inset-left);
+}
+
+.lc-hud-layer__instruments {
+  position: absolute;
+  right: calc(var(--lc-hud-inset-right) + 28px);
+  bottom: calc(var(--lc-hud-inset-bottom) + var(--lc-s-6));
+  display: flex;
+  gap: var(--lc-s-6);
+  align-items: flex-end;
+}
+
+/* Over the bare canvas the bar needs its own backing to stay legible on any background. */
+.lc-hud-layer__instruments .lc-scale-bar {
+  box-sizing: content-box;
+  padding: var(--lc-s-3) var(--lc-s-4);
+  border: 1px solid var(--lc-line);
+  background: var(--lc-glass-tip);
+}
+
+.lc-hud-layer__readout {
+  position: absolute;
+  bottom: calc(60px + env(safe-area-inset-bottom));
+  left: var(--lc-s-6);
+}
+
+/* Phones: the inspector is a bottom sheet, so the frame goes and the compass leads a map-control column under the header. */
+@media (max-width: 767px) {
+  .lc-hud-layer__frame {
+    display: none;
+  }
+
+  .lc-hud-layer__instruments {
+    top: 110px;
+    right: var(--lc-s-6);
+    bottom: auto;
+    flex-direction: column-reverse;
+    align-items: flex-end;
+  }
+}

@@ -1,0 +1,24 @@
+/* P-15 Kbd: mono 9px hint, one bordered key per <kbd>. */
+.lc-kbd {
+  display: inline-flex;
+  gap: var(--lc-s-1);
+  max-width: 100%;
+}
+
+.lc-kbd__key {
+  padding: var(--lc-s-1) 5px;
+  border: 1px solid var(--lc-line-strong);
+  border-radius: var(--lc-r-control);
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-mono);
+  font-size: 9px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+@media (forced-colors: active) {
+  .lc-kbd__key {
+    border-color: CanvasText;
+    color: CanvasText;
+  }
+}

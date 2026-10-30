@@ -24,7 +24,7 @@ import {
 import type { RealTerrain } from './real-terrain';
 
 const cliConfigVersion = 1;
-const browserBaseUrl = 'https://conorluddy.github.io/Topogra/';
+const browserBaseUrl = 'https://landcu.be/';
 const designKeys = Object.keys(versionOneDesignDefaults) as (keyof DesignSettings)[];
 const booleanKeys = new Set<keyof DesignSettings>([
   'summitTrianglesEnabled',
@@ -125,7 +125,7 @@ export async function runCli(argv: string[], io: CliIo = process): Promise<numbe
     }
 
     if (command === '--version') {
-      return write(io.stdout, `topogra ${version}\n`);
+      return write(io.stdout, `landcube ${version}\n`);
     }
 
     if (argumentsList.includes('--help') || argumentsList.includes('-h')) {
@@ -147,14 +147,14 @@ export async function runCli(argv: string[], io: CliIo = process): Promise<numbe
     }
 
     if (command !== 'generate') {
-      throw new Error(`Unknown command "${command}". Use "topogra --help".`);
+      throw new Error(`Unknown command "${command}". Use "landcube --help".`);
     }
 
     return await generateCommand(options, io);
   } catch (error) {
     write(
       io.stderr,
-      `topogra: ${error instanceof Error ? error.message : 'Unexpected failure.'}\n`,
+      `landcube: ${error instanceof Error ? error.message : 'Unexpected failure.'}\n`,
     );
 
     return 2;
@@ -302,7 +302,7 @@ async function generateCommand(options: Record<string, string | undefined>, io: 
 
   const output =
     options.output ??
-    `topogra-${settings.seed}-${settings.width * (settings.format === 'png' ? settings.pngScale : 1)}x${settings.height * (settings.format === 'png' ? settings.pngScale : 1)}.${settings.format}`;
+    `landcube-${settings.seed}-${settings.width * (settings.format === 'png' ? settings.pngScale : 1)}x${settings.height * (settings.format === 'png' ? settings.pngScale : 1)}.${settings.format}`;
 
   if (isEnabled(options, 'json') && output === '-') {
     throw new Error('--json cannot be combined with --output -.');
@@ -682,7 +682,7 @@ async function writeOutputFiles(files: { path: string; bytes: Uint8Array }[], fo
         }
       }
 
-      const temporary = `${target}.topogra-${process.pid}-${randomBytes(6).toString('hex')}.tmp`;
+      const temporary = `${target}.landcube-${process.pid}-${randomBytes(6).toString('hex')}.tmp`;
 
       staged.push({ target, temporary, previous, committed: false });
       await writeFile(temporary, file.bytes, { flag: 'wx' });
@@ -760,7 +760,7 @@ function write(stream: NodeJS.WriteStream, value: string) {
 function printHelp(stdout: NodeJS.WriteStream, isVerbose = false) {
   return write(
     stdout,
-    `Topogra CLI\n\nUsage: topogra generate [options]\n       topogra presets [--json true]\n       topogra validate --config design.json\n\nSources apply as defaults → config or URL → palette/size → explicit flags. --output - writes image bytes; --json true is incompatible with it. Existing files require --force true.\n\nGenerator options:\n  --config FILE | --url URL    Versioned CLI config or v=1 browser URL (mutually exclusive)\n  --palette NAME               ${[...Object.keys(designPalettePresets), 'random'].join(', ')}\n  --size WIDTHxHEIGHT          A listed output size; use presets --json true to discover values\n  --terrain generated|real     Real mode requires coordinates or --terrain-preset NAME\n  --latitude NUMBER --longitude NUMBER --span-km NUMBER\n  --contour-interval auto|density|METERS  New real designs use Auto; density keeps decorative levels\n  --max-depth NUMBER            Maximum depth below sea level in meters (new real designs: 0; 0–11000)\n  --elevation-floor NUMBER      Omit real terrain below this height in meters (optional; −11000–8900)\n  --format svg|png --output FILE|- --save-config FILE\n  --attribution embedded       Keep real-terrain credit visibly embedded (the default)\n  --attribution-file FILE      Write the resolved real-terrain credit alongside the image\n  --json true|false --force true|false\n\nDesign flags (default; range where applicable):\n${getDesignFlagReference(isVerbose)}\n${isVerbose ? '' : '\nUse --help --verbose for a full description of every design flag.\n'}`,
+    `landcube CLI\n\nUsage: landcube generate [options]\n       landcube presets [--json true]\n       landcube validate --config design.json\n\nSources apply as defaults → config or URL → palette/size → explicit flags. --output - writes image bytes; --json true is incompatible with it. Existing files require --force true.\n\nGenerator options:\n  --config FILE | --url URL    Versioned CLI config or v=1 browser URL (mutually exclusive)\n  --palette NAME               ${[...Object.keys(designPalettePresets), 'random'].join(', ')}\n  --size WIDTHxHEIGHT          A listed output size; use presets --json true to discover values\n  --terrain generated|real     Real mode requires coordinates or --terrain-preset NAME\n  --latitude NUMBER --longitude NUMBER --span-km NUMBER\n  --contour-interval auto|density|METERS  New real designs use Auto; density keeps decorative levels\n  --max-depth NUMBER            Maximum depth below sea level in meters (new real designs: 0; 0–11000)\n  --elevation-floor NUMBER      Omit real terrain below this height in meters (optional; −11000–8900)\n  --format svg|png --output FILE|- --save-config FILE\n  --attribution embedded       Keep real-terrain credit visibly embedded (the default)\n  --attribution-file FILE      Write the resolved real-terrain credit alongside the image\n  --json true|false --force true|false\n\nDesign flags (default; range where applicable):\n${getDesignFlagReference(isVerbose)}\n${isVerbose ? '' : '\nUse --help --verbose for a full description of every design flag.\n'}`,
   );
 }
 

@@ -1,0 +1,47 @@
+/* P-19 GroupHeader: code, title, hairline rule, trailing. The rule collapses first; the title shrinks last. */
+.lc-group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-s-5);
+  min-width: 0;
+  margin-bottom: var(--lc-s-6);
+  font-family: var(--lc-font-mono);
+}
+
+.lc-group-header__code {
+  flex: none;
+  color: var(--lc-text-disabled);
+  font-size: var(--lc-fs-micro);
+  letter-spacing: var(--lc-track-label);
+  white-space: nowrap;
+}
+
+.lc-group-header__title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--lc-text-strong);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-head);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Shrink factor 100 vs the title's 1: the rule gives up width long before the title does. */
+.lc-group-header__rule {
+  flex: 1 100 0;
+  min-width: 0;
+  height: 1px;
+  background: var(--lc-line-panel);
+}
+
+.lc-group-header__trailing {
+  flex: none;
+}
+
+@media (forced-colors: active) {
+  .lc-group-header__rule {
+    background: CanvasText;
+  }
+}

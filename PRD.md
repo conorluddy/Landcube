@@ -1,4 +1,4 @@
-# Topogra — Local Contour Background Generator
+# LANDCU.BE — Local Contour Background Generator
 
 ## Purpose
 
@@ -18,7 +18,7 @@ The default appearance is a charcoal background with subtle, lighter contour lin
 - Crisp rendering at different viewport sizes and pixel densities.
 - No accounts, backend, or runtime network dependencies beyond public elevation tiles and hosted-site analytics.
 - The hosted site MUST NOT send design-link query strings to Google Analytics. Google also collects standard browser details (IP address, user agent, referrer, screen size).
-- Where the origin is not `conorluddy.github.io`, the editor MUST NOT request `googletagmanager.com`.
+- Where the origin is not `landcu.be`, the editor MUST NOT request `googletagmanager.com`.
 
 Controls, export buttons, animation, real geographic data, 3D previews, and website-content previews are outside this version.
 
@@ -44,7 +44,7 @@ Use SVG paths for the initial renderer, with one solid page background and consi
 
 On resize, preserve the current seed and terrain scale, then redraw the newly visible area. Existing terrain should remain anchored to the top-left origin rather than changing randomly during resizing. Debounce expensive regeneration where needed. A refresh selects a new seed.
 
-Treat the image as decorative: hide the SVG from assistive technology. The page title is “Topogra”.
+Treat the image as decorative: hide the SVG from assistive technology. The page title is “LANDCU.BE”.
 
 ## Implementation direction
 

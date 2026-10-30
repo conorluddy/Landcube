@@ -38,7 +38,7 @@ await test('a standalone SVG has explicit colours, clipping, dimensions, and no 
 
   assert.ok(result.ok);
   assert.equal(result.data.blob.type, 'image/svg+xml');
-  assert.equal(result.data.filename, 'topogra-745-320x240.svg');
+  assert.equal(result.data.filename, 'landcube-745-320x240.svg');
   const svg = await result.data.blob.text();
 
   assert.match(svg, /xmlns="http:\/\/www.w3.org\/2000\/svg"/);
@@ -137,7 +137,7 @@ await test('PNG limits apply to final raster dimensions while SVG ignores PNG sc
   );
 
   assert.ok(svg.ok);
-  assert.equal(svg.data.filename, 'topogra-745-320x240.svg');
+  assert.equal(svg.data.filename, 'landcube-745-320x240.svg');
 });
 
 await test('generation failures return a recoverable export error', async () => {
@@ -215,7 +215,7 @@ await test('PNG encoding uses the selected raster resolution and releases image/
 
   assert.ok(success.ok);
   assert.equal(success.data.blob.type, 'image/png');
-  assert.equal(success.data.filename, 'topogra-745-640x480.png');
+  assert.equal(success.data.filename, 'landcube-745-640x480.png');
   assert.deepEqual(drawnSizes, [[640, 480]]);
   assert.equal(canvas.width, 0);
   assert.equal(canvas.height, 0);

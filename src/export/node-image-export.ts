@@ -39,7 +39,7 @@ export function createNodeExportFile(
       ok: true,
       data: {
         bytes,
-        filename: `topogra-${settings.seed}-${dimensions.data.width}x${dimensions.data.height}.${settings.format}`,
+        filename: `landcube-${settings.seed}-${dimensions.data.width}x${dimensions.data.height}.${settings.format}`,
         mimeType: imageMimeTypes[settings.format],
       },
     };

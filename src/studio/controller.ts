@@ -20,6 +20,7 @@ import {
   defaultRotationSeconds,
   defaultTerrainCameraSettings,
   terrainViewPresets,
+  type CameraPose,
   type TerrainCameraSettings,
   type TerrainViewPreset,
   type TurntableDirection,
@@ -42,15 +43,24 @@ import { loadBrowserRealTerrain } from '../browser-real-terrain';
 import { validateRealContourInterval } from '../real-terrain-contours';
 import type { RealTerrain } from '../real-terrain';
 import type { DesignSettings, ValidatedDesignSettings } from '../types/design';
-import type { Result } from '../types/operations';
+import type { OperationError, Result } from '../types/operations';
+import { parseGpx, routeStats, simplifyRoute } from '../gpx';
+import type { RoutePoint, RouteStats, RouteWaypoint } from '../types/route';
 import type { WaterStyle } from '../terrain-3d';
 import type { FloorStyle } from '../terrain-floor-styles';
 import type { TerrainStillScale } from '../export/still-export';
 import { defaultRoadStyle, roadDetailClasses, roadSpanLimitsKm } from '../constants/roads';
 import { operationErrorCodes } from '../constants/operations';
 import type { RoadNetwork, RoadStyle } from '../types/roads';
+import {
+  clampDivider,
+  defaultDividerFraction,
+  getComparePresetPatch,
+  isComparePresetId,
+} from './wipe-compare';
 import { createRoadNetworkLoader, getRoadPlacementKey } from './road-loader';
 import { createPlaceSearcher } from './place-searcher';
+import { describeTerrainFault, type StudioFault, type TerrainLoadProgress } from './terrain-fault';
 import type { PlaceMatch } from '../place-search';
 import {
   addSavedPlace,
@@ -70,6 +80,14 @@ import {
   type FrameStudioSettings,
 } from '../frame/frame-studio-settings';
 import type { FrameAssembly, FramePart, FramePartId } from '../types/frame';
+import type { ExportJob } from '../ui/job-list';
+import type { SheetSnap } from '../ui/sheet-handle';
+import {
+  cascadePosition,
+  nextZIndex,
+  type PanelPosition,
+  type PinnedGroupPlacement,
+} from '../ui/layout-manager';
 
 export type StudioView = '2d' | '3d';
 export type InspectorSection =
@@ -120,7 +138,21 @@ export interface RoadNetworkState {
   status: string;
   /** The last download failed in a way a later attempt may fix. */
   canRetry: boolean;
+  /** The last download failed; `status` explains why. */
+  hasFailed: boolean;
 }
+/** A loaded GPX route, simplified for drawing; stats come from the recorded points. */
+export interface WorkspaceRoute {
+  name: string;
+  points: RoutePoint[];
+  waypoints: RouteWaypoint[];
+  stats: RouteStats;
+  isVisible: boolean;
+}
+
+/** Douglas-Peucker tolerance for drawn routes: below a pixel at any supported span. */
+const routeSimplifyToleranceMeters = 5;
+
 export interface TerrainSourceState {
   selected: 'generated' | 'real';
   terrain?: RealTerrain;
@@ -135,9 +167,17 @@ export interface TerrainSourceState {
   hatching: boolean;
   loading: boolean;
   status: string;
+  /** Tiles downloaded so far; null before the first report and whenever nothing is loading. */
+  loadProgress: TerrainLoadProgress | null;
+  /** The last load failure, shown as a FaultCard until dismissed, retried or superseded. */
+  fault: StudioFault | null;
   /** Steps through preset locations in menu order, waiting after each load settles. */
   autoplay: { enabled: boolean; delaySeconds: number };
 }
+export type StudioPage = 'studio' | 'library' | 'presets' | 'account';
+/** The active on-canvas tool; `none` leaves every canvas pointer event to the terrain. */
+export type ToolMode = 'none' | 'crop' | 'measure' | 'presets' | 'route';
+
 export interface StudioState {
   design: ValidatedDesignSettings;
   source: TerrainSourceState;
@@ -159,12 +199,37 @@ export interface StudioState {
     sections: Record<StudioView, InspectorSection>;
     popover: 'Overlays' | 'Orbit' | null;
     exporting: boolean;
+    dossierOpen: boolean;
+    /** Phone bottom-sheet height. Session-only: never serialized into links. */
+    sheetSnap: SheetSnap;
+    /** Control groups floating outside the inspector (desktop). Session-only: never serialized. */
+    pinnedGroups: readonly PinnedGroupPlacement[];
+    /** The open command palette and its query; null while closed. */
+    palette: { query: string } | null;
+    /** Phone root page; `studio` keeps the WebGL canvas visible. Session-only, no router. */
+    page: StudioPage;
+    /** False only on a phone's first visit of the session; see `src/studio/pages/splash-session.ts`. */
+    hasSeenSplash: boolean;
+    /** The GPX route over the terrain. Session-only: never in design links. */
+    route: WorkspaceRoute | null;
+    /** Why the last GPX file was refused; the previous route stays. */
+    routeFault: OperationError | null;
+    /** The A/B preset wipe. Session-only; `null` while no preset is being compared. */
+    compare: { presetId: string; dividerFraction: number } | null;
+    /** The desktop preset strip. Session-only. */
+    comparePresetsOpen: boolean;
+    /** Session-only. Crop applies to the 3D model, so the crop frame shows only in 3D. */
+    toolMode: ToolMode;
   };
   seedLocked: boolean;
   status: string;
   manualLink: string;
+  /** Sequential frame-part STL downloads, oldest first. Cleared when the next batch starts. */
+  exportJobs: readonly ExportJob[];
   /** Measured from the rendered model; `spanKm` is its longer geographic side. */
   metrics: { height?: number; layerHeight?: number; spanKm?: number };
+  /** The 3D camera, published at most 20 times a second; undefined until the 3D view first draws. */
+  cameraPose?: CameraPose;
   /** Searched places that loaded, most recent first; kept in browser storage. */
   savedPlaces: SavedPlace[];
 }
@@ -203,8 +268,27 @@ export interface StudioController {
   sync: () => void;
   notify: (message: string) => void;
   workspace: (patch: Partial<StudioState['workspace']>) => void;
+  /** Floats a group in a cascaded panel on top of the others; pinning twice is a no-op. */
+  pinGroup: (id: string) => void;
+  /** Returns a pinned group to its section; docking an unpinned group is a no-op. */
+  dockGroup: (id: string) => void;
+  /** Places a pinned panel; the caller has already snapped and clamped `position`. */
+  moveGroup: (id: string, position: PanelPosition) => void;
+  /** Brings a pinned panel above the others. */
+  raiseGroup: (id: string) => void;
   dismissManualLink: () => void;
+  /** Parses and shows a GPX route; an invalid file sets `workspace.routeFault` and keeps the old route. */
+  loadRoute: (text: string, fallbackName?: string) => void;
+  clearRoute: () => void;
+  toggleRoute: () => void;
   design: (patch: Partial<DesignSettings>) => boolean;
+  /** Starts (or retargets) the A/B wipe against a palette preset; unknown ids are ignored. */
+  startCompare: (presetId: string) => void;
+  /** Moves the wipe divider, clamped to 0-1; a no-op while not comparing. */
+  moveDivider: (fraction: number) => void;
+  /** Applies the compared preset through `design()`, then ends the compare. */
+  applyCompare: () => void;
+  endCompare: () => void;
   newLandscape: () => void;
   lockSeed: (value: boolean) => void;
   copyLink: () => Promise<void>;
@@ -222,8 +306,12 @@ export interface StudioController {
   model: (patch: Partial<StudioState['model']>) => boolean;
   dimensions: (patch: Partial<TerrainModelSettings>) => boolean;
   frame: (patch: Partial<FrameStudioSettings>) => void;
-  downloadFrameStl: (partId: FramePartId) => void;
+  /** True when the download started; failures are reported through `status`. */
+  downloadFrameStl: (partId: FramePartId) => boolean;
+  /** Downloads the parts one after another, listing each in `exportJobs`. */
+  downloadFrameStlParts: (partIds: readonly FramePartId[]) => Promise<void>;
   metrics: (height: number, layerHeight?: number) => void;
+  cameraPose: (pose: CameraPose) => void;
   /** Reports the model's longer geographic side; auto road width follows it. */
   modelSpan: (spanKm: number | undefined) => void;
   source: (patch: Partial<TerrainSourceState>) => void;
@@ -231,6 +319,9 @@ export interface StudioController {
   /** Switches to real terrain, opening its location controls and loading the selected place. */
   useCoordinates: () => Promise<void>;
   loadTerrain: () => Promise<void>;
+  /** Stops the running terrain download; tiles already cached stay cached. */
+  cancelTerrainLoad: () => void;
+  dismissTerrainFault: () => void;
   autoplay: (patch: Partial<TerrainSourceState['autoplay']>) => Promise<void>;
   daylightCycle: (patch: Partial<SceneSettings['daylightCycle']>) => void;
   /** Edits road style; switching roads on for real terrain fetches them once. */
@@ -246,8 +337,23 @@ export interface StudioController {
   interval: (value: 'auto' | number) => boolean;
   hatching: (value: boolean) => void;
   resetCamera: () => void;
-  downloadStl: () => void;
+  /** True when the download started; failures are reported through `status`. */
+  downloadStl: () => boolean;
   downloadStill: (scale: TerrainStillScale) => Promise<void>;
+}
+
+/** The controller and its current snapshot, passed to the studio panels. */
+export interface PanelProps {
+  controller: StudioController;
+  state: StudioState;
+}
+
+/** Pause between part downloads so each job paints and the browser sees separate saves. */
+const exportJobPaceMs = 120;
+
+/** A binary STL is an 84-byte header plus 50 bytes per triangle. */
+export function estimateBinaryStlBytes(part: FramePart): number {
+  return 84 + (part.solid.indices.length / 3) * 50;
 }
 
 /** Twenty updates a second keeps the sun smooth without flooding React with renders. */
@@ -278,6 +384,8 @@ export function createStudioController(
       hatching: true,
       loading: false,
       status: '',
+      loadProgress: null,
+      fault: null,
       autoplay: { enabled: false, delaySeconds: 10 },
     },
     scene: {
@@ -318,7 +426,7 @@ export function createStudioController(
       roads: { ...defaultRoadStyle },
       grass: { ...defaultGrassStyle },
     },
-    roads: { sourceKey: '', loading: false, status: '', canRetry: false },
+    roads: { sourceKey: '', loading: false, status: '', canRetry: false, hasFailed: false },
     model: {
       dimensions: { ...defaultTerrainModelSettings },
       crop: { ...defaultTerrainCrop },
@@ -333,15 +441,28 @@ export function createStudioController(
       sections: { '2d': 'Terrain', '3d': 'Terrain' },
       popover: null,
       exporting: false,
+      dossierOpen: false,
+      sheetSnap: 'half',
+      pinnedGroups: [],
+      palette: null,
+      page: 'studio',
+      hasSeenSplash: true,
+      route: null,
+      routeFault: null,
+      compare: null,
+      comparePresetsOpen: false,
+      toolMode: 'none',
     },
     seedLocked: actions.isSeedLocked,
     status: '',
     manualLink: '',
+    exportJobs: [],
     metrics: {},
     savedPlaces: savedPlacesResult?.ok === true ? savedPlacesResult.data : [],
   };
   let effects: StudioEffects | undefined;
   let requestVersion = 0;
+  let terrainLoadCancel: AbortController | undefined;
   // Saved once its terrain loads, so a failed or superseded load never lists the place.
   let pendingSearchedPlace: SavedPlace | undefined;
   // Procedural mode parks the last real terrain so switching back is instant.
@@ -387,6 +508,35 @@ export function createStudioController(
   const workspace = (patch: Partial<StudioState['workspace']>) => {
     state = { ...state, workspace: { ...state.workspace, ...patch } };
     publish();
+  };
+
+  const updatePinnedGroup = (
+    id: string,
+    update: (pinned: PinnedGroupPlacement) => PinnedGroupPlacement,
+  ) => {
+    const { pinnedGroups } = state.workspace;
+    const nextPinnedGroups = pinnedGroups.map((pinned) =>
+      pinned.id === id ? update(pinned) : pinned,
+    );
+
+    if (nextPinnedGroups.some((pinned, index) => pinned !== pinnedGroups[index])) {
+      workspace({ pinnedGroups: nextPinnedGroups });
+    }
+  };
+
+  const findFramePart = (partId: FramePartId): FramePart | undefined => {
+    const assembly = state.frame.assembly;
+
+    return assembly?.ok === true ? assembly.data.parts.find(({ id }) => id === partId) : undefined;
+  };
+
+  const setExportJobs = (exportJobs: readonly ExportJob[]) => {
+    state = { ...state, exportJobs };
+    publish();
+  };
+
+  const updateExportJob = (jobId: string, patch: Partial<ExportJob>) => {
+    setExportJobs(state.exportJobs.map((job) => (job.id === jobId ? { ...job, ...patch } : job)));
   };
 
   /** Frames fit the model, so any model, height or frame shape edit rebuilds the assembly. */
@@ -440,7 +590,13 @@ export function createStudioController(
       roadLoader.cancel();
       state = {
         ...state,
-        roads: { sourceKey: roadSourceKey, loading: false, status: '', canRetry: false },
+        roads: {
+          sourceKey: roadSourceKey,
+          loading: false,
+          status: '',
+          canRetry: false,
+          hasFailed: false,
+        },
       };
     }
 
@@ -492,7 +648,12 @@ export function createStudioController(
       return;
     }
 
-    setRoads({ loading: true, status: 'Downloading OpenStreetMap roads…', canRetry: false });
+    setRoads({
+      loading: true,
+      status: 'Downloading OpenStreetMap roads…',
+      canRetry: false,
+      hasFailed: false,
+    });
     let result: Awaited<ReturnType<typeof roadLoader.load>>;
 
     try {
@@ -514,7 +675,12 @@ export function createStudioController(
     }
 
     if (!result.ok) {
-      setRoads({ loading: false, status: result.error.message, canRetry: result.error.retryable });
+      setRoads({
+        loading: false,
+        status: result.error.message,
+        canRetry: result.error.retryable,
+        hasFailed: true,
+      });
 
       return;
     }
@@ -538,6 +704,75 @@ export function createStudioController(
     sync,
     notify,
     workspace,
+    pinGroup(id: string) {
+      const { pinnedGroups } = state.workspace;
+
+      if (pinnedGroups.some((pinned) => pinned.id === id)) {
+        return;
+      }
+
+      workspace({
+        pinnedGroups: [
+          ...pinnedGroups,
+          { id, position: cascadePosition(pinnedGroups.length), zIndex: nextZIndex(pinnedGroups) },
+        ],
+      });
+    },
+    dockGroup(id: string) {
+      const { pinnedGroups } = state.workspace;
+
+      if (pinnedGroups.some((pinned) => pinned.id === id)) {
+        workspace({ pinnedGroups: pinnedGroups.filter((pinned) => pinned.id !== id) });
+      }
+    },
+    moveGroup(id: string, position: PanelPosition) {
+      updatePinnedGroup(id, (pinned) =>
+        pinned.position.xPx === position.xPx && pinned.position.yPx === position.yPx
+          ? pinned
+          : { ...pinned, position },
+      );
+    },
+    raiseGroup(id: string) {
+      const { pinnedGroups } = state.workspace;
+
+      updatePinnedGroup(id, (pinned) =>
+        pinnedGroups.every((other) => other === pinned || other.zIndex < pinned.zIndex)
+          ? pinned
+          : { ...pinned, zIndex: nextZIndex(pinnedGroups) },
+      );
+    },
+    loadRoute(text, fallbackName = 'GPX route') {
+      const parsed = parseGpx(text);
+
+      if (!parsed.ok) {
+        workspace({ routeFault: parsed.error });
+
+        return;
+      }
+
+      const { name, points, waypoints } = parsed.data;
+
+      workspace({
+        routeFault: null,
+        route: {
+          name: name ?? fallbackName,
+          points: simplifyRoute(points, routeSimplifyToleranceMeters),
+          waypoints,
+          stats: routeStats(points),
+          isVisible: true,
+        },
+      });
+    },
+    clearRoute() {
+      workspace({ route: null, routeFault: null });
+    },
+    toggleRoute() {
+      const { route } = state.workspace;
+
+      if (route) {
+        workspace({ route: { ...route, isVisible: !route.isVisible } });
+      }
+    },
     dismissManualLink() {
       state = { ...state, manualLink: '' };
       publish();
@@ -550,6 +785,39 @@ export function createStudioController(
       }
 
       return ok;
+    },
+    startCompare(presetId: string) {
+      if (!isComparePresetId(presetId)) {
+        return;
+      }
+
+      workspace({
+        compare: {
+          presetId,
+          dividerFraction: state.workspace.compare?.dividerFraction ?? defaultDividerFraction,
+        },
+      });
+    },
+    moveDivider(fraction: number) {
+      const { compare } = state.workspace;
+
+      if (compare !== null) {
+        workspace({ compare: { ...compare, dividerFraction: clampDivider(fraction) } });
+      }
+    },
+    applyCompare() {
+      const { compare } = state.workspace;
+
+      if (compare !== null && isComparePresetId(compare.presetId)) {
+        controller.design(getComparePresetPatch(compare.presetId));
+      }
+
+      workspace({ compare: null });
+    },
+    endCompare() {
+      if (state.workspace.compare !== null) {
+        workspace({ compare: null });
+      }
     },
     newLandscape() {
       if (!state.seedLocked) {
@@ -739,20 +1007,58 @@ export function createStudioController(
       publish();
     },
     downloadFrameStl(partId: FramePartId) {
-      const assembly = state.frame.assembly;
-      const part =
-        assembly?.ok === true ? assembly.data.parts.find(({ id }) => id === partId) : undefined;
+      const part = findFramePart(partId);
 
       if (!part) {
         notify(`Frame part ${partId} is not available. Fix the frame settings and retry.`);
 
-        return;
+        return false;
       }
 
       try {
         effects?.downloadFrameStl(part);
+
+        return true;
       } catch (error) {
         notify(error instanceof Error ? error.message : 'Frame STL export failed.');
+
+        return false;
+      }
+    },
+    async downloadFrameStlParts(partIds: readonly FramePartId[]) {
+      if (state.exportJobs.some(({ status }) => status === 'queued' || status === 'meshing')) {
+        return;
+      }
+
+      const parts = partIds.flatMap((partId) => findFramePart(partId) ?? []);
+
+      setExportJobs(
+        parts.map((part) => ({
+          id: part.id,
+          label: `${part.id} STL`,
+          status: 'queued',
+          fraction: 0,
+        })),
+      );
+
+      for (const part of parts) {
+        updateExportJob(part.id, { status: 'meshing' });
+        // Lets the list paint "meshing" before the synchronous STL build, and spaces the downloads.
+        await new Promise((resolve) => setTimeout(resolve, exportJobPaceMs));
+
+        try {
+          effects?.downloadFrameStl(part);
+          updateExportJob(part.id, {
+            status: 'done',
+            fraction: 1,
+            sizeBytes: estimateBinaryStlBytes(part),
+          });
+        } catch (error) {
+          updateExportJob(part.id, {
+            status: 'failed',
+            message: error instanceof Error ? error.message : 'Frame STL export failed.',
+          });
+        }
       }
     },
     metrics(height: number, layerHeight?: number) {
@@ -762,6 +1068,10 @@ export function createStudioController(
 
       state = { ...state, metrics: { ...state.metrics, height, layerHeight } };
       rebuildFrame();
+      publish();
+    },
+    cameraPose(pose: CameraPose) {
+      state = { ...state, cameraPose: pose };
       publish();
     },
     modelSpan(spanKm: number | undefined) {
@@ -872,6 +1182,7 @@ export function createStudioController(
       void controller.autoplay({ enabled: false });
 
       requestVersion++;
+      terrainLoadCancel?.abort();
 
       if (state.source.terrain) {
         parked = { terrain: state.source.terrain, fieldsKey: loadedFieldsKey };
@@ -880,6 +1191,8 @@ export function createStudioController(
       controller.source({
         selected: 'generated',
         loading: false,
+        loadProgress: null,
+        fault: null,
         status: 'Using generated terrain.',
       });
       applySource(undefined, true);
@@ -918,7 +1231,17 @@ export function createStudioController(
 
       pendingSearchedPlace = undefined;
 
-      controller.source({ loading: true, status: 'Downloading elevation tiles…' });
+      terrainLoadCancel?.abort();
+      const cancel = new AbortController();
+      let latestProgress: TerrainLoadProgress | null = null;
+
+      terrainLoadCancel = cancel;
+      controller.source({
+        loading: true,
+        status: 'Downloading elevation tiles…',
+        loadProgress: null,
+        fault: null,
+      });
 
       try {
         const terrain = await loadBrowserRealTerrain(
@@ -927,6 +1250,16 @@ export function createStudioController(
           source.spanKm,
           source.elevationFloor,
           source.maxDepth,
+          {
+            cancelSignal: cancel.signal,
+            onProgress: (loaded, total) => {
+              latestProgress = { loaded, total };
+
+              if (version === requestVersion) {
+                controller.source({ loadProgress: latestProgress });
+              }
+            },
+          },
         );
 
         if (version !== requestVersion) {
@@ -949,16 +1282,31 @@ export function createStudioController(
         });
       } catch (error) {
         if (version === requestVersion) {
-          controller.source({
-            status:
-              error instanceof Error ? error.message : 'Terrain could not load. Please retry.',
-          });
+          const fault = describeTerrainFault(error, latestProgress);
+
+          controller.source({ status: fault.message, fault });
         }
       } finally {
         if (version === requestVersion) {
-          controller.source({ loading: false });
+          controller.source({ loading: false, loadProgress: null });
         }
       }
+    },
+    cancelTerrainLoad() {
+      if (!state.source.loading) {
+        return;
+      }
+
+      requestVersion++;
+      terrainLoadCancel?.abort();
+      controller.source({
+        loading: false,
+        loadProgress: null,
+        status: 'Terrain download cancelled.',
+      });
+    },
+    dismissTerrainFault() {
+      controller.source({ fault: null });
     },
     grass(patch: Partial<GrassStyle>) {
       const preset =
@@ -1045,8 +1393,12 @@ export function createStudioController(
     downloadStl() {
       try {
         effects?.downloadStl();
+
+        return true;
       } catch (error) {
         notify(error instanceof Error ? error.message : 'STL export failed.');
+
+        return false;
       }
     },
     async downloadStill(scale: TerrainStillScale) {

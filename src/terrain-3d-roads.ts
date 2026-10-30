@@ -30,8 +30,17 @@ export interface TerrainRoadLayer {
   setSuppressed(value: boolean): void;
 }
 
-export function createTerrainRoadLayer(): TerrainRoadLayer {
-  const asphalt = createTerrainRoadMaterial(defaultRoadStyle.color);
+/** The GPX route reuses this layer with its own colour, sitting above the roads it crosses. */
+export interface TerrainRoadLayerOptions {
+  color?: string;
+  liftUnits?: number;
+}
+
+export function createTerrainRoadLayer({
+  color = defaultRoadStyle.color,
+  liftUnits = roadLiftUnits,
+}: TerrainRoadLayerOptions = {}): TerrainRoadLayer {
+  const asphalt = createTerrainRoadMaterial(color);
   const material = asphalt.material;
   const mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
   let style: Readonly<RoadStyle> = { ...defaultRoadStyle };
@@ -80,7 +89,7 @@ export function createTerrainRoadLayer(): TerrainRoadLayer {
 
     for (let offset = 1; offset < buffers.positions.length; offset += 3) {
       buffers.positions[offset] =
-        buffers.positions[offset] * exaggeration + elevationOffset + roadLiftUnits;
+        buffers.positions[offset] * exaggeration + elevationOffset + liftUnits;
     }
 
     const geometry = new THREE.BufferGeometry();

@@ -1,0 +1,114 @@
+/* P-08 Select: drawn frame around a real native <select>; no click-to-cycle (see select.tsx). */
+.lc-select-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-s-3) var(--lc-s-6);
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.lc-select-row__label {
+  min-width: 0;
+  color: var(--lc-text-body);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-body);
+  line-height: 15px;
+  overflow-wrap: anywhere;
+}
+
+.lc-select {
+  position: relative;
+  flex: 1 1 150px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.lc-select__control {
+  width: 100%;
+  height: var(--lc-h-s);
+  padding: 0 var(--lc-s-8) 0 9px;
+  border: 1px solid var(--lc-line);
+  border-radius: var(--lc-r-control);
+  appearance: none;
+  background: var(--lc-fill-field);
+  color: var(--lc-text-primary);
+  cursor: pointer;
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-body);
+  text-overflow: ellipsis;
+}
+
+.lc-select[data-has-position='true'] .lc-select__control {
+  padding-right: 48px;
+}
+
+.lc-select__control option,
+.lc-select__control optgroup {
+  background: var(--lc-ink-1);
+  color: var(--lc-text-primary);
+}
+
+/* Caret is drawn only when there is no position readout. */
+.lc-select[data-has-position='false']::after {
+  position: absolute;
+  top: 9px;
+  right: 11px;
+  width: 5px;
+  height: 5px;
+  border: solid var(--lc-text-tertiary);
+  border-width: 0 1px 1px 0;
+  content: '';
+  pointer-events: none;
+  transform: rotate(45deg);
+}
+
+.lc-select__position {
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-mono);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.lc-select__control:hover:not(:disabled),
+[data-force-state='hover'] .lc-select__control {
+  border-color: var(--lc-line-hover);
+}
+
+.lc-select__control:focus-visible,
+[data-force-state='focus'] .lc-select__control {
+  border-color: var(--lc-line-focus);
+  outline: 2px solid var(--lc-line-focus);
+  outline-offset: 2px;
+}
+
+.lc-select__control:active:not(:disabled),
+[data-force-state='active'] .lc-select__control {
+  background: var(--lc-fill-hover);
+}
+
+.lc-select__control:disabled {
+  color: var(--lc-text-disabled);
+  cursor: not-allowed;
+}
+
+@media (forced-colors: active) {
+  .lc-select__control {
+    border-color: ButtonText;
+    appearance: auto;
+  }
+
+  .lc-select__control:disabled {
+    border-color: GrayText;
+    color: GrayText;
+  }
+
+  .lc-select::after {
+    display: none;
+  }
+}

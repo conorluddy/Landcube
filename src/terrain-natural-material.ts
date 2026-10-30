@@ -49,7 +49,7 @@ export function createNaturalTerrainMaterial(cutaway: boolean): THREE.MeshPhysic
     polygonOffsetUnits: 2,
   });
 
-  material.customProgramCacheKey = () => `topogra-natural-v1-${cutaway}`;
+  material.customProgramCacheKey = () => `landcube-natural-v1-${cutaway}`;
 
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader

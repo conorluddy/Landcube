@@ -1,0 +1,50 @@
+/* O-02 Crosshair: 1px full-bleed lines through the pointer; transforms keep moves off layout. */
+.lc-crosshair {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.lc-crosshair[data-state='hidden'] {
+  display: none;
+}
+
+.lc-crosshair__line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: var(--lc-hud-hairline, color-mix(in srgb, var(--lc-ink-2) 28%, transparent));
+}
+
+.lc-crosshair__line[data-axis='horizontal'] {
+  width: 100%;
+  height: 1px;
+  transform: translateY(var(--lc-crosshair-y, 0));
+}
+
+.lc-crosshair__line[data-axis='vertical'] {
+  width: 1px;
+  height: 100%;
+  transform: translateX(var(--lc-crosshair-x, 0));
+}
+
+.lc-crosshair__tip {
+  position: absolute;
+  top: var(--lc-s-6);
+  left: var(--lc-s-6);
+  transform: translate(var(--lc-crosshair-x, 0), var(--lc-crosshair-y, 0));
+}
+
+/* Touch has no hover position to follow. */
+@media (hover: none) {
+  .lc-crosshair {
+    display: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-crosshair__line {
+    background: CanvasText;
+  }
+}

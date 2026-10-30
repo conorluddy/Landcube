@@ -77,6 +77,7 @@ await test('seed locking supports seed zero, unlocking, and malformed stored val
   assert.deepEqual(readLockedSeed(storage), { ok: true, data: null });
 
   for (const raw of ['-1', '4294967296', '', '12px']) {
+    // Legacy storage key kept across the landcube rename so existing data survives.
     storage.setItem('topogra-locked-seed', raw);
     assert.equal(readLockedSeed(storage).ok, false);
   }
@@ -133,7 +134,7 @@ await test('URL synchronization replaces the current entry while preserving hist
   assert.ok(parsed.ok);
   const state = { navigation: 'existing' };
   const calls: unknown[][] = [];
-  const url = replaceDesignUrl('https://topogra.example', parsed.data.settings, {
+  const url = replaceDesignUrl('https://landcube.example', parsed.data.settings, {
     state,
     replaceState: (...args: unknown[]) => {
       calls.push(args);
@@ -156,7 +157,7 @@ await test('a blocked address-bar update still provides the complete share link 
   context.mock.method(console, 'warn', (message: string) => {
     warnings.push(message);
   });
-  const url = replaceDesignUrl('https://topogra.example', parsed.data.settings, {
+  const url = replaceDesignUrl('https://landcube.example', parsed.data.settings, {
     state: null,
     replaceState: () => {
       throw new Error('Denied');

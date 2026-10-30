@@ -126,7 +126,7 @@ Apply the same rules as a review, and report findings in this order:
 
 Give a rewrite for each flagged requirement.
 
-## Topogra glossary seed
+## LANDCU.BE glossary seed
 
 - **Seed**: the integer that fully determines a synthetic landscape.
 - **Height field**: the 2D grid of elevations contours are extracted from.

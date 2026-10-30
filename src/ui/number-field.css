@@ -1,0 +1,17 @@
+/* P-09 NumberField extras; the frame lives in text-field.css. */
+.lc-field__input[type='number'] {
+  font-variant-numeric: tabular-nums;
+  appearance: textfield;
+}
+
+.lc-field__input[type='number']::-webkit-inner-spin-button,
+.lc-field__input[type='number']::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+@media (forced-colors: active) {
+  .lc-field__input[type='number'] {
+    appearance: auto;
+  }
+}

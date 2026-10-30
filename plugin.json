@@ -1,27 +1,27 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-  "name": "topogra",
+  "name": "landcube",
   "version": "0.2.0",
   "description": "Generate reproducible topographic SVG and PNG assets from synthetic landscapes or real-world terrain.",
   "author": {
     "name": "Conor Luddy",
     "url": "https://github.com/conorluddy"
   },
-  "homepage": "https://conorluddy.github.io/Topogra/",
-  "repository": "https://github.com/conorluddy/Topogra",
+  "homepage": "https://landcu.be/",
+  "repository": "https://github.com/conorluddy/landcube",
   "license": "MIT",
   "keywords": ["topography", "terrain", "svg", "png", "design"],
   "extensions": {
     "com.openai": {
       "interface": {
-        "displayName": "Topogra",
+        "displayName": "LANDCU.BE",
         "shortDescription": "Generate reproducible topographic assets",
         "longDescription": "Create SVG and PNG artwork from seeded landscapes or real-world elevation data. Save validated configurations for repeatable exports, with source credits for real terrain.",
         "developerName": "Conor Luddy",
         "category": "Productivity",
-        "websiteURL": "https://conorluddy.github.io/Topogra/",
+        "websiteURL": "https://landcu.be/",
         "defaultPrompt": [
-          "Use Topogra to create a topographic SVG background and save its reusable configuration."
+          "Use LANDCU.BE to create a topographic SVG background and save its reusable configuration."
         ]
       }
     }

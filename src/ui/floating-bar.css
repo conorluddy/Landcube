@@ -1,0 +1,74 @@
+/* C-01 FloatingBar: separate glass pills, 6px apart. Pill height comes from the bar size. */
+.lc-floating-bar {
+  --lc-bar-height: var(--lc-h-bar);
+
+  display: flex;
+  gap: var(--lc-s-3);
+  align-items: center;
+  min-width: 0;
+  height: var(--lc-bar-height);
+  margin: 0;
+  pointer-events: none;
+}
+
+.lc-floating-bar > * {
+  pointer-events: auto;
+}
+
+.lc-floating-bar[data-size='footer'] {
+  --lc-bar-height: 36px;
+}
+
+.lc-floating-bar[data-size='mobile'] {
+  --lc-bar-height: var(--lc-h-l);
+}
+
+.lc-bar-group {
+  display: flex;
+  flex: none;
+  gap: var(--lc-s-1);
+  align-items: center;
+  min-width: 0;
+  height: var(--lc-bar-height, var(--lc-h-bar));
+  padding: 0 3px;
+  background: var(--lc-glass-bar);
+  box-shadow: var(--lc-shadow-bar);
+}
+
+.lc-bar-group[data-spacer] {
+  flex: 1 1 0;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+/* Pressed or expanded tools inside a pill read as the active rail item does. */
+.lc-bar-group .lc-button[aria-pressed='true'],
+.lc-bar-group .lc-button[aria-expanded='true'] {
+  background: var(--lc-fill-selected);
+  color: var(--lc-text-primary);
+}
+
+/* Pills never squeeze their labels; a flexible child such as a SearchField gives way instead. */
+.lc-floating-bar > .lc-segmented-row {
+  flex: none;
+}
+
+/* A Segmented on a glass bar is its own pill; size it to the bar instead of its 42px default. */
+.lc-floating-bar .lc-segmented[data-on-glass-bar] {
+  --lc-segmented-item-height: calc(var(--lc-bar-height) - 8px);
+
+  box-shadow: var(--lc-shadow-bar);
+}
+
+@media (forced-colors: active) {
+  .lc-bar-group {
+    border-color: CanvasText;
+  }
+
+  .lc-bar-group .lc-button[aria-pressed='true'],
+  .lc-bar-group .lc-button[aria-expanded='true'] {
+    outline: 2px solid Highlight;
+  }
+}

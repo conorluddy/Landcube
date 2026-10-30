@@ -1,0 +1,79 @@
+/* C-08 DetachablePanel + LayoutManager: pinned groups float on glass above the viewport. */
+.lc-layout-manager {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.lc-layout-manager > .lc-detachable-panel {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.lc-detachable-panel {
+  width: 320px;
+  max-width: 100%;
+}
+
+.lc-detachable-panel__glass {
+  display: flex;
+  flex-direction: column;
+  max-height: 60vh;
+}
+
+.lc-detachable-panel__handle {
+  flex: none;
+  padding: var(--lc-s-6) var(--lc-s-9);
+  cursor: grab;
+  line-height: 16px;
+  touch-action: none;
+  user-select: none;
+}
+
+.lc-detachable-panel__handle .lc-group-header {
+  margin-bottom: 0;
+}
+
+/* The dock button sits in the header line, sized like the inspector's pin button. */
+.lc-detachable-panel__handle .lc-icon-button {
+  width: var(--lc-h-xs);
+  height: var(--lc-h-xs);
+  font-size: var(--lc-fs-body);
+}
+
+.lc-detachable-panel__handle:focus-visible,
+[data-force-state='focus'] .lc-detachable-panel__handle {
+  outline: 2px solid var(--lc-line-focus);
+  outline-offset: -2px;
+}
+
+.lc-detachable-panel[data-dragging='true'] .lc-detachable-panel__handle,
+[data-force-state='dragging'] .lc-detachable-panel__handle {
+  cursor: grabbing;
+}
+
+.lc-detachable-panel[data-dragging='true'] .lc-detachable-panel__glass,
+[data-force-state='dragging'] .lc-detachable-panel__glass {
+  border-color: var(--lc-line-hover);
+  box-shadow: var(--lc-shadow-card);
+}
+
+.lc-detachable-panel__body {
+  min-height: 0;
+  padding: 0 var(--lc-s-9) var(--lc-s-9);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* The handle already shows the title; the fieldset keeps its hidden legend for its name. */
+.lc-detachable-panel__body .lc-group > .lc-group-header {
+  display: none;
+}
+
+@media (forced-colors: active) {
+  .lc-detachable-panel__handle:focus-visible {
+    outline-color: Highlight;
+  }
+}

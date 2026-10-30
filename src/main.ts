@@ -3,20 +3,36 @@ import type { HeightField } from './types/terrain';
 import { createSeaLevelGeometry, type SeaLevelGeometry } from './sea-level';
 import { createStudioTerrainView } from './studio/terrain-view';
 import { createStudioController, getSceneCredits } from './studio/controller';
+import { createCompareSceneStore } from './studio/compare-scene';
 import { createCropPreview } from './studio/crop-preview';
-import { mountStudio } from './studio/app';
+import { mountStudio, phoneViewportQuery } from './studio/app';
+import { applySignalAccent, readSignalAccent } from './studio/accent';
+import { browserLocalStorage, browserSessionStorage } from './studio/browser-storage';
+import { shouldShowSplash } from './studio/pages/splash-session';
+import { signalAccentStorageKey } from './constants/library';
 import { downloadBlob } from './studio/export-panel';
 import { encodeTerrainStill } from './export/still-export';
 import { createBinaryStl } from './export/stl-export';
 import type { RealTerrain } from './real-terrain';
 import { createFloorPlace } from './floor-geo';
 import { clipRoadsToCrop, noRoadPaths } from './road-ribbons';
+import { clipRouteToCrop, noRouteOverlay, type TerrainRouteOverlay } from './terrain-3d-route';
 import type { RoadPath } from './types/roads';
 import type { GrassGeography } from './grass-coverage';
 import { generatedTerrainReliefMeters, generatedTerrainSpanMeters } from './constants/grass';
 import { findTerrainSummits } from './summit-markers';
 import { getRequiredElement } from './dom-elements';
-import './landscape-studio.css';
+import { awayPointer, createHudStore, type MapLocation } from './studio/hud-store';
+import {
+  locateModelFraction,
+  locateViewportPoint,
+  type ModelPlacement,
+} from './studio/hud-location';
+import { applyTheme, currentTheme, readTheme, subscribeToTheme } from './studio/theme';
+import './ui/ui.css';
+import './studio/studio.css';
+import './studio/studio-surfaces.css';
+import './studio/studio-phone.css';
 import { designChangePriority, versionOneDesignDefaults } from './constants/design';
 import { engineConfiguration } from './constants/engine';
 import { operationErrorCodes } from './constants/operations';
@@ -109,6 +125,12 @@ let lastContourRenderTimeMs = 0;
 let designUrlDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingChange: DesignChangeKind | undefined;
 let settingsUpdateFrameIdentifier: number | undefined;
+const hud = createHudStore();
+const compareScenes = createCompareSceneStore();
+let pendingHudPointerEvent: PointerEvent | undefined;
+let hudPointerFrameIdentifier: number | undefined;
+let reliefField: HeightField | undefined;
+let modelPlacement: ModelPlacement | undefined;
 
 const controls = createStudioController(
   {
@@ -170,7 +192,7 @@ controls.connect({
 
     downloadBlob(
       await encodeTerrainStill(frame, getStillAttribution()),
-      `topogra-${settings.seed}-3d-${scale}x.png`,
+      `landcube-${settings.seed}-3d-${scale}x.png`,
     );
 
     return { width: frame.width, height: frame.height };
@@ -178,9 +200,9 @@ controls.connect({
   frameChanged: terrain3d.frameChanged,
   downloadFrameStl: (part) => {
     downloadBlob(
-      new Blob([createBinaryStl(part.solid, `Topogra ${part.id}`)], { type: 'model/stl' }),
+      new Blob([createBinaryStl(part.solid, `landcube ${part.id}`)], { type: 'model/stl' }),
       // Size in the name keeps parts for different frames apart in one downloads folder.
-      `topogra-${settings.seed}-${part.id}-${Math.round(part.sizeMm.x)}x${Math.round(part.sizeMm.z)}mm.stl`,
+      `landcube-${settings.seed}-${part.id}-${Math.round(part.sizeMm.x)}x${Math.round(part.sizeMm.z)}mm.stl`,
     );
   },
   downloadStl: () => {
@@ -189,8 +211,8 @@ controls.connect({
     downloadBlob(
       new Blob([terrain3d.getStl()], { type: 'model/stl' }),
       model.cropShape === 'circle'
-        ? `topogra-${settings.seed}-circle-${model.widthMm}mm.stl`
-        : `topogra-${settings.seed}-${model.widthMm}x${model.lengthMm}mm.stl`,
+        ? `landcube-${settings.seed}-circle-${model.widthMm}mm.stl`
+        : `landcube-${settings.seed}-${model.widthMm}x${model.lengthMm}mm.stl`,
     );
   },
   roadsChanged: updateTerrain3d,
@@ -319,7 +341,18 @@ function synchronizeDesignUrl(): string {
 /** Keeps the page backdrop and browser theme aligned with the design. */
 function applyPageStyle(): void {
   document.documentElement.style.backgroundColor = settings.background;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', settings.background);
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', readBrowserChromeColor(settings.background));
+}
+
+/** The canvas fills the viewport, so the design background tints the browser; the light theme tints it light. */
+function readBrowserChromeColor(designBackground: string): string {
+  if (currentTheme(document.documentElement) !== 'light') {
+    return designBackground;
+  }
+
+  return getComputedStyle(document.documentElement).getPropertyValue('--lc-theme-color').trim();
 }
 
 /** Renders the current cursor influence over cached base terrain. */
@@ -329,11 +362,13 @@ function renderCurrentLandscape(): void {
       ? baseHeightField
       : applyCursorElevation(baseHeightField, cursor, settings);
 
+  publishGeneratedRelief();
   contours = extractContours(field, contourElevations, realTerrain);
   summits = findTerrainSummits(field);
   seaLevel = createSeaLevelGeometry(field, width, height, realTerrain);
   updateTerrain3d();
   renderContoursIntoSvg(terrainSvgElement, contours, width, height, settings, summits, seaLevel);
+  compareScenes.publish({ contours, width, height, summits, seaLevel });
 }
 
 // The source frame is captured once; viewport resizes never change printable terrain.
@@ -343,6 +378,10 @@ let modelSourceField: HeightField | undefined;
 let modelCropKey = '';
 let modelCrop: ReturnType<typeof cropTerrainModelField> | undefined;
 let roadPaths: { key: unknown[]; paths: RoadPath[] } = { key: [], paths: [] };
+let routeOverlay: { key: unknown[]; overlay: TerrainRouteOverlay } = {
+  key: [],
+  overlay: noRouteOverlay,
+};
 
 function updateTerrain3d(): void {
   if (!terrain3d.isActive()) {
@@ -400,6 +439,11 @@ function updateTerrain3d(): void {
     controls.getSnapshot().savedPlaces,
   );
 
+  modelPlacement = place
+    ? { kind: 'geographic', bounds: place.bounds }
+    : realTerrain
+      ? undefined
+      : { kind: 'generated', crop: modelCrop, frame: modelSourceFrame };
   // Before the update, so the update builds roads at the new auto width. A width change also
   // rebuilds once on the previous terrain; that costs one ribbon pass per place load.
   controls.modelSpan(place ? Math.max(place.widthKm, place.lengthKm) : undefined);
@@ -416,6 +460,7 @@ function updateTerrain3d(): void {
     getTerrainTerraceLevels(settings, engineConfiguration, realTerrain),
     getCroppedRoadPaths(modelSourceFrame, modelCrop, dimensions.cropShape ?? 'rectangle'),
     getGrassGeography(modelSourceFrame, modelCrop),
+    getCroppedRoute(modelSourceFrame, modelCrop, dimensions.cropShape ?? 'rectangle'),
   );
 }
 
@@ -465,6 +510,32 @@ function getCroppedRoadPaths(
   }
 
   return roadPaths.paths;
+}
+
+/** Projects the visible GPX route into the model crop, reusing the last result when unchanged. */
+function getCroppedRoute(
+  frame: { width: number; height: number },
+  crop: NonNullable<typeof modelCrop>,
+  shape: 'rectangle' | 'circle',
+): TerrainRouteOverlay {
+  const { route } = controls.getSnapshot().workspace;
+  const location = realTerrain?.location;
+  const spanKm = realTerrain?.spanKm;
+
+  if (route === null || !route.isVisible || !location || spanKm === undefined) {
+    return noRouteOverlay;
+  }
+
+  const key = [route, location, spanKm, frame, crop, shape];
+
+  if (key.some((value, index) => value !== routeOverlay.key[index])) {
+    routeOverlay = {
+      key,
+      overlay: clipRouteToCrop(route, { location, spanKm }, frame, crop, shape),
+    };
+  }
+
+  return routeOverlay.overlay;
 }
 
 /** Credits every external source visible in the 3D view. */
@@ -527,11 +598,13 @@ function scheduleCursorAnimation(): void {
 
 /** Tracks eligible pointers while keeping control interaction deformation-free. */
 function moveCursor(event: PointerEvent): void {
+  trackHudPointer(event);
+
   if (
     terrain3d.isActive() ||
     realTerrain !== undefined ||
     !settings.cursorEnabled ||
-    (event.target instanceof Element && event.target.closest('header, aside, footer, dialog'))
+    (event.target instanceof Element && event.target.closest('[data-ui-surface]'))
   ) {
     if (targetCursorInfluence.strength !== 0) {
       releaseCursor();
@@ -563,17 +636,134 @@ function releaseCursor(): void {
   scheduleCursorAnimation();
 }
 
+/** The pointer left the page or was cancelled: settle the cursor hill and hide the crosshair. */
+function releasePointer(): void {
+  pendingHudPointerEvent = undefined;
+  hud.setPointer(awayPointer);
+  releaseCursor();
+}
+
+/** Feeds the HUD crosshair: a mouse or pen over the open viewport, never over a UI surface. */
+function trackHudPointer(event: PointerEvent): void {
+  const isOverViewport =
+    event.pointerType !== 'touch' &&
+    event.target instanceof Element &&
+    event.target.closest('#studio-viewport') !== null &&
+    event.target.closest('[data-ui-surface]') === null;
+
+  if (!isOverViewport) {
+    pendingHudPointerEvent = undefined;
+    hud.setPointer(awayPointer);
+
+    return;
+  }
+
+  pendingHudPointerEvent = event;
+  hudPointerFrameIdentifier ??= requestAnimationFrame(publishHudPointer);
+}
+
+/** Locates the latest pointer once per frame; a 3D drag keeps the last location instead of ray casting. */
+function publishHudPointer(): void {
+  hudPointerFrameIdentifier = undefined;
+  const event = pendingHudPointerEvent;
+
+  if (!event) {
+    return;
+  }
+
+  const bounds = terrainSvgElement.getBoundingClientRect();
+  const point = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+
+  hud.setPointer({
+    kind: 'tracking',
+    xPx: point.x,
+    yPx: point.y,
+    location: locatePointer(event, point),
+  });
+}
+
+function locatePointer(
+  event: PointerEvent,
+  point: { x: number; y: number },
+): MapLocation | undefined {
+  if (!terrain3d.isActive()) {
+    return locateViewportPoint(point, { width, height }, realTerrain);
+  }
+
+  const previous = hud.getSnapshot().pointer;
+
+  if (event.buttons !== 0) {
+    return previous.kind === 'tracking' ? previous.location : undefined;
+  }
+
+  return locateModelSurfacePoint(event.clientX, event.clientY);
+}
+
+/** The place on the 3D model under a viewport point; undefined over sky or before the model. */
+function locateModelSurfacePoint(clientX: number, clientY: number): MapLocation | undefined {
+  const fraction = terrain3d.getSurfaceFractionAt(clientX, clientY);
+
+  return fraction && modelPlacement ? locateModelFraction(fraction, modelPlacement) : undefined;
+}
+
+/** The measure tool locates its endpoints on demand, with the same mapping as the coordinate tip. */
+function locateClientPoint(clientX: number, clientY: number): MapLocation | undefined {
+  if (terrain3d.isActive()) {
+    return locateModelSurfacePoint(clientX, clientY);
+  }
+
+  const bounds = terrainSvgElement.getBoundingClientRect();
+
+  return locateViewportPoint(
+    { x: clientX - bounds.left, y: clientY - bounds.top },
+    { width, height },
+    realTerrain,
+  );
+}
+
+/** Generated terrain's elevation range on its nominal relief, recomputed when the field changes. */
+function publishGeneratedRelief(): void {
+  if (realTerrain) {
+    reliefField = undefined;
+    hud.setGeneratedRelief(undefined);
+
+    return;
+  }
+
+  if (reliefField === baseHeightField) {
+    return;
+  }
+
+  reliefField = baseHeightField;
+  let minimum = Infinity;
+  let maximum = -Infinity;
+
+  for (const value of baseHeightField.values) {
+    minimum = Math.min(minimum, value);
+    maximum = Math.max(maximum, value);
+  }
+
+  const metersPerUnit =
+    generatedTerrainReliefMeters /
+    (engineConfiguration.elevationMax - engineConfiguration.elevationMin);
+
+  hud.setGeneratedRelief({
+    minimum: Math.round((minimum - engineConfiguration.elevationMin) * metersPerUnit),
+    maximum: Math.round((maximum - engineConfiguration.elevationMin) * metersPerUnit),
+  });
+}
+
 /** Connects pointer and page lifecycle events to rendering and URL synchronization. */
 window.addEventListener('pointermove', moveCursor, { passive: true });
 window.addEventListener('pointerdown', moveCursor, { passive: true });
 window.addEventListener('pointerup', (event) => {
   if (event.pointerType === 'touch') {
-    releaseCursor();
+    releasePointer();
   }
 });
-window.addEventListener('pointercancel', releaseCursor);
-document.documentElement.addEventListener('pointerleave', releaseCursor);
-window.addEventListener('blur', releaseCursor);
+window.addEventListener('pointercancel', releasePointer);
+document.documentElement.addEventListener('pointerleave', releasePointer);
+window.addEventListener('blur', releasePointer);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     if (cursorAnimationFrameIdentifier !== undefined) {
@@ -604,7 +794,34 @@ window.addEventListener('popstate', () => {
 });
 let viewportResizeDebounceTimer: ReturnType<typeof setTimeout>;
 
-mountStudio(controls, terrainSvgElement, outputRenderer, cropPreview);
+// Stored appearance applies before the first paint of the studio; the splash is phone-only.
+applyTheme(readTheme(browserLocalStorage), document.documentElement, browserLocalStorage);
+applySignalAccent(
+  readSignalAccent(browserLocalStorage, signalAccentStorageKey),
+  document.documentElement,
+  browserLocalStorage,
+  signalAccentStorageKey,
+);
+// A route load, toggle or clear redraws the 3D model; 2D reads it straight from state.
+let drawnRoute = controls.getSnapshot().workspace.route;
+
+controls.subscribe(() => {
+  const { route } = controls.getSnapshot().workspace;
+
+  if (route !== drawnRoute) {
+    drawnRoute = route;
+    updateTerrain3d();
+  }
+});
+controls.workspace({
+  hasSeenSplash: !shouldShowSplash(
+    matchMedia(phoneViewportQuery).matches,
+    opensDesignLink,
+    browserSessionStorage,
+  ),
+});
+hud.setLocator(locateClientPoint);
+mountStudio(controls, terrainSvgElement, outputRenderer, cropPreview, hud, compareScenes);
 const viewport = getRequiredElement(document, '#studio-viewport', HTMLElement);
 
 const resizeViewport = () => {
@@ -626,6 +843,7 @@ width = Math.max(1, viewport.clientWidth);
 height = Math.max(1, viewport.clientHeight);
 baseHeightField = sampleTerrain(terrain, width, height, terrainSettings);
 applyPageStyle();
+subscribeToTheme(applyPageStyle);
 renderCurrentLandscape();
 
 // Design links open the 2D design they encode. A fresh visit opens the default real location in 3D

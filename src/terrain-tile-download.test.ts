@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import type { TerrainLoadError } from './terrain-load-error';
 import { downloadTerrainTile } from './terrain-tile-download';
 
 void test('tile errors identify the URL and preserve underlying network failures', async (context) => {
@@ -25,4 +26,32 @@ void test('tile errors distinguish HTTP failures and timeouts', async (context) 
     Promise.reject(new DOMException('Timed out', 'TimeoutError')),
   );
   await assert.rejects(downloadTerrainTile('https://example.test/tile.png'), /Timed out/);
+});
+
+void test('tile download failures carry the download fault kind', async (context) => {
+  context.mock.method(globalThis, 'fetch', () =>
+    Promise.resolve(new Response(null, { status: 500 })),
+  );
+  await assert.rejects(
+    downloadTerrainTile('https://example.test/tile.png'),
+    (error: TerrainLoadError) => error.kind === 'tileDownloadFailed',
+  );
+});
+
+void test('cancelling stops an in-flight tile download', async (context) => {
+  context.mock.method(
+    globalThis,
+    'fetch',
+    (_url: string, init: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => {
+          reject(new Error('aborted'));
+        });
+      }),
+  );
+  const cancel = new AbortController();
+  const download = downloadTerrainTile('https://example.test/tile.png', cancel.signal);
+
+  cancel.abort();
+  await assert.rejects(download, /aborted/);
 });

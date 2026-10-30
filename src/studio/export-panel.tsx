@@ -1,21 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Button, Group, Hint, NumberField, Segmented, Select, Toggle } from './fields';
+import { ExportSheet } from '../ui/export-sheet';
+import { SuccessSheet, type SuccessRow } from '../ui/success-sheet';
 import { terrainStillScales, type TerrainStillScale } from '../export/still-export';
-import type { PanelProps } from './panels';
+import type { PanelProps } from './controller';
 import type { OutputRenderer } from '../types/export';
-import {
-  createExportFile,
-  createExportPreviewSvg,
-  downloadExport,
-  getRasterDimensions,
-} from '../export/image-export';
-import {
-  maximumExtraLargeOutputDimensionPixels,
-  maximumOutputDimensionPixels,
-  minimumOutputDimensionPixels,
-} from '../constants/design';
-import { outputSizePresetGroups } from '../constants/export';
+import type { FramePartId } from '../types/frame';
+import { createExportFile, createExportPreviewSvg, downloadExport } from '../export/image-export';
+import { maximumOutputDimensionPixels } from '../constants/design';
 import { clampOutputDimensionPixels } from '../design-settings';
+import { buildExportSheetModel, getFrameParts } from './export-sheet-model';
 
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -29,28 +22,24 @@ export function downloadBlob(blob: Blob, filename: string): void {
   }, 1000);
 }
 
+/** Adapter: builds the ExportSheet view model from the controller and owns the download handlers. */
 export function ExportPanel({
   controller: c,
   state: s,
   renderer,
 }: PanelProps & { renderer: OutputRenderer }): ReactNode {
-  const [preview, setPreview] = useState('');
+  const [previewUrl, setPreviewUrl] = useState('');
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [size, setSize] = useState('custom');
-  const [invalid, setInvalid] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
+  const [sizeChoice, setSizeChoice] = useState('custom');
   const [stillScale, setStillScale] = useState<TerrainStillScale>(2);
-  const [stillBusy, setStillBusy] = useState(false);
-  const fields = useRef<HTMLDivElement>(null);
-  const settings = s.design;
-  const limit = settings.allowExtraLargeExports
-    ? maximumExtraLargeOutputDimensionPixels
-    : maximumOutputDimensionPixels;
-
-  const frameParts =
-    s.workspace.view === '3d' && s.frame.assembly?.ok === true ? s.frame.assembly.data.parts : [];
-
+  const [isStillBusy, setIsStillBusy] = useState(false);
+  const [deselectedPartIds, setDeselectedPartIds] = useState<ReadonlySet<FramePartId>>(new Set());
+  const [successTitle, setSuccessTitle] = useState<string | undefined>(undefined);
   const activePreview = useRef<string | undefined>(undefined);
+  const successAnchor = useRef<HTMLDivElement>(null);
+  const settings = s.design;
+  const frameParts = getFrameParts(s);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,7 +64,7 @@ export function ExportPanel({
           const previous = activePreview.current;
 
           activePreview.current = pendingUrl;
-          setPreview(pendingUrl);
+          setPreviewUrl(pendingUrl);
           pendingUrl = undefined;
           setError('');
 
@@ -109,10 +98,12 @@ export function ExportPanel({
     },
     [],
   );
-  const raster = getRasterDimensions(settings);
+  useEffect(() => {
+    successAnchor.current?.scrollIntoView({ block: 'nearest' });
+  }, [successTitle]);
 
   const download = async () => {
-    setBusy(true);
+    setIsBusy(true);
     setError('');
 
     try {
@@ -130,284 +121,219 @@ export function ExportPanel({
         setError(downloaded.error.message);
       } else {
         c.notify('Download started.');
+        setSuccessTitle(`${settings.format.toUpperCase()} downloaded`);
       }
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Export failed. Please retry.');
     } finally {
-      setBusy(false);
+      setIsBusy(false);
     }
   };
 
-  return (
-    <>
-      <Group title="2D image">
-        <Hint>Exports settled 2D artwork. Cursor deformation and the 3D scene are excluded.</Hint>
-        <Select
-          id="format"
-          label="Format"
-          value={settings.format}
-          options={[
-            { value: 'svg', label: 'SVG' },
-            { value: 'png', label: 'PNG' },
-          ]}
-          onChange={(value) => c.design({ format: value })}
-        />
-        <div className="field-row">
-          <label htmlFor="output-size">Size</label>
-          <select
-            id="output-size"
-            value={size}
-            onChange={(event) => {
-              const value = event.target.value;
+  const changeSizeChoice = (value: string) => {
+    setSizeChoice(value);
 
-              setSize(value);
+    if (value === 'custom') {
+      return;
+    }
 
-              if (value === 'custom') {
-                return;
-              }
+    const [width, height] = resolvePresetSize(value);
 
-              const [width, height] =
-                value === 'viewport'
-                  ? [window.innerWidth, window.innerHeight]
-                  : value === 'screen'
-                    ? [
-                        window.screen.width * devicePixelRatio,
-                        window.screen.height * devicePixelRatio,
-                      ]
-                    : value.split('x').map(Number);
+    c.design({
+      width: clampOutputDimensionPixels(Math.round(width)),
+      height: clampOutputDimensionPixels(Math.round(height)),
+    });
 
-              c.design({
-                width: clampOutputDimensionPixels(Math.round(width)),
-                height: clampOutputDimensionPixels(Math.round(height)),
-              });
+    if (value === 'viewport' || value === 'screen') {
+      setSizeChoice('custom');
+    }
+  };
 
-              if (value === 'viewport' || value === 'screen') {
-                setSize('custom');
-              }
-            }}
-          >
-            <option value="custom">Custom</option>
-            <optgroup label="This device">
-              <option value="viewport">Current viewport</option>
-              <option value="screen">Device screen</option>
-            </optgroup>
-            {outputSizePresetGroups.map((group) => (
-              <optgroup key={group.label} label={group.label}>
-                {group.presets.map((preset) => (
-                  <option value={preset.value} key={preset.value}>
-                    {preset.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </div>
-        <Toggle
-          label="Allow extra-large exports"
-          value={settings.allowExtraLargeExports}
-          onChange={(value) =>
-            c.design({
-              allowExtraLargeExports: value,
-              ...(!value
-                ? {
-                    width: Math.min(settings.width, maximumOutputDimensionPixels),
-                    height: Math.min(settings.height, maximumOutputDimensionPixels),
-                  }
-                : {}),
-            })
-          }
-        />
-        {settings.allowExtraLargeExports && (
-          <Hint>
-            Up to 12,288 px per side. Large PNGs can use over 576 MiB of memory and may freeze this
-            tab.
-          </Hint>
-        )}
-        <div
-          className="control-grid"
-          ref={fields}
-          onBlur={() => {
-            requestAnimationFrame(() => {
-              setInvalid(fields.current?.querySelector('[aria-invalid="true"]') !== null);
-            });
-          }}
-          onInput={() => {
-            setInvalid(true);
-          }}
-        >
-          <NumberField
-            id="width"
-            label="Width"
-            value={settings.width}
-            min={minimumOutputDimensionPixels}
-            max={limit}
-            step={1}
-            onChange={(value) => {
-              setSize('custom');
-
-              return value !== undefined && c.design({ width: value });
-            }}
-          />
-          <NumberField
-            id="height"
-            label="Height"
-            value={settings.height}
-            min={minimumOutputDimensionPixels}
-            max={limit}
-            step={1}
-            onChange={(value) => {
-              setSize('custom');
-
-              return value !== undefined && c.design({ height: value });
-            }}
-          />
-        </div>
-        <Hint>
-          {minimumOutputDimensionPixels}–{limit} px per side · anchored at the top left
-        </Hint>
-        {settings.format === 'png' && (
-          <Select
-            id="pngScale"
-            label="Resolution"
-            value={String(settings.pngScale)}
-            options={['1', '2']}
-            onChange={(value) => c.design({ pngScale: Number(value) as 1 | 2 })}
-          />
-        )}
-        <Toggle
-          label="Transparent background"
-          value={settings.transparent}
-          onChange={(value) => c.design({ transparent: value })}
-        />
-        <div className="output-preview">
-          {preview !== '' && (
-            <img
-              id="output-preview-image"
-              src={preview}
-              alt="Settled landscape export preview"
-              onError={() => {
-                setError('Export preview could not be displayed.');
+  const model = buildExportSheetModel({
+    state: s,
+    ui: {
+      previewUrl,
+      error,
+      isBusy,
+      sizeChoice,
+      stillScale,
+      isStillBusy,
+      selectedPartIds: new Set(
+        frameParts.map(({ id }) => id).filter((id) => !deselectedPartIds.has(id)),
+      ),
+      success:
+        successTitle === undefined ? undefined : (
+          <div ref={successAnchor}>
+            <SuccessSheet
+              title={successTitle}
+              rows={buildSuccessRows(c)}
+              onDone={() => {
+                setSuccessTitle(undefined);
               }}
             />
-          )}
-        </div>
-        <Hint>
-          {settings.width * (settings.format === 'png' ? settings.pngScale : 1)} ×{' '}
-          {settings.height * (settings.format === 'png' ? settings.pngScale : 1)} px · cursor hill
-          excluded
-        </Hint>
-        {!raster.ok && settings.format === 'png' && <p role="alert">{raster.error.message}</p>}
-        {error !== '' && <p role="alert">{error}</p>}
-        <Button
-          primary
-          disabled={busy || invalid || (!raster.ok && settings.format === 'png')}
-          onClick={() => {
-            void download();
-          }}
-        >
-          {busy ? 'Generating…' : `Download ${settings.format.toUpperCase()}`}
-        </Button>
-      </Group>
-      {s.workspace.view === '3d' && (
-        <Group title="3D still">
-          <Segmented
-            label="Scale"
-            value={String(stillScale)}
-            options={terrainStillScales.map((scale) => ({
-              value: String(scale),
-              label: `${scale}×`,
-            }))}
-            onChange={(value) => {
-              setStillScale(Number(value) as TerrainStillScale);
-            }}
-          />
-          <Hint>
-            The current 3D view, with its lens, focus and lighting, at {stillScale}× its on-screen
-            size.
-            {s.source.terrain ? ' Includes terrain attribution.' : ''}
-          </Hint>
-          <Button
-            primary
-            disabled={stillBusy}
-            onClick={() => {
-              setStillBusy(true);
-              void c.downloadStill(stillScale).finally(() => {
-                setStillBusy(false);
-              });
-            }}
-          >
-            {stillBusy ? 'Rendering…' : 'Download 3D still'}
-          </Button>
-        </Group>
-      )}
-      {s.workspace.view === '3d' && (
-        <Group title="STL">
-          <Hint>
-            {s.model.dimensions.widthMm}{' '}
-            {s.model.dimensions.cropShape === 'circle'
-              ? 'mm diameter'
-              : `× ${s.model.dimensions.lengthMm} mm`}{' '}
-            · {s.metrics.height?.toFixed(2) ?? '—'} mm overall height
-          </Hint>
-          <Hint>
-            Terrain and solid base, in millimeters. Scene materials, water, decorations and engraved
-            grooves are excluded.
-          </Hint>
-          {/* The Frame tab owns the alert; repeating it here would announce it twice. */}
-          {s.frame.settings.preset !== 'none' && s.frame.assembly?.ok === false && (
-            <Hint>Fix the frame in the Frame tab: {s.frame.assembly.error.message}</Hint>
-          )}
-          {s.frame.settings.preset !== 'none' && s.frame.assembly === undefined && (
-            <Hint>Frame parts appear once the 3D model has finished building.</Hint>
-          )}
-          {frameParts.map((part) => (
-            <Hint key={part.id}>
-              {part.id}: {formatMm(part.sizeMm.x)} × {formatMm(part.sizeMm.z)} ×{' '}
-              {formatMm(part.sizeMm.y)} mm · print {part.printOrientation}
-            </Hint>
-          ))}
-          <div className="button-group" role="group" aria-label="STL downloads">
-            <Button
-              primary
-              onClick={() => {
-                c.downloadStl();
-              }}
-            >
-              Download STL
-            </Button>
-            {frameParts.map((part) => (
-              <Button
-                key={part.id}
-                primary
-                onClick={() => {
-                  c.downloadFrameStl(part.id);
-                }}
-              >
-                Download {part.id} STL
-              </Button>
-            ))}
           </div>
-          {s.source.terrain && (
-            <>
-              <Hint>{s.source.terrain.attribution}</Hint>
-              <Button
-                onClick={() => {
-                  downloadBlob(
-                    new Blob([s.source.terrain?.attribution ?? ''], { type: 'text/plain' }),
-                    `topogra-${settings.seed}-attribution.txt`,
-                  );
-                }}
-              >
-                Download attribution
-              </Button>
-            </>
-          )}
-        </Group>
-      )}
-    </>
-  );
+        ),
+    },
+    handlers: {
+      changeFormat: (value) => c.design({ format: value === 'png' ? 'png' : 'svg' }),
+      changeSizeChoice,
+      changeWidth: (value) => {
+        setSizeChoice('custom');
+
+        return value !== undefined && c.design({ width: value });
+      },
+      changeHeight: (value) => {
+        setSizeChoice('custom');
+
+        return value !== undefined && c.design({ height: value });
+      },
+      changeResolution: (value) => c.design({ pngScale: value === '2' ? 2 : 1 }),
+      setTransparent: (value) => c.design({ transparent: value }),
+      setExtraLargeAllowed: (value) =>
+        c.design({
+          allowExtraLargeExports: value,
+          ...(!value
+            ? {
+                width: Math.min(settings.width, maximumOutputDimensionPixels),
+                height: Math.min(settings.height, maximumOutputDimensionPixels),
+              }
+            : {}),
+        }),
+      failPreview: () => {
+        setError('Export preview could not be displayed.');
+      },
+      download: () => {
+        void download();
+      },
+      changeStillScale: (value) => {
+        const scale = terrainStillScales.find((candidate) => String(candidate) === value);
+
+        if (scale !== undefined) {
+          setStillScale(scale);
+        }
+      },
+      downloadStill: () => {
+        setIsStillBusy(true);
+        void c
+          .downloadStill(stillScale)
+          .then(() => {
+            setSuccessTitle('Still image saved');
+          })
+          .finally(() => {
+            setIsStillBusy(false);
+          });
+      },
+      downloadStl: () => {
+        if (c.downloadStl()) {
+          setSuccessTitle('STL downloaded');
+        }
+      },
+      downloadPart: (partId) => {
+        if (c.downloadFrameStl(partId)) {
+          setSuccessTitle(`${partId} STL downloaded`);
+        }
+      },
+      setPartSelected: (partId, isSelected) => {
+        setDeselectedPartIds((previous) => {
+          const next = new Set(previous);
+
+          if (isSelected) {
+            next.delete(partId);
+          } else {
+            next.add(partId);
+          }
+
+          return next;
+        });
+      },
+      downloadSelectedParts: () => {
+        const partIds = frameParts.map(({ id }) => id).filter((id) => !deselectedPartIds.has(id));
+
+        void c.downloadFrameStlParts(partIds).then(() => {
+          if (c.getSnapshot().exportJobs.every(({ status }) => status === 'done')) {
+            setSuccessTitle(
+              partIds.length === 1
+                ? `${partIds[0]} STL downloaded`
+                : `${String(partIds.length)} frame parts downloaded`,
+            );
+          }
+        });
+      },
+      openDossier: () => {
+        c.workspace({ dossierOpen: true });
+      },
+      downloadAttribution: () => {
+        downloadBlob(
+          new Blob([s.source.terrain?.attribution ?? ''], { type: 'text/plain' }),
+          `landcube-${settings.seed}-attribution.txt`,
+        );
+      },
+    },
+  });
+
+  return <ExportSheet model={model} />;
 }
 
-function formatMm(valueMm: number): string {
-  return String(Math.round(valueMm * 10) / 10);
+// === HELPERS ===
+
+function resolvePresetSize(value: string): [number, number] {
+  if (value === 'viewport') {
+    return [window.innerWidth, window.innerHeight];
+  }
+
+  if (value === 'screen') {
+    return [window.screen.width * devicePixelRatio, window.screen.height * devicePixelRatio];
+  }
+
+  const [width, height] = value.split('x').map(Number);
+
+  return [width, height];
+}
+
+/** Share needs the Web Share API; send-to-printer and file reveal have no backend yet (OQ-3 in #94). */
+function buildSuccessRows(c: PanelProps['controller']): SuccessRow[] {
+  const canShare = typeof navigator.share === 'function';
+
+  return [
+    {
+      glyph: '▤',
+      label: 'Files',
+      detail: 'Saved by your browser. Check its downloads folder.',
+      onClick: () => {
+        c.notify('Your browser saved the file to its downloads folder.');
+      },
+    },
+    ...(canShare
+      ? [
+          {
+            glyph: '↗',
+            label: 'Share',
+            onClick: () => {
+              void navigator
+                .share({ title: 'LANDCU.BE', url: window.location.href })
+                .catch((failure: unknown) => {
+                  // Dismissing the share sheet is not a failure.
+                  if (!(failure instanceof DOMException && failure.name === 'AbortError')) {
+                    c.notify('Sharing failed. Copy the style link instead.');
+                  }
+                });
+            },
+          },
+        ]
+      : []),
+    {
+      glyph: '⎙',
+      label: 'Send to printer',
+      onClick: () => undefined,
+      isDisabled: true,
+      tag: 'Soon',
+    },
+    {
+      glyph: '⧉',
+      label: 'Copy style link',
+      onClick: () => {
+        void c.copyLink();
+      },
+    },
+  ];
 }

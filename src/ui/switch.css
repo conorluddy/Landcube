@@ -1,0 +1,132 @@
+/* P-06 Switch: two-cell OFF/ON. The native checkbox is invisible and covers the whole row. */
+.lc-switch {
+  min-width: 0;
+}
+
+.lc-switch__row {
+  position: relative;
+  display: flex;
+  gap: var(--lc-s-6);
+  align-items: flex-start;
+  justify-content: space-between;
+  min-height: var(--lc-h-xs);
+  cursor: pointer;
+}
+
+.lc-switch__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: inherit;
+  opacity: 0;
+}
+
+.lc-switch__text {
+  min-width: 0;
+  padding-top: 3px;
+  color: var(--lc-text-body);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-body);
+  line-height: 15px;
+  overflow-wrap: anywhere;
+}
+
+.lc-switch__track {
+  display: inline-flex;
+  flex: none;
+  gap: 0;
+  padding: var(--lc-s-1);
+  border: 1px solid var(--lc-line);
+  border-radius: var(--lc-r-control);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-micro);
+  letter-spacing: 0.1em;
+  line-height: 9px;
+}
+
+.lc-switch__cell {
+  padding: 3px 6px;
+  border-radius: var(--lc-r-inner);
+  color: var(--lc-text-disabled);
+  transition:
+    background var(--lc-dur-fast) var(--lc-ease),
+    color var(--lc-dur-fast) var(--lc-ease);
+}
+
+/* Off: OFF cell lit. */
+.lc-switch__cell[data-cell='off'] {
+  background: var(--lc-fill-off);
+  color: var(--lc-text-strong);
+}
+
+/* On: ON cell lit, OFF dims. */
+.lc-switch__input:checked ~ .lc-switch__track .lc-switch__cell[data-cell='off'] {
+  background: transparent;
+  color: var(--lc-text-disabled);
+}
+
+.lc-switch__input:checked ~ .lc-switch__track .lc-switch__cell[data-cell='on'] {
+  background: var(--lc-bone);
+  color: var(--lc-text-on-bone);
+}
+
+.lc-switch__row:hover .lc-switch__track,
+[data-force-state='hover'] .lc-switch__track {
+  border-color: var(--lc-line-hover);
+}
+
+.lc-switch__input:focus-visible ~ .lc-switch__track,
+[data-force-state='focus'] .lc-switch__track {
+  outline: 2px solid var(--lc-line-focus);
+  outline-offset: 2px;
+}
+
+.lc-switch__input:active ~ .lc-switch__track,
+[data-force-state='active'] .lc-switch__track {
+  border-color: var(--lc-line-focus);
+}
+
+.lc-switch__input:disabled ~ .lc-switch__text {
+  color: var(--lc-text-disabled);
+}
+
+.lc-switch__input:disabled ~ .lc-switch__track {
+  opacity: 0.5;
+}
+
+.lc-switch__input:disabled {
+  cursor: not-allowed;
+}
+
+.lc-switch__description {
+  display: block;
+  margin-top: var(--lc-s-2);
+  color: var(--lc-text-tertiary);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-fs-hint);
+  line-height: 17px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-switch__cell {
+    transition: none;
+  }
+}
+
+/* The drawn track is hidden so the native control carries state with system colours. */
+@media (forced-colors: active) {
+  .lc-switch__input {
+    position: static;
+    order: 1;
+    width: auto;
+    height: auto;
+    appearance: auto;
+    opacity: 1;
+  }
+
+  .lc-switch__track {
+    display: none;
+  }
+}

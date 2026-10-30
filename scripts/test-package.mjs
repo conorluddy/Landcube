@@ -11,14 +11,14 @@ const packageMetadata = JSON.parse(await readFile(new URL('../package.json', imp
 const npmExecutablePath = process.env.npm_execpath;
 
 assert.ok(npmExecutablePath, 'Run this check with npm run test:package.');
-const directory = await mkdtemp(join(tmpdir(), 'topogra package '));
+const directory = await mkdtemp(join(tmpdir(), 'landcube package '));
 
 try {
   runNpm(['pack', '--pack-destination', directory], repositoryDirectory, { HUSKY: '0' });
-  const tarballPath = join(directory, `topogra-${packageMetadata.version}.tgz`);
+  const tarballPath = join(directory, `landcube-${packageMetadata.version}.tgz`);
 
   runNpm(['install', '--omit=dev', '--no-audit', '--no-fund', tarballPath]);
-  const installedDirectory = join(directory, 'node_modules', 'topogra');
+  const installedDirectory = join(directory, 'node_modules', 'landcube');
 
   assert.deepEqual((await readdir(installedDirectory)).sort(), [
     'LICENSE',
@@ -26,13 +26,13 @@ try {
     'dist-cli',
     'package.json',
   ]);
-  assert.match(runTopogra(['--help']), /Usage: topogra generate/);
-  assert.equal(runTopogra(['--version']), `topogra ${packageMetadata.version}\n`);
+  assert.match(runLandcube(['--help']), /Usage: landcube generate/);
+  assert.equal(runLandcube(['--version']), `landcube ${packageMetadata.version}\n`);
 
   for (const format of ['svg', 'png']) {
     const outputPath = join(directory, `terrain.${format}`);
     const metadata = JSON.parse(
-      runTopogra([
+      runLandcube([
         'generate',
         '--seed',
         '42',
@@ -62,14 +62,14 @@ try {
     }
   }
 
-  console.log(`Packed topogra@${packageMetadata.version}: help, version, SVG, and PNG passed.`);
+  console.log(`Packed landcube@${packageMetadata.version}: help, version, SVG, and PNG passed.`);
 } finally {
   await rm(directory, { recursive: true, force: true });
 }
 
 /** npm exec uses the installed bin wrapper, including .cmd shims on Windows. */
-function runTopogra(argumentsList) {
-  return runNpm(['exec', '--offline', '--', 'topogra', ...argumentsList]);
+function runLandcube(argumentsList) {
+  return runNpm(['exec', '--offline', '--', 'landcube', ...argumentsList]);
 }
 
 function runNpm(argumentsList, workingDirectory = directory, environment = {}) {

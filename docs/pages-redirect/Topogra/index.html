@@ -1,0 +1,11 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Moved to LANDCU.BE</title>
+<meta name="robots" content="noindex" />
+<script>
+  // Forwards /Topogra/<rest>?<query>#<hash> to the new site, preserving design links.
+  const remainder = location.pathname.replace(/^\/Topogra\/?/, '');
+  location.replace(`https://landcu.be/${remainder}${location.search}${location.hash}`);
+</script>
+<meta http-equiv="refresh" content="0; url=https://landcu.be/" />
+<p>Topogra is now <a href="https://landcu.be/">LANDCU.BE</a>.</p>
