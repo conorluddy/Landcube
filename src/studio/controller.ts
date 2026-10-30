@@ -1,4 +1,5 @@
 import {
+  defaultHeightExaggeration,
   defaultTerrainModelSettings,
   getSuggestedExaggeration,
   validateTerrainModelSettings,
@@ -499,7 +500,7 @@ export function createStudioController(
     model: {
       dimensions: { ...defaultTerrainModelSettings },
       crop: { ...defaultTerrainCrop },
-      exaggeration: 0.3,
+      exaggeration: defaultHeightExaggeration,
       autoExaggeration: true,
     },
     frame: { settings: { ...defaultFrameStudioSettings } },
