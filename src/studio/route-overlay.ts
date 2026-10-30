@@ -1,5 +1,5 @@
 /*
- * Route helpers shared by the 2D overlay and the Overlays popover: projecting a GPX route into
+ * Route helpers shared by the 2D overlay and the Route section: projecting a GPX route into
  * the viewport frame, counting what lies inside the loaded area, and the one-line summary.
  */
 import type { GeoBounds } from '../floor-geo';

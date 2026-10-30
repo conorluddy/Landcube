@@ -12,7 +12,8 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { InspectorPanel } from '../ui/inspector-panel';
 import {
-  threeDOnlySections,
+  getActiveSection,
+  getHiddenSections,
   type StudioController,
   type InspectorSection,
   type PanelProps,
@@ -26,8 +27,6 @@ import { StatusMessage } from '../ui/status-message';
 import { TextField } from '../ui/text-field';
 import { IconButton } from '../ui/icon-button';
 import { createPinnedPlaceholder } from '../ui/layout-manager';
-import { buildOverlayPopoverGroups } from './control-groups/overlays';
-import { buildOrbitGroup } from './control-groups/camera';
 import { buildSectionGroups } from './control-groups';
 import { StudioPinnedPanels } from './pinned-panels';
 import { getGroupCode, studioSections } from './sections';
@@ -179,7 +178,7 @@ function Studio({
   const state = useSyncExternalStore(c.subscribe, c.getSnapshot);
   const viewport = useRef<HTMLDivElement>(null);
   const inspectorToggle = useRef<HTMLButtonElement>(null);
-  const active = state.workspace.sections[state.workspace.view];
+  const active = getActiveSection(state);
   const isPhoneViewport = useSyncExternalStore(subscribeToPhoneViewport, readIsPhoneViewport);
 
   useLayoutEffect(() => {
@@ -197,8 +196,6 @@ function Studio({
         c.endCompare();
       } else if (state.workspace.comparePresetsOpen) {
         c.workspace({ comparePresetsOpen: false });
-      } else if (state.workspace.popover !== null) {
-        c.workspace({ popover: null });
       } else if (!isPhoneViewport && !state.workspace.collapsed) {
         c.workspace({ collapsed: true });
         inspectorToggle.current?.focus();
@@ -288,7 +285,7 @@ function Studio({
             onSelectSection={(section) => {
               c.selectSection(section);
             }}
-            hiddenSectionIds={state.workspace.view === '3d' ? [] : threeDOnlySections}
+            hiddenSectionIds={getHiddenSections(state)}
             isCollapsed={state.workspace.collapsed}
             headerTag={`Src · ${state.source.terrain ? 'Real' : 'Procedural'}`}
             renderSection={(section) =>
@@ -309,22 +306,6 @@ function Studio({
             inspectorToggleRef={inspectorToggle}
           />
         </>
-      )}
-      {state.workspace.popover !== null && (
-        <Surface
-          title={state.workspace.popover}
-          close={() => {
-            c.workspace({ popover: null });
-          }}
-        >
-          {state.workspace.popover === 'Overlays' ? (
-            buildOverlayPopoverGroups(c, state).map((group) => (
-              <ControlGroup key={group.id} group={group} code={getGroupCode(group.id)} />
-            ))
-          ) : (
-            <ControlGroup group={buildOrbitGroup(c, state, false)} code={getGroupCode('orbit')} />
-          )}
-        </Surface>
       )}
       {state.workspace.exporting && (
         <Surface

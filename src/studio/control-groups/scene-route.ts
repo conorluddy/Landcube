@@ -1,6 +1,6 @@
 /*
- * Route group (SCEN.12): a GPX track or route drawn over real terrain, in 2D and draped in 3D.
- * Session-only; never in design links or the STL. Built only when real terrain is loaded.
+ * Route section (ROUT.01): a route drawn or loaded from GPX over real terrain, in 2D and draped in
+ * 3D. Session-only; never in design links or the STL. Built only when real terrain is loaded.
  */
 import { createElement } from 'react';
 import { getFault } from '../../constants/faults';
@@ -17,7 +17,18 @@ import { analyseActiveRoute } from '../active-route-analysis';
 
 // === PUBLIC API ===
 
-export function buildRouteGroup(
+export function buildRouteGroups(
+  controller: StudioController,
+  state: StudioState,
+): ControlGroupDefinition[] {
+  const { terrain } = state.source;
+
+  return terrain ? [buildRouteGroup(controller, state, terrain)] : [];
+}
+
+// === GROUPS ===
+
+function buildRouteGroup(
   controller: StudioController,
   state: StudioState,
   terrain: RealTerrain,

@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { appUrl, enter3D, loadLocation, serveStudio } from './studio-fixture';
+import { appUrl, enter3D, loadLocation, section, serveStudio } from './studio-fixture';
 
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 // Software WebGL on CI runners is several times slower than local GPUs.
@@ -22,11 +22,9 @@ function chart(page: Page) {
 async function loadGpxRoute(page: Page): Promise<void> {
   await page.goto(`${appUrl}?v=1&seed=123`);
   await loadLocation(page);
-  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await section(page, 'Route');
   await page.getByLabel('GPX file').setInputFiles(routeFile);
   await expect(page.locator('.lc-route-line')).toBeVisible();
-  // Close the popover so it does not sit over the docked panel.
-  await page.keyboard.press('Escape');
 }
 
 async function box(page: Page, selector: string) {
@@ -137,9 +135,8 @@ test('an imported GPX is labelled terrain-derived and reverse swaps ascent and d
   const descent = profile(page).locator('.lc-route-profile__figure', { hasText: 'Descent' });
   const before = { ascent: await ascent.innerText(), descent: await descent.innerText() };
 
-  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await section(page, 'Route');
   await page.getByRole('button', { name: 'Reverse route', exact: true }).click();
-  await page.keyboard.press('Escape');
 
   await expect(ascent).toContainText(before.descent.replace('Descent', '').trim());
   await expect(descent).toContainText(before.ascent.replace('Ascent', '').trim());

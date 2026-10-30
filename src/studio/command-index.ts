@@ -10,9 +10,8 @@ import type { PlaceMatch } from '../place-search';
 import type { CommandQuickValue, CommandResult } from '../ui/command-palette';
 import type { Result } from '../types/operations';
 import { controlGroupBuilders } from './control-groups';
-import { buildOverlayPopoverGroups } from './control-groups/overlays';
 import {
-  threeDOnlySections,
+  getHiddenSections,
   type InspectorSection,
   type StudioController,
   type StudioState,
@@ -34,8 +33,6 @@ export interface ParameterCommand extends CommandResult {
   quickValues: readonly CommandQuickValue[];
   /** Applies through the row's own `onChange`. */
   apply: (value: string) => Result<void>;
-  /** Overlays groups render in the footer popover, not the inspector. */
-  isInOverlays: boolean;
 }
 
 export interface ActionCommand extends CommandResult {
@@ -85,7 +82,6 @@ export function buildParameterCommands(
                 code,
                 sectionId,
                 detail: control.current,
-                isInOverlays: build === buildOverlayPopoverGroups,
               })),
         );
       }),
@@ -120,15 +116,16 @@ function buildActionCommands(controller: StudioController, state: StudioState): 
       id: 'action-export',
       label: 'Open export',
       run: () => {
-        controller.workspace({ exporting: true, popover: null });
+        controller.workspace({ exporting: true });
       },
     },
     {
       kind: 'action',
       id: 'action-overlays',
       label: 'Open overlays',
+      sectionId: 'Overlays',
       run: () => {
-        controller.workspace({ popover: 'Overlays' });
+        controller.selectSection('Overlays');
       },
     },
     {
@@ -280,5 +277,5 @@ function buildRouteCommands(controller: StudioController, state: StudioState): A
 }
 
 function isSectionVisible(sectionId: InspectorSection, state: StudioState): boolean {
-  return state.workspace.view === '3d' || !threeDOnlySections.includes(sectionId);
+  return !getHiddenSections(state).includes(sectionId);
 }

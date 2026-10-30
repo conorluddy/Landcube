@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { appUrl, openDefaultStudio, serveStudio } from './studio-fixture';
+import { appUrl, openDefaultStudio, section, serveStudio } from './studio-fixture';
 
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 test.beforeEach(async ({ page }) => {
@@ -38,12 +38,12 @@ test('arrow keys move focus along the section rail', async ({ page }) => {
   await page.keyboard.press('ArrowDown');
   await expect(rail(page).getByRole('button', { name: 'Contours', exact: true })).toBeFocused();
   await page.keyboard.press('End');
-  await expect(rail(page).getByRole('button', { name: 'Scene', exact: true })).toBeFocused();
+  await expect(rail(page).getByRole('button', { name: 'Overlays', exact: true })).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await expect(terrain).toBeFocused();
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('region', { name: 'Scene settings' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Overlays settings' })).toBeVisible();
 });
 
 test('the phone tab strip moves focus with left and right arrows', async ({ page }) => {
@@ -102,7 +102,7 @@ test('glass keeps its blur while the turntable rotates by default', async ({ pag
   const shell = page.locator('.studio-shell');
 
   await expect(shell).not.toHaveAttribute('data-motion', 'active');
-  await page.getByRole('button', { name: 'Orbit', exact: true }).click();
+  await section(page, 'Orbit');
   await page.getByRole('switch', { name: 'Auto-rotate' }).check();
   await expect(shell).not.toHaveAttribute('data-motion', 'active');
   await expect(page.locator('header .lc-bar-group').first()).toHaveCSS('backdrop-filter', /blur\(/);

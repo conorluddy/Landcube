@@ -124,7 +124,6 @@ function useToolShortcuts(c: StudioController): void {
         event.altKey ||
         workspace.exporting ||
         workspace.palette !== null ||
-        workspace.popover !== null ||
         workspace.routeReplacement !== null ||
         isTextEntry(event.target)
       ) {

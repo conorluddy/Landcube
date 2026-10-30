@@ -23,7 +23,7 @@ test('studio separates view, inspector and shortcuts while retaining settings', 
   await page.goto(`${appUrl}?v=1&seed=234`);
   await expect(
     page.getByRole('navigation', { name: 'Editing section' }).getByRole('button'),
-  ).toHaveText(['Terrain', 'Contours', 'Colour', 'Scene']);
+  ).toHaveText(['Terrain', 'Contours', 'Colour', 'Scene', 'Overlays']);
   await section(page, 'Contours');
 
   await section(page, 'Colour');
@@ -33,11 +33,8 @@ test('studio separates view, inspector and shortcuts while retaining settings', 
   await page.getByRole('button', { name: 'Collapse controls' }).click();
   await expect(page.getByRole('region', { name: 'Contours settings' })).toBeHidden();
   await expect(page.getByRole('navigation', { name: 'Editing section' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Overlays', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await section(page, 'Overlays');
   await page.getByLabel('Grid style').selectOption('crosses');
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Overlays', exact: true })).toBeFocused();
   await section(page, 'Contours');
   await expect(page.getByRole('slider', { name: 'Weight', exact: true })).toHaveValue('1.5');
   await page.keyboard.press('Escape');
@@ -210,10 +207,9 @@ test('real terrain interval, overlays and failed loading retain the current land
   await page.getByLabel('Interval (m)').fill('50');
   await page.getByLabel('Interval (m)').press('Tab');
   await expect(page.getByText(/Contours: 50 m/)).toBeVisible();
-  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await section(page, 'Overlays');
   await expect(page.getByRole('switch', { name: 'Sea-level hatching' })).toBeChecked();
   await page.getByLabel('Grid style').selectOption('squares');
-  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Export ↗' }).click();
   const original = await download(page, 'Download SVG');
 

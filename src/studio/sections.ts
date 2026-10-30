@@ -6,15 +6,15 @@
  * `id` is today's `InspectorSection` value, not a slug: the inspector derives
  * `section#inspector-{id.toLowerCase()}[aria-label="{title} settings"]` and the rail button name
  * ("Model") from it, which the e2e tests bind to. Slug ↔ id: terrain ↔ 'Terrain',
- * contours ↔ 'Contours', colour ↔ 'Colour', camera ↔ 'Camera', scene ↔ 'Scene', model ↔ 'Model',
- * frame ↔ 'Frame'. Overlays popover groups register under SCEN; Orbit under CAMR.04. Export
- * groups carry no code yet (open question on #88).
+ * contours ↔ 'Contours', colour ↔ 'Colour', camera ↔ 'Camera',
+ * orbit ↔ 'Orbit', scene ↔ 'Scene', overlays ↔ 'Overlays', route ↔ 'Route', model ↔ 'Model',
+ * frame ↔ 'Frame'. Export groups carry no code yet (open question on #88).
  */
 import type { InspectorSection } from './controller';
 
 export interface StudioSection {
   id: InspectorSection;
-  /** 1-based display index: 01 TERR … 07 FRAM. */
+  /** 1-based display index: 01 TERR … 10 FRAM. */
   index: number;
   code: string;
   title: string;
@@ -55,38 +55,46 @@ export const studioSections = [
     index: 4,
     code: 'CAMR',
     title: 'Camera',
-    groupIds: ['lens', 'focus', 'exposure', 'orbit'],
+    groupIds: ['lens', 'focus', 'exposure'],
+  },
+  {
+    id: 'Orbit',
+    index: 5,
+    code: 'ORBT',
+    title: 'Orbit',
+    groupIds: ['orbit'],
   },
   {
     id: 'Scene',
-    index: 5,
+    index: 6,
     code: 'SCEN',
     title: 'Scene',
-    groupIds: [
-      'cursor-interaction',
-      'surface',
-      'grass',
-      'ground',
-      'water',
-      'lighting',
-      'decorative-grid',
-      'summit-markers',
-      'geographic-decorations',
-      'roads',
-      'sea-level',
-      'route',
-    ],
+    groupIds: ['cursor-interaction', 'surface', 'grass', 'ground', 'water', 'lighting'],
+  },
+  {
+    id: 'Overlays',
+    index: 7,
+    code: 'OVLY',
+    title: 'Overlays',
+    groupIds: ['decorative-grid', 'summit-markers', 'geographic-decorations', 'roads', 'sea-level'],
+  },
+  {
+    id: 'Route',
+    index: 8,
+    code: 'ROUT',
+    title: 'Route',
+    groupIds: ['route'],
   },
   {
     id: 'Model',
-    index: 6,
+    index: 9,
     code: 'MODL',
     title: 'Model',
     groupIds: ['model-dimensions', 'shape'],
   },
   {
     id: 'Frame',
-    index: 7,
+    index: 10,
     code: 'FRAM',
     title: 'Frame',
     groupIds: ['frame', 'dimensions', 'edge'],

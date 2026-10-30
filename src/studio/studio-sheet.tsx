@@ -7,7 +7,8 @@ import { getInspectorSectionId } from '../ui/inspector-panel';
 import { ReadoutCell, ReadoutGrid } from '../ui/readout-grid';
 import { SectionRail } from '../ui/section-rail';
 import {
-  threeDOnlySections,
+  getActiveSection,
+  getHiddenSections,
   type InspectorSection,
   type StudioController,
   type StudioState,
@@ -43,8 +44,8 @@ export function StudioSheet({
   renderSection: (section: InspectorSection) => ReactNode;
 }): ReactNode {
   const { workspace } = state;
-  const activeSectionId = workspace.sections[workspace.view];
-  const hiddenSectionIds = workspace.view === '3d' ? [] : threeDOnlySections;
+  const activeSectionId = getActiveSection(state);
+  const hiddenSectionIds = getHiddenSections(state);
 
   return (
     <BottomSheet
@@ -92,7 +93,7 @@ export function StudioSheet({
 
 /**
  * Phone map controls (P-04 in a mobile FloatingBar) down the right edge: reset the 3D camera,
- * Overlays, the command palette, the crop (3D), measure and route (real terrain) tools, and Orbit in 3D. Hidden while the sheet is full (CSS on `[data-sheet-snap]`).
+ * the command palette, the crop (3D), measure and route (real terrain) tools. Hidden while the sheet is full (CSS on `[data-sheet-snap]`).
  */
 export function StudioMapControls({
   controller: c,
@@ -112,15 +113,6 @@ export function StudioMapControls({
         disabled={!is3d}
         onClick={() => {
           c.resetCamera();
-        }}
-      />
-      <IconButton
-        glyph="◫"
-        label="Overlays"
-        hasPopup="dialog"
-        isExpanded={workspace.popover === 'Overlays'}
-        onClick={() => {
-          c.workspace({ popover: workspace.popover === 'Overlays' ? null : 'Overlays' });
         }}
       />
       <IconButton
@@ -157,17 +149,6 @@ export function StudioMapControls({
           isActive={getActiveTool(state) === 'route'}
           onClick={() => {
             toggleTool(c, state, 'route');
-          }}
-        />
-      )}
-      {is3d && (
-        <IconButton
-          glyph="⌖"
-          label="Orbit"
-          hasPopup="dialog"
-          isExpanded={workspace.popover === 'Orbit'}
-          onClick={() => {
-            c.workspace({ popover: workspace.popover === 'Orbit' ? null : 'Orbit' });
           }}
         />
       )}
@@ -216,7 +197,7 @@ function SheetPeek({
           size="small"
           aria-haspopup="dialog"
           onClick={() => {
-            c.workspace({ exporting: true, popover: null });
+            c.workspace({ exporting: true });
           }}
         >
           Export ↗

@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import type { ControlGroupDefinition } from '../ui/control-rows';
 import { LayoutManager, type PinnedPanel } from '../ui/layout-manager';
-import { threeDOnlySections, type StudioController, type StudioState } from './controller';
+import { getHiddenSections, type StudioController, type StudioState } from './controller';
 import { buildSectionGroups } from './control-groups';
 import type { CropPreview } from './crop-preview';
 import { getGroupCode, studioSections } from './sections';
@@ -60,9 +60,8 @@ function collectVisibleGroups(
   state: StudioState,
   cropPreview: CropPreview,
 ): Map<string, ControlGroupDefinition> {
-  const visibleSections = studioSections.filter(
-    ({ id }) => state.workspace.view === '3d' || !threeDOnlySections.includes(id),
-  );
+  const hiddenSections = getHiddenSections(state);
+  const visibleSections = studioSections.filter(({ id }) => !hiddenSections.includes(id));
 
   return new Map(
     visibleSections.flatMap(({ id }) =>

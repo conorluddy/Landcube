@@ -77,11 +77,11 @@ void test('an out-of-range value is rejected without calling the row', () => {
   assert.equal(updates.length, 0);
 });
 
-void test('overlays parameters are marked so the palette opens the popover', () => {
+void test('overlay parameters reveal the Overlays section', () => {
   const { controller } = createTestController();
 
-  assert.equal(findParameter(controller, 'gridStyle').isInOverlays, true);
-  assert.equal(findParameter(controller, 'contourCount').isInOverlays, false);
+  assert.equal(findParameter(controller, 'gridStyle').sectionId, 'Overlays');
+  assert.equal(findParameter(controller, 'contourCount').sectionId, 'Contours');
 });
 
 void test('actions cover the view, panels, style, presets and section jumps', () => {

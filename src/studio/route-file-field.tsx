@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import type { StudioController } from './controller';
 
-/** GPX file input for the Overlays popover; an invalid file reports through `workspace.routeFault`. */
+/** GPX file input for the Route section; an invalid file reports through `workspace.routeFault`. */
 export function RouteFileField({
   controller,
 }: {

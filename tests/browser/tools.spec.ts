@@ -247,9 +247,8 @@ test('3D measure endpoints stay on their terrain coordinates when the camera mov
   const readout = await page.locator('.lc-callout-label').textContent();
   const startBefore = await markerCentre(page, 'Measure start');
 
-  await page.getByRole('button', { name: 'Orbit', exact: true }).click();
+  await section(page, 'Orbit');
   await page.getByRole('button', { name: 'Plan', exact: true }).click();
-  await page.getByRole('button', { name: 'Orbit', exact: true }).click();
   await expect
     .poll(async () => {
       const now = await markerCentre(page, 'Measure start');

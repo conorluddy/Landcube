@@ -14,7 +14,8 @@ import {
   type WorkspaceRoute,
 } from '../controller';
 import { getGroupCode } from '../sections';
-import { buildOverlayPopoverGroups } from './overlays';
+import { buildOverlayGroups } from './overlays';
+import { buildRouteGroups } from './scene-route';
 import { buildSceneGroups } from './scene';
 
 const realTerrain = { attribution: 'Test credit' } as RealTerrain;
@@ -70,43 +71,39 @@ void test('the preview water level slider appears only while previewing', () => 
   );
 });
 
-void test('2D overlays show grid and summit markers, plus sea level and route on real terrain', () => {
+void test('2D overlays show grid and summit markers, plus sea level on real terrain', () => {
   const generated = createContext({ view: '2d' });
   const real = createContext({ view: '2d', terrain: realTerrain });
 
-  assert.deepEqual(listGroupIds(buildOverlayPopoverGroups(generated.controller, generated.state)), [
+  assert.deepEqual(listGroupIds(buildOverlayGroups(generated.controller, generated.state)), [
     'decorative-grid',
     'summit-markers',
   ]);
-  assert.deepEqual(listGroupIds(buildOverlayPopoverGroups(real.controller, real.state)), [
+  assert.deepEqual(listGroupIds(buildOverlayGroups(real.controller, real.state)), [
     'decorative-grid',
     'summit-markers',
     'sea-level',
-    'route',
   ]);
 });
 
-void test('3D overlays show geographic decorations and roads, plus sea level and route on real terrain', () => {
+void test('3D overlays show geographic decorations and roads, plus sea level on real terrain', () => {
   const generated = createContext({ view: '3d' });
   const real = createContext({ view: '3d', terrain: realTerrain });
 
-  assert.deepEqual(listGroupIds(buildOverlayPopoverGroups(generated.controller, generated.state)), [
+  assert.deepEqual(listGroupIds(buildOverlayGroups(generated.controller, generated.state)), [
     'geographic-decorations',
     'roads',
   ]);
-  assert.deepEqual(listGroupIds(buildOverlayPopoverGroups(real.controller, real.state)), [
+  assert.deepEqual(listGroupIds(buildOverlayGroups(real.controller, real.state)), [
     'geographic-decorations',
     'roads',
     'sea-level',
-    'route',
   ]);
 });
 
 void test('roads status is always mounted and focusable, even when empty', () => {
   const { controller, state } = createContext({ view: '3d', terrain: realTerrain });
-  const roads = buildOverlayPopoverGroups(controller, state).filter(
-    (group) => group.id === 'roads',
-  );
+  const roads = buildOverlayGroups(controller, state).filter((group) => group.id === 'roads');
   const status = roads[0].rows.find((row) => row !== false && row?.id === 'roads-status');
 
   assert.ok(status !== undefined && status !== false && status.kind === 'status');
@@ -118,10 +115,7 @@ void test('roads status is always mounted and focusable, even when empty', () =>
 void test('roads without a real location say so', () => {
   const { controller, state } = createContext({ view: '3d' });
 
-  assert.match(
-    renderGroups(buildOverlayPopoverGroups(controller, state)),
-    /Roads need a real location\./,
-  );
+  assert.match(renderGroups(buildOverlayGroups(controller, state)), /Roads need a real location\./);
 });
 
 void test('the retry button appears only for enabled roads that can be retried', () => {
@@ -133,21 +127,19 @@ void test('the retry button appears only for enabled roads that can be retried',
   const idle = createContext({ view: '3d', terrain: realTerrain });
 
   assert.ok(
-    listRowIds(buildOverlayPopoverGroups(retryable.controller, retryable.state), 'roads').includes(
+    listRowIds(buildOverlayGroups(retryable.controller, retryable.state), 'roads').includes(
       'roads-retry',
     ),
   );
   assert.ok(
-    !listRowIds(buildOverlayPopoverGroups(idle.controller, idle.state), 'roads').includes(
-      'roads-retry',
-    ),
+    !listRowIds(buildOverlayGroups(idle.controller, idle.state), 'roads').includes('roads-retry'),
   );
 });
 
 void test('the route group offers a GPX file input, a disabled toggle and a disabled clear before a route loads', () => {
   const { controller, state } = createContext({ view: '2d', terrain: realTerrain });
-  const groups = buildOverlayPopoverGroups(controller, state);
-  const markup = renderGroups(groups.filter((group) => group.id === 'route'));
+  const groups = buildRouteGroups(controller, state);
+  const markup = renderGroups(groups);
 
   assert.deepEqual(listRowIds(groups, 'route'), [
     'route-file',
@@ -160,7 +152,7 @@ void test('the route group offers a GPX file input, a disabled toggle and a disa
     'route-clear',
     'route-hint',
   ]);
-  assert.equal(getGroupCode('route'), 'SCEN.12');
+  assert.equal(getGroupCode('route'), 'ROUT.01');
   assert.match(markup, /type="file"[^>]*accept="[^"]*\.gpx/);
   assert.match(markup, /GPX file/);
   assert.match(markup, /<button[^>]*disabled[^>]*><span[^>]*>Clear route/);
@@ -192,12 +184,8 @@ void test('a loaded route shows its stats and a refused file shows an E-206 faul
     terrain: realTerrain,
     routeFault: { code: 'INVALID_ROUTE', message: 'Bad file.', retryable: false },
   });
-  const loadedGroups = buildOverlayPopoverGroups(loaded.controller, loaded.state);
-  const faultedMarkup = renderGroups(
-    buildOverlayPopoverGroups(faulted.controller, faulted.state).filter(
-      (group) => group.id === 'route',
-    ),
-  );
+  const loadedGroups = buildRouteGroups(loaded.controller, loaded.state);
+  const faultedMarkup = renderGroups(buildRouteGroups(faulted.controller, faulted.state));
 
   assert.ok(listRowIds(loadedGroups, 'route').includes('route-stats'));
   assert.match(renderGroups(loadedGroups), /Ridge walk · 11\.1 km ground · Terrain-derived/);

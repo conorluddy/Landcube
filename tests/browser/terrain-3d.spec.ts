@@ -78,8 +78,7 @@ test('orbit controls set the turntable and reset to an isometric camera', async 
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`${appUrl}?v=1&seed=123`);
   await enter3D(page);
-  await page.getByRole('button', { name: 'Collapse controls' }).click();
-  await page.getByRole('button', { name: 'Orbit', exact: true }).click();
+  await section(page, 'Orbit');
   await page.getByRole('switch', { name: 'Auto-rotate' }).check();
   await page.getByRole('button', { name: 'Clockwise', exact: true }).click();
   await page.getByLabel('Rotation speed').fill('60');
@@ -87,9 +86,7 @@ test('orbit controls set the turntable and reset to an isometric camera', async 
   await page.getByRole('switch', { name: 'Auto-rotate' }).uncheck();
   await expect(page.getByLabel('Rotation speed')).toBeDisabled();
   await page.getByRole('button', { name: 'Isometric', exact: true }).click();
-  await page.getByRole('button', { name: 'Reset camera' }).click();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Orbit', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'Reset camera', exact: true }).click();
   expect(errors).toEqual([]);
 });
 
@@ -99,10 +96,8 @@ test('camera settings switch projection, focus and lens effects, then reset', as
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`${appUrl}?v=1&seed=123`);
   await enter3D(page);
-  await page.getByRole('button', { name: 'Collapse controls' }).click();
-  await page.getByRole('button', { name: 'Orbit', exact: true }).click();
+  await section(page, 'Orbit');
   await page.getByRole('button', { name: 'Isometric', exact: true }).click();
-  await page.keyboard.press('Escape');
   await section(page, 'Camera');
   await expect(page.getByRole('button', { name: 'Orthographic', exact: true })).toHaveAttribute(
     'aria-pressed',
@@ -262,9 +257,8 @@ test('real location controls share contour intervals and export model attributio
   await page.getByLabel('Interval mode').selectOption('fixed');
   await page.getByLabel('Interval (m)').fill('50');
   await page.getByLabel('Interval (m)').press('Tab');
-  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await section(page, 'Overlays');
   await expect(page.getByRole('switch', { name: 'Map grid', exact: true })).toBeEnabled();
-  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Export ↗' }).click();
   const credit = await download(page, 'Download attribution');
 
@@ -296,15 +290,13 @@ test('cartographic floor styles repaint the floor without changing the STL', asy
 
   await page.keyboard.press('Escape');
 
+  await section(page, 'Overlays');
+
   for (const style of ['survey', 'plinth', 'rose', 'graticule', 'crop']) {
-    await page.getByRole('button', { name: 'Overlays', exact: true }).click();
     await page.getByLabel('Floor style', { exact: true }).selectOption(style);
-    await page.keyboard.press('Escape');
   }
 
-  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
   await page.getByLabel('Floor style', { exact: true }).selectOption('rose');
-  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Export ↗' }).click();
   const after = await download(page, 'Download STL');
 
@@ -430,7 +422,7 @@ test('mapped roads retry after a busy service, restyle without refetching and cr
   await page.goto(`${appUrl}?v=1&seed=123`);
   await loadLocation(page);
   await enter3D(page);
-  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await section(page, 'Overlays');
   await page.getByRole('switch', { name: 'Mapped roads', exact: true }).check();
   await expect(page.getByRole('status').filter({ hasText: 'busy' })).toBeVisible();
   await page.getByLabel('Road width').fill('1.5');
@@ -450,10 +442,9 @@ test('mapped roads retry after a busy service, restyle without refetching and cr
   expect(queries).toHaveLength(2);
   expect(queries[1]).toContain('way["highway"');
 
-  await page.keyboard.press('Escape');
   await section(page, 'Model');
   await page.getByLabel('Terrain shape', { exact: true }).selectOption('terraced');
-  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await section(page, 'Overlays');
   await expect(page.getByText('Roads are hidden on terraced models.')).toBeVisible();
   await expect(page.locator('footer a.attribution')).toHaveCount(0);
   expect(errors).toEqual([]);

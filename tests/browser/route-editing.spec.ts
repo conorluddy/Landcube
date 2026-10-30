@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { appUrl, loadLocation, readDownload, serveStudio } from './studio-fixture';
+import { appUrl, loadLocation, readDownload, section, serveStudio } from './studio-fixture';
 
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 // Software WebGL on CI runners is several times slower than local GPUs.
@@ -29,12 +29,12 @@ function routeLine(page: Page) {
   return page.locator('.lc-route-line');
 }
 
-/** The route group lives in the Overlays popover; opens it on demand. */
+/** The route group lives in the Route section; opens it on demand. */
 async function routeButton(page: Page, name: string) {
   const button = page.getByRole('button', { name, exact: true });
 
   if (!(await button.isVisible())) {
-    await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+    await section(page, 'Route');
   }
 
   return button;

@@ -96,8 +96,22 @@ import {
 
 export type StudioView = '2d' | '3d';
 export type InspectorSection =
-  'Terrain' | 'Contours' | 'Colour' | 'Scene' | 'Camera' | 'Model' | 'Frame';
-export const threeDOnlySections: readonly InspectorSection[] = ['Camera', 'Model', 'Frame'];
+  | 'Terrain'
+  | 'Contours'
+  | 'Colour'
+  | 'Camera'
+  | 'Orbit'
+  | 'Scene'
+  | 'Overlays'
+  | 'Route'
+  | 'Model'
+  | 'Frame';
+export const threeDOnlySections: readonly InspectorSection[] = [
+  'Camera',
+  'Orbit',
+  'Model',
+  'Frame',
+];
 export interface SceneSettings {
   contours: boolean;
   engraving: ContourEngravingSettings;
@@ -212,7 +226,6 @@ export interface StudioState {
     activating: boolean;
     collapsed: boolean;
     sections: Record<StudioView, InspectorSection>;
-    popover: 'Overlays' | 'Orbit' | null;
     exporting: boolean;
     dossierOpen: boolean;
     /** Phone bottom-sheet height. Session-only: never serialized into links. */
@@ -484,7 +497,6 @@ export function createStudioController(
       activating: false,
       collapsed: false,
       sections: { '2d': 'Terrain', '3d': 'Terrain' },
-      popover: null,
       exporting: false,
       dossierOpen: false,
       sheetSnap: 'half',
@@ -1057,7 +1069,7 @@ export function createStudioController(
       );
     },
     selectSection(section: InspectorSection) {
-      if (threeDOnlySections.includes(section) && state.workspace.view === '2d') {
+      if (getHiddenSections(state).includes(section)) {
         return;
       }
 
@@ -1071,7 +1083,7 @@ export function createStudioController(
         return;
       }
 
-      workspace({ activating: true, popover: null });
+      workspace({ activating: true });
 
       try {
         await effects?.activate(view);
@@ -1712,6 +1724,25 @@ export function describeRoadNetwork(network: RoadNetwork, style: RoadStyle): str
   }
 
   return `${parts.join(' · ')}.`;
+}
+
+/** Sections the inspector leaves out in this state: 3D-only ones in 2D, Route without real terrain. */
+export function getHiddenSections(
+  state: Pick<StudioState, 'workspace' | 'source'>,
+): InspectorSection[] {
+  return [
+    ...(state.workspace.view === '3d' ? [] : threeDOnlySections),
+    ...(state.source.terrain === undefined ? (['Route'] as const) : []),
+  ];
+}
+
+/** The open section, or Terrain when the remembered one is hidden (e.g. Route after real terrain goes). */
+export function getActiveSection(
+  state: Pick<StudioState, 'workspace' | 'source'>,
+): InspectorSection {
+  const remembered = state.workspace.sections[state.workspace.view];
+
+  return getHiddenSections(state).includes(remembered) ? 'Terrain' : remembered;
 }
 
 // Stats come from recorded points: recomputed only when those change (a reversal swaps ascent and

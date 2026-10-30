@@ -28,7 +28,7 @@ export function StudioSheetStatus({ state }: { state: StudioState }): ReactNode 
 }
 
 /**
- * Bottom bar: viewport tools (inspector toggle, Overlays, Orbit, Tour) and a status pill with the
+ * Bottom bar: viewport tools (inspector toggle, Tour) and a status pill with the
  * source, live status and data attribution. Real-terrain and road credits always stay reachable:
  * inline on desktop, behind "Data sources" on phones.
  */
@@ -62,30 +62,6 @@ export function StudioFooter({
         >
           {workspace.collapsed ? 'Controls ↑' : 'Controls ↓'}
         </Button>
-        <Button
-          variant="text"
-          size="small"
-          aria-haspopup="dialog"
-          aria-expanded={workspace.popover === 'Overlays'}
-          onClick={() => {
-            c.workspace({ popover: workspace.popover === 'Overlays' ? null : 'Overlays' });
-          }}
-        >
-          Overlays
-        </Button>
-        {workspace.view === '3d' && (
-          <Button
-            variant="text"
-            size="small"
-            aria-haspopup="dialog"
-            aria-expanded={workspace.popover === 'Orbit'}
-            onClick={() => {
-              c.workspace({ popover: workspace.popover === 'Orbit' ? null : 'Orbit' });
-            }}
-          >
-            Orbit
-          </Button>
-        )}
         <Button
           variant="text"
           size="small"

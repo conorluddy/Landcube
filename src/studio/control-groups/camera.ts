@@ -1,8 +1,7 @@
 /*
- * Camera section (CAMR.01 to CAMR.04): lens, focus, exposure and orbit. The Orbit popover in the
- * footer renders the same orbit group (without the camera-settings reset), so while that popover
- * is open the section omits it rather than repeat its ids. Row ids are the original field ids the
- * e2e tests bind to. The pattern is in ./README.md.
+ * Camera section (CAMR.01 to CAMR.03): lens, focus and exposure, plus the Orbit section
+ * (ORBT.01). Row ids are the original field ids the e2e tests bind to. The pattern is in
+ * ./README.md.
  */
 import type { ControlGroupDefinition } from '../../ui/control-rows';
 import {
@@ -34,19 +33,19 @@ export function buildCameraGroups(
     buildLensGroup(controller, state),
     buildFocusGroup(controller, state),
     buildExposureGroup(controller, state),
-    ...(state.workspace.popover === 'Orbit' ? [] : [buildOrbitGroup(controller, state, true)]),
   ];
 }
 
-/**
- * Orbit tools. The section adds "Reset camera settings" (it resets lens, focus and exposure, which
- * the popover does not show); the popover omits it.
- */
-export function buildOrbitGroup(
+export function buildOrbitGroups(
   controller: StudioController,
   state: StudioState,
-  isResettingCameraSettings: boolean,
-): ControlGroupDefinition {
+): ControlGroupDefinition[] {
+  return [buildOrbitGroup(controller, state)];
+}
+
+// === GROUPS ===
+
+function buildOrbitGroup(controller: StudioController, state: StudioState): ControlGroupDefinition {
   const { scene } = state;
 
   return {
@@ -108,18 +107,9 @@ export function buildOrbitGroup(
         'orbit-controls-hint',
         'Drag to orbit · scroll or pinch to zoom · right-drag to pan · double-click terrain to orbit around that point.',
       ),
-      isResettingCameraSettings &&
-        buttonRow('camera-reset-settings', {
-          children: 'Reset camera settings',
-          onClick: () => {
-            controller.resetCameraSettings();
-          },
-        }),
     ],
   };
 }
-
-// === GROUPS ===
 
 function buildLensGroup(controller: StudioController, state: StudioState): ControlGroupDefinition {
   const { camera } = state.scene;
@@ -271,6 +261,13 @@ function buildExposureGroup(
           controller.camera({ exposureEv: value });
         },
       },
+      // Last in the section because it resets lens, focus and exposure together.
+      buttonRow('camera-reset-settings', {
+        children: 'Reset camera settings',
+        onClick: () => {
+          controller.resetCameraSettings();
+        },
+      }),
     ],
   };
 }

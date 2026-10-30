@@ -22,7 +22,7 @@ const malformedFile = resolve('tests/fixtures/malformed.gpx');
 test('a GPX route draws in 2D with waypoints, hides on toggle and clears', async ({ page }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
   await loadLocation(page);
-  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await section(page, 'Route');
   await page.getByLabel('GPX file').setInputFiles(routeFile);
 
   const route = page.locator('.lc-route-line');
@@ -60,7 +60,7 @@ test('a GPX route drapes in 3D and never changes the printable STL', async ({ pa
   await expect(canvas).not.toHaveAttribute('data-route-points', /.*/);
   const before = await modelDownload(page);
 
-  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await section(page, 'Route');
   await page.getByLabel('GPX file').setInputFiles(routeFile);
   await expect(canvas).toHaveAttribute('data-route-points', /^[1-9]\d*$/);
   await expect(canvas).toHaveAttribute('data-route-waypoints', '2');
@@ -71,7 +71,6 @@ test('a GPX route drapes in 3D and never changes the printable STL', async ({ pa
   await page.getByRole('switch', { name: 'Show route', exact: true }).check();
   await expect(canvas).toHaveAttribute('data-route-points', /^[1-9]\d*$/);
 
-  await page.keyboard.press('Escape');
   expect((await modelDownload(page)).equals(before)).toBe(true);
   expect(errors).toEqual([]);
 });
@@ -88,27 +87,21 @@ test('a route follows terraced 3D models and stays out of the STL in both shapes
   const canvas = page.locator('canvas.terrain-3d');
   const showRoute = page.getByRole('switch', { name: 'Show route', exact: true });
 
-  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await section(page, 'Route');
   await page.getByLabel('GPX file').setInputFiles(routeFile);
   await expect(canvas).toHaveAttribute('data-route-points', /^[1-9]\d*$/);
 
   for (const shape of ['smooth', 'terraced'] as const) {
-    await page.keyboard.press('Escape');
     await section(page, 'Model');
     await page.getByLabel('Terrain shape', { exact: true }).selectOption(shape);
-    await page.keyboard.press('Escape');
-    await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+    await section(page, 'Route');
     await expect(canvas).toHaveAttribute('data-route-points', /^[1-9]\d*$/);
     await expect(canvas).toHaveAttribute('data-route-waypoints', '2');
-    await page.keyboard.press('Escape');
     const shown = await modelDownload(page);
 
-    await page.getByRole('button', { name: 'Overlays', exact: true }).click();
     await showRoute.uncheck();
     await expect(canvas).not.toHaveAttribute('data-route-points', /.*/);
-    await page.keyboard.press('Escape');
     expect((await modelDownload(page)).equals(shown), `${shape} STL`).toBe(true);
-    await page.getByRole('button', { name: 'Overlays', exact: true }).click();
     await showRoute.check();
   }
 
@@ -121,13 +114,12 @@ test('a retained route rebuilds against a newly loaded location', async ({ page 
   await enter3D(page);
   const canvas = page.locator('canvas.terrain-3d');
 
-  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await section(page, 'Route');
   await page.getByLabel('GPX file').setInputFiles(routeFile);
   await expect(canvas).toHaveAttribute('data-route-points', /^[1-9]\d*$/);
   const builds = Number(await canvas.getAttribute('data-route-builds'));
 
   // A nudge keeps the route on the model while the (routed, synthetic) tiles change under it.
-  await page.keyboard.press('Escape');
   await section(page, 'Terrain');
   const latitude = page.getByLabel('Latitude', { exact: true });
 
@@ -144,7 +136,7 @@ test('a retained route rebuilds against a newly loaded location', async ({ page 
 test('an invalid GPX file shows an E-206 fault and keeps the previous route', async ({ page }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
   await loadLocation(page);
-  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
+  await section(page, 'Route');
   await page.getByLabel('GPX file').setInputFiles(routeFile);
   await expect(page.locator('.lc-route-line')).toBeVisible();
 
@@ -161,8 +153,13 @@ test('an invalid GPX file shows an E-206 fault and keeps the previous route', as
   await expect(fault).toHaveCount(0);
 });
 
-test('the route group needs a real location', async ({ page }) => {
+test('the Route section needs a real location', async ({ page }) => {
+  const routeSection = page
+    .getByRole('navigation', { name: 'Editing section' })
+    .getByRole('button', { name: 'Route', exact: true });
+
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: 'Overlays', exact: true }).click();
-  await expect(page.getByLabel('GPX file')).toHaveCount(0);
+  await expect(routeSection).toHaveCount(0);
+  await loadLocation(page);
+  await expect(routeSection).toBeVisible();
 });
