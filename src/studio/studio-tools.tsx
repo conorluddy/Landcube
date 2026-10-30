@@ -1,23 +1,13 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import type { TerrainCropSettings } from '../terrain-crop';
-import { CalloutLabel } from '../ui/overlays/callout-label';
 import { CropFrame } from '../ui/overlays/crop-frame';
-import {
-  MeasureLine,
-  type MeasureEndpoint,
-  type MeasurePoint,
-  type MeasurePointer,
-} from '../ui/overlays/measure-line';
+import { MeasureTool } from './measure-tool';
 import { RouteTool } from './route-tool';
 import { FloatingBar } from '../ui/floating-bar';
 import { Segmented, type SegmentedOption } from '../ui/segmented';
 import type { StudioController, StudioState, ToolMode } from './controller';
-import type { HudStore, MapLocation } from './hud-store';
+import type { HudStore } from './hud-store';
 import {
-  bearingDegrees,
-  distanceBetweenPlaces,
-  formatBearing,
-  formatDistance,
   getCropFractionBox,
   getNudgeDelta,
   getRouteKeyAction,
@@ -30,14 +20,6 @@ import {
  * and measure line the HUD's `tools` slot shows. Crop edits go through `controller.model`, so the
  * Model section's crop widget and this frame always read the same `state.model.crop`.
  */
-type PlacedPoint = MeasurePoint & { location?: MapLocation };
-type Measurement =
-  | { kind: 'empty' }
-  | { kind: 'anchored'; start: PlacedPoint }
-  | { kind: 'measured'; start: PlacedPoint; end: PlacedPoint };
-
-/** Pointer travel below this is a tap that places one endpoint, not a drag. */
-const tapSlopPx = 4;
 const toolShortcuts: Partial<Record<string, ToolMode>> = { c: 'crop', m: 'measure', r: 'route' };
 
 // === PUBLIC API ===
@@ -112,7 +94,7 @@ export function StudioToolOverlays({
   }
 
   if (activeTool === 'measure') {
-    return <MeasureTool key={state.workspace.view} hud={hud} />;
+    return <MeasureTool hud={hud} terrain={state.source.terrain} />;
   }
 
   if (activeTool === 'route') {
@@ -238,103 +220,6 @@ function CropTool({
       }}
     />
   );
-}
-
-/** Click-drag, or two taps, places a line; endpoints drag. Points are located when placed. */
-function MeasureTool({ hud }: { hud: HudStore }): ReactNode {
-  const [measurement, setMeasurement] = useState<Measurement>({ kind: 'empty' });
-  const gesture = useRef<{ down: PlacedPoint; isDrag: boolean } | undefined>(undefined);
-  const place = (pointer: MeasurePointer): PlacedPoint => ({
-    xPx: pointer.xPx,
-    yPx: pointer.yPx,
-    location: hud.locateClientPoint(pointer.clientX, pointer.clientY),
-  });
-
-  const handleSurface = (phase: 'down' | 'move' | 'up', pointer: MeasurePointer) => {
-    if (phase === 'down') {
-      gesture.current = { down: place(pointer), isDrag: false };
-
-      return;
-    }
-
-    const current = gesture.current;
-
-    if (current === undefined) {
-      return;
-    }
-
-    const travelPx = Math.hypot(pointer.xPx - current.down.xPx, pointer.yPx - current.down.yPx);
-
-    current.isDrag ||= travelPx > tapSlopPx;
-
-    if (current.isDrag) {
-      setMeasurement({ kind: 'measured', start: current.down, end: place(pointer) });
-    }
-
-    if (phase !== 'up') {
-      return;
-    }
-
-    gesture.current = undefined;
-
-    if (!current.isDrag) {
-      setMeasurement((previous) =>
-        previous.kind === 'anchored'
-          ? { kind: 'measured', start: previous.start, end: current.down }
-          : { kind: 'anchored', start: current.down },
-      );
-    }
-  };
-
-  const moveEndpoint = (endpoint: MeasureEndpoint, pointer: MeasurePointer) => {
-    setMeasurement((previous) => {
-      if (previous.kind === 'empty') {
-        return previous;
-      }
-
-      if (previous.kind === 'anchored') {
-        return { kind: 'anchored', start: place(pointer) };
-      }
-
-      return { ...previous, [endpoint]: place(pointer) };
-    });
-  };
-
-  const start = measurement.kind === 'empty' ? undefined : measurement.start;
-  const end = measurement.kind === 'measured' ? measurement.end : undefined;
-
-  return (
-    <MeasureLine
-      start={start}
-      end={end}
-      onSurfacePointer={handleSurface}
-      onEndpointMove={moveEndpoint}
-    >
-      {start !== undefined && end !== undefined && (
-        <CalloutLabel
-          anchor={{ xPx: (start.xPx + end.xPx) / 2, yPx: (start.yPx + end.yPx) / 2 }}
-          {...describeMeasurement(start, end)}
-        />
-      )}
-    </MeasureLine>
-  );
-}
-
-function describeMeasurement(
-  start: PlacedPoint,
-  end: PlacedPoint,
-): { value: string; meta: string[] } {
-  if (start.location === undefined || end.location === undefined) {
-    return { value: '—', meta: ['Off terrain'] };
-  }
-
-  const meters = distanceBetweenPlaces(start.location, end.location);
-  const bearing = bearingDegrees(start.location, end.location);
-
-  return {
-    value: meters === undefined ? '—' : formatDistance(meters),
-    meta: [bearing === undefined || meters === 0 ? '' : `Bearing ${formatBearing(bearing)}`],
-  };
 }
 
 /** Keeps only the latest crop per animation frame, so a drag rebuilds the 3D model at most once a frame. */

@@ -150,6 +150,13 @@ export interface Terrain3d {
    * preview units before the frame seat lift; undefined off the model or before a terrain update.
    */
   getDisplayedSurfaceHeight(point: FramePoint): number | undefined;
+  /**
+   * Viewport (client) pixels of a crop-unit point on the displayed surface; undefined off the
+   * model, before a terrain update, or behind the camera.
+   */
+  projectCropPointToClient(point: FramePoint): { clientX: number; clientY: number } | undefined;
+  /** Runs after every drawn frame (orbit, presets, turntable, rebuilds); returns an unsubscribe. */
+  subscribeDraw(listener: () => void): () => void;
 }
 
 type GradientRange = readonly [minimum: number, maximum: number];
@@ -552,10 +559,16 @@ export function createTerrain3d(
     return -point.clone().applyMatrix4(camera.matrixWorldInverse).z;
   };
 
+  const drawListeners = new Set<() => void>();
+
   const draw = () => {
     if (visible && !document.hidden) {
       render();
       onDraw();
+
+      for (const listener of drawListeners) {
+        listener();
+      }
     }
   };
 
@@ -1573,6 +1586,43 @@ export function createTerrain3d(
       draw();
     },
     getDisplayedSurfaceHeight: (point) => displayedSurface?.heightAt(point),
+    projectCropPointToClient(point) {
+      const [, width, height] = lastUpdate ?? [];
+      const surfaceHeight = displayedSurface?.heightAt(point);
+
+      if (width === undefined || height === undefined || surfaceHeight === undefined) {
+        return undefined;
+      }
+
+      const scale = 2 / Math.max(width, height);
+      const world = landscape.localToWorld(
+        new THREE.Vector3(
+          (point.x - width / 2) * scale,
+          surfaceHeight,
+          (point.y - height / 2) * scale,
+        ),
+      );
+
+      camera.updateMatrixWorld();
+      const ndc = world.project(camera);
+      const bounds = renderer.domElement.getBoundingClientRect();
+
+      if (ndc.z < -1 || ndc.z > 1) {
+        return undefined;
+      }
+
+      return {
+        clientX: bounds.left + ((ndc.x + 1) / 2) * bounds.width,
+        clientY: bounds.top + ((1 - ndc.y) / 2) * bounds.height,
+      };
+    },
+    subscribeDraw(listener) {
+      drawListeners.add(listener);
+
+      return () => {
+        drawListeners.delete(listener);
+      };
+    },
     pickFocus() {
       const canvas = renderer.domElement;
 

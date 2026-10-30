@@ -5,6 +5,7 @@ import { RouteEditor, type RouteEditorPointer } from '../ui/overlays/route-edito
 import type { GeoPoint } from '../types/terrain-analysis';
 import type { StudioController, StudioState } from './controller';
 import type { HudStore } from './hud-store';
+import { useProjectionRevision } from './use-projection-revision';
 import { isRouteComplete } from './route-editing';
 import { getRouteKeyAction, getSegmentMidpoint, projectRoutePoint, toGeoPoint } from './tool-state';
 
@@ -18,9 +19,9 @@ const tapSlopPx = 4;
  * delete while drawing or editing; segment targets insert. All edits go through the controller's
  * route actions. Entering with no route starts drawing; with a complete one, editing.
  *
- * Seam: `projectRoutePoint` is the only world-to-screen step. It returns undefined in 3D until
- * `terrain-3d.ts` exports a projector, so 3D shows no handles but taps still place waypoints
- * through the HUD store's ray-cast locator.
+ * Seam: `projectRoutePoint` is the only world-to-screen step; in 3D it uses the HUD store's camera
+ * projector, and the tool re-renders as the camera moves. Pointer locations come from the store's
+ * ray-cast locator in both views.
  */
 export function RouteTool({
   controller: c,
@@ -37,7 +38,13 @@ export function RouteTool({
   const editing = route?.editing ?? { mode: 'viewing' as const };
   const gesture = useRef<{ xPx: number; yPx: number; location: GeoPoint | undefined }>(undefined);
   const commitMove = useFrameThrottledMove(c);
-  const view = { is3d: state.workspace.view === '3d', terrain: state.source.terrain };
+
+  useProjectionRevision(hud);
+  const view = {
+    is3d: state.workspace.view === '3d',
+    terrain: state.source.terrain,
+    projectLocation: hud.projectLocation,
+  };
 
   useEffect(() => {
     const { route: current } = c.getSnapshot().workspace;

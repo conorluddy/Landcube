@@ -29,7 +29,9 @@ import { generatedTerrainReliefMeters, generatedTerrainSpanMeters } from './cons
 import { findTerrainSummits } from './summit-markers';
 import { getRequiredElement } from './dom-elements';
 import { awayPointer, createHudStore, type MapLocation } from './studio/hud-store';
+import { projectToRealTerrainFrame } from './real-terrain-projection';
 import {
+  getFrameMetersPerPixel,
   locateModelFraction,
   locateViewportPoint,
   type ModelPlacement,
@@ -445,11 +447,17 @@ function updateTerrain3d(): void {
     controls.getSnapshot().savedPlaces,
   );
 
-  modelPlacement = place
-    ? { kind: 'geographic', bounds: place.bounds }
-    : realTerrain
-      ? undefined
-      : { kind: 'generated', crop: modelCrop, frame: modelSourceFrame };
+  modelPlacement =
+    place && realTerrain?.location && realTerrain.spanKm !== undefined
+      ? {
+          kind: 'geographic',
+          placement: { location: realTerrain.location, spanKm: realTerrain.spanKm },
+          crop: modelCrop,
+          frame: modelSourceFrame,
+        }
+      : realTerrain
+        ? undefined
+        : { kind: 'generated', crop: modelCrop, frame: modelSourceFrame };
   // Before the update, so the update builds roads at the new auto width. A width change also
   // rebuilds once on the previous terrain; that costs one ribbon pass per place load.
   controls.modelSpan(place ? Math.max(place.widthKm, place.lengthKm) : undefined);
@@ -773,6 +781,75 @@ function locateClientPoint(clientX: number, clientY: number): MapLocation | unde
   );
 }
 
+/** A place in the model's crop units; undefined outside the crop or for a mismatched terrain kind. */
+function projectLocationToCrop(location: MapLocation): { x: number; y: number } | undefined {
+  if (!modelSourceFrame || !modelCrop) {
+    return undefined;
+  }
+
+  if (location.kind === 'local') {
+    if (realTerrain) {
+      return undefined;
+    }
+
+    const metersPerUnit = getFrameMetersPerPixel(modelSourceFrame, undefined);
+    const point = {
+      x: location.eastMeters / metersPerUnit - modelCrop.x,
+      y: location.southMeters / metersPerUnit - modelCrop.y,
+    };
+
+    return point.x >= 0 && point.y >= 0 && point.x <= modelCrop.width && point.y <= modelCrop.height
+      ? point
+      : undefined;
+  }
+
+  if (!realTerrain?.location || realTerrain.spanKm === undefined) {
+    return undefined;
+  }
+
+  return projectRoutePointToCrop(
+    location,
+    { location: realTerrain.location, spanKm: realTerrain.spanKm },
+    modelSourceFrame,
+    modelCrop,
+    controls.getSnapshot().model.dimensions.cropShape ?? 'rectangle',
+  );
+}
+
+/**
+ * Where a place appears over the viewport, in the same pixels as the HUD pointer. 2D uses the
+ * frame projection; 3D projects through the camera onto the displayed surface.
+ */
+function projectLocation(location: MapLocation): { xPx: number; yPx: number } | undefined {
+  const bounds = terrainSvgElement.getBoundingClientRect();
+
+  if (terrain3d.isActive()) {
+    const cropPoint = projectLocationToCrop(location);
+    const client = cropPoint && terrain3d.projectCropPointToClient(cropPoint);
+
+    return client && { xPx: client.clientX - bounds.left, yPx: client.clientY - bounds.top };
+  }
+
+  if (location.kind === 'geographic') {
+    if (!realTerrain?.location || realTerrain.spanKm === undefined) {
+      return undefined;
+    }
+
+    const { x, y } = projectToRealTerrainFrame(
+      { location: realTerrain.location, spanKm: realTerrain.spanKm },
+      location.latitude,
+      location.longitude,
+      { width, height },
+    );
+
+    return { xPx: x, yPx: y };
+  }
+
+  const metersPerPixel = getFrameMetersPerPixel({ width, height }, undefined);
+
+  return { xPx: location.eastMeters / metersPerPixel, yPx: location.southMeters / metersPerPixel };
+}
+
 /** Generated terrain's elevation range on its nominal relief, recomputed when the field changes. */
 function publishGeneratedRelief(): void {
   if (realTerrain) {
@@ -885,6 +962,10 @@ controls.workspace({
   ),
 });
 hud.setLocator(locateClientPoint);
+hud.setProjector(projectLocation);
+terrain3d.subscribeDraw(() => {
+  hud.notifyProjectionChanged();
+});
 mountStudio(controls, terrainSvgElement, outputRenderer, cropPreview, hud, compareScenes);
 const viewport = getRequiredElement(document, '#studio-viewport', HTMLElement);
 
