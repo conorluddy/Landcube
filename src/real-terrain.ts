@@ -1,9 +1,10 @@
 import type { RealContourInterval } from './real-terrain-contours';
-import { realTerrainBounds } from './constants/real-terrain';
+import { realTerrainBounds, terrariumTileSizePixels } from './constants/real-terrain';
 import { getMercatorSpanFraction, getMercatorX, getMercatorY } from './real-terrain-projection';
 import { preprocessElevations } from './elevation-preprocessing';
 import { TerrainLoadError } from './terrain-load-error';
-import type { GeoCoverage, GeoPoint, SourceElevationSampler } from './types/terrain-analysis';
+import { createSourceElevationSampler } from './source-elevation-sampler';
+import type { SourceElevationSampler } from './types/terrain-analysis';
 
 export interface RealTerrain {
   sample: (x: number, y: number, width: number, height: number) => number;
@@ -34,8 +35,6 @@ export interface DecodedTerrainTile {
 export type TerrainLoadProgressReporter = (loadedTiles: number, totalTiles: number) => void;
 
 export type TerrainTileLoader = (tileUrl: string) => Promise<DecodedTerrainTile>;
-
-const tileSizePixels = 256;
 
 /** Decodes the public Terrarium RGB elevation format into meters. */
 export function decodeTerrariumElevation(red: number, green: number, blue: number): number {
@@ -100,8 +99,8 @@ export async function loadRealTerrain(
   const startY = Math.floor(centerY - spanTiles / 2);
   const endX = Math.floor(centerX + spanTiles / 2);
   const endY = Math.floor(centerY + spanTiles / 2);
-  const columns = (endX - startX + 1) * tileSizePixels;
-  const rows = (endY - startY + 1) * tileSizePixels;
+  const columns = (endX - startX + 1) * terrariumTileSizePixels;
+  const rows = (endY - startY + 1) * terrariumTileSizePixels;
   const elevations = new Float64Array(columns * rows);
   const requests: Promise<void>[] = [];
   const credits = new Set<string>();
@@ -133,13 +132,19 @@ export async function loadRealTerrain(
   const elevationRange = Math.max(1, maximum - minimum);
   let visibleMinimum = Infinity;
   let visibleMaximum = -Infinity;
-  const left = Math.max(0, Math.floor((centerX - startX - spanTiles / 2) * tileSizePixels));
+  const left = Math.max(
+    0,
+    Math.floor((centerX - startX - spanTiles / 2) * terrariumTileSizePixels),
+  );
   const right = Math.min(
     columns - 1,
-    Math.ceil((centerX - startX + spanTiles / 2) * tileSizePixels),
+    Math.ceil((centerX - startX + spanTiles / 2) * terrariumTileSizePixels),
   );
-  const top = Math.max(0, Math.floor((centerY - startY - spanTiles / 2) * tileSizePixels));
-  const bottom = Math.min(rows - 1, Math.ceil((centerY - startY + spanTiles / 2) * tileSizePixels));
+  const top = Math.max(0, Math.floor((centerY - startY - spanTiles / 2) * terrariumTileSizePixels));
+  const bottom = Math.min(
+    rows - 1,
+    Math.ceil((centerY - startY + spanTiles / 2) * terrariumTileSizePixels),
+  );
 
   for (let y = top; y <= bottom; y++) {
     for (let x = left; x <= right; x++) {
@@ -165,14 +170,14 @@ export async function loadRealTerrain(
         0,
         Math.min(
           columns - 1,
-          (centerX - startX + ((x - width / 2) / frameSize) * spanTiles) * tileSizePixels,
+          (centerX - startX + ((x - width / 2) / frameSize) * spanTiles) * terrariumTileSizePixels,
         ),
       );
       const pixelY = Math.max(
         0,
         Math.min(
           rows - 1,
-          (centerY - startY + ((y - height / 2) / frameSize) * spanTiles) * tileSizePixels,
+          (centerY - startY + ((y - height / 2) / frameSize) * spanTiles) * terrariumTileSizePixels,
         ),
       );
       const left = Math.floor(pixelX);
@@ -193,7 +198,7 @@ export async function loadRealTerrain(
     sourceElevations: createSourceElevationSampler(
       { values: elevations, columns, rows, startX, startY, tileCount, centerLongitude: longitude },
       // Neighbouring samples sit one pixel apart; the span covers spanTiles tiles of pixels.
-      (spanKm * 1000) / (spanTiles * tileSizePixels),
+      (spanKm * 1000) / (spanTiles * terrariumTileSizePixels),
       `real:${[latitude, longitude, spanKm, elevationFloor ?? 'none', maxDepth ?? 'none'].join(',')}`,
     ),
   };
@@ -213,16 +218,18 @@ export async function loadRealTerrain(
       }
     }
 
-    if (tile.pixels.length !== tileSizePixels * tileSizePixels * 4) {
+    if (tile.pixels.length !== terrariumTileSizePixels * terrariumTileSizePixels * 4) {
       throw new TerrainLoadError('tileDecodeFailed', 'Terrain tile has unexpected dimensions.');
     }
 
-    for (let row = 0; row < tileSizePixels; row++) {
-      for (let column = 0; column < tileSizePixels; column++) {
-        const offset = (row * tileSizePixels + column) * 4;
+    for (let row = 0; row < terrariumTileSizePixels; row++) {
+      for (let column = 0; column < terrariumTileSizePixels; column++) {
+        const offset = (row * terrariumTileSizePixels + column) * 4;
 
         elevations[
-          ((y - startY) * tileSizePixels + row) * columns + (x - startX) * tileSizePixels + column
+          ((y - startY) * terrariumTileSizePixels + row) * columns +
+            (x - startX) * terrariumTileSizePixels +
+            column
         ] = decodeTerrariumElevation(
           tile.pixels[offset],
           tile.pixels[offset + 1],
@@ -260,79 +267,3 @@ const terrainCredits: readonly [readonly string[], string][] = [
     '© Environment Agency copyright and/or database right 2015. All rights reserved',
   ],
 ];
-
-/** Where the loaded grid sits: sample (column, row) lies at tile (startX + column / 256, startY + row / 256). */
-interface PlacedElevationGrid {
-  values: Float64Array;
-  columns: number;
-  rows: number;
-  startX: number;
-  startY: number;
-  tileCount: number;
-  centerLongitude: number;
-}
-
-/** Reads repaired metres by place with the same grid placement `sample` uses for frame points. */
-function createSourceElevationSampler(
-  grid: PlacedElevationGrid,
-  resolutionMeters: number,
-  revision: string,
-): SourceElevationSampler {
-  const { values, columns, rows, startX, startY, tileCount, centerLongitude } = grid;
-  const worldPixels = tileCount * tileSizePixels;
-  // Rows beyond the Mercator world repeat clamped polar tiles, so they hold nobody's elevation.
-  const firstRow = Math.max(0, -startY * tileSizePixels);
-  const lastRow = Math.min(rows - 1, (tileCount - startY) * tileSizePixels - 1);
-  const centerWorldX = getMercatorX(centerLongitude);
-  // Like getRealTerrainSourceBounds, west or east runs past ±180° near the antimeridian.
-  const coverage: GeoCoverage = {
-    north: getLatitudeAtMercatorY((startY * tileSizePixels + firstRow) / worldPixels),
-    south: getLatitudeAtMercatorY((startY * tileSizePixels + lastRow) / worldPixels),
-    west: getLongitudeAtMercatorX(startX / tileCount),
-    east: getLongitudeAtMercatorX((startX * tileSizePixels + columns - 1) / worldPixels),
-  };
-
-  return {
-    revision,
-    resolutionMeters,
-    coverage,
-    sampleMeters({ latitude, longitude }: GeoPoint) {
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90) {
-        return undefined;
-      }
-
-      // Wrapping toward the centre keeps a patch that straddles the antimeridian contiguous.
-      const eastOffset = getMercatorX(longitude) - centerWorldX;
-      const worldX = centerWorldX + eastOffset - Math.round(eastOffset);
-      const column = worldX * worldPixels - startX * tileSizePixels;
-      const row = getMercatorY(latitude) * worldPixels - startY * tileSizePixels;
-
-      if (!(column >= 0 && column <= columns - 1 && row >= firstRow && row <= lastRow)) {
-        return undefined;
-      }
-
-      const left = Math.floor(column);
-      const top = Math.floor(row);
-      const right = Math.min(columns - 1, left + 1);
-      const bottom = Math.min(lastRow, top + 1);
-      const fractionX = column - left;
-      const fractionY = row - top;
-      const upper =
-        values[top * columns + left] * (1 - fractionX) + values[top * columns + right] * fractionX;
-      const lower =
-        values[bottom * columns + left] * (1 - fractionX) +
-        values[bottom * columns + right] * fractionX;
-      const meters = upper * (1 - fractionY) + lower * fractionY;
-
-      return Number.isFinite(meters) ? meters : undefined;
-    },
-  };
-}
-
-function getLatitudeAtMercatorY(mercatorY: number): number {
-  return (Math.atan(Math.sinh(Math.PI * (1 - 2 * mercatorY))) * 180) / Math.PI;
-}
-
-function getLongitudeAtMercatorX(mercatorX: number): number {
-  return mercatorX * 360 - 180;
-}
