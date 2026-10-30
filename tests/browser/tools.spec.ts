@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { appUrl, loadLocation, section, serveStudio } from './studio-fixture';
+import { appUrl, enter3D, loadLocation, section, serveStudio } from './studio-fixture';
 
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 // Software WebGL on CI runners is several times slower than local GPUs.
@@ -59,7 +59,7 @@ test('crop mode frames the 3D model with eight handles and resizes the model cro
   page,
 }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await section(page, 'Model');
   await expect(cropSize(page)).toHaveValue('100');
   await tool(page, 'Crop').click();
@@ -85,7 +85,7 @@ test('crop mode frames the 3D model with eight handles and resizes the model cro
 
 test('the crop widget and the crop frame stay in sync', async ({ page }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await section(page, 'Model');
   await tool(page, 'Crop').click();
   const rightEdge = page.getByRole('slider', { name: 'Crop right edge', exact: true });
@@ -159,7 +159,7 @@ test('C and M shortcuts toggle tools but never fire inside the place search', as
   await page.goto(`${appUrl}?v=1&seed=123`);
   await page.keyboard.press('c');
   await expect(tool(page, 'Select')).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await enter3D(page);
   await expect(tool(page, 'Crop')).toBeVisible();
   await page.keyboard.press('c');
   await expect(tool(page, 'Crop')).toHaveAttribute('aria-pressed', 'true');

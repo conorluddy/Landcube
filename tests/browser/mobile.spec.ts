@@ -156,16 +156,18 @@ test('a slow drag follows the pointer and settles on the nearest snap', async ({
   await page.waitForTimeout(150);
   await page.mouse.up();
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'half');
-  await dragHandle(page, 300, 10, 100);
+  // 150 ms apart keeps each move well under the flick speed even when CI delivers events late.
+  await dragHandle(page, 300, 10, 150);
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'peek');
-  await dragHandle(page, -540, 18, 100);
+  await dragHandle(page, -540, 18, 150);
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'full');
 });
 
 test('a fast flick steps one snap in its direction', async ({ page }) => {
-  await dragHandle(page, -60, 3, 0);
+  // 60 px moves stay a flick unless CI spaces them over 120 ms apart; 120 px alone snaps back.
+  await dragHandle(page, -120, 2, 0);
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'full');
-  await dragHandle(page, 60, 3, 0);
+  await dragHandle(page, 120, 2, 0);
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'half');
 });
 
@@ -190,7 +192,7 @@ test('touch drags on the handle move the sheet', async ({ page }) => {
 
   for (let step = 1; step <= 10; step++) {
     await send('touchMove', startY + step * 30);
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(150);
   }
 
   await send('touchEnd', startY + 300);

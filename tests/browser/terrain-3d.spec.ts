@@ -68,6 +68,16 @@ test('view selection activates 3D directly and restores independent inspector se
   await expect(page.getByRole('region', { name: 'Scene settings' })).toBeVisible();
   await expect(page.getByLabel('Time of day')).toHaveValue('2');
   await expect(page.getByRole('switch', { name: 'Solid base', exact: true })).not.toBeChecked();
+  expect(errors).toEqual([]);
+});
+
+// Split from the view test: auto-rotate keeps software WebGL busy and slows every action.
+test('orbit controls set the turntable and reset to an isometric camera', async ({ page }) => {
+  const errors: string[] = [];
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await enter3D(page);
   await page.getByRole('button', { name: 'Collapse controls' }).click();
   await page.getByRole('button', { name: 'Orbit', exact: true }).click();
   await page.getByRole('switch', { name: 'Auto-rotate' }).check();
@@ -80,6 +90,19 @@ test('view selection activates 3D directly and restores independent inspector se
   await page.getByRole('button', { name: 'Reset camera' }).click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Orbit', exact: true })).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
+test('camera settings switch projection, focus and lens effects, then reset', async ({ page }) => {
+  const errors: string[] = [];
+
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await enter3D(page);
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  await page.getByRole('button', { name: 'Orbit', exact: true }).click();
+  await page.getByRole('button', { name: 'Isometric', exact: true }).click();
+  await page.keyboard.press('Escape');
   await section(page, 'Camera');
   await expect(page.getByRole('button', { name: 'Orthographic', exact: true })).toHaveAttribute(
     'aria-pressed',

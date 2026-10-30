@@ -49,13 +49,26 @@ jobs:
           path: dist
 
   browser:
-    name: Browser tests (${{ matrix.shard }}/3)
+    name: Browser tests (${{ matrix.group }})
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       fail-fast: false
+      # Groups are Playwright projects in playwright.config.ts; studio splits by test across two runners.
       matrix:
-        shard: [1, 2, 3]
+        include:
+          - group: 3D terrain
+            slug: 3d-terrain
+            args: --project=3d-terrain
+          - group: 3D tools
+            slug: 3d-tools
+            args: --project=3d-tools
+          - group: studio 1/2
+            slug: studio-1
+            args: --project=studio --shard=1/2
+          - group: studio 2/2
+            slug: studio-2
+            args: --project=studio --shard=2/2
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -75,15 +88,14 @@ jobs:
       - name: Build browser test specimens
         run: npm run build:specimens
 
-      # Serial software-WebGL journeys outgrow one runner, so shards split them across three.
       - name: Verify browser journeys and GitHub Pages subpath
-        run: npx playwright test --reporter=list --shard=${{ matrix.shard }}/3
+        run: npx playwright test --reporter=list ${{ matrix.args }}
 
       - name: Upload failure traces
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-traces-${{ matrix.shard }}
+          name: playwright-traces-${{ matrix.slug }}
           path: test-results
           retention-days: 7
 
