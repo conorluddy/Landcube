@@ -23,6 +23,7 @@ interface StudioTerrainView {
   frameChanged: () => void;
   resetCamera: () => void;
   applyViewPreset: (preset: TerrainViewPreset) => void;
+  setCameraDirection: (azimuthDegrees: number, elevationDegrees: number) => void;
   pickFocus: () => Promise<boolean>;
   captureStill: (scale: number) => HTMLCanvasElement;
   /** Arms a morph for the next 3D rebuild; the 2D view and an inactive 3D view always cut. */
@@ -240,6 +241,7 @@ export function createStudioTerrainView(
     },
     resetCamera: () => view?.reset(),
     applyViewPreset: (preset) => view?.applyViewPreset(preset),
+    setCameraDirection: (azimuth, elevation) => view?.setCameraDirection(azimuth, elevation),
     pickFocus: () => view?.pickFocus() ?? Promise.resolve(false),
     captureStill(scale) {
       if (!view || !active) {

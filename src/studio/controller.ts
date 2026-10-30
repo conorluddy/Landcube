@@ -247,6 +247,7 @@ export interface StudioEffects {
   modelChanged(): void;
   resetCamera(): void;
   applyViewPreset(preset: TerrainViewPreset): void;
+  setCameraDirection(azimuthDegrees: number, elevationDegrees: number): void;
   pickFocus(): Promise<boolean>;
   /** Resolves to the saved image's pixel size. */
   downloadStill(scale: TerrainStillScale): Promise<{ width: number; height: number }>;
@@ -307,6 +308,7 @@ export interface StudioController {
   camera: (patch: Partial<TerrainCameraSettings>) => void;
   resetCameraSettings: () => void;
   applyViewPreset: (preset: TerrainViewPreset) => void;
+  setCameraDirection: (azimuthDegrees: number, elevationDegrees: number) => void;
   /** Arms a one-off terrain click that sets the depth-of-field focus point. */
   pickFocus: () => Promise<void>;
   model: (patch: Partial<StudioState['model']>) => boolean;
@@ -950,6 +952,9 @@ export function createStudioController(
       }
 
       effects?.applyViewPreset(preset);
+    },
+    setCameraDirection(azimuth, elevation) {
+      effects?.setCameraDirection(azimuth, elevation);
     },
     async pickFocus() {
       const pickId = ++latestFocusPickId;

@@ -20,6 +20,7 @@ import {
 import type { HudStore } from './hud-store';
 import { projectRouteToFrame } from './route-overlay';
 import { StudioToolOverlays } from './studio-tools';
+import { CameraSelector } from './camera-selector';
 
 /** The card needs a desktop-sized viewport: wider than a phone and at least 700px tall. */
 const readoutCardQuery = '(min-width: 768px) and (min-height: 700px)';
@@ -109,6 +110,7 @@ export function StudioHud({
       instruments={
         <>
           {canvasScaleBar && <ScaleBar {...canvasScaleBar} />}
+          {is3d && <CameraSelector controller={controller} />}
           <Compass headingDegrees={is3d ? (state.cameraPose?.azimuthDegrees ?? 0) : 0} />
         </>
       }
