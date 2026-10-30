@@ -36,6 +36,8 @@ A specimen with `state: 'hover' | 'focus' | 'active'` renders inside an `<articl
 
 `npm run dev`, then open `/specimens.html`. Filters: `?only=tag` (component id), `?theme=light`. Each `<article data-specimen="component/variant/size/state">` is screenshotted by `tests/browser/specimens.spec.ts` in default, reduced-motion and forced-colors modes.
 
+The same specimen definitions are the plates of the in-app design-system mode (`src/system/`), so a new component also needs a part in `src/system/parts/components.ts`; `src/system/registry.test.tsx` fails until it has one.
+
 The page is built by `npm run build:specimens` into `dist-specimens/`. `vite build` only builds `index.html`, so `dist/` never contains it (`tests/specimens-build.test.ts` asserts that).
 
 ## Screenshots

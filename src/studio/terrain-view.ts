@@ -16,6 +16,8 @@ import { createCameraPosePublisher } from './camera-pose';
 interface StudioTerrainView {
   isActive: () => boolean;
   activate: (mode: StudioView) => Promise<void>;
+  /** Stops drawing while the canvas is hidden behind design-system mode; resumes on false. */
+  setSuspended: (isSuspended: boolean) => void;
   sceneChanged: (previous: SceneSettings) => void;
   modelChanged: () => void;
   frameChanged: () => void;
@@ -52,6 +54,7 @@ export function createStudioTerrainView(
 ): StudioTerrainView {
   let view: Terrain3d | undefined;
   let active = false;
+  let suspended = false;
   let floorPlace: FloorPlace | undefined;
   let interval: number | undefined;
   const motion = createShellMotion(() => document.querySelector('.studio-shell'));
@@ -207,7 +210,7 @@ export function createStudioTerrainView(
       active = mode === '3d';
       motion.setHeld('turntable', active && controller.getSnapshot().scene.rotating);
       document.querySelector('#terrain')?.toggleAttribute('hidden', active);
-      view?.setVisible(active);
+      view?.setVisible(active && !suspended);
 
       if (view && active) {
         const model = controller.getSnapshot().model;
@@ -218,6 +221,10 @@ export function createStudioTerrainView(
       }
 
       changed();
+    },
+    setSuspended(isSuspended) {
+      suspended = isSuspended;
+      view?.setVisible(active && !suspended);
     },
     sceneChanged: syncScene,
     frameChanged() {

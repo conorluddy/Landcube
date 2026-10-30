@@ -47,6 +47,101 @@ body,
   position: absolute;
   inset: 0;
   overflow: hidden;
+  transition: opacity 600ms var(--lc-ease);
+}
+
+/* === DESIGN-SYSTEM MODE: drafting ground, cross-fade, inspector flip, scan line === */
+
+/* Minor lines every 12px, major every 120px, offset 12px so the grid meets the panel inset. */
+.studio-ground {
+  position: absolute;
+  inset: 0;
+  background-color: var(--lc-canvas);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--lc-ink-3) 16%, transparent) 1px, transparent 1px),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--lc-ink-3) 16%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(color-mix(in srgb, var(--lc-ink-3) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--lc-ink-3) 7%, transparent) 1px, transparent 1px);
+  background-position: 12px 12px;
+  background-size:
+    120px 120px,
+    120px 120px,
+    12px 12px,
+    12px 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 600ms var(--lc-ease);
+}
+
+.studio-shell[data-mode-target='system'] > .studio-viewport {
+  opacity: 0;
+}
+
+.studio-shell[data-mode-target='system'] > .studio-ground {
+  opacity: 1;
+}
+
+/* The transform sits on the glass itself: a preserve-3d parent would kill its backdrop blur. */
+.studio-shell[data-flip] > .lc-inspector {
+  transform: perspective(1800px) rotateY(var(--lc-mode-flip-angle, 0deg));
+}
+
+.studio-shell[data-flip='foldOut'] > .lc-inspector {
+  transition: transform 260ms cubic-bezier(0.5, 0, 0.9, 0.4);
+}
+
+.studio-shell[data-flip='foldIn'] > .lc-inspector {
+  transition: transform 300ms var(--lc-ease);
+}
+
+/* One bone sweep across the stage, clipped short of the inspector. */
+.studio-scan {
+  position: absolute;
+  top: 0;
+  right: 408px;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.studio-scan::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--lc-bone);
+  box-shadow: 0 0 14px 3px color-mix(in srgb, var(--lc-bone) 55%, transparent);
+  animation: studio-scan 640ms var(--lc-ease) forwards;
+  content: '';
+}
+
+@keyframes studio-scan {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-viewport,
+  .studio-ground {
+    transition-duration: 200ms;
+  }
 }
 
 .studio-header {
@@ -174,7 +269,8 @@ body,
 .studio-status .source-label,
 .studio-status .studio-status-message,
 .studio-status .attribution,
-.studio-status .studio-github {
+.studio-status .studio-github,
+.studio-status .studio-mode-link {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -196,15 +292,33 @@ body,
   text-decoration: none;
 }
 
-.studio-github {
+.studio-github,
+.studio-mode-link {
   flex: none;
   color: var(--lc-text-strong);
   text-decoration: none;
 }
 
+/* A text link that switches mode, so a button with the link's look. */
+.studio-mode-link {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
 .studio-status .attribution:hover,
-.studio-status .studio-github:hover {
+.studio-status .studio-github:hover,
+.studio-status .studio-mode-link:hover {
   color: var(--lc-text-primary);
+}
+
+.studio-status .studio-mode-link:hover {
+  text-decoration: underline;
 }
 
 /* The theme toggle is a 44px glass IconButton elsewhere; inside the 36px footer it shrinks to a bare square. */

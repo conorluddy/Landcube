@@ -37,11 +37,17 @@ export function StudioFooter({
   state,
   inspectorId,
   inspectorToggleRef,
+  onOpenSystem,
+  onPreloadSystem,
 }: {
   controller: StudioController;
   state: StudioState;
   inspectorId: string;
   inspectorToggleRef: Ref<HTMLButtonElement>;
+  /** Flips the studio into design-system mode. */
+  onOpenSystem: () => void;
+  /** Fetches the system chunk ahead of a likely click, so the flip lands on loaded content. */
+  onPreloadSystem: () => void;
 }): ReactNode {
   const { workspace, source } = state;
   const isRoadCreditShown = areRoadsDrawn(state);
@@ -134,6 +140,15 @@ export function StudioFooter({
         )}
         <DataSources state={state} />
         <ThemeToggle />
+        <button
+          type="button"
+          className="studio-mode-link"
+          onClick={onOpenSystem}
+          onPointerEnter={onPreloadSystem}
+          onFocus={onPreloadSystem}
+        >
+          Design system ◧
+        </button>
         <a
           className="studio-github"
           href="https://github.com/conorluddy/landcube"

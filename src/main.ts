@@ -6,6 +6,7 @@ import { createStudioController, getSceneCredits } from './studio/controller';
 import { createCompareSceneStore } from './studio/compare-scene';
 import { createCropPreview } from './studio/crop-preview';
 import { mountStudio, phoneViewportQuery } from './studio/app';
+import { modeFlipTiming } from './studio/mode-flip';
 import { applySignalAccent, readSignalAccent } from './studio/accent';
 import { browserLocalStorage, browserSessionStorage } from './studio/browser-storage';
 import { shouldShowSplash } from './studio/pages/splash-session';
@@ -804,13 +805,29 @@ applySignalAccent(
 );
 // A route load, toggle or clear redraws the 3D model; 2D reads it straight from state.
 let drawnRoute = controls.getSnapshot().workspace.route;
+// Design-system mode fades the canvas out, then stops 3D drawing; returning resumes before the fade in.
+let terrainMode = controls.getSnapshot().workspace.mode;
+let terrainSuspendTimer: ReturnType<typeof setTimeout> | undefined;
 
 controls.subscribe(() => {
-  const { route } = controls.getSnapshot().workspace;
+  const { route, mode } = controls.getSnapshot().workspace;
 
   if (route !== drawnRoute) {
     drawnRoute = route;
     updateTerrain3d();
+  }
+
+  if (mode !== terrainMode) {
+    terrainMode = mode;
+    clearTimeout(terrainSuspendTimer);
+
+    if (mode === 'system') {
+      terrainSuspendTimer = setTimeout(() => {
+        terrain3d.setSuspended(true);
+      }, modeFlipTiming.canvasFadeMs);
+    } else {
+      terrain3d.setSuspended(false);
+    }
   }
 });
 controls.workspace({

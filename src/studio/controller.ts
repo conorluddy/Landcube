@@ -175,6 +175,8 @@ export interface TerrainSourceState {
   autoplay: { enabled: boolean; delaySeconds: number };
 }
 export type StudioPage = 'studio' | 'library' | 'presets' | 'account';
+/** `system` swaps the canvas for the design-system gallery (desktop only). */
+export type StudioMode = 'studio' | 'system';
 /** The active on-canvas tool; `none` leaves every canvas pointer event to the terrain. */
 export type ToolMode = 'none' | 'crop' | 'measure' | 'presets' | 'route';
 
@@ -220,6 +222,10 @@ export interface StudioState {
     comparePresetsOpen: boolean;
     /** Session-only. Crop applies to the 3D model, so the crop frame shows only in 3D. */
     toolMode: ToolMode;
+    /** Session-only; the mode flip in `mode-flip.ts` animates between the two. */
+    mode: StudioMode;
+    /** The design-system part on the stage, by registry id. */
+    systemPartId: string;
   };
   seedLocked: boolean;
   status: string;
@@ -452,6 +458,8 @@ export function createStudioController(
       compare: null,
       comparePresetsOpen: false,
       toolMode: 'none',
+      mode: 'studio',
+      systemPartId: 'ink',
     },
     seedLocked: actions.isSeedLocked,
     status: '',
