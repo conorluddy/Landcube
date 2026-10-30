@@ -4,6 +4,7 @@ import test from 'node:test';
 import type { Specimen } from '../ui/specimens';
 import { renderMarkup } from '../ui/test-helpers';
 import { FoundationPlate } from './foundation-plates';
+import { LayoutPlate } from './layout-plates';
 import { systemParts, systemSections } from './registry';
 
 const uiDirectory = new URL('../ui/', import.meta.url);
@@ -50,14 +51,20 @@ void test('parts are listed section by section, in rail order', () => {
   );
 });
 
-void test('every foundation cell renders as a plate', () => {
+void test('every drawn cell renders as a plate', () => {
   for (const part of systemParts) {
-    if (part.kind !== 'foundation') {
+    if (part.kind === 'component') {
       continue;
     }
 
     for (const cell of part.cells) {
-      const markup = renderMarkup(<FoundationPlate cell={cell} />);
+      const markup = renderMarkup(
+        cell.k === 'desktopShell' || cell.k === 'mobileShell' ? (
+          <LayoutPlate cell={cell} />
+        ) : (
+          <FoundationPlate cell={cell} />
+        ),
+      );
 
       assert.match(markup, /system-plate/, `${part.id} ${cell.k} ${cell.label}`);
     }

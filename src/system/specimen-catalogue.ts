@@ -38,7 +38,7 @@ export function getComponentSpecimens(component: string): ComponentSpecimens {
   return found;
 }
 
-/** How many plates a part shows: its specimens, or its foundation cells. */
+/** How many plates a part shows: its specimens, or its drawn cells. */
 export function countPlates(part: CodedPart): number {
   return part.kind === 'component'
     ? getComponentSpecimens(part.component).specimens.length

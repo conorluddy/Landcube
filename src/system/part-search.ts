@@ -17,7 +17,7 @@ export function findParts(parts: readonly CodedPart[], query: string): CodedPart
     [
       part.name,
       part.summary,
-      part.kind === 'foundation' ? part.source : part.component,
+      part.kind === 'component' ? part.component : part.source,
       part.group,
       part.code,
     ]

@@ -6,6 +6,8 @@ A footer link (`Design system ◧`) flips the studio into a living specimen book
 
 - **No second copy of any component.** Component plates are the `defineSpecimens` entries from `src/ui/**/*.specimens.tsx`, the same ones `/specimens.html` and the screenshot suite use (`specimen-catalogue.ts`). The registry holds only editorial metadata.
 - **Foundations read live tokens.** Tokens aren't components, so `foundation-plates.tsx` draws them. Every value shown comes from `getComputedStyle` (`token-value.ts`), never from a copy.
+- **Real terrain behind plates.** `assets/terrain-plate.webp` is a greyscale frame from the real 3D renderer, captured by `npx tsx scripts/capture-terrain-plate.ts` (default location, bundled tiles, so it runs offline). Overlay specimens pick it up through `--lc-specimen-stage-background`; the catalogue keeps its flat stand-in. Recapture when the renderer's look changes.
+- **Layouts are diagrams or real components.** The desktop shell is drawn to scale from the shell's numbers. The phone is real `BottomSheet`, `FloatingBar` and `IconButton` at 390 × 800, scaled into a 210px frame, so its snaps are the sheet's own.
 - **Lazy chunk.** `src/studio/app.tsx` loads `system-mode.tsx` with `React.lazy`. The studio entry bundle carries none of this folder (`tests/specimens-build.test.ts`).
 - **Desktop only.** Below 768px the mode falls back to the studio.
 
