@@ -203,9 +203,13 @@ function Studio({
   // A rejected lazy import stays rejected, so a failed load swaps in a fresh one for the retry.
   const [SystemMode, setSystemMode] = useState(() => lazy(loadSystemMode));
 
+  // Opening from the studio moves focus into the gallery; a link straight in leaves it alone.
+  const [isSystemOpenedFromStudio, setIsSystemOpenedFromStudio] = useState(false);
+
   const requestMode = (mode: StudioMode) => {
     if (mode === 'system') {
       preloadSystemMode();
+      setIsSystemOpenedFromStudio(true);
     }
 
     modeFlip.request(mode);
@@ -319,6 +323,7 @@ function Studio({
           <Suspense fallback={null}>
             <SystemMode
               partId={state.workspace.systemPartId}
+              isFocusedOnEntry={isSystemOpenedFromStudio}
               onSelectPart={(systemPartId) => {
                 c.workspace({ systemPartId });
               }}

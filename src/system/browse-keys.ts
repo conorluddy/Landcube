@@ -14,6 +14,33 @@ export function readBrowseStep(event: {
   return arrowKeySteps[event.key];
 }
 
+/** ⌘F or Ctrl+F, or a bare `/`: both move focus to Find. */
+export function isFindShortcut(event: {
+  key: string;
+  altKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+}): boolean {
+  if (event.altKey || event.shiftKey) {
+    return false;
+  }
+
+  if (event.metaKey || event.ctrlKey) {
+    return event.key.toLowerCase() === 'f';
+  }
+
+  return event.key === '/';
+}
+
+/** Fields take typed keys, so shortcuts that are plain characters must leave them alone. */
+export function isTextField(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+  );
+}
+
 /**
  * True where arrow keys already mean something: fields, and everything on a plate, whose
  * specimens (sliders, tabs, radio groups, listboxes) own their keys.
@@ -21,8 +48,7 @@ export function readBrowseStep(event: {
 export function ownsArrowKeys(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLElement &&
-    (target.isContentEditable ||
-      ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
+    (isTextField(target) ||
       target.closest(
         '.system-plate, [role="slider"], [role="tablist"], [role="radiogroup"], [role="listbox"], [role="menu"]',
       ) !== null)

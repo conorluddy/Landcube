@@ -7,6 +7,7 @@ import { createCompareSceneStore } from './studio/compare-scene';
 import { createCropPreview } from './studio/crop-preview';
 import { mountStudio, phoneViewportQuery } from './studio/app';
 import { modeFlipTiming } from './studio/mode-flip';
+import { readSystemLink, replaceSystemLink } from './system-link';
 import { applySignalAccent, readSignalAccent } from './studio/accent';
 import { browserLocalStorage, browserSessionStorage } from './studio/browser-storage';
 import { shouldShowSplash } from './studio/pages/splash-session';
@@ -828,6 +829,27 @@ controls.subscribe(() => {
     } else {
       terrain3d.setSuspended(false);
     }
+  }
+});
+// A `?mode=system` link opens the design-system gallery (desktop only); the address bar then
+// follows the part on show, so any part can be linked to.
+const openedSystemLink = readSystemLink(new URLSearchParams(location.search));
+let linkedSystemPartId = openedSystemLink?.partReference;
+
+if (openedSystemLink !== undefined && !matchMedia(phoneViewportQuery).matches) {
+  controls.workspace({
+    mode: 'system',
+    systemPartId: openedSystemLink.partReference ?? controls.getSnapshot().workspace.systemPartId,
+  });
+}
+
+controls.subscribe(() => {
+  const { mode, systemPartId } = controls.getSnapshot().workspace;
+  const partId = mode === 'system' ? systemPartId : undefined;
+
+  if (partId !== linkedSystemPartId) {
+    linkedSystemPartId = partId;
+    replaceSystemLink(location.href, partId, history);
   }
 });
 controls.workspace({

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './system.css';
-import { ownsArrowKeys, readBrowseStep } from './browse-keys';
+import { isFindShortcut, isTextField, ownsArrowKeys, readBrowseStep } from './browse-keys';
 import { findParts, stepPart } from './part-search';
-import { findPartById, systemParts, systemSections } from './registry';
+import { findPartByCode, findPartById, systemParts, systemSections } from './registry';
 import type { SystemSectionId } from './registry.types';
 import { SystemFooter, SystemHeader, SystemHud } from './system-chrome';
 import { SystemNav } from './system-nav';
@@ -10,9 +10,11 @@ import { SystemStage } from './system-stage';
 import { countPlates } from './specimen-catalogue';
 
 export interface SystemModeProps {
-  /** The part on the stage; an unknown id shows the first part. */
+  /** The part on the stage, by id or code (from a link); an unknown one shows the first part. */
   partId: string;
   onSelectPart: (id: string) => void;
+  /** Moves focus to the current part on entry, for keyboard users arriving from the studio. */
+  isFocusedOnEntry: boolean;
   /** Flips back to the studio. */
   onExit: () => void;
 }
@@ -24,14 +26,23 @@ export interface SystemModeProps {
 export default function SystemMode({
   partId,
   onSelectPart,
+  isFocusedOnEntry,
   onExit,
 }: SystemModeProps): React.JSX.Element {
-  const part = findPartById(partId) ?? systemParts[0];
+  const part = findPartById(partId) ?? findPartByCode(partId) ?? systemParts[0];
   const [navSectionId, setNavSectionId] = useState<SystemSectionId>(part.section);
   const [query, setQuery] = useState('');
+  const findInput = useRef<HTMLInputElement>(null);
   const hits = query.trim() === '' ? undefined : findParts(systemParts, query);
   const section = systemSections.find(({ id }) => id === part.section) ?? systemSections[0];
   const position = systemParts.indexOf(part) + 1;
+
+  // A link may name a part by code, or by nothing we know: settle on the id actually shown.
+  useEffect(() => {
+    if (part.id !== partId) {
+      onSelectPart(part.id);
+    }
+  }, [part.id, partId, onSelectPart]);
 
   // Stepping across a section boundary takes the nav along with it.
   useEffect(() => {
@@ -40,18 +51,33 @@ export default function SystemMode({
 
   // The control that opened this mode unmounted with the studio chrome; keep keyboard users in place.
   useEffect(() => {
-    if (document.activeElement === null || document.activeElement === document.body) {
+    const isFocusLost = document.activeElement === null || document.activeElement === document.body;
+
+    if (isFocusedOnEntry && isFocusLost) {
       document
         .querySelector<HTMLElement>('#system-inspector .lc-part-row[aria-current="true"]')
         ?.focus();
     }
+    // Entry only: later renders must not pull focus back.
   }, []);
 
   useEffect(() => {
-    const browse = (event: KeyboardEvent) => {
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      if (isFindShortcut(event) && !(event.key === '/' && isTextField(event.target))) {
+        event.preventDefault();
+        findInput.current?.focus();
+        findInput.current?.select();
+
+        return;
+      }
+
       const delta = readBrowseStep(event);
 
-      if (delta === undefined || event.defaultPrevented || ownsArrowKeys(event.target)) {
+      if (delta === undefined || ownsArrowKeys(event.target)) {
         return;
       }
 
@@ -59,10 +85,10 @@ export default function SystemMode({
       onSelectPart(stepPart(systemParts, part.id, delta).id);
     };
 
-    document.addEventListener('keydown', browse);
+    document.addEventListener('keydown', handleKey);
 
     return () => {
-      document.removeEventListener('keydown', browse);
+      document.removeEventListener('keydown', handleKey);
     };
   }, [part.id, onSelectPart]);
 
@@ -72,6 +98,7 @@ export default function SystemMode({
         part={part}
         section={section}
         query={query}
+        findInputRef={findInput}
         matchCount={hits?.length}
         onQueryChange={setQuery}
         onExit={onExit}
