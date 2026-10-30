@@ -297,6 +297,24 @@ void test('a searched place is saved and listed once its terrain loads', async (
   assert.deepEqual(setup(undefined, storage).controller.getSnapshot().savedPlaces, [saved]);
 });
 
+void test('a searched place can load with an explicit area span', async (t) => {
+  const { controller: c } = setup();
+
+  stubBrowserTileDecoding(t);
+  await c.loadSearchedPlace(
+    {
+      name: 'Ben Nevis',
+      detail: 'Scotland',
+      latitude: 56.7969,
+      longitude: -5.0035,
+      provider: 'photon',
+    },
+    50,
+  );
+  assert.equal(c.getSnapshot().source.spanKm, 50);
+  assert.equal(c.getSnapshot().source.place, '56.7969,-5.0035');
+});
+
 void test('searched places from separate tabs are merged when each load succeeds', async (t) => {
   const items = new Map<string, string>();
   const storage = {
