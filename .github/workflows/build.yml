@@ -54,8 +54,8 @@ jobs:
     timeout-minutes: 15
     strategy:
       fail-fast: false
-      # Groups are Playwright projects in playwright.config.ts; 3D terrain and studio split by test
-      # across two runners each, since 3D terrain alone took 7 minutes on one.
+      # Groups are Playwright projects in playwright.config.ts. Each splits by test across two
+      # runners, since the 3D groups took 7-9 minutes on one.
       matrix:
         include:
           - group: 3D terrain 1/2
@@ -64,9 +64,12 @@ jobs:
           - group: 3D terrain 2/2
             slug: 3d-terrain-2
             args: --project=3d-terrain --shard=2/2
-          - group: 3D tools
-            slug: 3d-tools
-            args: --project=3d-tools
+          - group: 3D tools 1/2
+            slug: 3d-tools-1
+            args: --project=3d-tools --shard=1/2
+          - group: 3D tools 2/2
+            slug: 3d-tools-2
+            args: --project=3d-tools --shard=2/2
           - group: studio 1/2
             slug: studio-1
             args: --project=studio --shard=1/2
