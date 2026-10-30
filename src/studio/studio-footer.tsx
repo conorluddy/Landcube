@@ -6,6 +6,7 @@ import { IconButton } from '../ui/icon-button';
 import { SignalMark } from '../ui/signal-mark';
 import { areRoadsDrawn, type StudioController, type StudioState } from './controller';
 import { applyTheme, currentTheme, subscribeToTheme } from './theme';
+import { isSoundMuted, setSoundMuted, subscribeToSoundMuted } from '../sound-preference';
 
 /**
  * Phone status line inside the bottom sheet's peek row: live status, then the "Data sources"
@@ -98,6 +99,7 @@ export function StudioFooter({
         </a>
       </BarGroup>
       <BarGroup className="studio-tools" role="group" label="Viewport tools">
+        <SoundToggle />
         <Button
           variant="text"
           size="small"
@@ -153,6 +155,21 @@ function ThemeToggle(): ReactNode {
       isActive={isLight}
       onClick={() => {
         applyTheme(isLight ? 'dark' : 'light', document.documentElement, localStorage);
+      }}
+    />
+  );
+}
+
+function SoundToggle(): ReactNode {
+  const isMuted = useSyncExternalStore(subscribeToSoundMuted, isSoundMuted);
+
+  return (
+    <IconButton
+      glyph={isMuted ? '♪̸' : '♪'}
+      label={isMuted ? 'Unmute sound' : 'Mute sound'}
+      isActive={!isMuted}
+      onClick={() => {
+        setSoundMuted(!isMuted);
       }}
     />
   );

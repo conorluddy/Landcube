@@ -1,4 +1,5 @@
 import { terrainTransitionDurationMs } from './constants/terrain-transition';
+import { isSoundMuted, subscribeToSoundMuted } from './sound-preference';
 
 /** Spike: a tectonic rumble under each landscape morph, faded out as the terrain settles. */
 export interface TerrainTransitionAudio {
@@ -39,7 +40,18 @@ export function createTerrainTransitionAudio(): TerrainTransitionAudio {
     source.stop(now + fadeOutSeconds);
   };
 
+  // Muting mid-rumble fades it rather than letting it run out.
+  subscribeToSoundMuted((isMuted) => {
+    if (isMuted) {
+      fadeOut();
+    }
+  });
+
   const play = () => {
+    if (isSoundMuted()) {
+      return;
+    }
+
     context ??= new AudioContext();
     rumble ??= loadRumble(context);
     void context.resume();
