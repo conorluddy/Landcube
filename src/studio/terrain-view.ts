@@ -9,6 +9,7 @@ import type { FloorPlace } from '../floor-geo';
 import type { RoadPath } from '../types/roads';
 import type { GrassGeography } from '../grass-coverage';
 import type { TerrainRouteOverlay } from '../terrain-3d-route';
+import type { FramePoint } from '../real-terrain-projection';
 import { getAutoRotateSpeed, type TerrainViewPreset } from '../terrain-camera';
 import { createShellMotion } from './shell-motion';
 import { createCameraPosePublisher } from './camera-pose';
@@ -31,6 +32,12 @@ interface StudioTerrainView {
   getStl: () => ArrayBuffer;
   /** The model point under a viewport position while 3D is active, as fractions across the model. */
   getSurfaceFractionAt: (clientX: number, clientY: number) => { x: number; y: number } | undefined;
+  /** The profile-inspection marker, in model-crop units; main re-sends it after each 3D update. */
+  setRouteMarker: (point: FramePoint | undefined) => void;
+  /** Viewport pixels of a crop-unit point on the displayed 3D surface. */
+  projectCropPointToClient: (point: FramePoint) => { clientX: number; clientY: number } | undefined;
+  /** Runs after each drawn 3D frame, so overlays can follow the camera; returns an unsubscribe. */
+  subscribeDraw: (listener: () => void) => () => void;
   update: (
     contours: Contour[],
     width: number,
@@ -58,6 +65,8 @@ export function createStudioTerrainView(
   let suspended = false;
   let floorPlace: FloorPlace | undefined;
   let interval: number | undefined;
+  // The 3D module loads lazily, so listeners live here and are fanned out from one view subscription.
+  const drawListeners = new Set<() => void>();
   const motion = createShellMotion(() => document.querySelector('.studio-shell'));
   const posePublisher = createCameraPosePublisher(
     (pose) => {
@@ -199,6 +208,11 @@ export function createStudioTerrainView(
             }
           },
         );
+        view.subscribeDraw(() => {
+          for (const listener of drawListeners) {
+            listener();
+          }
+        });
         const canvas = document.querySelector<HTMLCanvasElement>('canvas.terrain-3d');
 
         if (canvas) {
@@ -257,6 +271,16 @@ export function createStudioTerrainView(
     },
     getSurfaceFractionAt: (clientX, clientY) =>
       active ? view?.getSurfaceFractionAt(clientX, clientY) : undefined,
+    setRouteMarker: (point) => view?.setRouteMarker(point),
+    projectCropPointToClient: (point) =>
+      active ? view?.projectCropPointToClient(point) : undefined,
+    subscribeDraw(listener) {
+      drawListeners.add(listener);
+
+      return () => {
+        drawListeners.delete(listener);
+      };
+    },
     getStl() {
       if (!view || !active) {
         throw new Error('Select the 3D view before downloading STL.');

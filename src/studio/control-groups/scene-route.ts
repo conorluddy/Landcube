@@ -1,6 +1,6 @@
 /*
- * Route group (SCEN.12): a GPX track or route drawn over real terrain, in 2D and draped in 3D.
- * Session-only; never in design links or the STL. Built only when real terrain is loaded.
+ * Route section (ROUT.01): a route drawn or loaded from GPX over real terrain, in 2D and draped in
+ * 3D. Session-only; never in design links or the STL. Built only when real terrain is loaded.
  */
 import { createElement } from 'react';
 import { getFault } from '../../constants/faults';
@@ -9,18 +9,40 @@ import type { ControlGroupDefinition } from '../../ui/control-rows';
 import type { RealTerrain } from '../../real-terrain';
 import type { StudioController, StudioState } from '../controller';
 import { buttonRow, customRow, hintRow, statusRow, toggleRow } from '../control-rows';
+import { drawRoute, exportRouteGpx } from '../route-actions';
+import { isRouteComplete } from '../route-editing';
 import { RouteFileField } from '../route-file-field';
 import { countRoutePointsInside, describeRoute } from '../route-overlay';
+import { analyseActiveRoute } from '../active-route-analysis';
+import { isRouteFramed } from '../../route-framing';
+import type { ActiveRoute } from '../../types/terrain-analysis';
 
 // === PUBLIC API ===
 
-export function buildRouteGroup(
+export function buildRouteGroups(
+  controller: StudioController,
+  state: StudioState,
+): ControlGroupDefinition[] {
+  const { terrain } = state.source;
+
+  return terrain ? [buildRouteGroup(controller, state, terrain)] : [];
+}
+
+// === GROUPS ===
+
+function buildRouteGroup(
   controller: StudioController,
   state: StudioState,
   terrain: RealTerrain,
 ): ControlGroupDefinition {
   const { route, routeFault } = state.workspace;
-  const insideCount = route === null ? undefined : countRoutePointsInside(route.points, terrain);
+  const isIncomplete = route !== null && !isRouteComplete(route.active);
+  const isComplete = route !== null && !isIncomplete;
+  const isEditingGeometry = route !== null && route.editing.mode !== 'viewing';
+  const insideCount =
+    route === null ? undefined : countRoutePointsInside(route.active.waypoints, terrain);
+  const shouldOfferCentring =
+    isComplete && !isEditingGeometry && !isTerrainFramingRoute(route.active, terrain, insideCount);
 
   return {
     id: 'route',
@@ -42,13 +64,63 @@ export function buildRouteGroup(
           controller.toggleRoute();
         },
       }),
-      route !== null && hintRow('route-stats', describeRoute(route)),
+      route !== null &&
+        hintRow(
+          'route-stats',
+          describeRoute(route, analyseActiveRoute(route.active, terrain.sourceElevations)),
+        ),
+      isIncomplete &&
+        hintRow('route-incomplete', 'Incomplete route: place at least two waypoints.'),
       route !== null &&
         insideCount !== undefined &&
         hintRow(
           'route-clip',
-          `${insideCount} of ${route.points.length} points inside the loaded area.`,
+          `${insideCount} of ${route.active.waypoints.length} points inside the loaded area.`,
         ),
+      shouldOfferCentring &&
+        hintRow('route-centre-hint', 'The route is off-centre on this terrain.'),
+      shouldOfferCentring &&
+        buttonRow('route-centre', {
+          children: 'Centre terrain on route',
+          disabled: state.source.loading,
+          onClick: () => {
+            void controller.centreTerrainOnRoute();
+          },
+        }),
+      buttonRow('route-draw', {
+        children: 'Draw route',
+        onClick: () => {
+          drawRoute(controller);
+        },
+      }),
+      buttonRow('route-edit', {
+        children: 'Edit route',
+        disabled: !isComplete || isEditingGeometry,
+        onClick: () => {
+          controller.editRoute();
+        },
+      }),
+      buttonRow('route-finish', {
+        children: 'Finish route',
+        disabled: !isEditingGeometry,
+        onClick: () => {
+          controller.finishRoute();
+        },
+      }),
+      buttonRow('route-reverse', {
+        children: 'Reverse route',
+        disabled: route === null,
+        onClick: () => {
+          controller.reverseRoute();
+        },
+      }),
+      buttonRow('route-export', {
+        children: 'Export route GPX',
+        disabled: !isComplete,
+        onClick: () => {
+          exportRouteGpx(controller, state);
+        },
+      }),
       buttonRow('route-clear', {
         children: 'Clear route',
         disabled: route === null,
@@ -62,4 +134,21 @@ export function buildRouteGroup(
       ),
     ],
   };
+}
+
+// === HELPERS ===
+
+/** Real terrain loaded around the route already, so there is nothing to offer. */
+function isTerrainFramingRoute(
+  route: ActiveRoute,
+  terrain: RealTerrain,
+  insideCount: number | undefined,
+): boolean {
+  const { location, spanKm } = terrain;
+
+  return (
+    location === undefined ||
+    spanKm === undefined ||
+    isRouteFramed(route.waypoints, { location, spanKm }, insideCount ?? 0)
+  );
 }

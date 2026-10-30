@@ -45,12 +45,18 @@ import type { RealTerrain } from '../real-terrain';
 import type { DesignSettings, ValidatedDesignSettings } from '../types/design';
 import type { OperationError, Result } from '../types/operations';
 import { parseGpx, routeStats, simplifyRoute } from '../gpx';
-import type { RoutePoint, RouteStats, RouteWaypoint } from '../types/route';
+import type { RouteStats } from '../types/route';
+import type { ActiveRoute, GeoPoint, RouteEditing } from '../types/terrain-analysis';
+import { reduceRouteEditing, type RouteEditingAction } from './route-editing';
+import { frameRoute } from '../route-framing';
+import { defaultSlopeThresholdPercent } from '../constants/route-analysis';
 import type { WaterStyle } from '../terrain-3d';
 import type { FloorStyle } from '../terrain-floor-styles';
 import type { TerrainStillScale } from '../export/still-export';
 import { defaultRoadStyle, roadDetailClasses, roadSpanLimitsKm } from '../constants/roads';
 import { operationErrorCodes } from '../constants/operations';
+import { parseDesignParameters } from '../design-settings';
+import type { SavedDesign } from '../saved-designs';
 import type { RoadNetwork, RoadStyle } from '../types/roads';
 import {
   clampDivider,
@@ -91,8 +97,22 @@ import {
 
 export type StudioView = '2d' | '3d';
 export type InspectorSection =
-  'Terrain' | 'Contours' | 'Colour' | 'Scene' | 'Camera' | 'Model' | 'Frame';
-export const threeDOnlySections: readonly InspectorSection[] = ['Camera', 'Model', 'Frame'];
+  | 'Terrain'
+  | 'Contours'
+  | 'Colour'
+  | 'Camera'
+  | 'Orbit'
+  | 'Scene'
+  | 'Overlays'
+  | 'Route'
+  | 'Model'
+  | 'Frame';
+export const threeDOnlySections: readonly InspectorSection[] = [
+  'Camera',
+  'Orbit',
+  'Model',
+  'Frame',
+];
 export interface SceneSettings {
   contours: boolean;
   engraving: ContourEngravingSettings;
@@ -141,13 +161,23 @@ export interface RoadNetworkState {
   /** The last download failed; `status` explains why. */
   hasFailed: boolean;
 }
-/** A loaded GPX route, simplified for drawing; stats come from the recorded points. */
+/** The session's one route: geometry, editing mode and view state. Session-only, never in links. */
 export interface WorkspaceRoute {
-  name: string;
-  points: RoutePoint[];
-  waypoints: RouteWaypoint[];
-  stats: RouteStats;
+  active: ActiveRoute;
+  editing: RouteEditing;
   isVisible: boolean;
+  /** Recorded-point stats; imported routes only (drawn routes get terrain analysis instead). */
+  stats?: RouteStats;
+  /** Profile cursor: distance along the route being inspected. */
+  inspectedDistanceMeters?: number;
+}
+
+/** A new drawing or GPX load waiting for the user to confirm discarding the current route (REQ-19). */
+export type PendingRouteReplacement =
+  { kind: 'draw' } | { kind: 'import'; text: string; fallbackName: string };
+
+export interface RouteReplaceResult {
+  needsConfirmation: boolean;
 }
 
 /** Douglas-Peucker tolerance for drawn routes: below a pixel at any supported span. */
@@ -199,7 +229,6 @@ export interface StudioState {
     activating: boolean;
     collapsed: boolean;
     sections: Record<StudioView, InspectorSection>;
-    popover: 'Overlays' | 'Orbit' | null;
     exporting: boolean;
     dossierOpen: boolean;
     /** Phone bottom-sheet height. Session-only: never serialized into links. */
@@ -216,6 +245,8 @@ export interface StudioState {
     route: WorkspaceRoute | null;
     /** Why the last GPX file was refused; the previous route stays. */
     routeFault: OperationError | null;
+    /** Shown as the replace-confirm dialog until confirmed or cancelled. */
+    routeReplacement: PendingRouteReplacement | null;
     /** The A/B preset wipe. Session-only; `null` while no preset is being compared. */
     compare: { presetId: string; dividerFraction: number } | null;
     /** The desktop preset strip. Session-only. */
@@ -284,9 +315,39 @@ export interface StudioController {
   /** Brings a pinned panel above the others. */
   raiseGroup: (id: string) => void;
   dismissManualLink: () => void;
-  /** Parses and shows a GPX route; an invalid file sets `workspace.routeFault` and keeps the old route. */
-  loadRoute: (text: string, fallbackName?: string) => void;
+  /**
+   * Parses and shows a GPX route; an invalid file sets `workspace.routeFault` and keeps the old
+   * route. Over a non-empty route it only sets `workspace.routeReplacement` and waits.
+   */
+  loadRoute: (text: string, fallbackName?: string) => RouteReplaceResult;
+  /** Starts a new empty drawn route in drawing mode, asking first like `loadRoute`. */
+  startRouteDrawing: () => RouteReplaceResult;
+  /** Runs the pending replacement; a confirmed drawing also hands the canvas to the Route tool. */
+  confirmRouteReplacement: () => void;
+  cancelRouteReplacement: () => void;
+  placeRouteWaypoint: (point: GeoPoint) => void;
+  moveRouteWaypoint: (index: number, point: GeoPoint) => void;
+  /** Inserts between waypoint `segmentIndex` and the next. */
+  insertRouteWaypoint: (segmentIndex: number, point: GeoPoint) => void;
+  selectRouteWaypoint: (index: number | undefined) => void;
+  /** Deletes the selected waypoint. */
+  deleteRouteWaypoint: () => void;
+  finishRoute: () => void;
+  editRoute: () => void;
+  escapeRoute: () => void;
+  reverseRoute: () => void;
   clearRoute: () => void;
+  setRouteSlopeThreshold: (percent: number) => void;
+  inspectRoute: (distanceMeters: number | undefined) => void;
+  /** Loads real terrain centred on the route at a span that holds it; a no-op without a route. */
+  centreTerrainOnRoute: () => Promise<void>;
+  /** Library restore: installs a route in viewing mode, replacing any current one. */
+  setRoute: (route: ActiveRoute) => void;
+  /**
+   * Library restore, in order: design link, then real terrain (awaited so analysis sees it), then
+   * the route. A design without a route leaves the current route alone.
+   */
+  restoreSavedDesign: (saved: SavedDesign) => Promise<Result<void>>;
   toggleRoute: () => void;
   design: (patch: Partial<DesignSettings>) => boolean;
   /** Starts (or retargets) the A/B wipe against a palette preset; unknown ids are ignored. */
@@ -447,7 +508,6 @@ export function createStudioController(
       activating: false,
       collapsed: false,
       sections: { '2d': 'Terrain', '3d': 'Terrain' },
-      popover: null,
       exporting: false,
       dossierOpen: false,
       sheetSnap: 'half',
@@ -457,6 +517,7 @@ export function createStudioController(
       hasSeenSplash: true,
       route: null,
       routeFault: null,
+      routeReplacement: null,
       compare: null,
       comparePresetsOpen: false,
       toolMode: 'none',
@@ -518,6 +579,80 @@ export function createStudioController(
   const workspace = (patch: Partial<StudioState['workspace']>) => {
     state = { ...state, workspace: { ...state.workspace, ...patch } };
     publish();
+  };
+
+  let drawnRouteCount = 0;
+
+  const installRoute = (active: ActiveRoute) => {
+    workspace({
+      routeFault: null,
+      route: toWorkspaceRoute(active, { mode: 'viewing' }, true, null),
+    });
+  };
+
+  const applyRouteAction = (action: RouteEditingAction) => {
+    const { route } = state.workspace;
+    const next = reduceRouteEditing(
+      { route: route?.active ?? null, editing: route?.editing ?? { mode: 'viewing' } },
+      action,
+    );
+
+    workspace({
+      route:
+        next.route === null
+          ? null
+          : toWorkspaceRoute(next.route, next.editing, route?.isVisible ?? true, route),
+    });
+  };
+
+  // An empty drawn route has nothing to lose, so replacing it needs no confirmation.
+  const requestReplacement = (pending: PendingRouteReplacement): boolean => {
+    if ((state.workspace.route?.active.waypoints.length ?? 0) === 0) {
+      return false;
+    }
+
+    workspace({ routeReplacement: pending });
+
+    return true;
+  };
+
+  const importRoute = (
+    text: string,
+    fallbackName: string,
+    isConfirmed: boolean,
+  ): RouteReplaceResult => {
+    const parsed = parseGpx(text);
+
+    if (!parsed.ok) {
+      workspace({ routeFault: parsed.error });
+
+      return { needsConfirmation: false };
+    }
+
+    if (!isConfirmed && requestReplacement({ kind: 'import', text, fallbackName })) {
+      return { needsConfirmation: true };
+    }
+
+    const { name, points, waypoints } = parsed.data;
+    const routeName = name ?? fallbackName;
+
+    installRoute({
+      id: createRouteId(routeName, points),
+      name: routeName,
+      provenance: 'imported',
+      waypoints: simplifyRoute(points, routeSimplifyToleranceMeters).map(toGeoPoint),
+      originalPoints: points,
+      namedWaypoints: waypoints,
+      slopeThresholdPercent: defaultSlopeThresholdPercent,
+    });
+
+    return { needsConfirmation: false };
+  };
+
+  const beginDrawing = () => {
+    drawnRouteCount += 1;
+    applyRouteAction({ type: 'start-drawing', id: `drawn-${drawnRouteCount}` });
+    workspace({ routeFault: null });
   };
 
   const updatePinnedGroup = (
@@ -751,30 +886,141 @@ export function createStudioController(
           : { ...pinned, zIndex: nextZIndex(pinnedGroups) },
       );
     },
-    loadRoute(text, fallbackName = 'GPX route') {
-      const parsed = parseGpx(text);
+    loadRoute: (text, fallbackName = 'GPX route') => importRoute(text, fallbackName, false),
+    startRouteDrawing() {
+      if (requestReplacement({ kind: 'draw' })) {
+        return { needsConfirmation: true };
+      }
 
-      if (!parsed.ok) {
-        workspace({ routeFault: parsed.error });
+      beginDrawing();
+
+      return { needsConfirmation: false };
+    },
+    confirmRouteReplacement() {
+      const pending = state.workspace.routeReplacement;
+
+      if (pending === null) {
+        return;
+      }
+
+      workspace({ routeReplacement: null });
+
+      if (pending.kind === 'import') {
+        importRoute(pending.text, pending.fallbackName, true);
 
         return;
       }
 
-      const { name, points, waypoints } = parsed.data;
-
-      workspace({
-        routeFault: null,
-        route: {
-          name: name ?? fallbackName,
-          points: simplifyRoute(points, routeSimplifyToleranceMeters),
-          waypoints,
-          stats: routeStats(points),
-          isVisible: true,
-        },
-      });
+      beginDrawing();
+      workspace({ toolMode: 'route' });
+    },
+    cancelRouteReplacement() {
+      workspace({ routeReplacement: null });
+    },
+    placeRouteWaypoint: (point) => {
+      applyRouteAction({ type: 'place', point });
+    },
+    moveRouteWaypoint: (index, point) => {
+      applyRouteAction({ type: 'drag', index, point });
+    },
+    insertRouteWaypoint: (segmentIndex, point) => {
+      applyRouteAction({ type: 'insert', segmentIndex, point });
+    },
+    selectRouteWaypoint: (index) => {
+      applyRouteAction({ type: 'select', index });
+    },
+    deleteRouteWaypoint: () => {
+      applyRouteAction({ type: 'delete' });
+    },
+    finishRoute: () => {
+      applyRouteAction({ type: 'finish' });
+    },
+    editRoute: () => {
+      applyRouteAction({ type: 'edit' });
+    },
+    escapeRoute: () => {
+      applyRouteAction({ type: 'escape' });
+    },
+    reverseRoute: () => {
+      applyRouteAction({ type: 'reverse' });
     },
     clearRoute() {
       workspace({ route: null, routeFault: null });
+    },
+    setRouteSlopeThreshold: (percent) => {
+      applyRouteAction({ type: 'set-threshold', percent });
+    },
+    inspectRoute(distanceMeters) {
+      const { route } = state.workspace;
+
+      if (route && route.inspectedDistanceMeters !== distanceMeters) {
+        workspace({
+          route: toWorkspaceRoute(
+            route.active,
+            route.editing,
+            route.isVisible,
+            route,
+            distanceMeters,
+          ),
+        });
+      }
+    },
+    setRoute(active) {
+      installRoute(active);
+    },
+    async centreTerrainOnRoute() {
+      const { route } = state.workspace;
+      const framing = route && frameRoute(route.active.originalPoints ?? route.active.waypoints);
+
+      if (!framing) {
+        return;
+      }
+
+      void controller.autoplay({ enabled: false });
+      controller.source({
+        selected: 'real',
+        place: `${framing.latitude},${framing.longitude}`,
+        ...framing,
+      });
+      await controller.loadTerrain();
+    },
+    async restoreSavedDesign(saved) {
+      const settings = readDesignLink(saved.link);
+
+      if (settings === null) {
+        return {
+          ok: false,
+          error: {
+            code: operationErrorCodes.invalidSettings,
+            message: `${saved.name} could not be opened because its saved link is invalid. Delete it and save again.`,
+            retryable: false,
+          },
+        };
+      }
+
+      controller.design(settings);
+
+      if (saved.terrain) {
+        controller.source({ selected: 'real', ...saved.terrain });
+        await controller.loadTerrain();
+      }
+
+      if (saved.route) {
+        const { id, name, provenance, points, namedWaypoints, slopeThresholdPercent } = saved.route;
+
+        // Imported routes get their recorded elevations back so GPX export never terrain-fills them.
+        installRoute({
+          id,
+          name,
+          provenance,
+          waypoints: points.map(({ latitude, longitude }) => ({ latitude, longitude })),
+          namedWaypoints,
+          slopeThresholdPercent,
+          ...(provenance === 'imported' && { originalPoints: points }),
+        });
+      }
+
+      return { ok: true, data: undefined };
     },
     toggleRoute() {
       const { route } = state.workspace;
@@ -852,7 +1098,7 @@ export function createStudioController(
       );
     },
     selectSection(section: InspectorSection) {
-      if (threeDOnlySections.includes(section) && state.workspace.view === '2d') {
+      if (getHiddenSections(state).includes(section)) {
         return;
       }
 
@@ -866,7 +1112,7 @@ export function createStudioController(
         return;
       }
 
-      workspace({ activating: true, popover: null });
+      workspace({ activating: true });
 
       try {
         await effects?.activate(view);
@@ -1512,6 +1758,69 @@ export function describeRoadNetwork(network: RoadNetwork, style: RoadStyle): str
   return `${parts.join(' · ')}.`;
 }
 
+/** Sections the inspector leaves out in this state: 3D-only ones in 2D, Route without real terrain. */
+export function getHiddenSections(
+  state: Pick<StudioState, 'workspace' | 'source'>,
+): InspectorSection[] {
+  return [
+    ...(state.workspace.view === '3d' ? [] : threeDOnlySections),
+    ...(state.source.terrain === undefined ? (['Route'] as const) : []),
+  ];
+}
+
+/** The open section, or Terrain when the remembered one is hidden (e.g. Route after real terrain goes). */
+export function getActiveSection(
+  state: Pick<StudioState, 'workspace' | 'source'>,
+): InspectorSection {
+  const remembered = state.workspace.sections[state.workspace.view];
+
+  return getHiddenSections(state).includes(remembered) ? 'Terrain' : remembered;
+}
+
+// Stats come from recorded points: recomputed only when those change (a reversal swaps ascent and
+// descent), reused while scrubbing, and gone once an edit makes the route a drawn one. A stale
+// profile cursor is dropped too.
+function toWorkspaceRoute(
+  active: ActiveRoute,
+  editing: RouteEditing,
+  isVisible: boolean,
+  previous: WorkspaceRoute | null,
+  inspectedDistanceMeters?: number,
+): WorkspaceRoute {
+  const { originalPoints } = active;
+  const stats =
+    originalPoints === undefined
+      ? undefined
+      : previous?.active.originalPoints === originalPoints
+        ? previous.stats
+        : routeStats(originalPoints);
+
+  return {
+    active,
+    editing,
+    isVisible,
+    ...(inspectedDistanceMeters === undefined ? {} : { inspectedDistanceMeters }),
+    ...(stats === undefined ? {} : { stats }),
+  };
+}
+
+function toGeoPoint({ latitude, longitude }: GeoPoint): GeoPoint {
+  return { latitude, longitude };
+}
+
+/** FNV-1a over name and coordinates: the same file always gets the same id, with no randomness. */
+function createRouteId(name: string, points: readonly GeoPoint[]): string {
+  let hash = 0x811c9dc5;
+
+  const text = `${name}|${points.map((p) => `${p.latitude},${p.longitude}`).join(';')}`;
+
+  for (let index = 0; index < text.length; index++) {
+    hash = Math.imul(hash ^ text.charCodeAt(index), 0x01000193) >>> 0;
+  }
+
+  return `imported-${hash.toString(16).padStart(8, '0')}`;
+}
+
 /** "1 bridge", "2 bridges", "1,204 mapped roads". */
 function countOf(count: number, noun: string): string {
   return `${count.toLocaleString('en')} ${noun}${count === 1 ? '' : 's'}`;
@@ -1568,6 +1877,17 @@ function applySuggestedExaggeration(
     ...model,
     exaggeration: getSuggestedExaggeration(elevations.metersPerUnit * 1.6, terrain.spanKm),
   };
+}
+
+/** Parses a stored design link exactly as a pasted URL would be; null when it is not a valid link. */
+function readDesignLink(link: string): Partial<DesignSettings> | null {
+  try {
+    const result = parseDesignParameters(new URL(link).searchParams);
+
+    return result.ok ? result.data.settings : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Absent outside browsers, where tests run with motion allowed. */

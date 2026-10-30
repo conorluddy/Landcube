@@ -1,10 +1,10 @@
 import { downloadTerrainTile } from './terrain-tile-download';
 import { bundledTerrainTileSources } from './constants/bundled-terrain-tiles';
+import { terrariumTileSizePixels } from './constants/real-terrain';
 import { loadRealTerrain as loadTerrainFromTiles } from './real-terrain';
 import type { DecodedTerrainTile, RealTerrain, TerrainLoadProgressReporter } from './real-terrain';
 import { TerrainLoadError } from './terrain-load-error';
 
-const terrainTileSizePixels = 256;
 /** Terrarium tiles are immutable; bump the version only if the cached format changes. */
 // Legacy cache name kept across the landcube rename so existing data survives.
 const terrainTileCacheName = 'topogra-terrain-tiles-v1';
@@ -54,7 +54,7 @@ async function decodeBrowserTerrainTile(
   try {
     const canvas = document.createElement('canvas');
 
-    canvas.width = canvas.height = terrainTileSizePixels;
+    canvas.width = canvas.height = terrariumTileSizePixels;
     const context = canvas.getContext('2d', { willReadFrequently: true });
 
     if (!context) {
@@ -65,7 +65,7 @@ async function decodeBrowserTerrainTile(
 
     return {
       pixels: new Uint8Array(
-        context.getImageData(0, 0, terrainTileSizePixels, terrainTileSizePixels).data,
+        context.getImageData(0, 0, terrariumTileSizePixels, terrariumTileSizePixels).data,
       ),
       imagerySources,
     };

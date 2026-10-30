@@ -90,25 +90,24 @@ test('keyboard on the handle steps between peek, half and full', async ({ page }
 });
 
 test('a full sheet hides the map controls and the scale bar', async ({ page }) => {
-  const overlays = page.getByRole('button', { name: 'Overlays', exact: true });
+  const measure = page.getByRole('button', { name: 'Measure tool', exact: true });
   const scaleBar = page.locator('[data-hud] .lc-hud-layer__instruments .lc-scale-bar');
 
-  await expect(overlays).toBeVisible();
+  await expect(measure).toBeVisible();
   await expect(scaleBar).toBeVisible();
   await page.getByRole('button', { name: 'Resize sheet' }).focus();
   await page.keyboard.press('ArrowUp');
-  await expect(overlays).toBeHidden();
+  await expect(measure).toBeHidden();
   await expect(scaleBar).toBeHidden();
 });
 
-test('map controls are 44px and open the Overlays popover', async ({ page }) => {
-  const overlays = page.getByRole('button', { name: 'Overlays', exact: true });
-  const box = await overlays.boundingBox();
+test('map controls are 44px and toggle their tool', async ({ page }) => {
+  const measure = page.getByRole('button', { name: 'Measure tool', exact: true });
+  const box = await measure.boundingBox();
 
   expect([box?.width, box?.height]).toEqual([44, 44]);
-  await overlays.click();
-  await expect(page.getByRole('dialog', { name: 'Overlays' })).toBeVisible();
-  await expect(overlays).toHaveAttribute('aria-expanded', 'true');
+  await measure.click();
+  await expect(measure).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('the sheet animates between snaps unless reduced motion is set', async ({ page }) => {

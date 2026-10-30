@@ -4,6 +4,7 @@
  * joined), `rte/rtept` and `wpt`; everything else is ignored. Input over 25 MB is refused.
  */
 import { operationErrorCodes } from './constants/operations';
+import { measureGroundMeters } from './route-sampling';
 import type { GpxRoute, RoutePoint, RouteStats, RouteWaypoint } from './types/route';
 import type { OperationError, Result } from './types/operations';
 
@@ -98,7 +99,7 @@ export function routeStats(points: readonly RoutePoint[]): RouteStats {
 
   for (const [index, point] of points.entries()) {
     if (index > 0) {
-      distanceMeters += haversineMeters(points[index - 1], point);
+      distanceMeters += measureGroundMeters(points[index - 1], point);
     }
 
     const elevation = point.elevationMeters;
@@ -397,19 +398,6 @@ function distanceToSegment(point: PlanarPoint, start: PlanarPoint, end: PlanarPo
         );
 
   return Math.hypot(point.x - (start.x + fraction * dx), point.y - (start.y + fraction * dy));
-}
-
-function haversineMeters(a: RoutePoint, b: RoutePoint): number {
-  const toRadians = Math.PI / 180;
-  const deltaLatitude = (b.latitude - a.latitude) * toRadians;
-  const deltaLongitude = (b.longitude - a.longitude) * toRadians;
-  const h =
-    Math.sin(deltaLatitude / 2) ** 2 +
-    Math.cos(a.latitude * toRadians) *
-      Math.cos(b.latitude * toRadians) *
-      Math.sin(deltaLongitude / 2) ** 2;
-
-  return 2 * earthRadiusMeters * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
 function fail(message: string): { ok: false; error: OperationError } {

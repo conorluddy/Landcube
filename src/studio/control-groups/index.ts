@@ -8,9 +8,10 @@ import type { InspectorSection, StudioController, StudioState } from '../control
 import type { CropPreview } from '../crop-preview';
 import { buildColourGroups } from './colour';
 import { buildContourGroups } from './contours';
-import { buildOverlayPopoverGroups } from './overlays';
+import { buildOverlayGroups } from './overlays';
+import { buildRouteGroups } from './scene-route';
 import { buildSceneGroups } from './scene';
-import { buildCameraGroups } from './camera';
+import { buildCameraGroups, buildOrbitGroups } from './camera';
 import { buildFrameGroups } from './frame';
 import { buildModelGroups } from './model';
 import { buildTerrainGroups } from './terrain';
@@ -29,9 +30,11 @@ export const controlGroupBuilders: readonly ControlGroupBuilder[] = [
   buildTerrainGroups,
   buildContourGroups,
   buildColourGroups,
-  buildSceneGroups,
-  buildOverlayPopoverGroups,
   buildCameraGroups,
+  buildOrbitGroups,
+  buildSceneGroups,
+  buildOverlayGroups,
+  buildRouteGroups,
   buildModelGroups,
   buildFrameGroups,
 ];
@@ -52,8 +55,14 @@ export function buildSectionGroups(
       return buildColourGroups(controller, state);
     case 'Camera':
       return buildCameraGroups(controller, state);
+    case 'Orbit':
+      return buildOrbitGroups(controller, state);
     case 'Scene':
       return buildSceneGroups(controller, state);
+    case 'Overlays':
+      return buildOverlayGroups(controller, state);
+    case 'Route':
+      return buildRouteGroups(controller, state);
     case 'Model':
       return buildModelGroups(controller, state, cropPreview);
     case 'Frame':

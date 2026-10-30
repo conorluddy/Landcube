@@ -1,3 +1,6 @@
+/** Terrarium tiles are square PNGs of this many pixels a side. */
+export const terrariumTileSizePixels = 256;
+
 /** Geographic and area bounds accepted by every real-terrain loader. */
 export const realTerrainBounds = {
   minimumLatitude: -85,

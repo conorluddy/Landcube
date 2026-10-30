@@ -7,7 +7,9 @@ import { HudLayer } from '../ui/overlays/hud-layer';
 import { ReadoutCard } from '../ui/overlays/readout-card';
 import { RouteLine } from '../ui/overlays/route-line';
 import { ScaleBar } from '../ui/overlays/scale-bar';
-import type { StudioController, StudioState } from './controller';
+import type { RealTerrain } from '../real-terrain';
+import type { FramePoint } from '../real-terrain-projection';
+import type { StudioController, StudioState, WorkspaceRoute } from './controller';
 import { getFrameMetersPerPixel } from './hud-location';
 import {
   chooseScaleBar,
@@ -18,7 +20,9 @@ import {
   getCanvasTone,
 } from './hud-readouts';
 import type { HudStore } from './hud-store';
+import { locateRouteDistance } from '../route-sampling';
 import { projectRouteToFrame } from './route-overlay';
+import { RouteReplaceDialog } from './route-replace-dialog';
 import { StudioToolOverlays } from './studio-tools';
 import { CameraSelector } from './camera-selector';
 
@@ -67,7 +71,15 @@ export function StudioHud({
   const route = state.workspace.route;
   const projectedRoute =
     route !== null && route.isVisible && !is3d && viewportSize !== undefined && state.source.terrain
-      ? projectRouteToFrame(route, state.source.terrain, viewportSize)
+      ? projectRouteToFrame(route.active, state.source.terrain, viewportSize)
+      : undefined;
+  const highlight =
+    route !== null &&
+    projectedRoute !== undefined &&
+    route.inspectedDistanceMeters !== undefined &&
+    viewportSize !== undefined &&
+    state.source.terrain
+      ? projectInspectedPoint(route, state.source.terrain, viewportSize)
       : undefined;
 
   return (
@@ -83,7 +95,8 @@ export function StudioHud({
               heightPx={viewportSize.height}
               points={projectedRoute.points}
               waypoints={projectedRoute.waypoints}
-              label={`Route: ${route.name}`}
+              label={`Route: ${route.active.name}`}
+              highlight={highlight}
             />
           )}
           <Crosshair position={pointer.kind === 'tracking' ? pointer : undefined}>
@@ -94,12 +107,15 @@ export function StudioHud({
         </>
       }
       tools={
-        <StudioToolOverlays
-          controller={controller}
-          state={state}
-          hud={hud}
-          viewportSize={viewportSize}
-        />
+        <>
+          <StudioToolOverlays
+            controller={controller}
+            state={state}
+            hud={hud}
+            viewportSize={viewportSize}
+          />
+          <RouteReplaceDialog controller={controller} state={state} />
+        </>
       }
       frame={
         <HudFrame
@@ -117,6 +133,21 @@ export function StudioHud({
       readout={<ReadoutCard {...target} scaleBar={cardScaleBar} isHidden={!isReadoutCardShown} />}
     />
   );
+}
+
+function projectInspectedPoint(
+  route: WorkspaceRoute,
+  terrain: RealTerrain,
+  frame: { width: number; height: number },
+): FramePoint | undefined {
+  const point = locateRouteDistance(
+    route.active.originalPoints ?? route.active.waypoints,
+    route.inspectedDistanceMeters ?? 0,
+  );
+
+  return point === undefined
+    ? undefined
+    : projectRouteToFrame({ waypoints: [point], namedWaypoints: [] }, terrain, frame)?.points[0];
 }
 
 function useElementSize(

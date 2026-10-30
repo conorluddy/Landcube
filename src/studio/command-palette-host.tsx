@@ -174,21 +174,17 @@ function describeStatus(
   return query.trim() !== '' && resultCount === 0 ? 'No matches.' : undefined;
 }
 
-/** Shows the edited control: its section (or the Overlays popover), scrolled into view. */
+/** Shows the edited control: its section, scrolled into view. */
 function revealParameter(
   c: StudioController,
   state: StudioState,
   command: ParameterCommand,
   isMobile: boolean,
 ): void {
-  if (command.isInOverlays) {
-    c.workspace({ popover: 'Overlays' });
-  } else {
-    c.selectSection(command.sectionId);
+  c.selectSection(command.sectionId);
 
-    if (isMobile && state.workspace.sheetSnap === 'peek') {
-      c.workspace({ sheetSnap: 'half' });
-    }
+  if (isMobile && state.workspace.sheetSnap === 'peek') {
+    c.workspace({ sheetSnap: 'half' });
   }
 
   // The section renders on the next frame; only then is the control laid out.

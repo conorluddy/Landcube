@@ -89,7 +89,7 @@ export function StudioHeader({
             size="small"
             aria-haspopup="dialog"
             onClick={() => {
-              c.workspace({ exporting: true, popover: null });
+              c.workspace({ exporting: true });
             }}
           >
             Export ↗

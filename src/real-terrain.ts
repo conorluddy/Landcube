@@ -1,8 +1,10 @@
 import type { RealContourInterval } from './real-terrain-contours';
-import { realTerrainBounds } from './constants/real-terrain';
+import { realTerrainBounds, terrariumTileSizePixels } from './constants/real-terrain';
 import { getMercatorSpanFraction, getMercatorX, getMercatorY } from './real-terrain-projection';
 import { preprocessElevations } from './elevation-preprocessing';
 import { TerrainLoadError } from './terrain-load-error';
+import { createSourceElevationSampler } from './source-elevation-sampler';
+import type { SourceElevationSampler } from './types/terrain-analysis';
 
 export interface RealTerrain {
   sample: (x: number, y: number, width: number, height: number) => number;
@@ -18,6 +20,8 @@ export interface RealTerrain {
     originMeters: number;
     metersPerUnit: number;
   };
+  /** Repaired source metres by place, before the depth floor and every display transform. */
+  sourceElevations?: SourceElevationSampler;
 }
 
 /** Raw decoded RGBA pixels and source metadata for one 256px Terrarium tile. */
@@ -31,8 +35,6 @@ export interface DecodedTerrainTile {
 export type TerrainLoadProgressReporter = (loadedTiles: number, totalTiles: number) => void;
 
 export type TerrainTileLoader = (tileUrl: string) => Promise<DecodedTerrainTile>;
-
-const tileSizePixels = 256;
 
 /** Decodes the public Terrarium RGB elevation format into meters. */
 export function decodeTerrariumElevation(red: number, green: number, blue: number): number {
@@ -97,8 +99,8 @@ export async function loadRealTerrain(
   const startY = Math.floor(centerY - spanTiles / 2);
   const endX = Math.floor(centerX + spanTiles / 2);
   const endY = Math.floor(centerY + spanTiles / 2);
-  const columns = (endX - startX + 1) * tileSizePixels;
-  const rows = (endY - startY + 1) * tileSizePixels;
+  const columns = (endX - startX + 1) * terrariumTileSizePixels;
+  const rows = (endY - startY + 1) * terrariumTileSizePixels;
   const elevations = new Float64Array(columns * rows);
   const requests: Promise<void>[] = [];
   const credits = new Set<string>();
@@ -115,36 +117,39 @@ export async function loadRealTerrain(
 
   elevations.set(preprocessElevations(elevations, columns, rows).values);
 
-  // Opt-in clipping avoids inventing coastline geometry or changing legacy terrain.
-  if (effectiveFloor !== undefined) {
-    for (let index = 0; index < elevations.length; index++) {
-      elevations[index] = Math.max(effectiveFloor, elevations[index]);
-    }
-  }
-
+  // Opt-in clipping avoids inventing coastline geometry or changing legacy terrain. It applies on
+  // read so the grid keeps the source metres terrain analysis measures.
+  const floorMeters = effectiveFloor ?? -Infinity;
+  const readClipped = (index: number): number => Math.max(floorMeters, elevations[index]);
   let minimum = Infinity;
   let maximum = -Infinity;
 
-  for (const elevation of elevations) {
-    minimum = Math.min(minimum, elevation);
-    maximum = Math.max(maximum, elevation);
+  for (let index = 0; index < elevations.length; index++) {
+    minimum = Math.min(minimum, readClipped(index));
+    maximum = Math.max(maximum, readClipped(index));
   }
 
   const elevationRange = Math.max(1, maximum - minimum);
   let visibleMinimum = Infinity;
   let visibleMaximum = -Infinity;
-  const left = Math.max(0, Math.floor((centerX - startX - spanTiles / 2) * tileSizePixels));
+  const left = Math.max(
+    0,
+    Math.floor((centerX - startX - spanTiles / 2) * terrariumTileSizePixels),
+  );
   const right = Math.min(
     columns - 1,
-    Math.ceil((centerX - startX + spanTiles / 2) * tileSizePixels),
+    Math.ceil((centerX - startX + spanTiles / 2) * terrariumTileSizePixels),
   );
-  const top = Math.max(0, Math.floor((centerY - startY - spanTiles / 2) * tileSizePixels));
-  const bottom = Math.min(rows - 1, Math.ceil((centerY - startY + spanTiles / 2) * tileSizePixels));
+  const top = Math.max(0, Math.floor((centerY - startY - spanTiles / 2) * terrariumTileSizePixels));
+  const bottom = Math.min(
+    rows - 1,
+    Math.ceil((centerY - startY + spanTiles / 2) * terrariumTileSizePixels),
+  );
 
   for (let y = top; y <= bottom; y++) {
     for (let x = left; x <= right; x++) {
-      visibleMinimum = Math.min(visibleMinimum, elevations[y * columns + x]);
-      visibleMaximum = Math.max(visibleMaximum, elevations[y * columns + x]);
+      visibleMinimum = Math.min(visibleMinimum, readClipped(y * columns + x));
+      visibleMaximum = Math.max(visibleMaximum, readClipped(y * columns + x));
     }
   }
 
@@ -165,14 +170,14 @@ export async function loadRealTerrain(
         0,
         Math.min(
           columns - 1,
-          (centerX - startX + ((x - width / 2) / frameSize) * spanTiles) * tileSizePixels,
+          (centerX - startX + ((x - width / 2) / frameSize) * spanTiles) * terrariumTileSizePixels,
         ),
       );
       const pixelY = Math.max(
         0,
         Math.min(
           rows - 1,
-          (centerY - startY + ((y - height / 2) / frameSize) * spanTiles) * tileSizePixels,
+          (centerY - startY + ((y - height / 2) / frameSize) * spanTiles) * terrariumTileSizePixels,
         ),
       );
       const left = Math.floor(pixelX);
@@ -182,14 +187,20 @@ export async function loadRealTerrain(
       const fractionX = pixelX - left;
       const fractionY = pixelY - top;
       const upper =
-        elevations[top * columns + left] * (1 - fractionX) +
-        elevations[top * columns + right] * fractionX;
+        readClipped(top * columns + left) * (1 - fractionX) +
+        readClipped(top * columns + right) * fractionX;
       const lower =
-        elevations[bottom * columns + left] * (1 - fractionX) +
-        elevations[bottom * columns + right] * fractionX;
+        readClipped(bottom * columns + left) * (1 - fractionX) +
+        readClipped(bottom * columns + right) * fractionX;
 
       return ((upper * (1 - fractionY) + lower * fractionY - minimum) / elevationRange - 0.5) * 1.6;
     },
+    sourceElevations: createSourceElevationSampler(
+      { values: elevations, columns, rows, startX, startY, tileCount, centerLongitude: longitude },
+      // Neighbouring samples sit one pixel apart; the span covers spanTiles tiles of pixels.
+      (spanKm * 1000) / (spanTiles * terrariumTileSizePixels),
+      `real:${[latitude, longitude, spanKm, elevationFloor ?? 'none', maxDepth ?? 'none'].join(',')}`,
+    ),
   };
 
   /** Copies one decoded tile into the shared elevation grid. */
@@ -204,16 +215,18 @@ export async function loadRealTerrain(
       credits.add(credit);
     }
 
-    if (tile.pixels.length !== tileSizePixels * tileSizePixels * 4) {
+    if (tile.pixels.length !== terrariumTileSizePixels * terrariumTileSizePixels * 4) {
       throw new TerrainLoadError('tileDecodeFailed', 'Terrain tile has unexpected dimensions.');
     }
 
-    for (let row = 0; row < tileSizePixels; row++) {
-      for (let column = 0; column < tileSizePixels; column++) {
-        const offset = (row * tileSizePixels + column) * 4;
+    for (let row = 0; row < terrariumTileSizePixels; row++) {
+      for (let column = 0; column < terrariumTileSizePixels; column++) {
+        const offset = (row * terrariumTileSizePixels + column) * 4;
 
         elevations[
-          ((y - startY) * tileSizePixels + row) * columns + (x - startX) * tileSizePixels + column
+          ((y - startY) * terrariumTileSizePixels + row) * columns +
+            (x - startX) * terrariumTileSizePixels +
+            column
         ] = decodeTerrariumElevation(
           tile.pixels[offset],
           tile.pixels[offset + 1],

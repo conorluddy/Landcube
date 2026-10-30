@@ -6,11 +6,11 @@ import { ControlGroup } from '../../ui/control-group';
 import type { ControlGroupDefinition } from '../../ui/control-rows';
 import { renderMarkup } from '../../ui/test-helpers';
 import { createStudioController, type StudioController, type StudioState } from '../controller';
-import { buildCameraGroups } from './camera';
+import { buildCameraGroups, buildOrbitGroups } from './camera';
 
 void test('perspective camera shows lens, focus, exposure and orbit with the original ids', () => {
   const { controller, state } = createContext();
-  const groups = buildCameraGroups(controller, state);
+  const groups = [...buildCameraGroups(controller, state), ...buildOrbitGroups(controller, state)];
 
   assert.deepEqual(listGroupIds(groups), ['lens', 'focus', 'exposure', 'orbit']);
   assert.deepEqual(listRowIds(groups, 'lens'), [
@@ -19,7 +19,7 @@ void test('perspective camera shows lens, focus, exposure and orbit with the ori
     'camera-lens-hint',
   ]);
   assert.deepEqual(listRowIds(groups, 'focus'), ['camera-focus-effect']);
-  assert.deepEqual(listRowIds(groups, 'exposure'), ['camera-exposure']);
+  assert.deepEqual(listRowIds(groups, 'exposure'), ['camera-exposure', 'camera-reset-settings']);
   assert.deepEqual(listRowIds(groups, 'orbit'), [
     'orbit-view-presets',
     'orbit-auto-rotate',
@@ -27,7 +27,6 @@ void test('perspective camera shows lens, focus, exposure and orbit with the ori
     'orbit-turn-direction',
     'orbit-reset-camera',
     'orbit-controls-hint',
-    'camera-reset-settings',
   ]);
 
   const markup = renderGroups(groups);
@@ -72,14 +71,13 @@ void test('tilt-shift adds its three bands and depth of field adds aperture and 
   ]);
 });
 
-void test('the section yields the orbit group while the Orbit popover shows it', () => {
+void test('orbit has its own section and the camera reset stays with the camera settings', () => {
   const { controller, state } = createContext();
-  const groups = buildCameraGroups(controller, {
-    ...state,
-    workspace: { ...state.workspace, popover: 'Orbit' },
-  });
+  const cameraGroups = buildCameraGroups(controller, state);
 
-  assert.deepEqual(listGroupIds(groups), ['lens', 'focus', 'exposure']);
+  assert.deepEqual(listGroupIds(cameraGroups), ['lens', 'focus', 'exposure']);
+  assert.ok(listRowIds(cameraGroups, 'exposure').includes('camera-reset-settings'));
+  assert.deepEqual(listGroupIds(buildOrbitGroups(controller, state)), ['orbit']);
 });
 
 // === HELPERS ===

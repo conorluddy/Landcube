@@ -2,8 +2,6 @@ import { expect, test, type Page } from '@playwright/test';
 import { appUrl, enter3D, loadLocation, section, serveStudio } from './studio-fixture';
 
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
-// Software WebGL on CI runners is several times slower than local GPUs.
-test.describe.configure({ timeout: 90_000 });
 test.beforeEach(async ({ page }) => {
   await serveStudio(page);
 });
@@ -189,4 +187,84 @@ test('the phone mode bar toggles the measure tool and drops the sheet to peek', 
   await measure.click();
   await expect(measure).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('.lc-measure-line')).toHaveCount(0);
+});
+
+const elevationLine = /^(Start|End) -?\d+ m$/;
+const differenceLine = /^Δ (\+|-)?\d+ m$/;
+
+async function calloutLines(page: Page): Promise<string[]> {
+  return page.locator('.lc-callout-label__meta').allTextContents();
+}
+
+async function markerCentre(page: Page, name: 'Measure start' | 'Measure end'): Promise<Point> {
+  const box = await page.getByRole('button', { name, exact: true }).boundingBox();
+
+  if (box === null) {
+    throw new Error(`${name} is not laid out.`);
+  }
+
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
+test('measuring real terrain in 2D shows distance, bearing, both elevations and the difference', async ({
+  page,
+}) => {
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await loadLocation(page);
+  await page.keyboard.press('m');
+  await drag(page, { x: 100, y: 400 }, { x: 700, y: 400 });
+  await expect(page.locator('.lc-callout-label')).toContainText('Bearing 090°');
+  const lines = await calloutLines(page);
+
+  expect(lines).toHaveLength(4);
+  expect(lines[1]).toMatch(elevationLine);
+  expect(lines[2]).toMatch(elevationLine);
+  expect(lines[3]).toMatch(differenceLine);
+  await expect(page.locator('.lc-measure-line__endpoint')).toHaveCount(2);
+});
+
+test('procedural measure shows no elevations', async ({ page }) => {
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await tool(page, 'Measure').click();
+  await drag(page, { x: 300, y: 300 }, { x: 600, y: 300 });
+  await expect(page.locator('.lc-callout-label')).toContainText('Bearing 090°');
+  expect(await calloutLines(page)).toEqual(['Bearing 090°']);
+});
+
+test('3D measure endpoints stay on their terrain coordinates when the camera moves', async ({
+  page,
+}) => {
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await loadLocation(page);
+  await enter3D(page);
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  await page.keyboard.press('m');
+  await page.mouse.click(560, 420);
+  await page.mouse.click(720, 380);
+  await expect(page.locator('.lc-callout-label')).toContainText('Start');
+  const readout = await page.locator('.lc-callout-label').textContent();
+  const startBefore = await markerCentre(page, 'Measure start');
+
+  await section(page, 'Orbit');
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
+  await expect
+    .poll(async () => {
+      const now = await markerCentre(page, 'Measure start');
+
+      return Math.hypot(now.x - startBefore.x, now.y - startBefore.y);
+    })
+    .toBeGreaterThan(5);
+  expect(await page.locator('.lc-callout-label').textContent()).toBe(readout);
+});
+
+test('route handles show in 3D', async ({ page }) => {
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await loadLocation(page);
+  await enter3D(page);
+  await page.getByRole('button', { name: 'Collapse controls' }).click();
+  await page.keyboard.press('r');
+  await page.mouse.click(520, 420);
+  await page.mouse.click(640, 340);
+  await page.mouse.click(740, 430);
+  await expect(page.locator('[data-route-handle]')).toHaveCount(3);
 });

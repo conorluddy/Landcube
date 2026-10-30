@@ -10,8 +10,6 @@ import {
 } from './studio-fixture';
 
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
-// Software WebGL on CI runners is several times slower than local GPUs.
-test.describe.configure({ timeout: 90_000 });
 test.beforeEach(async ({ page }) => {
   await serveStudio(page);
 });

@@ -339,3 +339,35 @@ body,
 .mobile-attribution {
   display: none;
 }
+
+/*
+ * Route profile (desktop): docked along the bottom, above the footer and clear of the inspector.
+ * The HUD frame, instruments and readout card lift by its height so nothing sits under it.
+ */
+.studio-shell[data-route-profile='open'] {
+  --studio-route-profile-height: 196px;
+}
+
+.studio-shell[data-route-profile='collapsed'] {
+  --studio-route-profile-height: 50px;
+}
+
+.studio-route-profile {
+  position: absolute;
+  right: 420px;
+  bottom: calc(60px + env(safe-area-inset-bottom));
+  left: var(--lc-s-6);
+  z-index: 2;
+}
+
+.studio-shell:has(> .lc-inspector[data-collapsed='true']) .studio-route-profile {
+  right: 116px;
+}
+
+.studio-shell[data-route-profile] .lc-hud-layer {
+  --lc-hud-inset-bottom: calc(72px + var(--studio-route-profile-height));
+}
+
+.studio-shell[data-route-profile] .lc-hud-layer__readout {
+  bottom: calc(68px + var(--studio-route-profile-height) + env(safe-area-inset-bottom));
+}
