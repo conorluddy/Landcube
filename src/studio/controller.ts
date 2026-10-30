@@ -104,6 +104,7 @@ export type InspectorSection =
   | 'Colour'
   | 'Camera'
   | 'Orbit'
+  | 'Director'
   | 'Scene'
   | 'Overlays'
   | 'Route'
@@ -112,6 +113,7 @@ export type InspectorSection =
 export const threeDOnlySections: readonly InspectorSection[] = [
   'Camera',
   'Orbit',
+  'Director',
   'Model',
   'Frame',
 ];

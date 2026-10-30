@@ -3,7 +3,6 @@
  * (ORBT.01). Row ids are the original field ids the e2e tests bind to. The pattern is in
  * ./README.md.
  */
-import { createElement } from 'react';
 import type { ControlGroupDefinition } from '../../ui/control-rows';
 import {
   getNearestStopIndex,
@@ -16,8 +15,7 @@ import {
   type TerrainViewPreset,
 } from '../../terrain-camera';
 import type { StudioController, StudioState } from '../controller';
-import { buttonRow, customRow, hintRow, segmentedRow, toggleRow } from '../control-rows';
-import { ShotStrip } from '../shot-strip';
+import { buttonRow, hintRow, segmentedRow, toggleRow } from '../control-rows';
 
 const tiltShiftSettings = [
   ['tiltShiftPosition', 'Band position', 0, 100],
@@ -42,7 +40,7 @@ export function buildOrbitGroups(
   controller: StudioController,
   state: StudioState,
 ): ControlGroupDefinition[] {
-  return [buildOrbitGroup(controller, state), buildDirectorGroup(controller, state)];
+  return [buildOrbitGroup(controller, state)];
 }
 
 // === GROUPS ===
@@ -109,46 +107,6 @@ function buildOrbitGroup(controller: StudioController, state: StudioState): Cont
         'orbit-controls-hint',
         'Drag to orbit · scroll or pinch to zoom · right-drag to pan · double-click terrain to orbit around that point.',
       ),
-    ],
-  };
-}
-
-function buildDirectorGroup(
-  controller: StudioController,
-  state: StudioState,
-): ControlGroupDefinition {
-  const { shots, isPlaying } = state.cameraShots;
-
-  return {
-    id: 'director',
-    title: 'Director',
-    rows: [
-      shots.length > 0
-        ? customRow('director-shots', () => createElement(ShotStrip, { controller, shots }))
-        : hintRow(
-            'director-empty',
-            'Frame a view and press B to save it as a shot. P plays the shots as a looping tour.',
-          ),
-      buttonRow('director-add-shot', {
-        children: 'Add shot',
-        onClick: () => {
-          controller.saveCameraShot();
-        },
-      }),
-      buttonRow('director-play', {
-        children: isPlaying ? 'Stop' : 'Play',
-        disabled: shots.length === 0,
-        onClick: () => {
-          controller.toggleCameraShotPlayback();
-        },
-      }),
-      buttonRow('director-clear', {
-        children: 'Clear shots',
-        disabled: shots.length === 0,
-        onClick: () => {
-          controller.clearCameraShots();
-        },
-      }),
     ],
   };
 }

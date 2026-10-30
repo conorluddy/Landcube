@@ -12,6 +12,7 @@ import { buildOverlayGroups } from './overlays';
 import { buildRouteGroups } from './scene-route';
 import { buildSceneGroups } from './scene';
 import { buildCameraGroups, buildOrbitGroups } from './camera';
+import { buildDirectorGroups } from './director';
 import { buildFrameGroups } from './frame';
 import { buildModelGroups } from './model';
 import { buildTerrainGroups } from './terrain';
@@ -32,6 +33,7 @@ export const controlGroupBuilders: readonly ControlGroupBuilder[] = [
   buildColourGroups,
   buildCameraGroups,
   buildOrbitGroups,
+  buildDirectorGroups,
   buildSceneGroups,
   buildOverlayGroups,
   buildRouteGroups,
@@ -57,6 +59,8 @@ export function buildSectionGroups(
       return buildCameraGroups(controller, state);
     case 'Orbit':
       return buildOrbitGroups(controller, state);
+    case 'Director':
+      return buildDirectorGroups(controller, state);
     case 'Scene':
       return buildSceneGroups(controller, state);
     case 'Overlays':
