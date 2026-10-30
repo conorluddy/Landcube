@@ -13,12 +13,14 @@ export interface RouteLineProps {
   waypoints: readonly (RouteLinePoint & { name: string })[];
   /** Names the route for assistive tech, e.g. "Route: Ridge walk". */
   label: string;
+  /** Profile inspection (REQ-26): where the inspected distance falls on the route. */
+  highlight?: RouteLinePoint;
 }
 
 /**
  * GPX route over the 2D terrain (O-08): a 2.5px bone line over a 7px ink halo at 0.5, with
- * diamond waypoints and a label tip. Never takes the pointer. `data-route-points` and
- * `data-route-waypoints` are the test hooks.
+ * diamond waypoints and a label tip. Never takes the pointer. `data-route-points`,
+ * `data-route-waypoints` and `data-route-cursor` are the test hooks.
  */
 export function RouteLine({
   widthPx,
@@ -26,6 +28,7 @@ export function RouteLine({
   points,
   waypoints,
   label,
+  highlight,
 }: RouteLineProps): React.JSX.Element {
   const polyline = points.map(({ x, y }) => `${round(x)},${round(y)}`).join(' ');
 
@@ -58,6 +61,13 @@ export function RouteLine({
           <span className="lc-route-line__label">{name}</span>
         </div>
       ))}
+      {highlight !== undefined && (
+        <span
+          className="lc-route-line__cursor"
+          data-route-cursor=""
+          style={{ left: `${round(highlight.x)}px`, top: `${round(highlight.y)}px` }}
+        />
+      )}
     </div>
   );
 }

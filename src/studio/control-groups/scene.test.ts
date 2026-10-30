@@ -200,7 +200,7 @@ void test('a loaded route shows its stats and a refused file shows an E-206 faul
   );
 
   assert.ok(listRowIds(loadedGroups, 'route').includes('route-stats'));
-  assert.match(renderGroups(loadedGroups), /Ridge walk · 11\.1 km · 0 waypoints/);
+  assert.match(renderGroups(loadedGroups), /Ridge walk · 11\.1 km ground · Terrain-derived/);
   assert.match(faultedMarkup, /E-206/);
   assert.match(faultedMarkup, /Bad file\./);
 });

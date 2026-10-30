@@ -31,7 +31,9 @@ test('a GPX route draws in 2D with waypoints, hides on toggle and clears', async
   await expect(route).toHaveAttribute('data-route-waypoints', '2');
   await expect(route.locator('.lc-route-line__label')).toHaveText(['Start hut', 'Summit']);
   await expect(
-    page.getByText(/Ridge walk · \d+\.\d km · ascent \d+ m · descent \d+ m · 2 waypoints/),
+    page.getByText(
+      /Ridge walk · \d+\.\d km ground · .*ascent \d+ m · descent \d+ m · net [+-]?\d+ m · Terrain-derived · 2 waypoints/,
+    ),
   ).toBeVisible();
   await expect(page.getByText(/\d+ of \d+ points inside the loaded area\./)).toBeVisible();
 

@@ -1,0 +1,270 @@
+/*
+ * O-10 RouteProfile: glass panel with summary figures in the header and an elevation area chart.
+ * Climb bands are amber, descent bands phosphor; each also carries its text label.
+ */
+.lc-route-profile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-5);
+  box-sizing: border-box;
+  padding: var(--lc-s-5) var(--lc-s-6);
+  border: 1px solid var(--lc-line-panel);
+  border-radius: var(--lc-r-panel);
+  color: var(--lc-text-body);
+}
+
+.lc-route-profile__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-s-3) var(--lc-s-8);
+  align-items: center;
+  min-height: 28px;
+}
+
+.lc-route-profile__toggle {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--lc-line);
+  border-radius: var(--lc-r-control);
+  background: var(--lc-fill-field);
+  color: var(--lc-text-primary);
+  cursor: pointer;
+}
+
+.lc-route-profile__toggle:hover {
+  background: var(--lc-fill-hover);
+}
+
+.lc-route-profile__toggle:focus-visible,
+.lc-route-profile__plot:focus-visible {
+  outline: 1px solid var(--lc-line-focus);
+  outline-offset: 2px;
+}
+
+.lc-route-profile__figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-s-2) var(--lc-s-8);
+  margin: 0;
+}
+
+.lc-route-profile__figure {
+  display: flex;
+  gap: var(--lc-s-3);
+  align-items: baseline;
+}
+
+.lc-route-profile__figure dt {
+  color: var(--lc-text-quiet);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-label);
+}
+
+.lc-route-profile__figure dd {
+  margin: 0;
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-value);
+}
+
+.lc-route-profile__incomplete,
+.lc-route-profile__empty {
+  margin: 0;
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-fs-body);
+}
+
+.lc-route-profile__flags {
+  display: flex;
+  gap: var(--lc-s-3);
+  margin: 0;
+}
+
+.lc-route-profile__flag {
+  padding: 1px 6px;
+  border: 1px solid var(--lc-line-strong);
+  color: var(--lc-text-secondary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  letter-spacing: var(--lc-track-coord);
+}
+
+.lc-route-profile__body {
+  display: flex;
+  gap: var(--lc-s-8);
+  align-items: flex-start;
+}
+
+.lc-route-profile__body[hidden] {
+  display: none;
+}
+
+.lc-route-profile__threshold {
+  flex: none;
+  width: 132px;
+}
+
+.lc-route-profile__chart {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-rows: 104px 16px;
+  min-width: 0;
+}
+
+.lc-route-profile__y-axis,
+.lc-route-profile__x-axis {
+  position: relative;
+  color: var(--lc-text-quiet);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-micro);
+}
+
+.lc-route-profile__y-axis span {
+  position: absolute;
+  right: var(--lc-s-3);
+  transform: translateY(-50%);
+}
+
+.lc-route-profile__x-axis {
+  grid-column: 2;
+}
+
+.lc-route-profile__x-axis span {
+  position: absolute;
+  top: var(--lc-s-2);
+  transform: translateX(-50%);
+}
+
+.lc-route-profile__x-axis span:first-child {
+  transform: none;
+}
+
+.lc-route-profile__plot {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--lc-line-strong);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.lc-route-profile__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.lc-route-profile__grid {
+  stroke: var(--lc-line);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+
+.lc-route-profile__area {
+  fill: var(--lc-fill-selected);
+}
+
+.lc-route-profile__line {
+  fill: none;
+  stroke: var(--lc-text-primary);
+  stroke-linejoin: round;
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+}
+
+.lc-route-profile__band--climb {
+  fill: color-mix(in srgb, var(--lc-signal-amber) 26%, transparent);
+}
+
+.lc-route-profile__band--descent {
+  fill: color-mix(in srgb, var(--lc-signal-phosphor) 22%, transparent);
+}
+
+.lc-route-profile__band-label {
+  position: absolute;
+  top: 2px;
+  overflow: hidden;
+  padding-left: 3px;
+  box-sizing: border-box;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-micro);
+  letter-spacing: var(--lc-track-coord);
+  text-overflow: clip;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.lc-route-profile__band-label--climb {
+  color: var(--lc-signal-amber);
+}
+
+.lc-route-profile__band-label--descent {
+  color: var(--lc-signal-phosphor);
+}
+
+.lc-route-profile__no-data {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--lc-text-quiet);
+  font-size: var(--lc-fs-hint);
+}
+
+.lc-route-profile__cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--lc-text-primary);
+  pointer-events: none;
+}
+
+@media (max-width: 767px) {
+  .lc-route-profile {
+    padding: var(--lc-s-5) 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .lc-route-profile__body {
+    flex-direction: column;
+  }
+
+  .lc-route-profile__threshold {
+    width: 100%;
+  }
+
+  .lc-route-profile__chart {
+    width: 100%;
+  }
+}
+
+@media (forced-colors: active) {
+  .lc-route-profile__line {
+    stroke: CanvasText;
+  }
+
+  .lc-route-profile__band--climb,
+  .lc-route-profile__band--descent {
+    fill: Highlight;
+  }
+
+  .lc-route-profile__band-label,
+  .lc-route-profile__cursor {
+    color: CanvasText;
+    background: CanvasText;
+  }
+
+  .lc-route-profile__band-label {
+    background: transparent;
+  }
+}
