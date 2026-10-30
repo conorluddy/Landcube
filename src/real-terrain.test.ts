@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { access } from 'node:fs/promises';
 import test from 'node:test';
 import { validateDesignSettings } from './design-settings';
@@ -16,6 +17,8 @@ import {
 } from './constants/real-terrain';
 import { versionOneDesignDefaults } from './constants/design';
 import { createGridMarkup } from './svg-rendering';
+import { locateRealTerrainFramePoint } from './real-terrain-projection';
+import type { GeoPoint, SourceElevationSampler } from './types/terrain-analysis';
 
 void test('Terrarium decoding preserves sea level, negative heights and fractional meters', () => {
   assert.equal(decodeTerrariumElevation(128, 0, 0), 0);
@@ -295,4 +298,225 @@ void test('bundled tiles cover exactly the default location and exist on disk', 
   for (const tileKey of requestedTileKeys) {
     await access(new URL(`../public/terrain-tiles/${tileKey}.png`, import.meta.url));
   }
+});
+
+// === SOURCE ELEVATIONS ===
+
+/** Serves one tile everywhere, so a sample's tile-local column and row fix its height. */
+function createTileLoader(elevationAt: (column: number, row: number) => number): TerrainTileLoader {
+  const pixels = new Uint8Array(terrainTilePixelCount);
+
+  for (let row = 0; row < 256; row++) {
+    for (let column = 0; column < 256; column++) {
+      const encoded = elevationAt(column, row) + 32768;
+      const offset = (row * 256 + column) * 4;
+
+      pixels[offset] = Math.floor(encoded / 256);
+      pixels[offset + 1] = Math.floor(encoded % 256);
+      pixels[offset + 2] = Math.round((encoded % 1) * 256);
+      pixels[offset + 3] = 255;
+    }
+  }
+
+  return () => Promise.resolve({ pixels, imagerySources: 'srtm' });
+}
+
+/** Seabed to hills with a 2500 m spike at (200, 40) that preprocessing repairs. */
+const mixedTileLoader = createTileLoader((column, row) =>
+  column === 200 && row === 40 ? 2500 : (column - 128) * 3 + (row % 17) + (column % 5) / 4,
+);
+const floorCases: [number | undefined, number | undefined][] = [
+  [undefined, undefined],
+  [100, undefined],
+  [undefined, 50],
+  [-20, 100],
+  [undefined, 0],
+];
+
+/** A 2 km patch at (0, 0) loads zoom-14 tiles 8191–8192 on both axes; grid sample 256 sits on (0, 0). */
+function locateEquatorGridSample(column: number, row: number): GeoPoint {
+  const tileCount = 2 ** 14;
+  const mercatorY = (8191 + row / 256) / tileCount;
+
+  return {
+    latitude: (Math.atan(Math.sinh(Math.PI * (1 - 2 * mercatorY))) * 180) / Math.PI,
+    longitude: ((8191 + column / 256) / tileCount) * 360 - 180,
+  };
+}
+
+function requireSourceElevations(terrain: RealTerrain): SourceElevationSampler {
+  assert.ok(terrain.sourceElevations, 'Real terrain should carry source elevations.');
+
+  return terrain.sourceElevations;
+}
+
+function assertNear(actual: number | undefined, expected: number, tolerance = 1e-6) {
+  assert.ok(
+    actual !== undefined && Math.abs(actual - expected) < tolerance,
+    `Expected ${expected} within ${tolerance}, got ${actual}.`,
+  );
+}
+
+void test('legacy sampling and ranges stay byte-identical with the floor applied on read', async () => {
+  const values: number[] = [];
+  const placements = [
+    [0, 0, 2],
+    [53.12, -9.7, 25],
+    [-41.3, 174.8, 120],
+  ];
+
+  for (const [latitude, longitude, spanKm] of placements) {
+    for (const [floor, depth] of floorCases) {
+      const terrain = await loadRealTerrain(
+        latitude,
+        longitude,
+        spanKm,
+        mixedTileLoader,
+        floor,
+        depth,
+      );
+      const { minimumMeters, maximumMeters, originMeters, metersPerUnit } =
+        terrain.elevations ?? {};
+
+      values.push(terrain.seaLevel ?? NaN, minimumMeters ?? NaN, maximumMeters ?? NaN);
+      values.push(originMeters ?? NaN, metersPerUnit ?? NaN);
+
+      for (let y = -10; y <= 90; y += 2.5) {
+        for (let x = -10; x <= 110; x += 2.5) {
+          values.push(terrain.sample(x, y, 100, 80));
+        }
+      }
+    }
+  }
+
+  // Digest of the same values from the in-place clipping algorithm this replaced.
+  assert.equal(
+    createHash('sha256').update(new Float64Array(values)).digest('hex'),
+    '6790c11561d164dd344ed905683d096d1542cfe8bc479dc003677e16ccbdebab',
+  );
+});
+
+void test('source metres ignore the elevation floor and maximum depth, even below the floor', async () => {
+  const loads = await Promise.all(
+    floorCases.map(([floor, depth]) => loadRealTerrain(0, 0, 2, mixedTileLoader, floor, depth)),
+  );
+  const points = Array.from({ length: 64 }, (_, index) =>
+    locateEquatorGridSample(40 + index * 7.3, 30 + index * 6.1),
+  );
+  const unclipped = points.map((point) => requireSourceElevations(loads[0]).sampleMeters(point));
+
+  assert.ok(unclipped.some((meters) => meters !== undefined && meters < -100));
+
+  for (const terrain of loads.slice(1)) {
+    assert.deepEqual(
+      points.map((point) => requireSourceElevations(terrain).sampleMeters(point)),
+      unclipped,
+    );
+    assert.notEqual(terrain.sample(0, 50, 100, 100), loads[0].sample(0, 50, 100, 100));
+  }
+});
+
+void test('source metres read the repaired grid rather than raw spikes', async () => {
+  const terrain = await loadRealTerrain(0, 0, 2, mixedTileLoader);
+  const spikeMeters = requireSourceElevations(terrain).sampleMeters(
+    locateEquatorGridSample(200, 40),
+  );
+
+  assertNear(spikeMeters, (200 - 128) * 3, 20);
+});
+
+void test('source metres interpolate bilinearly between grid samples', async () => {
+  const terrain = await loadRealTerrain(
+    0,
+    0,
+    2,
+    createTileLoader((column, row) => 100 + column + 2 * row),
+  );
+  const sampler = requireSourceElevations(terrain);
+
+  assert.equal(sampler.sampleMeters({ latitude: 0, longitude: 0 }), 100);
+  assertNear(sampler.sampleMeters(locateEquatorGridSample(256.5, 256)), 100.5);
+  assertNear(sampler.sampleMeters(locateEquatorGridSample(256.5, 256.5)), 101.5);
+  assertNear(sampler.sampleMeters(locateEquatorGridSample(10.25, 300)), 198.25);
+});
+
+void test('source metres are unavailable rather than zero outside the loaded coverage', async () => {
+  const terrain = await loadRealTerrain(
+    0,
+    0,
+    2,
+    createTileLoader(() => 0),
+  );
+  const sampler = requireSourceElevations(terrain);
+  const { north, south, east, west } = sampler.coverage;
+  const inset = 1e-7;
+
+  assert.equal(sampler.sampleMeters({ latitude: north - inset, longitude: west + inset }), 0);
+  assert.equal(sampler.sampleMeters({ latitude: south + inset, longitude: east - inset }), 0);
+  assert.equal(sampler.sampleMeters({ latitude: north + 0.001, longitude: 0 }), undefined);
+  assert.equal(sampler.sampleMeters({ latitude: 0, longitude: east + 0.001 }), undefined);
+  assert.equal(sampler.sampleMeters({ latitude: 10, longitude: 10 }), undefined);
+  assert.equal(sampler.sampleMeters({ latitude: NaN, longitude: 0 }), undefined);
+  assert.equal(sampler.sampleMeters({ latitude: 0, longitude: Infinity }), undefined);
+  assert.equal(sampler.sampleMeters({ latitude: 95, longitude: 0 }), undefined);
+  // Zoom-14 equator pixels are 1 / 2^22 of the circumference apart.
+  assertNear(sampler.resolutionMeters, 40075016.686 / 2 ** 22, 1e-9);
+});
+
+void test('polar patches report no source metres beyond the Mercator world edge', async () => {
+  const terrain = await loadRealTerrain(
+    85,
+    0,
+    200,
+    createTileLoader(() => 40),
+  );
+  const sampler = requireSourceElevations(terrain);
+
+  assert.ok(sampler.coverage.north < 85.0512);
+  assert.equal(sampler.sampleMeters({ latitude: 85, longitude: 0 }), 40);
+  assert.equal(sampler.sampleMeters({ latitude: 85.06, longitude: 0 }), undefined);
+});
+
+void test('source metres agree with frame sampling at the same place, even on a copied terrain', async () => {
+  const terrain = await loadRealTerrain(53.12, -9.7, 25, mixedTileLoader);
+  const copiedTerrain = { ...terrain };
+  const { originMeters = NaN, metersPerUnit = NaN } = terrain.elevations ?? {};
+  const frame = { width: 100, height: 80 };
+
+  for (let y = 0; y <= 80; y += 7) {
+    for (let x = 0; x <= 100; x += 9) {
+      const place = locateRealTerrainFramePoint(
+        { location: { latitude: 53.12, longitude: -9.7 }, spanKm: 25 },
+        { x, y },
+        frame,
+      );
+      const meters = requireSourceElevations(copiedTerrain).sampleMeters(place) ?? NaN;
+
+      assertNear((meters - originMeters) / metersPerUnit, terrain.sample(x, y, 100, 80), 1e-9);
+    }
+  }
+});
+
+void test('source revision is stable for identical loads and changes with every load input', async () => {
+  const load = (
+    latitude: number,
+    longitude: number,
+    spanKm: number,
+    floor?: number,
+    depth?: number,
+  ) =>
+    loadRealTerrain(latitude, longitude, spanKm, mixedTileLoader, floor, depth).then(
+      (terrain) => requireSourceElevations(terrain).revision,
+    );
+  const base = await load(0, 0, 2);
+  const variants = await Promise.all([
+    load(0.01, 0, 2),
+    load(0, 0.01, 2),
+    load(0, 0, 3),
+    load(0, 0, 2, 10),
+    load(0, 0, 2, undefined, 10),
+  ]);
+
+  assert.equal(await load(0, 0, 2), base);
+  assert.equal(new Set([base, ...variants]).size, variants.length + 1);
 });

@@ -3,6 +3,7 @@ import { realTerrainBounds } from './constants/real-terrain';
 import { getMercatorSpanFraction, getMercatorX, getMercatorY } from './real-terrain-projection';
 import { preprocessElevations } from './elevation-preprocessing';
 import { TerrainLoadError } from './terrain-load-error';
+import type { GeoCoverage, GeoPoint, SourceElevationSampler } from './types/terrain-analysis';
 
 export interface RealTerrain {
   sample: (x: number, y: number, width: number, height: number) => number;
@@ -18,6 +19,8 @@ export interface RealTerrain {
     originMeters: number;
     metersPerUnit: number;
   };
+  /** Repaired source metres by place, before the depth floor and every display transform. */
+  sourceElevations?: SourceElevationSampler;
 }
 
 /** Raw decoded RGBA pixels and source metadata for one 256px Terrarium tile. */
@@ -115,19 +118,16 @@ export async function loadRealTerrain(
 
   elevations.set(preprocessElevations(elevations, columns, rows).values);
 
-  // Opt-in clipping avoids inventing coastline geometry or changing legacy terrain.
-  if (effectiveFloor !== undefined) {
-    for (let index = 0; index < elevations.length; index++) {
-      elevations[index] = Math.max(effectiveFloor, elevations[index]);
-    }
-  }
-
+  // Opt-in clipping avoids inventing coastline geometry or changing legacy terrain. It applies on
+  // read so the grid keeps the source metres terrain analysis measures.
+  const floorMeters = effectiveFloor ?? -Infinity;
+  const readClipped = (index: number): number => Math.max(floorMeters, elevations[index]);
   let minimum = Infinity;
   let maximum = -Infinity;
 
-  for (const elevation of elevations) {
-    minimum = Math.min(minimum, elevation);
-    maximum = Math.max(maximum, elevation);
+  for (let index = 0; index < elevations.length; index++) {
+    minimum = Math.min(minimum, readClipped(index));
+    maximum = Math.max(maximum, readClipped(index));
   }
 
   const elevationRange = Math.max(1, maximum - minimum);
@@ -143,8 +143,8 @@ export async function loadRealTerrain(
 
   for (let y = top; y <= bottom; y++) {
     for (let x = left; x <= right; x++) {
-      visibleMinimum = Math.min(visibleMinimum, elevations[y * columns + x]);
-      visibleMaximum = Math.max(visibleMaximum, elevations[y * columns + x]);
+      visibleMinimum = Math.min(visibleMinimum, readClipped(y * columns + x));
+      visibleMaximum = Math.max(visibleMaximum, readClipped(y * columns + x));
     }
   }
 
@@ -182,14 +182,20 @@ export async function loadRealTerrain(
       const fractionX = pixelX - left;
       const fractionY = pixelY - top;
       const upper =
-        elevations[top * columns + left] * (1 - fractionX) +
-        elevations[top * columns + right] * fractionX;
+        readClipped(top * columns + left) * (1 - fractionX) +
+        readClipped(top * columns + right) * fractionX;
       const lower =
-        elevations[bottom * columns + left] * (1 - fractionX) +
-        elevations[bottom * columns + right] * fractionX;
+        readClipped(bottom * columns + left) * (1 - fractionX) +
+        readClipped(bottom * columns + right) * fractionX;
 
       return ((upper * (1 - fractionY) + lower * fractionY - minimum) / elevationRange - 0.5) * 1.6;
     },
+    sourceElevations: createSourceElevationSampler(
+      { values: elevations, columns, rows, startX, startY, tileCount, centerLongitude: longitude },
+      // Neighbouring samples sit one pixel apart; the span covers spanTiles tiles of pixels.
+      (spanKm * 1000) / (spanTiles * tileSizePixels),
+      `real:${[latitude, longitude, spanKm, elevationFloor ?? 'none', maxDepth ?? 'none'].join(',')}`,
+    ),
   };
 
   /** Copies one decoded tile into the shared elevation grid. */
@@ -254,3 +260,79 @@ const terrainCredits: readonly [readonly string[], string][] = [
     '© Environment Agency copyright and/or database right 2015. All rights reserved',
   ],
 ];
+
+/** Where the loaded grid sits: sample (column, row) lies at tile (startX + column / 256, startY + row / 256). */
+interface PlacedElevationGrid {
+  values: Float64Array;
+  columns: number;
+  rows: number;
+  startX: number;
+  startY: number;
+  tileCount: number;
+  centerLongitude: number;
+}
+
+/** Reads repaired metres by place with the same grid placement `sample` uses for frame points. */
+function createSourceElevationSampler(
+  grid: PlacedElevationGrid,
+  resolutionMeters: number,
+  revision: string,
+): SourceElevationSampler {
+  const { values, columns, rows, startX, startY, tileCount, centerLongitude } = grid;
+  const worldPixels = tileCount * tileSizePixels;
+  // Rows beyond the Mercator world repeat clamped polar tiles, so they hold nobody's elevation.
+  const firstRow = Math.max(0, -startY * tileSizePixels);
+  const lastRow = Math.min(rows - 1, (tileCount - startY) * tileSizePixels - 1);
+  const centerWorldX = getMercatorX(centerLongitude);
+  // Like getRealTerrainSourceBounds, west or east runs past ±180° near the antimeridian.
+  const coverage: GeoCoverage = {
+    north: getLatitudeAtMercatorY((startY * tileSizePixels + firstRow) / worldPixels),
+    south: getLatitudeAtMercatorY((startY * tileSizePixels + lastRow) / worldPixels),
+    west: getLongitudeAtMercatorX(startX / tileCount),
+    east: getLongitudeAtMercatorX((startX * tileSizePixels + columns - 1) / worldPixels),
+  };
+
+  return {
+    revision,
+    resolutionMeters,
+    coverage,
+    sampleMeters({ latitude, longitude }: GeoPoint) {
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90) {
+        return undefined;
+      }
+
+      // Wrapping toward the centre keeps a patch that straddles the antimeridian contiguous.
+      const eastOffset = getMercatorX(longitude) - centerWorldX;
+      const worldX = centerWorldX + eastOffset - Math.round(eastOffset);
+      const column = worldX * worldPixels - startX * tileSizePixels;
+      const row = getMercatorY(latitude) * worldPixels - startY * tileSizePixels;
+
+      if (!(column >= 0 && column <= columns - 1 && row >= firstRow && row <= lastRow)) {
+        return undefined;
+      }
+
+      const left = Math.floor(column);
+      const top = Math.floor(row);
+      const right = Math.min(columns - 1, left + 1);
+      const bottom = Math.min(lastRow, top + 1);
+      const fractionX = column - left;
+      const fractionY = row - top;
+      const upper =
+        values[top * columns + left] * (1 - fractionX) + values[top * columns + right] * fractionX;
+      const lower =
+        values[bottom * columns + left] * (1 - fractionX) +
+        values[bottom * columns + right] * fractionX;
+      const meters = upper * (1 - fractionY) + lower * fractionY;
+
+      return Number.isFinite(meters) ? meters : undefined;
+    },
+  };
+}
+
+function getLatitudeAtMercatorY(mercatorY: number): number {
+  return (Math.atan(Math.sinh(Math.PI * (1 - 2 * mercatorY))) * 180) / Math.PI;
+}
+
+function getLongitudeAtMercatorX(mercatorX: number): number {
+  return mercatorX * 360 - 180;
+}
