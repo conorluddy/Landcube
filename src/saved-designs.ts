@@ -125,21 +125,19 @@ export function toSavedRoute(route: ActiveRoute): SavedRoute {
   const { id, name, provenance, waypoints, namedWaypoints, slopeThresholdPercent } = route;
   const recorded = route.originalPoints ?? [];
   let cursor = 0;
+  // One pass over the recorded points overall: each search resumes where the last match ended.
   const points = waypoints.map((waypoint): RoutePoint => {
-    const found = recorded.findIndex(
-      (point, index) =>
-        index >= cursor &&
-        point.latitude === waypoint.latitude &&
-        point.longitude === waypoint.longitude,
-    );
+    for (let index = cursor; index < recorded.length; index++) {
+      const point = recorded[index];
 
-    if (found === -1) {
-      return { latitude: waypoint.latitude, longitude: waypoint.longitude };
+      if (point.latitude === waypoint.latitude && point.longitude === waypoint.longitude) {
+        cursor = index + 1;
+
+        return point;
+      }
     }
 
-    cursor = found + 1;
-
-    return recorded[found];
+    return { latitude: waypoint.latitude, longitude: waypoint.longitude };
   });
 
   return { version: 1, id, name, provenance, points, namedWaypoints, slopeThresholdPercent };

@@ -561,7 +561,7 @@ export function createStudioController(
   const installRoute = (active: ActiveRoute) => {
     workspace({
       routeFault: null,
-      route: toWorkspaceRoute(active, { mode: 'viewing' }, true),
+      route: toWorkspaceRoute(active, { mode: 'viewing' }, true, null),
     });
   };
 
@@ -576,7 +576,7 @@ export function createStudioController(
       route:
         next.route === null
           ? null
-          : toWorkspaceRoute(next.route, next.editing, route?.isVisible ?? true),
+          : toWorkspaceRoute(next.route, next.editing, route?.isVisible ?? true, route),
     });
   };
 
@@ -591,7 +591,11 @@ export function createStudioController(
     return true;
   };
 
-  const importRoute = (text: string, fallbackName: string): RouteReplaceResult => {
+  const importRoute = (
+    text: string,
+    fallbackName: string,
+    isConfirmed: boolean,
+  ): RouteReplaceResult => {
     const parsed = parseGpx(text);
 
     if (!parsed.ok) {
@@ -600,7 +604,7 @@ export function createStudioController(
       return { needsConfirmation: false };
     }
 
-    if (requestReplacement({ kind: 'import', text, fallbackName })) {
+    if (!isConfirmed && requestReplacement({ kind: 'import', text, fallbackName })) {
       return { needsConfirmation: true };
     }
 
@@ -857,7 +861,7 @@ export function createStudioController(
           : { ...pinned, zIndex: nextZIndex(pinnedGroups) },
       );
     },
-    loadRoute: (text, fallbackName = 'GPX route') => importRoute(text, fallbackName),
+    loadRoute: (text, fallbackName = 'GPX route') => importRoute(text, fallbackName, false),
     startRouteDrawing() {
       if (requestReplacement({ kind: 'draw' })) {
         return { needsConfirmation: true };
@@ -874,10 +878,10 @@ export function createStudioController(
         return;
       }
 
-      workspace({ routeReplacement: null, route: null });
+      workspace({ routeReplacement: null });
 
       if (pending.kind === 'import') {
-        importRoute(pending.text, pending.fallbackName);
+        importRoute(pending.text, pending.fallbackName, true);
 
         return;
       }
@@ -926,7 +930,13 @@ export function createStudioController(
 
       if (route && route.inspectedDistanceMeters !== distanceMeters) {
         workspace({
-          route: toWorkspaceRoute(route.active, route.editing, route.isVisible, distanceMeters),
+          route: toWorkspaceRoute(
+            route.active,
+            route.editing,
+            route.isVisible,
+            route,
+            distanceMeters,
+          ),
         });
       }
     },
@@ -1704,21 +1714,30 @@ export function describeRoadNetwork(network: RoadNetwork, style: RoadStyle): str
   return `${parts.join(' · ')}.`;
 }
 
-/** "1 bridge", "2 bridges", "1,204 mapped roads". */
-// Stats come from recorded points, so they are recomputed (a reversal swaps ascent and descent) and
-// vanish once an edit turns the route into a drawn one. A stale profile cursor is dropped too.
+// Stats come from recorded points: recomputed only when those change (a reversal swaps ascent and
+// descent), reused while scrubbing, and gone once an edit makes the route a drawn one. A stale
+// profile cursor is dropped too.
 function toWorkspaceRoute(
   active: ActiveRoute,
   editing: RouteEditing,
   isVisible: boolean,
+  previous: WorkspaceRoute | null,
   inspectedDistanceMeters?: number,
 ): WorkspaceRoute {
+  const { originalPoints } = active;
+  const stats =
+    originalPoints === undefined
+      ? undefined
+      : previous?.active.originalPoints === originalPoints
+        ? previous.stats
+        : routeStats(originalPoints);
+
   return {
     active,
     editing,
     isVisible,
     ...(inspectedDistanceMeters === undefined ? {} : { inspectedDistanceMeters }),
-    ...(active.originalPoints === undefined ? {} : { stats: routeStats(active.originalPoints) }),
+    ...(stats === undefined ? {} : { stats }),
   };
 }
 
@@ -1739,6 +1758,7 @@ function createRouteId(name: string, points: readonly GeoPoint[]): string {
   return `imported-${hash.toString(16).padStart(8, '0')}`;
 }
 
+/** "1 bridge", "2 bridges", "1,204 mapped roads". */
 function countOf(count: number, noun: string): string {
   return `${count.toLocaleString('en')} ${noun}${count === 1 ? '' : 's'}`;
 }

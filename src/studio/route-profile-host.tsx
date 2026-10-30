@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { RouteProfile } from '../ui/overlays/route-profile';
 import type { StudioController, StudioState } from './controller';
 import { describeRouteSummary } from './route-overlay';
-import { hasRouteProfile, useRouteAnalysis } from './use-route-analysis';
+import { hasRouteProfile, getActiveRouteAnalysis } from './active-route-analysis';
 
 /**
  * Connects the route profile to the controller: analysis in, inspection and threshold out.
@@ -20,7 +20,7 @@ export function RouteProfileHost({
   isCollapsed: boolean;
   onCollapsedChange: (isCollapsed: boolean) => void;
 }): ReactNode {
-  const outcome = useRouteAnalysis(state);
+  const outcome = getActiveRouteAnalysis(state);
   const route = state.workspace.route;
 
   if (route === null || !hasRouteProfile(state)) {
@@ -32,15 +32,8 @@ export function RouteProfileHost({
   return (
     <RouteProfile
       summary={describeRouteSummary(outcome, route.active.provenance)}
-      profile={
-        analysis === undefined
-          ? undefined
-          : {
-              groundMeters: analysis.groundMeters,
-              samples: analysis.samples,
-              steepSections: analysis.steepSections,
-            }
-      }
+      // The cached analysis itself, so its identity changes only when the route or terrain does.
+      profile={analysis}
       slopeThresholdPercent={route.active.slopeThresholdPercent}
       inspectedDistanceMeters={route.inspectedDistanceMeters}
       isCollapsed={isCollapsed}

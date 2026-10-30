@@ -170,3 +170,16 @@ void test('editing an imported route drops its recorded stats and points', () =>
   assert.equal(route?.active.provenance, 'drawn');
   assert.equal(route.stats, undefined);
 });
+
+void test('scrubbing the profile reuses the recorded stats', () => {
+  const c = setupController();
+
+  c.loadRoute(twoPoints);
+
+  const stats = c.getSnapshot().workspace.route?.stats;
+
+  c.inspectRoute(5);
+
+  assert.equal(c.getSnapshot().workspace.route?.inspectedDistanceMeters, 5);
+  assert.equal(c.getSnapshot().workspace.route?.stats, stats);
+});

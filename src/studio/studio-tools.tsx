@@ -133,8 +133,10 @@ function useToolShortcuts(c: StudioController): void {
 
       if (event.key === 'Escape') {
         // Escape first leaves drawing or editing (keeping the route); the next one leaves the tool.
+        // An empty route has nothing to keep, so it leaves at once (the tool's exit clears it).
         if (
           getActiveTool(state) === 'route' &&
+          (workspace.route?.active.waypoints.length ?? 0) > 0 &&
           getRouteKeyAction(event.key, workspace.route?.editing ?? { mode: 'viewing' }) === 'escape'
         ) {
           event.preventDefault();

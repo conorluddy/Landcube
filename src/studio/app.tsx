@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { RouteProfileHost } from './route-profile-host';
-import { hasRouteProfile } from './use-route-analysis';
+import { hasRouteProfile } from './active-route-analysis';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { InspectorPanel } from '../ui/inspector-panel';

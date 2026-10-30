@@ -157,3 +157,8 @@ function importedRoute(): ActiveRoute {
     slopeThresholdPercent: 15,
   };
 }
+
+void test('finishing or escaping an empty drawing discards it', () => {
+  assert.equal(run(...drawn(), { type: 'escape' }).route, null);
+  assert.equal(run(...drawn(), { type: 'finish' }).route, null);
+});

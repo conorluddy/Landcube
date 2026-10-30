@@ -12,12 +12,8 @@ import { buttonRow, customRow, hintRow, statusRow, toggleRow } from '../control-
 import { drawRoute, exportRouteGpx } from '../route-actions';
 import { isRouteComplete } from '../route-editing';
 import { RouteFileField } from '../route-file-field';
-import { createRouteAnalysisCache } from '../../route-analysis';
 import { countRoutePointsInside, describeRoute } from '../route-overlay';
-import { analyseActiveRoute } from '../use-route-analysis';
-
-// Group rows rebuild on every state change; the memo keeps hover scrubbing from re-sampling.
-const analyse = createRouteAnalysisCache();
+import { analyseActiveRoute } from '../active-route-analysis';
 
 // === PUBLIC API ===
 
@@ -56,7 +52,7 @@ export function buildRouteGroup(
       route !== null &&
         hintRow(
           'route-stats',
-          describeRoute(route, analyseActiveRoute(route.active, terrain.sourceElevations, analyse)),
+          describeRoute(route, analyseActiveRoute(route.active, terrain.sourceElevations)),
         ),
       isIncomplete &&
         hintRow('route-incomplete', 'Incomplete route: place at least two waypoints.'),

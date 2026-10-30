@@ -64,10 +64,14 @@ export function reduceRouteEditing(
       };
     case 'clear':
       return emptyRouteEditingState;
-    // Finish and escape both retain the route; the controller distinguishes them for the UI.
+    // Finish and escape both retain the route; an empty one has nothing to retain.
     case 'finish':
     case 'escape':
-      return route === null || editing.mode === 'viewing' ? state : { route, editing: viewing };
+      if (route === null || editing.mode === 'viewing') {
+        return state;
+      }
+
+      return route.waypoints.length === 0 ? emptyRouteEditingState : { route, editing: viewing };
     case 'edit':
       return route === null || !isRouteComplete(route)
         ? state

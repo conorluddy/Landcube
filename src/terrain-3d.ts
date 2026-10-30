@@ -146,11 +146,6 @@ export interface Terrain3d {
   /** Shows the profile-inspection marker at a crop-unit point on the route; never rebuilds it. */
   setRouteMarker(point: FramePoint | undefined): void;
   /**
-   * Displayed surface height (smooth or terraced) at a crop-unit point, in landscape-local
-   * preview units before the frame seat lift; undefined off the model or before a terrain update.
-   */
-  getDisplayedSurfaceHeight(point: FramePoint): number | undefined;
-  /**
    * Viewport (client) pixels of a crop-unit point on the displayed surface; undefined off the
    * model, before a terrain update, or behind the camera.
    */
@@ -1585,7 +1580,6 @@ export function createTerrain3d(
       syncRouteHooks();
       draw();
     },
-    getDisplayedSurfaceHeight: (point) => displayedSurface?.heightAt(point),
     projectCropPointToClient(point) {
       const [, width, height] = lastUpdate ?? [];
       const surfaceHeight = displayedSurface?.heightAt(point);

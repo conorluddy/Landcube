@@ -1,4 +1,4 @@
-import { useId, type KeyboardEvent, type PointerEvent } from 'react';
+import { useId, useMemo, type KeyboardEvent, type PointerEvent } from 'react';
 import {
   maximumSlopeThresholdPercent,
   minimumSlopeThresholdPercent,
@@ -236,23 +236,13 @@ function ProfileChart({
   onInspect: (distanceMeters: number | undefined) => void;
 }): React.JSX.Element {
   const { groundMeters, samples, steepSections } = profile;
-  const elevations = samples.flatMap(({ elevationMeters }) =>
-    elevationMeters === undefined ? [] : [elevationMeters],
+  // Scrubbing re-renders on every pointer move; the up-to-10k-sample geometry only changes with the profile.
+  const { hasElevation, elevationTicks, distanceTicks, toX, toY, runPaths } = useMemo(
+    () => layoutProfileChart(profile),
+    [profile],
   );
-  const hasElevation = elevations.length > 0;
-  const elevationTicks = hasElevation
-    ? chooseTicks(Math.min(...elevations), Math.max(...elevations), 3)
-    : [];
-  const floorMeters = elevationTicks[0] ?? 0;
-  const ceilingMeters = Math.max(elevationTicks.at(-1) ?? 1, floorMeters + 1);
-  const distanceTicks = chooseTicks(0, groundMeters, 4).filter((tick) => tick <= groundMeters);
-  const toX = (distanceMeters: number): number =>
-    groundMeters === 0 ? 0 : (distanceMeters / groundMeters) * chartWidth;
-  const toY = (elevationMeters: number): number =>
-    chartHeight * (1 - (elevationMeters - floorMeters) / (ceilingMeters - floorMeters));
   const toPercent = (distanceMeters: number): string =>
     `${groundMeters === 0 ? 0 : (distanceMeters / groundMeters) * 100}%`;
-  const runs = splitElevationRuns(samples);
   const inspected = inspectedDistanceMeters;
 
   const inspectAt = (event: PointerEvent<HTMLDivElement>): void => {
@@ -335,24 +325,12 @@ function ProfileChart({
               height={chartHeight}
             />
           ))}
-          {runs.map((run) => {
-            const points = run.map(
-              ({ distanceMeters, elevationMeters = 0 }) =>
-                `${toX(distanceMeters).toFixed(1)},${toY(elevationMeters).toFixed(1)}`,
-            );
-            const first = run[0];
-            const last = run[run.length - 1];
-
-            return (
-              <g key={first.distanceMeters} data-profile-run={run.length}>
-                <polygon
-                  className="lc-route-profile__area"
-                  points={`${toX(first.distanceMeters).toFixed(1)},${chartHeight} ${points.join(' ')} ${toX(last.distanceMeters).toFixed(1)},${chartHeight}`}
-                />
-                <polyline className="lc-route-profile__line" points={points.join(' ')} />
-              </g>
-            );
-          })}
+          {runPaths.map(({ key, sampleCount, area, line }) => (
+            <g key={key} data-profile-run={sampleCount}>
+              <polygon className="lc-route-profile__area" points={area} />
+              <polyline className="lc-route-profile__line" points={line} />
+            </g>
+          ))}
         </svg>
         {steepSections.map((section) => (
           <span
@@ -384,6 +362,43 @@ function ProfileChart({
       </div>
     </div>
   );
+}
+
+/** Axis ticks, scales and SVG point lists for one profile; pure so the chart can memoise it. */
+function layoutProfileChart({ groundMeters, samples }: RouteProfileData) {
+  const elevations = samples.flatMap(({ elevationMeters }) =>
+    elevationMeters === undefined ? [] : [elevationMeters],
+  );
+  const hasElevation = elevations.length > 0;
+  const elevationTicks = hasElevation
+    ? chooseTicks(Math.min(...elevations), Math.max(...elevations), 3)
+    : [];
+  const floorMeters = elevationTicks[0] ?? 0;
+  const ceilingMeters = Math.max(elevationTicks.at(-1) ?? 1, floorMeters + 1);
+  const distanceTicks = chooseTicks(0, groundMeters, 4).filter((tick) => tick <= groundMeters);
+  const toX = (distanceMeters: number): number =>
+    groundMeters === 0 ? 0 : (distanceMeters / groundMeters) * chartWidth;
+  const toY = (elevationMeters: number): number =>
+    chartHeight * (1 - (elevationMeters - floorMeters) / (ceilingMeters - floorMeters));
+  const runPaths = splitElevationRuns(samples).map((run) => {
+    const line = run
+      .map(
+        ({ distanceMeters, elevationMeters = 0 }) =>
+          `${toX(distanceMeters).toFixed(1)},${toY(elevationMeters).toFixed(1)}`,
+      )
+      .join(' ');
+    const startX = toX(run[0].distanceMeters).toFixed(1);
+    const endX = toX(run[run.length - 1].distanceMeters).toFixed(1);
+
+    return {
+      key: run[0].distanceMeters,
+      sampleCount: run.length,
+      line,
+      area: `${startX},${chartHeight} ${line} ${endX},${chartHeight}`,
+    };
+  });
+
+  return { hasElevation, elevationTicks, distanceTicks, toX, toY, runPaths };
 }
 
 function describeInspection(
