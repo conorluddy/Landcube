@@ -83,6 +83,8 @@ export function createTerrainTransitionAudio(): TerrainTransitionAudio {
       },
       (error: unknown) => {
         isStarting = false;
+        // Forget the failed load so the next morph retries instead of staying silent.
+        buffer = undefined;
         console.warn('Terrain transition audio failed to load; morphs stay silent.', error);
       },
     );
@@ -90,7 +92,8 @@ export function createTerrainTransitionAudio(): TerrainTransitionAudio {
 
   return {
     play() {
-      if (isSoundMuted()) {
+      // No sound (or 468 KB download) before the visitor has interacted with the page.
+      if (isSoundMuted() || !hasUserInteracted()) {
         return;
       }
 
@@ -98,7 +101,7 @@ export function createTerrainTransitionAudio(): TerrainTransitionAudio {
       start(sliceSeconds);
     },
     sustain() {
-      if (isSoundMuted() || isStarting) {
+      if (isSoundMuted() || isStarting || !hasUserInteracted()) {
         return;
       }
 
@@ -158,4 +161,9 @@ function scheduleEnd({ source, gain }: Rumble, nowSeconds: number, endSeconds: n
 
   gain.gain.linearRampToValueAtTime(0, endSeconds);
   source.stop(endSeconds);
+}
+
+/** Browsers without the User Activation API are assumed interactive; they gate audio themselves. */
+function hasUserInteracted(): boolean {
+  return (navigator as { userActivation?: UserActivation }).userActivation?.hasBeenActive ?? true;
 }

@@ -56,6 +56,10 @@ export interface WalkScale {
   nearPlane: number;
 }
 
+// Reused every frame so walking doesn't churn the garbage collector.
+const scratchForward = new THREE.Vector3();
+const scratchRight = new THREE.Vector3();
+
 // === PUBLIC API ===
 
 export function getWalkScale(metersPerUnit: number): WalkScale {
@@ -109,6 +113,11 @@ export function createTerrainWalk(options: TerrainWalkOptions): TerrainWalk {
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
+    // Browser and OS shortcuts (reload, address bar, tab switching, F-keys) keep working.
+    if (event.metaKey || event.ctrlKey || event.altKey || /^(Tab|F\d+)$/.test(event.key)) {
+      return;
+    }
+
     if (event.key === 'Escape') {
       stop();
     } else if (event.code === 'Space' && !jump && !landing) {
@@ -230,8 +239,8 @@ function stepCamera(
     return;
   }
 
-  const forward = camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize();
-  const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+  const forward = camera.getWorldDirection(scratchForward).setY(0).normalize();
+  const right = scratchRight.crossVectors(forward, camera.up).normalize();
   const speed =
     scale.walkSpeedPerSecond * (isHeld('ShiftLeft', 'ShiftRight') ? sprintMultiplier : 1);
   const step = forward

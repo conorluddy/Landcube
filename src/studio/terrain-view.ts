@@ -208,7 +208,17 @@ export function createStudioTerrainView(
       event.target instanceof HTMLElement &&
       event.target.closest('input, textarea, select, [contenteditable]') !== null;
 
-    if (event.code === 'KeyF' && !isTyping && !event.metaKey && !event.ctrlKey) {
+    // A modal owns the keyboard; F behind it would walk and grab the pointer unseen.
+    const isDialogOpen = document.querySelector('dialog[open], [role="dialog"]') !== null;
+
+    if (
+      event.code === 'KeyF' &&
+      !isTyping &&
+      !isDialogOpen &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.altKey
+    ) {
       walkAt();
     }
   });

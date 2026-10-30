@@ -85,3 +85,12 @@
     transform-origin: 18px calc(100% + 18px);
   }
 }
+
+/* On phones the toggle sits near the left edge, so the dial opens rightward to stay on screen. */
+@media (max-width: 767px) {
+  .camera-selector__dial {
+    left: 0;
+    margin-left: 0;
+    transform-origin: 18px calc(100% + 18px);
+  }
+}

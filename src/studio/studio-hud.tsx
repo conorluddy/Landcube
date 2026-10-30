@@ -29,6 +29,8 @@ import { WalkDrop } from './walk-drop';
 
 /** The card needs a desktop-sized viewport: wider than a phone and at least 700px tall. */
 const readoutCardQuery = '(min-width: 768px) and (min-height: 700px)';
+/** Walking needs pointer lock and a keyboard, so the walker only shows for a mouse or trackpad. */
+const walkPointerQuery = '(pointer: fine)';
 /** Inside the card's 300px less its 14px side padding. */
 const cardScaleBarMaximumPx = 272;
 const canvasScaleBarMaximumPx = 120;
@@ -51,6 +53,7 @@ export function StudioHud({
     subscribeToReadoutCardQuery,
     readReadoutCardQuery,
   );
+  const canWalk = useSyncExternalStore(subscribeToWalkPointerQuery, readWalkPointerQuery);
   const layer = useRef<HTMLDivElement>(null);
   const viewportSize = useElementSize(layer);
   const is3d = state.workspace.view === '3d';
@@ -128,7 +131,7 @@ export function StudioHud({
         <>
           {canvasScaleBar && <ScaleBar {...canvasScaleBar} />}
           {is3d && <CameraSelector controller={controller} />}
-          {is3d && <WalkDrop controller={controller} />}
+          {is3d && canWalk && <WalkDrop controller={controller} />}
           <Compass headingDegrees={is3d ? (state.cameraPose?.azimuthDegrees ?? 0) : 0} />
         </>
       }
@@ -190,4 +193,18 @@ function subscribeToReadoutCardQuery(onChange: () => void): () => void {
 
 function readReadoutCardQuery(): boolean {
   return matchMedia(readoutCardQuery).matches;
+}
+
+function subscribeToWalkPointerQuery(onChange: () => void): () => void {
+  const query = matchMedia(walkPointerQuery);
+
+  query.addEventListener('change', onChange);
+
+  return () => {
+    query.removeEventListener('change', onChange);
+  };
+}
+
+function readWalkPointerQuery(): boolean {
+  return matchMedia(walkPointerQuery).matches;
 }

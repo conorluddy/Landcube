@@ -108,6 +108,18 @@ void test('in 3D, height exaggeration follows the area span, and procedural terr
   );
 });
 
+void test('in 2D, height exaggeration is hidden because it only shapes the 3D model', () => {
+  for (const selected of ['generated', 'real'] as const) {
+    const { controller, state } = createContext({ selected, view: '2d' });
+    const rowIds = buildTerrainGroups(controller, state).flatMap((group) =>
+      listRowIds([group], group.id),
+    );
+
+    assert.ok(!rowIds.includes('model-exaggeration'), `${selected} terrain hides the slider`);
+    assert.ok(!rowIds.includes('model-auto-exaggeration'), `${selected} terrain hides auto height`);
+  }
+});
+
 // === HELPERS ===
 
 interface ContextOverrides {

@@ -762,13 +762,13 @@ export function createTerrain3d(
   });
 
   // Spike: first person drops in at a terrain point; Esc returns to the saved orbit pose.
-  const downRay = new THREE.Raycaster();
+  const downRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
   let orbitPose: { position: THREE.Vector3; target: THREE.Vector3 } | undefined;
   const walk = createTerrainWalk({
     camera: perspectiveCamera,
     canvas: renderer.domElement,
     getGroundHeight(x, z) {
-      downRay.set(new THREE.Vector3(x, 50, z), new THREE.Vector3(0, -1, 0));
+      downRay.ray.origin.set(x, 50, z);
 
       return downRay.intersectObject(surface, false)[0]?.point.y;
     },
@@ -1381,6 +1381,8 @@ export function createTerrain3d(
       if (!value) {
         finishTransition();
         cancelFocusPick?.();
+        // Leaving 3D must release the walk's frame loop, key capture and studio state.
+        walk.stop();
       }
 
       renderer.domElement.hidden = !value;
