@@ -20,7 +20,8 @@ export function buildRouteGroup(
   terrain: RealTerrain,
 ): ControlGroupDefinition {
   const { route, routeFault } = state.workspace;
-  const insideCount = route === null ? undefined : countRoutePointsInside(route.points, terrain);
+  const insideCount =
+    route === null ? undefined : countRoutePointsInside(route.active.waypoints, terrain);
 
   return {
     id: 'route',
@@ -47,7 +48,7 @@ export function buildRouteGroup(
         insideCount !== undefined &&
         hintRow(
           'route-clip',
-          `${insideCount} of ${route.points.length} points inside the loaded area.`,
+          `${insideCount} of ${route.active.waypoints.length} points inside the loaded area.`,
         ),
       buttonRow('route-clear', {
         children: 'Clear route',

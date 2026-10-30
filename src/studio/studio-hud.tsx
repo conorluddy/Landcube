@@ -66,7 +66,7 @@ export function StudioHud({
   const route = state.workspace.route;
   const projectedRoute =
     route !== null && route.isVisible && !is3d && viewportSize !== undefined && state.source.terrain
-      ? projectRouteToFrame(route, state.source.terrain, viewportSize)
+      ? projectRouteToFrame(route.active, state.source.terrain, viewportSize)
       : undefined;
 
   return (
@@ -82,7 +82,7 @@ export function StudioHud({
               heightPx={viewportSize.height}
               points={projectedRoute.points}
               waypoints={projectedRoute.waypoints}
-              label={`Route: ${route.name}`}
+              label={`Route: ${route.active.name}`}
             />
           )}
           <Crosshair position={pointer.kind === 'tracking' ? pointer : undefined}>
