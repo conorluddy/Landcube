@@ -13,6 +13,8 @@ const directions = [
   { name: 'Northwest', label: 'NW', azimuth: -135 },
 ];
 const elevations = [60, 30, 15];
+// Stay just off the pole so the orbit retains a stable north-up orientation.
+const overheadElevationDegrees = 89.95;
 
 /** Camera position is expressed relative to the model, with north at the top of the dial. */
 export function CameraSelector({
@@ -45,10 +47,36 @@ export function CameraSelector({
         }
       }}
     >
+      <button
+        ref={toggle}
+        className="camera-selector__toggle"
+        type="button"
+        aria-label="Camera angle shortcuts"
+        aria-expanded={open}
+        onClick={() => {
+          setOpen((current) => !current);
+        }}
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M4 7h3l1.5-2h7L17 7h3v12H4z" />
+          <circle cx="12" cy="13" r="3.5" />
+        </svg>
+      </button>
       {open && (
         <svg
           className="camera-selector__dial"
           viewBox="-125 -125 250 250"
+          role="group"
           aria-label="Camera angles"
         >
           {elevations.flatMap((elevation, ring) =>
@@ -76,15 +104,15 @@ export function CameraSelector({
             tabIndex={0}
             aria-label="North-up overhead view"
             onClick={() => {
-              select(0, 89.95);
+              select(0, overheadElevationDegrees);
             }}
             onKeyDown={(event) => {
-              activate(event, 0, 89.95);
+              activate(event, 0, overheadElevationDegrees);
             }}
           >
             <title>North-up overhead view</title>
           </circle>
-          <text x="0" y="4" textAnchor="middle">
+          <text aria-hidden="true" x="0" y="4" textAnchor="middle">
             TOP
           </text>
           {directions.map((direction, index) => {
@@ -93,6 +121,7 @@ export function CameraSelector({
             return (
               <text
                 key={direction.name}
+                aria-hidden="true"
                 x={Math.sin(angle) * 118}
                 y={-Math.cos(angle) * 118 + 4}
                 textAnchor="middle"
@@ -102,37 +131,18 @@ export function CameraSelector({
             );
           })}
           {elevations.map((elevation, index) => (
-            <text key={elevation} x="0" y={-(41 + index * 26) + 4} textAnchor="middle">
+            <text
+              key={elevation}
+              aria-hidden="true"
+              x="0"
+              y={-(41 + index * 26) + 4}
+              textAnchor="middle"
+            >
               {elevation}°
             </text>
           ))}
         </svg>
       )}
-      <button
-        ref={toggle}
-        className="camera-selector__toggle"
-        type="button"
-        aria-label="Camera angle shortcuts"
-        aria-expanded={open}
-        onClick={() => {
-          setOpen(!open);
-        }}
-      >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          width="18"
-          height="18"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M4 7h3l1.5-2h7L17 7h3v12H4z" />
-          <circle cx="12" cy="13" r="3.5" />
-        </svg>
-      </button>
     </div>
   );
 }
