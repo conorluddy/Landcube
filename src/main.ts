@@ -210,6 +210,10 @@ controls.connect({
   applyViewPreset: terrain3d.applyViewPreset,
   setCameraDirection: terrain3d.setCameraDirection,
   pickFocus: terrain3d.pickFocus,
+  captureCameraShot: terrain3d.captureCameraShot,
+  flyToCameraShot: terrain3d.flyToCameraShot,
+  playCameraShots: terrain3d.playCameraShots,
+  stopCameraShots: terrain3d.stopCameraShots,
   async downloadStill(scale) {
     const frame = terrain3d.captureStill(scale);
 

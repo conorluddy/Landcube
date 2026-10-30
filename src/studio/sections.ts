@@ -63,7 +63,7 @@ export const studioSections = [
     index: 5,
     code: 'ORBT',
     title: 'Orbit',
-    groupIds: ['orbit'],
+    groupIds: ['orbit', 'director'],
   },
   {
     id: 'Scene',

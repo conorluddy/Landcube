@@ -267,7 +267,9 @@ function Studio({
         return;
       }
 
-      if (state.workspace.mode === 'system') {
+      if (state.cameraShots.isPlaying) {
+        c.stopCameraShots();
+      } else if (state.workspace.mode === 'system') {
         if (!isTextField(event.target)) {
           modeFlip.request('studio');
         }
@@ -288,7 +290,41 @@ function Studio({
     return () => {
       document.removeEventListener('keydown', escape);
     };
-  }, [c, modeFlip, state.workspace, isPhoneViewport]);
+  }, [c, modeFlip, state.workspace, state.cameraShots.isPlaying, isPhoneViewport]);
+  useEffect(() => {
+    // Director shortcuts: B saves a shot, Shift+B clears them, P plays or stops the tour.
+    const directCameraShots = (event: KeyboardEvent) => {
+      const { workspace } = c.getSnapshot();
+
+      if (
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.repeat ||
+        isTextField(event.target) ||
+        workspace.mode !== 'studio' ||
+        workspace.view !== '3d'
+      ) {
+        return;
+      }
+
+      if (event.code === 'KeyB') {
+        if (event.shiftKey) {
+          c.clearCameraShots();
+        } else {
+          c.saveCameraShot();
+        }
+      } else if (event.code === 'KeyP' && !event.shiftKey) {
+        c.toggleCameraShotPlayback();
+      }
+    };
+
+    document.addEventListener('keydown', directCameraShots);
+
+    return () => {
+      document.removeEventListener('keydown', directCameraShots);
+    };
+  }, [c]);
   useEffect(() => {
     const openPalette = (event: KeyboardEvent) => {
       if (!isCommandPaletteShortcut(event) || c.getSnapshot().workspace.mode === 'system') {

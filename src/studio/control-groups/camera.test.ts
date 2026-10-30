@@ -12,7 +12,7 @@ void test('perspective camera shows lens, focus, exposure and orbit with the ori
   const { controller, state } = createContext();
   const groups = [...buildCameraGroups(controller, state), ...buildOrbitGroups(controller, state)];
 
-  assert.deepEqual(listGroupIds(groups), ['lens', 'focus', 'exposure', 'orbit']);
+  assert.deepEqual(listGroupIds(groups), ['lens', 'focus', 'exposure', 'orbit', 'director']);
   assert.deepEqual(listRowIds(groups, 'lens'), [
     'camera-projection',
     'camera-focal-length',
@@ -77,7 +77,7 @@ void test('orbit has its own section and the camera reset stays with the camera 
 
   assert.deepEqual(listGroupIds(cameraGroups), ['lens', 'focus', 'exposure']);
   assert.ok(listRowIds(cameraGroups, 'exposure').includes('camera-reset-settings'));
-  assert.deepEqual(listGroupIds(buildOrbitGroups(controller, state)), ['orbit']);
+  assert.deepEqual(listGroupIds(buildOrbitGroups(controller, state)), ['orbit', 'director']);
 });
 
 // === HELPERS ===
@@ -122,3 +122,33 @@ function listRowIds(groups: readonly ControlGroupDefinition[], groupId: string):
 function renderGroups(groups: readonly ControlGroupDefinition[]): string {
   return renderMarkup(groups.map((group) => createElement(ControlGroup, { key: group.id, group })));
 }
+
+void test('director shows a hint until a shot is saved, then the strip and playback', () => {
+  const { controller, state } = createContext();
+  const empty = buildOrbitGroups(controller, state);
+
+  assert.deepEqual(listRowIds(empty, 'director'), [
+    'director-empty',
+    'director-add-shot',
+    'director-play',
+    'director-clear',
+  ]);
+
+  const withShot = buildOrbitGroups(controller, {
+    ...state,
+    cameraShots: {
+      shots: [
+        {
+          id: 1,
+          thumbnailUrl: '',
+          target: { x: 0, y: 0, z: 0 },
+          direction: { x: 0, y: 1, z: 0 },
+          distance: 2,
+        },
+      ],
+      isPlaying: false,
+    },
+  });
+
+  assert.equal(listRowIds(withShot, 'director')[0], 'director-shots');
+});
