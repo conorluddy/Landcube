@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import './system.css';
+import { ownsArrowKeys, readBrowseStep } from './browse-keys';
 import { findParts, stepPart } from './part-search';
 import { findPartById, systemParts, systemSections } from './registry';
 import type { SystemSectionId } from './registry.types';
@@ -37,11 +38,20 @@ export default function SystemMode({
     setNavSectionId(part.section);
   }, [part.section]);
 
+  // The control that opened this mode unmounted with the studio chrome; keep keyboard users in place.
+  useEffect(() => {
+    if (document.activeElement === null || document.activeElement === document.body) {
+      document
+        .querySelector<HTMLElement>('#system-inspector .lc-part-row[aria-current="true"]')
+        ?.focus();
+    }
+  }, []);
+
   useEffect(() => {
     const browse = (event: KeyboardEvent) => {
-      const delta = arrowKeySteps[event.key];
+      const delta = readBrowseStep(event);
 
-      if (delta === undefined || event.defaultPrevented || isTypingTarget(event.target)) {
+      if (delta === undefined || event.defaultPrevented || ownsArrowKeys(event.target)) {
         return;
       }
 
@@ -97,21 +107,5 @@ export default function SystemMode({
         onExit={onExit}
       />
     </>
-  );
-}
-
-// === HELPERS ===
-
-const arrowKeySteps: Partial<Record<string, 1 | -1>> = {
-  ArrowDown: 1,
-  ArrowRight: 1,
-  ArrowUp: -1,
-  ArrowLeft: -1,
-};
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
   );
 }

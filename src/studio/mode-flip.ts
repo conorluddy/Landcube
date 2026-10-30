@@ -24,7 +24,10 @@ export interface ModeFlipTimers {
 export interface ModeFlip {
   getSnapshot: () => ModeFlipSnapshot;
   subscribe: (listener: () => void) => () => void;
-  /** Starts a flip to `mode`; false when busy or already there. Commits the mode before animating. */
+  /**
+   * Starts a flip to `mode`, committing it before animating; true when it started. A request made
+   * mid-flip is held and runs as the flip finishes, so an early Esc is never dropped.
+   */
   request: (mode: StudioMode) => boolean;
   /** Follows a mode change made elsewhere (a phone viewport, a deep link) without animating. */
   snapTo: (mode: StudioMode) => void;
@@ -35,6 +38,8 @@ export interface ModeFlip {
 export const modeFlipTiming = {
   foldOutMs: 260,
   settleMs: 30,
+  foldInMs: 300,
+  /** Unlocks even if a fold-in timer never fired; normally the lock clears when the fold-in ends. */
   safetyMs: 700,
   /** Terrain and ground cross-fade; terrain drawing pauses once it has faded out. */
   canvasFadeMs: 600,
@@ -66,6 +71,7 @@ export function createModeFlip({
   };
   const listeners = new Set<() => void>();
   const pendingTimers = new Set<number>();
+  let heldMode: StudioMode | undefined;
 
   const update = (patch: Partial<ModeFlipSnapshot>) => {
     snapshot = { ...snapshot, ...patch };
@@ -83,12 +89,67 @@ export function createModeFlip({
     pendingTimers.add(handle);
   };
 
+  const unlock = () => {
+    if (!snapshot.isBusy) {
+      return;
+    }
+
+    update({ angleDegrees: 0, transition: 'none', isBusy: false });
+
+    const next = heldMode;
+
+    heldMode = undefined;
+
+    if (next !== undefined) {
+      request(next);
+    }
+  };
+
   const clearPending = () => {
     pendingTimers.forEach((handle) => {
       timers.clearTimeout(handle);
     });
     pendingTimers.clear();
   };
+
+  function request(mode: StudioMode): boolean {
+    if (snapshot.isBusy) {
+      heldMode = mode;
+
+      return false;
+    }
+
+    if (mode === snapshot.shownMode) {
+      return false;
+    }
+
+    // A finished flip's safety timer must not land on this one.
+    clearPending();
+    commit(mode);
+
+    if (prefersReducedMotion()) {
+      update({ shownMode: mode });
+
+      return true;
+    }
+
+    update({
+      angleDegrees: 90,
+      transition: 'foldOut',
+      isBusy: true,
+      sweepCount: snapshot.sweepCount + 1,
+    });
+    after(modeFlipTiming.foldOutMs, () => {
+      update({ shownMode: mode, angleDegrees: -90, transition: 'none' });
+      after(modeFlipTiming.settleMs, () => {
+        update({ angleDegrees: 0, transition: 'foldIn' });
+        after(modeFlipTiming.foldInMs, unlock);
+      });
+    });
+    after(modeFlipTiming.safetyMs, unlock);
+
+    return true;
+  }
 
   return {
     getSnapshot: () => snapshot,
@@ -99,43 +160,14 @@ export function createModeFlip({
         listeners.delete(listener);
       };
     },
-    request(mode) {
-      if (snapshot.isBusy || mode === snapshot.shownMode) {
-        return false;
-      }
-
-      commit(mode);
-
-      if (prefersReducedMotion()) {
-        update({ shownMode: mode });
-
-        return true;
-      }
-
-      update({
-        angleDegrees: 90,
-        transition: 'foldOut',
-        isBusy: true,
-        sweepCount: snapshot.sweepCount + 1,
-      });
-      after(modeFlipTiming.foldOutMs, () => {
-        update({ shownMode: mode, angleDegrees: -90, transition: 'none' });
-        after(modeFlipTiming.settleMs, () => {
-          update({ angleDegrees: 0, transition: 'foldIn' });
-        });
-      });
-      after(modeFlipTiming.safetyMs, () => {
-        update({ angleDegrees: 0, transition: 'none', isBusy: false });
-      });
-
-      return true;
-    },
+    request,
     snapTo(mode) {
       if (mode === snapshot.shownMode && !snapshot.isBusy) {
         return;
       }
 
       clearPending();
+      heldMode = undefined;
       update({ shownMode: mode, angleDegrees: 0, transition: 'none', isBusy: false });
     },
     dispose: clearPending,

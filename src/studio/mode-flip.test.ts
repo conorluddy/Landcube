@@ -21,12 +21,29 @@ void test('a flip folds out, swaps the shown mode edge-on, then folds back in', 
   assert.equal(flip.getSnapshot().angleDegrees, 0);
   assert.equal(flip.getSnapshot().transition, 'foldIn');
 
-  advance(410);
+  advance(300);
   assert.equal(flip.getSnapshot().isBusy, false);
   assert.equal(flip.getSnapshot().transition, 'none');
 });
 
-void test('toggles are ignored while a flip is running', () => {
+void test('the lock clears as the fold-in ends, so an Esc straight after is not dropped', () => {
+  const { flip, committed, advance } = setup();
+
+  flip.request('system');
+  advance(600);
+
+  assert.equal(flip.request('studio'), true);
+  assert.deepEqual(committed, ['system', 'studio']);
+
+  advance(150);
+  assert.equal(
+    flip.getSnapshot().isBusy,
+    true,
+    'the first flip’s safety timer must not unlock the second',
+  );
+});
+
+void test('a toggle during a flip is held, then flips back once the first flip finishes', () => {
   const { flip, committed, advance } = setup();
 
   flip.request('system');
@@ -35,8 +52,24 @@ void test('toggles are ignored while a flip is running', () => {
   assert.equal(flip.request('studio'), false);
   assert.deepEqual(committed, ['system']);
 
-  advance(600);
-  assert.equal(flip.request('studio'), true);
+  advance(490);
+  assert.deepEqual(committed, ['system', 'studio']);
+  assert.equal(flip.getSnapshot().isBusy, true);
+
+  advance(590);
+  assert.equal(flip.getSnapshot().shownMode, 'studio');
+});
+
+void test('repeating the request in flight during a flip does not flip again', () => {
+  const { flip, committed, advance } = setup();
+
+  flip.request('system');
+  advance(100);
+  flip.request('system');
+  advance(1000);
+
+  assert.deepEqual(committed, ['system']);
+  assert.equal(flip.getSnapshot().shownMode, 'system');
 });
 
 void test('requesting the mode already shown does nothing', () => {

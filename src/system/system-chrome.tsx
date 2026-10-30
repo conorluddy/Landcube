@@ -59,6 +59,20 @@ export function SystemHeader({
               onChange={(event) => {
                 onQueryChange(event.target.value);
               }}
+              onKeyDown={(event) => {
+                if (event.key !== 'Escape') {
+                  return;
+                }
+
+                // Handled here, so the shell's Escape handler leaves it alone.
+                event.preventDefault();
+
+                if (query === '') {
+                  onExit();
+                } else {
+                  onQueryChange('');
+                }
+              }}
             />
           }
         />

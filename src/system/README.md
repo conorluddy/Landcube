@@ -21,7 +21,14 @@ A footer link (`Design system ◧`) flips the studio into a living specimen book
 | `system-nav.tsx`                              | The flipped inspector                                               |
 | `system-chrome.tsx`                           | System header, footer and HUD                                       |
 
-The flip itself lives in `src/studio/mode-flip.ts`. It is timer-driven, not rAF, so a background tab can't leave the panel edge-on. `src/main.ts` suspends 3D drawing once the canvas has faded out.
+The flip itself lives in `src/studio/mode-flip.ts`. It is timer-driven, not rAF, so a background tab can't leave the panel edge-on. A toggle made mid-flip is held and runs as the flip finishes, so an early Esc is never dropped. `src/main.ts` suspends 3D drawing once the canvas has faded out.
+
+## Keys and focus
+
+- `↑ ↓ ← →` step through parts, wrapping. Modified arrows belong to the browser (Alt+← is Back). Fields, plates and ARIA widgets keep their own arrows (`browse-keys.ts`).
+- `Esc` flips back to the studio. In Find, the first Esc clears the query; the next one exits.
+- Entering focuses the current part row; leaving focuses the `Design system ◧` link.
+- If the chunk fails to load, the studio comes back with an E-304 status, and the next click retries.
 
 ## Adding a part
 
@@ -29,5 +36,6 @@ Add a component in `src/ui` with its specimens file, then one `part(...)` line i
 
 ## Gotchas
 
+- The studio chrome unmounts in system mode. Everything in the controller survives the round trip, but component-local state doesn't: a placed measure line and unsent place-search text are lost. This is accepted; both are throwaway.
 - Text printed on the light ground sits in `.system-print`, which re-points `--lc-bone` and friends at ink, so shared components such as `Tag` and `GroupHeader` read correctly on the canvas.
 - Arrow keys browse parts unless a field has focus or a component already handled the key (`defaultPrevented`), so rail, segmented and slider arrows keep working.

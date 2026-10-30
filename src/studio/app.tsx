@@ -1,4 +1,5 @@
 import {
+  Component,
   lazy,
   Suspense,
   useEffect,
@@ -48,12 +49,19 @@ import type { HudStore } from './hud-store';
 import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
 import { PhonePages } from './pages/phone-pages';
+import { operationErrorCodes } from '../constants/operations';
+import { logOperationError } from '../operation-logging';
+import type { OperationError } from '../types/operations';
 
 const inspectorId = 'studio-inspector';
 
 // The design-system gallery is its own chunk: the studio bundle never carries the registry or specimens.
 const loadSystemMode = () => import('../system/system-mode');
-const SystemMode = lazy(loadSystemMode);
+const systemModeLoadError: OperationError = {
+  code: operationErrorCodes.moduleLoadFailed,
+  message: 'The design system could not load. Check your connection, then try again.',
+  retryable: true,
+};
 
 /** Below this the inspector becomes a bottom sheet with a horizontal section strip. */
 export const phoneViewportQuery = '(max-width: 767px)';
@@ -191,10 +199,13 @@ function Studio({
   const [modeFlip] = useState(() => createStudioModeFlip(c));
   const flip = useSyncExternalStore(modeFlip.subscribe, modeFlip.getSnapshot);
   const isSystemShown = !isPhoneViewport && flip.shownMode === 'system';
+  const previousShownMode = useRef(flip.shownMode);
+  // A rejected lazy import stays rejected, so a failed load swaps in a fresh one for the retry.
+  const [SystemMode, setSystemMode] = useState(() => lazy(loadSystemMode));
 
   const requestMode = (mode: StudioMode) => {
     if (mode === 'system') {
-      void loadSystemMode();
+      preloadSystemMode();
     }
 
     modeFlip.request(mode);
@@ -204,6 +215,16 @@ function Studio({
     viewport.current?.append(terrain);
   }, [terrain]);
   useEffect(() => modeFlip.dispose, [modeFlip]);
+  // Leaving system mode unmounts the focused control; land on the link that opens it again.
+  useEffect(() => {
+    const wasSystem = previousShownMode.current === 'system';
+
+    previousShownMode.current = flip.shownMode;
+
+    if (wasSystem && flip.shownMode === 'studio' && document.activeElement === document.body) {
+      document.querySelector<HTMLElement>('.studio-mode-link')?.focus();
+    }
+  }, [flip.shownMode]);
   // System mode is desktop-only, and a mode set elsewhere (a link, a phone rotation) shows without a flip.
   useEffect(() => {
     if (isPhoneViewport && state.workspace.mode === 'system') {
@@ -286,17 +307,27 @@ function Studio({
       <div className="studio-ground" aria-hidden="true" />
       {flip.isBusy && <div key={flip.sweepCount} className="studio-scan" aria-hidden="true" />}
       {isSystemShown ? (
-        <Suspense fallback={null}>
-          <SystemMode
-            partId={state.workspace.systemPartId}
-            onSelectPart={(systemPartId) => {
-              c.workspace({ systemPartId });
-            }}
-            onExit={() => {
-              requestMode('studio');
-            }}
-          />
-        </Suspense>
+        <SystemModeBoundary
+          onFailure={() => {
+            logOperationError(systemModeLoadError);
+            setSystemMode(() => lazy(loadSystemMode));
+            modeFlip.snapTo('studio');
+            c.workspace({ mode: 'studio' });
+            c.notify(systemModeLoadError.message);
+          }}
+        >
+          <Suspense fallback={null}>
+            <SystemMode
+              partId={state.workspace.systemPartId}
+              onSelectPart={(systemPartId) => {
+                c.workspace({ systemPartId });
+              }}
+              onExit={() => {
+                requestMode('studio');
+              }}
+            />
+          </Suspense>
+        </SystemModeBoundary>
       ) : (
         <>
           <StudioHeader controller={c} state={state} isPhoneViewport={isPhoneViewport} />
@@ -473,6 +504,31 @@ function renderSectionBody(
       />
     );
   });
+}
+
+/** Starts fetching the system chunk early; a failure surfaces through SystemModeBoundary on render. */
+function preloadSystemMode(): void {
+  loadSystemMode().catch(() => undefined);
+}
+
+/** Catches a system chunk that fails to load, so the shell never goes blank. */
+class SystemModeBoundary extends Component<
+  { onFailure: () => void; children: ReactNode },
+  { hasFailed: boolean }
+> {
+  override state = { hasFailed: false };
+
+  static getDerivedStateFromError(): { hasFailed: boolean } {
+    return { hasFailed: true };
+  }
+
+  override componentDidCatch(): void {
+    this.props.onFailure();
+  }
+
+  override render(): ReactNode {
+    return this.state.hasFailed ? null : this.props.children;
+  }
 }
 
 function createStudioModeFlip(c: StudioController): ModeFlip {
