@@ -12,6 +12,7 @@ import {
   type StudioState,
   type StudioView,
 } from './controller';
+import type { RealTerrain } from '../real-terrain';
 import { getSectionForGroup } from './sections';
 
 void test('the index lists every value row the builders emit, in 2D and 3D', () => {
@@ -191,6 +192,53 @@ function withView(
     source: { ...state.source, selected },
   };
 }
+
+void test('route commands appear only on real terrain, and clear and export wait for a route', () => {
+  const { controller } = createTestController();
+  const procedural = controller.getSnapshot();
+  const real = {
+    ...procedural,
+    source: { ...procedural.source, terrain: { attribution: 'Test' } as RealTerrain },
+  };
+  const routeIds = (state: StudioState) =>
+    buildCommandIndex(controller, state)
+      .map(({ id }) => id)
+      .filter((id) => id.startsWith('action-route-'));
+
+  assert.deepEqual(routeIds(procedural), []);
+  assert.deepEqual(routeIds(real), ['action-route-tool', 'action-route-draw']);
+
+  const withRoute = {
+    ...real,
+    workspace: {
+      ...real.workspace,
+      route: {
+        active: {
+          id: 'drawn-1',
+          name: 'Drawn route',
+          provenance: 'drawn' as const,
+          waypoints: [
+            { latitude: 1, longitude: 1 },
+            { latitude: 1, longitude: 2 },
+          ],
+          namedWaypoints: [],
+          slopeThresholdPercent: 15,
+        },
+        editing: { mode: 'drawing' as const },
+        isVisible: true,
+      },
+    },
+  };
+
+  assert.deepEqual(routeIds(withRoute), [
+    'action-route-tool',
+    'action-route-draw',
+    'action-route-finish',
+    'action-route-reverse',
+    'action-route-clear',
+    'action-route-export',
+  ]);
+});
 
 function createTestController(): { controller: StudioController; updates: DesignSettings[] } {
   const parsed = parseDesignParameters(new URLSearchParams('v=1&seed=123'));

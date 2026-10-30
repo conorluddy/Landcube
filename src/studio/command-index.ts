@@ -19,6 +19,8 @@ import {
 } from './controller';
 import { describeValueControls, type ValueRowKind } from './command-values';
 import { formatMapLocation } from './hud-readouts';
+import { drawRoute, exportRouteGpx } from './route-actions';
+import { isRouteComplete } from './route-editing';
 import { getGroupCode, getSectionForGroup, studioSections } from './sections';
 
 export interface ParameterCommand extends CommandResult {
@@ -154,6 +156,10 @@ function buildActionCommands(controller: StudioController, state: StudioState): 
     },
   ];
 
+  if (state.source.terrain !== undefined) {
+    actions.push(...buildRouteCommands(controller, state));
+  }
+
   if (!state.seedLocked) {
     actions.push({
       kind: 'action',
@@ -202,6 +208,76 @@ function buildActionCommands(controller: StudioController, state: StudioState): 
 }
 
 // === HELPERS ===
+
+/** Route commands exist only on real terrain; the ones that need a route wait for one. */
+function buildRouteCommands(controller: StudioController, state: StudioState): ActionCommand[] {
+  const { route } = state.workspace;
+  const isEditing = route !== null && route.editing.mode !== 'viewing';
+  const commands: ActionCommand[] = [
+    {
+      kind: 'action',
+      id: 'action-route-tool',
+      label: 'Route tool',
+      detail: 'R',
+      run: () => {
+        controller.workspace({ toolMode: state.workspace.toolMode === 'route' ? 'none' : 'route' });
+      },
+    },
+    {
+      kind: 'action',
+      id: 'action-route-draw',
+      label: 'Draw route',
+      run: () => {
+        drawRoute(controller);
+      },
+    },
+  ];
+
+  if (isEditing) {
+    commands.push({
+      kind: 'action',
+      id: 'action-route-finish',
+      label: 'Finish route',
+      run: () => {
+        controller.finishRoute();
+      },
+    });
+  }
+
+  if (route !== null) {
+    commands.push(
+      {
+        kind: 'action',
+        id: 'action-route-reverse',
+        label: 'Reverse route',
+        run: () => {
+          controller.reverseRoute();
+        },
+      },
+      {
+        kind: 'action',
+        id: 'action-route-clear',
+        label: 'Clear route',
+        run: () => {
+          controller.clearRoute();
+        },
+      },
+    );
+  }
+
+  if (route !== null && isRouteComplete(route.active)) {
+    commands.push({
+      kind: 'action',
+      id: 'action-route-export',
+      label: 'Export route GPX',
+      run: () => {
+        exportRouteGpx(controller, state);
+      },
+    });
+  }
+
+  return commands;
+}
 
 function isSectionVisible(sectionId: InspectorSection, state: StudioState): boolean {
   return state.workspace.view === '3d' || !threeDOnlySections.includes(sectionId);

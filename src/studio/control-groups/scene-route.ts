@@ -9,6 +9,8 @@ import type { ControlGroupDefinition } from '../../ui/control-rows';
 import type { RealTerrain } from '../../real-terrain';
 import type { StudioController, StudioState } from '../controller';
 import { buttonRow, customRow, hintRow, statusRow, toggleRow } from '../control-rows';
+import { drawRoute, exportRouteGpx } from '../route-actions';
+import { isRouteComplete } from '../route-editing';
 import { RouteFileField } from '../route-file-field';
 import { countRoutePointsInside, describeRoute } from '../route-overlay';
 
@@ -20,6 +22,9 @@ export function buildRouteGroup(
   terrain: RealTerrain,
 ): ControlGroupDefinition {
   const { route, routeFault } = state.workspace;
+  const isIncomplete = route !== null && !isRouteComplete(route.active);
+  const isComplete = route !== null && !isIncomplete;
+  const isEditingGeometry = route !== null && route.editing.mode !== 'viewing';
   const insideCount =
     route === null ? undefined : countRoutePointsInside(route.active.waypoints, terrain);
 
@@ -44,12 +49,48 @@ export function buildRouteGroup(
         },
       }),
       route !== null && hintRow('route-stats', describeRoute(route)),
+      isIncomplete &&
+        hintRow('route-incomplete', 'Incomplete route: place at least two waypoints.'),
       route !== null &&
         insideCount !== undefined &&
         hintRow(
           'route-clip',
           `${insideCount} of ${route.active.waypoints.length} points inside the loaded area.`,
         ),
+      buttonRow('route-draw', {
+        children: 'Draw route',
+        onClick: () => {
+          drawRoute(controller);
+        },
+      }),
+      buttonRow('route-edit', {
+        children: 'Edit route',
+        disabled: !isComplete || isEditingGeometry,
+        onClick: () => {
+          controller.editRoute();
+        },
+      }),
+      buttonRow('route-finish', {
+        children: 'Finish route',
+        disabled: !isEditingGeometry,
+        onClick: () => {
+          controller.finishRoute();
+        },
+      }),
+      buttonRow('route-reverse', {
+        children: 'Reverse route',
+        disabled: route === null,
+        onClick: () => {
+          controller.reverseRoute();
+        },
+      }),
+      buttonRow('route-export', {
+        children: 'Export route GPX',
+        disabled: !isComplete,
+        onClick: () => {
+          exportRouteGpx(controller, state);
+        },
+      }),
       buttonRow('route-clear', {
         children: 'Clear route',
         disabled: route === null,

@@ -152,6 +152,11 @@ void test('the route group offers a GPX file input, a disabled toggle and a disa
   assert.deepEqual(listRowIds(groups, 'route'), [
     'route-file',
     'route-visible',
+    'route-draw',
+    'route-edit',
+    'route-finish',
+    'route-reverse',
+    'route-export',
     'route-clear',
     'route-hint',
   ]);

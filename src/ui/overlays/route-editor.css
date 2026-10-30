@@ -1,0 +1,142 @@
+/*
+ * O-09 RouteEditor: 28px handles (start square, end diamond, bone fill when selected) and 24px
+ * insert targets at segment midpoints. The root never takes the pointer; the parts that need it opt in.
+ */
+.lc-route-editor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.lc-route-editor__surface {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.lc-route-editor__handle,
+.lc-route-editor__insert {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: none;
+  transform: translate(var(--lc-route-editor-x, 0), var(--lc-route-editor-y, 0));
+}
+
+.lc-route-editor__handle {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  color: var(--lc-bone);
+  cursor: move;
+  font: 600 10px/1 monospace;
+}
+
+.lc-route-editor__handle::before {
+  position: absolute;
+  inset: 4px;
+  box-sizing: border-box;
+  border: 2px solid var(--lc-bone);
+  border-radius: 50%;
+  background: var(--lc-ink-1);
+  content: '';
+}
+
+.lc-route-editor__handle[data-end='start']::before {
+  border-radius: 2px;
+}
+
+.lc-route-editor__handle[data-end='end']::before {
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.lc-route-editor__handle[aria-pressed='true'] {
+  color: var(--lc-ink-1);
+}
+
+.lc-route-editor__handle[aria-pressed='true']::before {
+  outline: 2px solid var(--lc-bone);
+  outline-offset: 2px;
+  background: var(--lc-bone);
+}
+
+.lc-route-editor__handle > span {
+  position: relative;
+}
+
+.lc-route-editor__insert {
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  cursor: copy;
+}
+
+.lc-route-editor__insert::before {
+  position: absolute;
+  inset: 8px;
+  border: 1.5px solid var(--lc-bone);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--lc-ink-1) 60%, transparent);
+  content: '';
+}
+
+.lc-route-editor__handle:focus-visible,
+.lc-route-editor__insert:focus-visible {
+  outline: 1px solid var(--lc-line-focus);
+  outline-offset: 0;
+}
+
+.lc-route-editor__bar {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+  transform: translateX(-50%);
+}
+
+@media (forced-colors: active) {
+  .lc-route-editor__handle {
+    color: CanvasText;
+  }
+
+  .lc-route-editor__handle::before,
+  .lc-route-editor__insert::before {
+    border-color: CanvasText;
+    background: Canvas;
+  }
+}
+
+/* Replace-route confirmation: a centred glass card over a dimmed canvas. */
+.lc-route-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--lc-ink-1) 40%, transparent);
+  pointer-events: auto;
+}
+
+.lc-route-confirm__card {
+  display: grid;
+  gap: 12px;
+  max-width: 320px;
+}
+
+.lc-route-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

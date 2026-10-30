@@ -82,6 +82,7 @@
 @import './detachable-panel.css';
 
 /* #21–23 tool overlays */
+@import './overlays/route-editor.css';
 @import './overlays/route-line.css';
 @import './overlays/wipe.css';
 @import './overlays/crop-frame.css';

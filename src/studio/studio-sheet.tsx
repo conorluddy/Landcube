@@ -88,7 +88,7 @@ export function StudioSheet({
 
 /**
  * Phone map controls (P-04 in a mobile FloatingBar) down the right edge: reset the 3D camera,
- * Overlays, the command palette, the crop (3D) and measure tools, and Orbit in 3D. Hidden while the sheet is full (CSS on `[data-sheet-snap]`).
+ * Overlays, the command palette, the crop (3D), measure and route (real terrain) tools, and Orbit in 3D. Hidden while the sheet is full (CSS on `[data-sheet-snap]`).
  */
 export function StudioMapControls({
   controller: c,
@@ -145,6 +145,15 @@ export function StudioMapControls({
           toggleTool(c, state, 'measure');
         }}
       />
+      <IconButton
+        glyph="⌇"
+        label="Route tool"
+        isActive={getActiveTool(state) === 'route'}
+        disabled={state.source.terrain === undefined}
+        onClick={() => {
+          toggleTool(c, state, 'route');
+        }}
+      />
       {is3d && (
         <IconButton
           glyph="⌖"
@@ -163,7 +172,11 @@ export function StudioMapControls({
 // === HELPERS ===
 
 /** The phone mode bar: a tool drops the sheet to peek so the canvas is free to work on. */
-function toggleTool(c: StudioController, state: StudioState, tool: 'crop' | 'measure'): void {
+function toggleTool(
+  c: StudioController,
+  state: StudioState,
+  tool: 'crop' | 'measure' | 'route',
+): void {
   if (getActiveTool(state) === tool) {
     c.workspace({ toolMode: 'none' });
   } else {

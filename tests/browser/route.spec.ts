@@ -82,6 +82,8 @@ test('an invalid GPX file shows an E-206 fault and keeps the previous route', as
   await expect(page.locator('.lc-route-line')).toBeVisible();
 
   await page.getByLabel('GPX file').setInputFiles(routeFile);
+  // A valid file over an existing route asks before replacing it (REQ-19).
+  await page.getByRole('button', { name: 'Replace route', exact: true }).click();
   await expect(fault).toHaveCount(0);
 });
 

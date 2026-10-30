@@ -19,6 +19,7 @@ import {
 } from './hud-readouts';
 import type { HudStore } from './hud-store';
 import { projectRouteToFrame } from './route-overlay';
+import { RouteReplaceDialog } from './route-replace-dialog';
 import { StudioToolOverlays } from './studio-tools';
 
 /** The card needs a desktop-sized viewport: wider than a phone and at least 700px tall. */
@@ -93,12 +94,15 @@ export function StudioHud({
         </>
       }
       tools={
-        <StudioToolOverlays
-          controller={controller}
-          state={state}
-          hud={hud}
-          viewportSize={viewportSize}
-        />
+        <>
+          <StudioToolOverlays
+            controller={controller}
+            state={state}
+            hud={hud}
+            viewportSize={viewportSize}
+          />
+          <RouteReplaceDialog />
+        </>
       }
       frame={
         <HudFrame

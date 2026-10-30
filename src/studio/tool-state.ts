@@ -1,5 +1,8 @@
 import { getTerrainCropBounds, type TerrainCropSettings } from '../terrain-crop';
 import type { CropFrameHandle } from '../ui/overlays/crop-frame';
+import type { RealTerrain } from '../real-terrain';
+import { projectToRealTerrainFrame } from '../real-terrain-projection';
+import type { GeoPoint, RouteEditing } from '../types/terrain-analysis';
 import type { MapLocation } from './hud-store';
 
 /**
@@ -36,6 +39,72 @@ const shiftNudgeFraction = 0.05;
 const earthRadiusMeters = 6_371_008.8;
 
 // === PUBLIC API ===
+
+export type RouteKeyAction = 'finish' | 'escape' | 'delete';
+
+/** What a key does to the route being drawn or edited; nothing while it is only being viewed. */
+export function getRouteKeyAction(key: string, editing: RouteEditing): RouteKeyAction | undefined {
+  if (editing.mode === 'viewing') {
+    return undefined;
+  }
+
+  if (key === 'Enter') {
+    return 'finish';
+  }
+
+  if (key === 'Escape') {
+    return 'escape';
+  }
+
+  return (key === 'Delete' || key === 'Backspace') && editing.selectedIndex !== undefined
+    ? 'delete'
+    : undefined;
+}
+
+/** Only a place on Earth can be a waypoint; generated terrain's local metres cannot. */
+export function toGeoPoint(location: MapLocation | undefined): GeoPoint | undefined {
+  return location?.kind === 'geographic'
+    ? { latitude: location.latitude, longitude: location.longitude }
+    : undefined;
+}
+
+/** Where a new waypoint goes when its segment is clicked: halfway, before the user drags it. */
+export function getSegmentMidpoint(from: GeoPoint, to: GeoPoint): GeoPoint {
+  return {
+    latitude: (from.latitude + to.latitude) / 2,
+    longitude: (from.longitude + to.longitude) / 2,
+  };
+}
+
+/**
+ * Screen position of a route point in the 2D frame, as `RouteLine` draws it. The 3D view has no
+ * world-to-screen projector yet, so it returns undefined and its handles stay hidden.
+ */
+export function projectRoutePoint(
+  point: GeoPoint,
+  view: { is3d: boolean; terrain: Pick<RealTerrain, 'location' | 'spanKm'> | undefined },
+  frame: { width: number; height: number } | undefined,
+): { xPx: number; yPx: number } | undefined {
+  const { terrain } = view;
+
+  if (
+    view.is3d ||
+    frame === undefined ||
+    terrain?.location === undefined ||
+    terrain.spanKm === undefined
+  ) {
+    return undefined;
+  }
+
+  const { x, y } = projectToRealTerrainFrame(
+    { location: terrain.location, spanKm: terrain.spanKm },
+    point.latitude,
+    point.longitude,
+    frame,
+  );
+
+  return { xPx: x, yPx: y };
+}
 
 /** Where the crop sits on its source, normalised exactly as the crop widget normalises it. */
 export function getCropFractionBox(
