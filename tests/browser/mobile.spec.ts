@@ -163,7 +163,8 @@ test('a slow drag follows the pointer and settles on the nearest snap', async ({
 });
 
 test('a fast flick steps one snap in its direction', async ({ page }) => {
-  // 60 px moves stay a flick unless CI spaces them over 120 ms apart; 120 px alone snaps back.
+  // Two 60 px moves with no delay: above the 0.5 px/ms flick threshold unless CI spaces them over
+  // 120 ms apart. Released slowly, the same 120 px drag settles back to the snap it started on.
   await dragHandle(page, -120, 2, 0);
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'full');
   await dragHandle(page, 120, 2, 0);
