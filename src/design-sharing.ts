@@ -1,20 +1,34 @@
-import { maximumSeedValue, versionOneDesignDefaults } from './constants/design';
+import {
+  maximumSeedValue,
+  outputSettingKeys,
+  terrainSettingKeys,
+  versionOneDesignDefaults,
+} from './constants/design';
 import { operationErrorCodes } from './constants/operations';
-import { lockedSeedStorageKey } from './constants/sharing';
-import { clampOutputDimensionPixels, getDesignUrl, parseDesignParameters } from './design-settings';
+import { designStyleStorageKey, lockedSeedStorageKey } from './constants/sharing';
+import {
+  clampOutputDimensionPixels,
+  getDesignUrl,
+  parseDesignParameters,
+  serializeDesignParameters,
+} from './design-settings';
 import { logOperationError } from './operation-logging';
 import { keepSystemLink } from './system-link';
-import type { LoadedDesign } from './types/design';
+import type { DesignSettings, LoadedDesign } from './types/design';
 import type { ImageDimensions } from './types/dimensions';
 import type { Result } from './types/operations';
 
 // === PUBLIC API ===
-/** Applies URL, locked-seed, and fresh-seed startup precedence. */
+/**
+ * Applies URL, locked-seed, and fresh-seed startup precedence. The stored style applies only
+ * without a design link, so links always reproduce exactly what they encode.
+ */
 export function loadInitialDesign(
   parameters: URLSearchParams,
   viewport: ImageDimensions,
   randomSeed: number,
   storedSeed: number | null,
+  storedStyle: URLSearchParams = new URLSearchParams(),
 ): Result<LoadedDesign> {
   if (hasDesignParameters(parameters)) {
     const result = parseDesignParameters(parameters);
@@ -28,12 +42,15 @@ export function loadInitialDesign(
     );
   }
 
-  return parseDesignParameters(new URLSearchParams(), {
+  const freshDefaults = {
     ...versionOneDesignDefaults,
     seed: storedSeed ?? randomSeed,
     width: clampOutputDimensionPixels(viewport.width),
     height: clampOutputDimensionPixels(viewport.height),
-  });
+  };
+  const styled = parseDesignParameters(pickDesignStyleParameters(storedStyle), freshDefaults);
+
+  return styled.ok ? styled : parseDesignParameters(new URLSearchParams(), freshDefaults);
 }
 
 /** True when the URL carries a design link rather than opening the studio fresh. */
@@ -99,6 +116,51 @@ export function saveLockedSeed(storage: Storage, seed: number | null): Result<vo
   }
 }
 
+/** Reads the last edited design style as design parameters; nothing stored yields none. */
+export function readDesignStyle(storage: Pick<Storage, 'getItem'>): Result<URLSearchParams> {
+  try {
+    return {
+      ok: true,
+      data: pickDesignStyleParameters(
+        new URLSearchParams(storage.getItem(designStyleStorageKey) ?? ''),
+      ),
+    };
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: operationErrorCodes.storageFailed,
+        message: 'Browser storage is unavailable, so new visits open with the default style.',
+        retryable: true,
+      },
+    };
+  }
+}
+
+/** Saves the design's style without its seed, landscape shape or output options. */
+export function saveDesignStyle(
+  storage: Pick<Storage, 'setItem'>,
+  settings: Readonly<DesignSettings>,
+): Result<void> {
+  try {
+    storage.setItem(
+      designStyleStorageKey,
+      pickDesignStyleParameters(serializeDesignParameters(settings)).toString(),
+    );
+
+    return { ok: true, data: undefined };
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: operationErrorCodes.storageFailed,
+        message: 'Could not save the design style; new visits open with the default style.',
+        retryable: true,
+      },
+    };
+  }
+}
+
 /** Reports clipboard failures so the interface can offer manual copying. */
 export async function copyDesignLink(
   url: string,
@@ -146,4 +208,13 @@ export function replaceDesignUrl(
   }
 
   return url;
+}
+
+// === HELPERS ===
+
+/** A fresh visit keeps its own seed, landscape shape and viewport-sized output. */
+const nonStyleSettingKeys: readonly string[] = [...terrainSettingKeys, ...outputSettingKeys];
+
+function pickDesignStyleParameters(parameters: URLSearchParams): URLSearchParams {
+  return new URLSearchParams([...parameters].filter(([key]) => !nonStyleSettingKeys.includes(key)));
 }

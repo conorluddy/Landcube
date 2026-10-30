@@ -1,10 +1,13 @@
+import { versionOneDesignDefaults } from './constants/design';
 import { parseDesignParameters } from './design-settings';
 import {
   copyDesignLink,
   hasDesignParameters,
   loadInitialDesign,
+  readDesignStyle,
   readLockedSeed,
   replaceDesignUrl,
+  saveDesignStyle,
   saveLockedSeed,
 } from './design-sharing';
 import assert from 'node:assert/strict';
@@ -66,6 +69,60 @@ await test('plain visits use the viewport and prefer the locked seed, while expl
   assert.equal(loadInitialDesign(new URLSearchParams('v=7'), viewport, 123, null).ok, false);
 });
 
+await test('a fresh visit opens with the stored style but its own seed, landscape and size', () => {
+  const storage = memoryStorage();
+  const edited = parseDesignParameters(
+    new URLSearchParams('v=1&seed=9&detail=0.9&lineColor=%23ff0000&strokeWidth=1.5&width=600'),
+  );
+
+  assert.ok(edited.ok);
+  assert.ok(saveDesignStyle(storage, edited.data.settings).ok);
+  const style = readDesignStyle(storage);
+
+  assert.ok(style.ok);
+  const fresh = loadInitialDesign(
+    new URLSearchParams(),
+    { width: 390, height: 844 },
+    123,
+    null,
+    style.data,
+  );
+
+  assert.ok(fresh.ok);
+  assert.equal(fresh.data.settings.lineColor, '#ff0000');
+  assert.equal(fresh.data.settings.strokeWidth, 1.5);
+  assert.equal(fresh.data.settings.seed, 123);
+  assert.equal(fresh.data.settings.detail, versionOneDesignDefaults.detail);
+  assert.equal(fresh.data.settings.width, 390);
+});
+
+await test('design links ignore the stored style', () => {
+  const style = new URLSearchParams('v=1&lineColor=%23ff0000');
+  const link = loadInitialDesign(
+    new URLSearchParams('v=1&seed=5'),
+    { width: 390, height: 844 },
+    123,
+    null,
+    style,
+  );
+
+  assert.ok(link.ok);
+  assert.equal(link.data.settings.lineColor, versionOneDesignDefaults.lineColor);
+});
+
+await test('a stored style from an unknown version opens with the default style', () => {
+  const fresh = loadInitialDesign(
+    new URLSearchParams(),
+    { width: 390, height: 844 },
+    123,
+    null,
+    new URLSearchParams('v=7&lineColor=%23ff0000'),
+  );
+
+  assert.ok(fresh.ok);
+  assert.equal(fresh.data.settings.lineColor, versionOneDesignDefaults.lineColor);
+});
+
 await test('seed locking supports seed zero, unlocking, and malformed stored values', () => {
   /** Verifies seed locking supports seed zero, unlocking, and malformed stored values. */
   const storage = memoryStorage();
@@ -100,6 +157,8 @@ await test('unavailable storage and clipboard return actionable failures', async
   };
 
   assert.equal(readLockedSeed(storage).ok, false);
+  assert.equal(readDesignStyle(storage).ok, false);
+  assert.equal(saveDesignStyle(storage, versionOneDesignDefaults).ok, false);
   assert.equal(saveLockedSeed(storage, 12).ok, false);
   assert.equal(saveLockedSeed(storage, null).ok, false);
   assert.equal((await copyDesignLink('https://example.test', undefined)).ok, false);
