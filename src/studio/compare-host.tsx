@@ -84,16 +84,18 @@ export function CompareHost({
             </div>
           ))}
         </PresetStrip>
-        {compare !== null && (
-          <div className="studio-compare__actions">
-            <Button variant="primary" size="small" onClick={c.applyCompare}>
-              Apply
-            </Button>
-            <Button variant="secondary" size="small" onClick={c.endCompare}>
-              Cancel
-            </Button>
-          </div>
-        )}
+        {/* Reserve space so dismissal cannot move a preset under the pointer and restart preview. */}
+        <div
+          className="studio-compare__actions"
+          style={{ visibility: compare === null ? 'hidden' : undefined }}
+        >
+          <Button variant="primary" size="small" onClick={c.applyCompare}>
+            Apply
+          </Button>
+          <Button variant="secondary" size="small" onClick={c.endCompare}>
+            Cancel
+          </Button>
+        </div>
       </section>
     </>
   );

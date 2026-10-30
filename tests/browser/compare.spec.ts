@@ -103,6 +103,21 @@ test('arrow keys move the divider by 2 percent and Shift by 10', async ({ page }
   await expect(divider(page)).toHaveAttribute('aria-valuenow', '100');
 });
 
+test('comparison actions keep preset cards stationary when shown and dismissed', async ({
+  page,
+}) => {
+  await openStrip(page);
+  const paper = strip(page).getByRole('button', { name: 'Paper', exact: true });
+  const initialBounds = await paper.boundingBox();
+
+  await paper.click();
+  await expect(strip(page).getByRole('button', { name: 'Cancel' })).toBeVisible();
+  expect(await paper.boundingBox()).toEqual(initialBounds);
+  await strip(page).getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.locator('[data-wipe]')).toHaveCount(0);
+  expect(await paper.boundingBox()).toEqual(initialBounds);
+});
+
 test('Apply commits the preset and removes the wipe', async ({ page }) => {
   await startPaperCompare(page);
   await strip(page).getByRole('button', { name: 'Apply' }).click();
