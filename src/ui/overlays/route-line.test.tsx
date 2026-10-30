@@ -52,3 +52,23 @@ void test('RouteLine with an empty route renders no waypoints and an empty polyl
   assert.ok(!markup.includes('lc-route-line__waypoint'));
   assert.ok(markup.includes('points=""'));
 });
+
+void test('RouteLine marks the inspected point only when given one (REQ-26)', () => {
+  const plain = renderMarkup(
+    <RouteLine widthPx={200} heightPx={100} points={points} waypoints={[]} label="Route: Ridge" />,
+  );
+  const inspected = renderMarkup(
+    <RouteLine
+      widthPx={200}
+      heightPx={100}
+      points={points}
+      waypoints={[]}
+      label="Route: Ridge"
+      highlight={{ x: 60.04, y: 50 }}
+    />,
+  );
+
+  assert.ok(!plain.includes('data-route-cursor'));
+  assert.ok(inspected.includes('data-route-cursor'));
+  assert.ok(inspected.includes('left:60px;top:50px'));
+});

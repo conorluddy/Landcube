@@ -49,6 +49,19 @@
   white-space: nowrap;
 }
 
+/* The inspected point: a 12px bone ring with an ink halo, centred on the location. */
+.lc-route-line__cursor {
+  position: absolute;
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--lc-bone);
+  border-radius: 50%;
+  background: var(--lc-ink-1);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lc-ink-1) 50%, transparent);
+  transform: translate(-6px, -6px);
+}
+
 @media (forced-colors: active) {
   .lc-route-line__halo {
     stroke: Canvas;
@@ -56,6 +69,11 @@
 
   .lc-route-line__line {
     stroke: CanvasText;
+  }
+
+  .lc-route-line__cursor {
+    border-color: CanvasText;
+    background: Canvas;
   }
 
   .lc-route-line__label {

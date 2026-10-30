@@ -1,4 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
+import { RouteProfileHost } from './route-profile-host';
+import { hasRouteProfile } from './use-route-analysis';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { InspectorPanel } from '../ui/inspector-panel';
@@ -221,11 +230,27 @@ function Studio({
       document.removeEventListener('keydown', openPalette);
     };
   }, [c]);
+  const [isRouteProfileCollapsed, setIsRouteProfileCollapsed] = useState(false);
   const props = { controller: c, state };
+  const routeProfile = hasRouteProfile(state) ? (
+    <RouteProfileHost
+      controller={c}
+      state={state}
+      isCollapsed={isRouteProfileCollapsed}
+      onCollapsedChange={setIsRouteProfileCollapsed}
+    />
+  ) : undefined;
 
   return (
     <div
       className="studio-shell"
+      data-route-profile={
+        !isPhoneViewport && routeProfile !== undefined
+          ? isRouteProfileCollapsed
+            ? 'collapsed'
+            : 'open'
+          : undefined
+      }
       data-sheet-snap={isPhoneViewport ? state.workspace.sheetSnap : undefined}
       data-page-hidden={isPhoneViewport && state.workspace.page !== 'studio' ? true : undefined}
     >
@@ -247,6 +272,7 @@ function Studio({
             state={state}
             hud={hud}
             id={inspectorId}
+            routeProfile={routeProfile}
             renderSection={(section) => renderSectionBody(section, props, cropPreview)}
           />
           <PhonePages controller={c} state={state} renderer={renderer} />
@@ -275,6 +301,7 @@ function Studio({
           />
           <StudioPinnedPanels controller={c} state={state} cropPreview={cropPreview} />
           <StudioToolBar controller={c} state={state} />
+          {routeProfile !== undefined && <div className="studio-route-profile">{routeProfile}</div>}
           <StudioFooter
             controller={c}
             state={state}

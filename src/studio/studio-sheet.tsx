@@ -31,12 +31,15 @@ export function StudioSheet({
   state,
   hud,
   id,
+  routeProfile,
   renderSection,
 }: {
   controller: StudioController;
   state: StudioState;
   hud: HudStore;
   id: string;
+  /** The route profile, shown at the top of the sheet body while a route exists (REQ-25). */
+  routeProfile?: ReactNode;
   renderSection: (section: InspectorSection) => ReactNode;
 }): ReactNode {
   const { workspace } = state;
@@ -71,6 +74,7 @@ export function StudioSheet({
         />
       }
     >
+      {routeProfile}
       {studioSections.map((section) => (
         <section
           key={section.id}
