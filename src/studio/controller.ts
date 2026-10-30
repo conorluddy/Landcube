@@ -54,6 +54,8 @@ import type { FloorStyle } from '../terrain-floor-styles';
 import type { TerrainStillScale } from '../export/still-export';
 import { defaultRoadStyle, roadDetailClasses, roadSpanLimitsKm } from '../constants/roads';
 import { operationErrorCodes } from '../constants/operations';
+import { parseDesignParameters } from '../design-settings';
+import type { SavedDesign } from '../saved-designs';
 import type { RoadNetwork, RoadStyle } from '../types/roads';
 import {
   clampDivider,
@@ -315,6 +317,11 @@ export interface StudioController {
   inspectRoute: (distanceMeters: number | undefined) => void;
   /** Library restore: installs a route in viewing mode, replacing any current one. */
   setRoute: (route: ActiveRoute) => void;
+  /**
+   * Library restore, in order: design link, then real terrain (awaited so analysis sees it), then
+   * the route. A design without a route leaves the current route alone.
+   */
+  restoreSavedDesign: (saved: SavedDesign) => Promise<Result<void>>;
   toggleRoute: () => void;
   design: (patch: Partial<DesignSettings>) => boolean;
   /** Starts (or retargets) the A/B wipe against a palette preset; unknown ids are ignored. */
@@ -887,6 +894,44 @@ export function createStudioController(
     },
     setRoute(active) {
       installRoute(active);
+    },
+    async restoreSavedDesign(saved) {
+      const settings = readDesignLink(saved.link);
+
+      if (settings === null) {
+        return {
+          ok: false,
+          error: {
+            code: operationErrorCodes.invalidSettings,
+            message: `${saved.name} could not be opened because its saved link is invalid. Delete it and save again.`,
+            retryable: false,
+          },
+        };
+      }
+
+      controller.design(settings);
+
+      if (saved.terrain) {
+        controller.source({ selected: 'real', ...saved.terrain });
+        await controller.loadTerrain();
+      }
+
+      if (saved.route) {
+        const { id, name, provenance, points, namedWaypoints, slopeThresholdPercent } = saved.route;
+
+        // Imported routes get their recorded elevations back so GPX export never terrain-fills them.
+        installRoute({
+          id,
+          name,
+          provenance,
+          waypoints: points.map(({ latitude, longitude }) => ({ latitude, longitude })),
+          namedWaypoints,
+          slopeThresholdPercent,
+          ...(provenance === 'imported' && { originalPoints: points }),
+        });
+      }
+
+      return { ok: true, data: undefined };
     },
     toggleRoute() {
       const { route } = state.workspace;
@@ -1711,6 +1756,17 @@ function applySuggestedExaggeration(
     ...model,
     exaggeration: getSuggestedExaggeration(elevations.metersPerUnit * 1.6, terrain.spanKm),
   };
+}
+
+/** Parses a stored design link exactly as a pasted URL would be; null when it is not a valid link. */
+function readDesignLink(link: string): Partial<DesignSettings> | null {
+  try {
+    const result = parseDesignParameters(new URL(link).searchParams);
+
+    return result.ok ? result.data.settings : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Absent outside browsers, where tests run with motion allowed. */
