@@ -1,5 +1,5 @@
 /**
- * Flags `.studio-shell[data-motion="active"]` while the 3D view moves, so glass trades its
+ * Optionally flags `.studio-shell[data-motion="active"]` while the 3D view moves, so glass trades its
  * backdrop blur for opaque alpha (see `src/ui/base.css`). Drags and wheel pulses clear 200ms
  * after the last movement; turntable rotation and terrain morphs hold the flag until they end.
  */
@@ -16,6 +16,10 @@ export type MotionHoldReason = 'turntable' | 'morph';
 
 const motionIdleDelayMs = 200;
 
+// Opt-in performance tradeoff: disabling blur during motion visibly darkens the HUD.
+// Keep false for consistent glass backgrounds; enable to evaluate WebGL camera performance.
+const shellMotionConfiguration = { shouldReduceGlassDuringMotion: false };
+
 // === PUBLIC API ===
 
 export function createShellMotion(findShell: () => Element | null): ShellMotion {
@@ -29,12 +33,20 @@ export function createShellMotion(findShell: () => Element | null): ShellMotion 
   };
 
   const pulse = () => {
+    if (!shellMotionConfiguration.shouldReduceGlassDuringMotion) {
+      return;
+    }
+
     findShell()?.setAttribute('data-motion', 'active');
     window.clearTimeout(idleTimer);
     idleTimer = window.setTimeout(settle, motionIdleDelayMs);
   };
 
   const setHeld = (reason: MotionHoldReason, isHeld: boolean) => {
+    if (!shellMotionConfiguration.shouldReduceGlassDuringMotion) {
+      return;
+    }
+
     if (isHeld) {
       heldReasons.add(reason);
     } else if (!heldReasons.delete(reason)) {
@@ -48,6 +60,10 @@ export function createShellMotion(findShell: () => Element | null): ShellMotion 
     pulse,
     setHeld,
     watchCanvas(canvas) {
+      if (!shellMotionConfiguration.shouldReduceGlassDuringMotion) {
+        return;
+      }
+
       canvas.addEventListener(
         'pointermove',
         (event) => {
