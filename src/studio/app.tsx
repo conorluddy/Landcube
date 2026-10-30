@@ -308,7 +308,8 @@ function Studio({
         workspace.exporting ||
         workspace.dossierOpen ||
         workspace.palette !== null ||
-        workspace.routeReplacement !== null
+        workspace.routeReplacement !== null ||
+        c.getSnapshot().manualLink !== ''
       ) {
         return;
       }

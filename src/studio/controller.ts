@@ -450,12 +450,12 @@ export function estimateBinaryStlBytes(part: FramePart): number {
 /** Twenty updates a second keeps the sun smooth without flooding React with renders. */
 const daylightFrameMs = 50;
 
-/** Session state is independent of controls, rendering and version-one URL serialization. */
 const cameraShotBlockerMessages: Record<CameraShotBlocker, string> = {
   'not-3d': 'Switch to the 3D view to use shots',
   walking: 'Stop walking to use shots',
 };
 
+/** Session state is independent of controls, rendering and version-one URL serialization. */
 export function createStudioController(
   actions: DesignControlActions,
   // Roads and place search share one fetch so tests can fake the network once.
@@ -612,9 +612,12 @@ export function createStudioController(
 
   /** Sets the stack; a running tour restarts on the new stack so it never visits removed shots. */
   const replaceCameraShots = (shots: readonly CapturedCameraShot[]) => {
-    if (state.cameraShots.isPlaying && shots.length > 0) {
-      playCameraShotTour(shots);
-    } else if (state.cameraShots.isPlaying) {
+    const blocker =
+      state.cameraShots.isPlaying && shots.length > 0 ? playCameraShotTour(shots) : undefined;
+
+    if (blocker) {
+      notify(cameraShotBlockerMessages[blocker]);
+    } else if (state.cameraShots.isPlaying && shots.length === 0) {
       effects?.stopCameraShots();
     }
 
@@ -1740,8 +1743,9 @@ export function createStudioController(
         { ...captured.shot, id: nextCameraShotId++, thumbnailUrl: captured.thumbnailUrl },
       ];
 
-      replaceCameraShots(shots);
       notify(`Shot ${shots.length} saved`);
+      // After the notice, so a tour that cannot restart reports why instead.
+      replaceCameraShots(shots);
     },
     removeCameraShot(id) {
       replaceCameraShots(state.cameraShots.shots.filter((shot) => shot.id !== id));
