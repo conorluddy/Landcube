@@ -303,7 +303,11 @@ function Studio({
         event.repeat ||
         isTextField(event.target) ||
         workspace.mode !== 'studio' ||
-        workspace.view !== '3d'
+        workspace.view !== '3d' ||
+        // The export sheet and confirm dialogs own the keyboard; the tour must not start behind them.
+        workspace.exporting ||
+        workspace.palette !== null ||
+        document.querySelector('dialog[open], [aria-modal="true"]') !== null
       ) {
         return;
       }

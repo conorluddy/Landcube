@@ -165,11 +165,14 @@ export interface Terrain3d {
   walkAt(metersPerUnit: number, clientX?: number, clientY?: number): boolean;
   /** Runs after every drawn frame (orbit, presets, turntable, rebuilds); returns an unsubscribe. */
   subscribeDraw(listener: () => void): () => void;
-  /** The current view and a small preview drawn from it. */
-  captureCameraShot(): { shot: CameraShot; thumbnailUrl: string };
+  /** The current view and a small preview drawn from it; undefined while walking. */
+  captureCameraShot(): { shot: CameraShot; thumbnailUrl: string } | undefined;
   flyToCameraShot(shot: CameraShot): void;
-  /** Tours the shots in a loop until stopped; `onStop` runs however playback ends, e.g. on a drag. */
-  playCameraShots(shots: readonly CameraShot[], onStop: () => void): void;
+  /**
+   * Tours the shots in a loop until stopped; `onStop` runs however playback ends, e.g. on a drag.
+   * False while walking, when nothing starts.
+   */
+  playCameraShots(shots: readonly CameraShot[], onStop: () => void): boolean;
   stopCameraShots(): void;
 }
 
@@ -771,7 +774,8 @@ export function createTerrain3d(
   ) => {
     stopCameraShots?.();
     settleViewAnimation?.();
-    const isReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Reduced motion cuts between shots; the hold still paces the tour.
+    const moveMs = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : cameraShotMoveMs;
     let from = getCameraShot();
     let playback: CameraShotPlayback = { kind: 'moving', index: 0, startedAtMs: performance.now() };
     let frame = 0;
@@ -785,7 +789,7 @@ export function createTerrain3d(
 
     const step = () => {
       const now = performance.now();
-      const next = advanceCameraShotPlayback(playback, now, shots.length);
+      const next = advanceCameraShotPlayback(playback, now, shots.length, moveMs);
 
       if (playback.kind === 'moving' && next.kind !== 'moving') {
         from = shots[playback.index];
@@ -801,9 +805,9 @@ export function createTerrain3d(
       playback = next;
 
       if (playback.kind === 'moving') {
-        const progress = isReducedMotion ? 1 : (now - playback.startedAtMs) / cameraShotMoveMs;
-
-        placeCameraShot(interpolateCameraShot(from, shots[playback.index], progress));
+        placeCameraShot(
+          interpolateCameraShot(from, shots[playback.index], (now - playback.startedAtMs) / moveMs),
+        );
       }
 
       frame = requestAnimationFrame(step);
@@ -900,6 +904,7 @@ export function createTerrain3d(
     orbitPose = { position: perspectiveCamera.position.clone(), target: controls.target.clone() };
     camera = perspectiveCamera;
     postProcessing?.setCamera(camera);
+    stopCameraShots?.();
     onWalkChange(true);
     walk.start({ x: dropPoint.x, z: dropPoint.z }, metersPerUnit);
 
@@ -1884,6 +1889,10 @@ export function createTerrain3d(
     },
     reset,
     captureCameraShot() {
+      if (walk.isWalking) {
+        return undefined;
+      }
+
       const thumbnail = document.createElement('canvas');
       const source = renderer.domElement;
 
@@ -1896,10 +1905,18 @@ export function createTerrain3d(
       return { shot: getCameraShot(), thumbnailUrl: thumbnail.toDataURL('image/jpeg', 0.8) };
     },
     flyToCameraShot(shot: CameraShot) {
-      runCameraShots([shot], false);
+      if (!walk.isWalking) {
+        runCameraShots([shot], false);
+      }
     },
     playCameraShots(shots: readonly CameraShot[], onStop: () => void) {
+      if (walk.isWalking) {
+        return false;
+      }
+
       runCameraShots(shots, true, onStop);
+
+      return true;
     },
     stopCameraShots() {
       stopCameraShots?.();

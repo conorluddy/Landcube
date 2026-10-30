@@ -57,3 +57,21 @@ void test('playback without shots goes idle', () => {
     kind: 'idle',
   });
 });
+
+void test('a frame after a long pause starts the next phase now instead of skipping shots', () => {
+  const pausedMs = 60_000;
+  const playback = advanceCameraShotPlayback(
+    { kind: 'moving', index: 0, startedAtMs: 0 },
+    pausedMs,
+    3,
+  );
+
+  assert.deepEqual(playback, { kind: 'holding', index: 0, startedAtMs: pausedMs - 100 });
+  assert.equal(advanceCameraShotPlayback(playback, pausedMs + 16, 3), playback);
+});
+
+void test('without a move the tour cuts to each shot and holds there', () => {
+  const playback = advanceCameraShotPlayback({ kind: 'moving', index: 1, startedAtMs: 0 }, 0, 2, 0);
+
+  assert.deepEqual(playback, { kind: 'holding', index: 1, startedAtMs: 0 });
+});

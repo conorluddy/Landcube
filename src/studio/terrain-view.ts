@@ -31,7 +31,7 @@ interface StudioTerrainView {
   pickFocus: () => Promise<boolean>;
   captureCameraShot: () => { shot: CameraShot; thumbnailUrl: string } | undefined;
   flyToCameraShot: (shot: CameraShot) => void;
-  playCameraShots: (shots: readonly CameraShot[], onStop: () => void) => void;
+  playCameraShots: (shots: readonly CameraShot[], onStop: () => void) => boolean;
   stopCameraShots: () => void;
   captureStill: (scale: number) => HTMLCanvasElement;
   /** Arms a morph for the next 3D rebuild; the 2D view and an inactive 3D view always cut. */
@@ -307,7 +307,13 @@ export function createStudioTerrainView(
     pickFocus: () => view?.pickFocus() ?? Promise.resolve(false),
     captureCameraShot: () => (view && active && !suspended ? view.captureCameraShot() : undefined),
     flyToCameraShot: (shot) => view?.flyToCameraShot(shot),
-    playCameraShots: (shots, onStop) => view?.playCameraShots(shots, onStop),
+    playCameraShots(shots, onStop) {
+      if (!view || !active || suspended) {
+        return false;
+      }
+
+      return view.playCameraShots(shots, onStop);
+    },
     stopCameraShots: () => view?.stopCameraShots(),
     captureStill(scale) {
       if (!view || !active) {

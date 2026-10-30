@@ -291,7 +291,8 @@ export interface StudioEffects {
   /** Undefined while the 3D view is not showing. */
   captureCameraShot(): { shot: CameraShot; thumbnailUrl: string } | undefined;
   flyToCameraShot(shot: CameraShot): void;
-  playCameraShots(shots: readonly CameraShot[], onStop: () => void): void;
+  /** False when the 3D view is not showing, so nothing started. */
+  playCameraShots(shots: readonly CameraShot[], onStop: () => void): boolean;
   stopCameraShots(): void;
   /** Resolves to the saved image's pixel size. */
   downloadStill(scale: TerrainStillScale): Promise<{ width: number; height: number }>;
@@ -603,6 +604,28 @@ export function createStudioController(
   const setCameraShots = (patch: Partial<StudioState['cameraShots']>) => {
     state = { ...state, cameraShots: { ...state.cameraShots, ...patch } };
     publish();
+  };
+
+  /** Sets the stack; a running tour restarts on the new stack so it never visits removed shots. */
+  const replaceCameraShots = (shots: readonly CapturedCameraShot[]) => {
+    if (state.cameraShots.isPlaying && shots.length > 0) {
+      playCameraShotTour(shots);
+    } else if (state.cameraShots.isPlaying) {
+      effects?.stopCameraShots();
+    }
+
+    setCameraShots({ shots });
+  };
+
+  const playCameraShotTour = (shots: readonly CapturedCameraShot[]) => {
+    const hasStarted =
+      effects?.playCameraShots(shots, () => {
+        setCameraShots({ isPlaying: false });
+      }) ?? false;
+
+    setCameraShots({ isPlaying: hasStarted });
+
+    return hasStarted;
   };
 
   /** Shots frame the old landscape, so a new one starts with an empty stack. */
@@ -1707,17 +1730,11 @@ export function createStudioController(
         { ...captured.shot, id: nextCameraShotId++, thumbnailUrl: captured.thumbnailUrl },
       ];
 
-      setCameraShots({ shots });
+      replaceCameraShots(shots);
       notify(`Shot ${shots.length} saved`);
     },
     removeCameraShot(id) {
-      const shots = state.cameraShots.shots.filter((shot) => shot.id !== id);
-
-      if (shots.length === 0) {
-        effects?.stopCameraShots();
-      }
-
-      setCameraShots({ shots, isPlaying: state.cameraShots.isPlaying && shots.length > 0 });
+      replaceCameraShots(state.cameraShots.shots.filter((shot) => shot.id !== id));
     },
     clearCameraShots() {
       effects?.stopCameraShots();
@@ -1746,10 +1763,12 @@ export function createStudioController(
         return;
       }
 
-      effects?.playCameraShots(shots, () => {
-        setCameraShots({ isPlaying: false });
-      });
-      setCameraShots({ isPlaying: true });
+      if (!playCameraShotTour(shots)) {
+        notify('Switch to the 3D view to play shots');
+
+        return;
+      }
+
       notify(`Playing ${shots.length} ${shots.length === 1 ? 'shot' : 'shots'}`);
     },
     stopCameraShots() {

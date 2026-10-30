@@ -61,7 +61,7 @@ async function createState(
     pickFocus: () => Promise.resolve(false),
     captureCameraShot: () => undefined,
     flyToCameraShot: () => undefined,
-    playCameraShots: () => undefined,
+    playCameraShots: () => true,
     stopCameraShots: () => undefined,
     downloadStill: () => Promise.resolve({ width: 1, height: 1 }),
     downloadStl: noop,

@@ -29,6 +29,8 @@ export type CameraShotPlayback =
 
 export const cameraShotMoveMs = 2500;
 export const cameraShotHoldMs = 1000;
+/** A late frame starts the next phase at most this far in the past, so a paused tab resumes smoothly. */
+const maxPhaseLagMs = 100;
 
 // === PUBLIC API ===
 
@@ -58,6 +60,7 @@ export function advanceCameraShotPlayback(
   playback: CameraShotPlayback,
   nowMs: number,
   shotCount: number,
+  moveMs = cameraShotMoveMs,
 ): CameraShotPlayback {
   if (playback.kind === 'idle' || shotCount === 0) {
     return { kind: 'idle' };
@@ -66,12 +69,12 @@ export function advanceCameraShotPlayback(
   const elapsedMs = nowMs - playback.startedAtMs;
 
   if (playback.kind === 'moving') {
-    return elapsedMs < cameraShotMoveMs
+    return elapsedMs < moveMs
       ? playback
       : {
           kind: 'holding',
           index: playback.index,
-          startedAtMs: playback.startedAtMs + cameraShotMoveMs,
+          startedAtMs: getNextPhaseStartMs(playback.startedAtMs + moveMs, nowMs),
         };
   }
 
@@ -80,11 +83,15 @@ export function advanceCameraShotPlayback(
     : {
         kind: 'moving',
         index: (playback.index + 1) % shotCount,
-        startedAtMs: playback.startedAtMs + cameraShotHoldMs,
+        startedAtMs: getNextPhaseStartMs(playback.startedAtMs + cameraShotHoldMs, nowMs),
       };
 }
 
 // === HELPERS ===
+
+function getNextPhaseStartMs(phaseEndMs: number, nowMs: number): number {
+  return Math.max(phaseEndMs, nowMs - maxPhaseLagMs);
+}
 
 function lerpVector(
   from: CameraShotVector,
