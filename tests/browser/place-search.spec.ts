@@ -46,3 +46,30 @@ test('mobile users can inspect terrain attribution', async ({ page }) => {
   await expect(page.locator('.mobile-attribution p')).toContainText('Copernicus');
   await expect(page.getByRole('combobox', { name: 'Search' })).toHaveCount(1);
 });
+
+test('search result span shortcuts load the selected place at that span', async ({ page }) => {
+  await serveStudio(page);
+  await page.route('https://photon.komoot.io/**', (route) =>
+    route.fulfill({
+      json: {
+        features: [
+          { geometry: { coordinates: [-5.0035, 56.7969] }, properties: { name: 'Ben Nevis' } },
+        ],
+      },
+    }),
+  );
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await page.getByRole('button', { name: 'Coordinates', exact: true }).click();
+  const search = page.locator('.header-place-search').getByRole('combobox');
+
+  await search.fill('Ben');
+  const shortcut = page.getByRole('button', { name: 'Load Ben Nevis at 50 km' });
+
+  await expect(shortcut).toBeVisible();
+  await search.press('Tab');
+  await expect(page.getByRole('button', { name: 'Load Ben Nevis at 10 km' })).toBeFocused();
+  await shortcut.click();
+  await expect(page.locator('#terrain-place')).toHaveValue('56.7969,-5.0035');
+  await expect(search).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByText('50 km', { exact: true }).first()).toBeVisible();
+});

@@ -401,7 +401,7 @@ export interface StudioController {
   /** Resolves undefined when a newer search superseded this one. */
   searchPlaces: (query: string) => Promise<Result<PlaceMatch[]> | undefined>;
   /** Loads a search match; once its terrain loads it is saved and listed before the presets. */
-  loadSearchedPlace: (match: PlaceMatch) => Promise<void>;
+  loadSearchedPlace: (match: PlaceMatch, spanKm?: number) => Promise<void>;
   /** Edits grass; picking a preset applies its look, and hand-editing the look makes it custom. */
   grass: (patch: Partial<GrassStyle>) => void;
   interval: (value: 'auto' | number) => boolean;
@@ -1608,7 +1608,7 @@ export function createStudioController(
     searchPlaces(query) {
       return placeSearcher.search(query);
     },
-    async loadSearchedPlace(match) {
+    async loadSearchedPlace(match, spanKm) {
       void controller.autoplay({ enabled: false });
       pendingSearchedPlace = {
         name: match.name,
@@ -1620,6 +1620,7 @@ export function createStudioController(
         place: `${match.latitude},${match.longitude}`,
         latitude: match.latitude,
         longitude: match.longitude,
+        ...(spanKm === undefined ? {} : { spanKm }),
       });
       await controller.loadTerrain();
     },

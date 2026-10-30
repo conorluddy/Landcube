@@ -67,13 +67,13 @@ export function PlaceSearchField({ controller }: { controller: StudioController 
 
   const places = search.kind === 'results' ? search.places : [];
 
-  const choosePlace = (place: PlaceMatch) => {
+  const choosePlace = (place: PlaceMatch, spanKm?: number) => {
     chosenQuery.current = place.name;
     setQuery(place.name);
     setSearch({ kind: 'idle' });
     setActiveIndex(-1);
     setIsOpen(false);
-    void controller.loadSearchedPlace(place);
+    void controller.loadSearchedPlace(place, spanKm);
   };
 
   const input = (
@@ -91,8 +91,13 @@ export function PlaceSearchField({ controller }: { controller: StudioController 
       onFocus={() => {
         setIsOpen(true);
       }}
-      onBlur={() => {
-        setIsOpen(false);
+      onBlur={(event) => {
+        if (
+          !(event.relatedTarget instanceof Element) ||
+          !event.relatedTarget.closest('.place-search-popover')
+        ) {
+          setIsOpen(false);
+        }
       }}
       onChange={(event) => {
         setQuery(event.target.value);
@@ -121,26 +126,64 @@ export function PlaceSearchField({ controller }: { controller: StudioController 
     />
   );
   const popover = (
-    <div className="place-search-popover" data-open={isOpen}>
+    <div
+      className="place-search-popover"
+      data-open={isOpen}
+      onBlur={(event) => {
+        if (
+          !(event.relatedTarget instanceof Element) ||
+          (!event.currentTarget.contains(event.relatedTarget) &&
+            event.relatedTarget.id !== `${id}-search`)
+        ) {
+          setIsOpen(false);
+        }
+      }}
+    >
       {isOpen && places.length > 0 && (
-        <ul id={`${id}-results`} className="place-search-results" role="listbox">
-          {places.map((place, index) => (
-            <li
-              id={`${id}-result-${index}`}
-              key={`${place.latitude},${place.longitude},${place.name}`}
-              role="option"
-              aria-selected={index === activeIndex}
-              onMouseDown={(event) => {
-                // Keeps focus in the input so the click lands before any blur.
-                event.preventDefault();
-                choosePlace(place);
-              }}
-            >
-              <strong>{place.name}</strong>
-              {place.detail !== '' && <span>{place.detail}</span>}
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="place-search-span-heading">Area span · km</div>
+          <ul id={`${id}-results`} className="place-search-results" role="listbox">
+            {places.map((place, index) => (
+              <li
+                key={`${place.latitude},${place.longitude},${place.name}`}
+                role="presentation"
+                className="place-search-row"
+              >
+                <div
+                  id={`${id}-result-${index}`}
+                  role="option"
+                  aria-selected={index === activeIndex}
+                  onMouseDown={(event) => {
+                    // Keeps focus in the input so the click lands before any blur.
+                    event.preventDefault();
+                    choosePlace(place);
+                  }}
+                >
+                  <strong>{place.name}</strong>
+                  {place.detail !== '' && <span>{place.detail}</span>}
+                </div>
+                <div
+                  className="place-search-spans"
+                  role="group"
+                  aria-label={`Area span for ${place.name}${place.detail ? `, ${place.detail}` : ''}`}
+                >
+                  {[10, 25, 50].map((spanKm) => (
+                    <button
+                      key={spanKm}
+                      type="button"
+                      aria-label={`Load ${place.name}${place.detail ? `, ${place.detail}` : ''} at ${spanKm} km`}
+                      onClick={() => {
+                        choosePlace(place, spanKm);
+                      }}
+                    >
+                      {spanKm}
+                    </button>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
       <p role="status">
         {search.kind === 'loading'

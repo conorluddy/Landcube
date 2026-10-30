@@ -230,6 +230,66 @@ body,
   flex: 1 1 auto;
 }
 
+.header-place-search .lc-search-field__popover {
+  right: auto;
+  width: 480px;
+  max-width: calc(100vw - 32px);
+}
+
+.place-search-span-heading {
+  padding: var(--lc-s-2) var(--lc-s-4);
+  color: var(--lc-text-quiet);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  text-align: right;
+}
+
+.place-search-row {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-s-2);
+}
+
+.place-search-row [role='option'] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.place-search-spans {
+  display: flex;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--lc-line-strong);
+  border-radius: var(--lc-r-control);
+}
+
+.place-search-spans button {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  color: var(--lc-text-body);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-fs-label);
+  background: var(--lc-fill-field);
+  border: 0;
+  cursor: pointer;
+}
+
+.place-search-spans button + button {
+  border-left: 1px solid var(--lc-line-strong);
+}
+
+.place-search-spans button:hover,
+.place-search-spans button:focus-visible {
+  color: var(--lc-text-primary);
+  background: var(--lc-fill-selected);
+}
+
+.place-search-spans button:focus-visible {
+  outline: 1px solid var(--lc-line-focus);
+  outline-offset: -2px;
+}
+
 /*
  * The search reaches its 120px minimum at an 811px shell; narrower, the header pills overflow
  * (measured with the default header content), so the search moves to the Terrain section.
@@ -237,6 +297,16 @@ body,
 @container studio-shell (width < 811px) {
   .header-place-search {
     display: none;
+  }
+
+  .place-search-row {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    padding-bottom: var(--lc-s-2);
+  }
+
+  .place-search-row [role='option'] {
+    flex-basis: 100%;
   }
 }
 
