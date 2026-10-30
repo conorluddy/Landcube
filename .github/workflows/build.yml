@@ -54,18 +54,21 @@ jobs:
     timeout-minutes: 15
     strategy:
       fail-fast: false
-      # Software WebGL makes 3D journeys slow, so the heaviest files get their own runners
-      # and everything else, including new files, splits across the studio shards.
+      # Groups are Playwright projects in playwright.config.ts; studio splits by test across two runners.
       matrix:
         include:
           - group: 3D terrain
-            args: --grep "terrain-3d\.spec"
+            slug: 3d-terrain
+            args: --project=3d-terrain
           - group: 3D tools
-            args: --grep "(frame|tools|route|hud)\.spec"
+            slug: 3d-tools
+            args: --project=3d-tools
           - group: studio 1/2
-            args: --grep-invert "(terrain-3d|frame|tools|route|hud)\.spec" --shard=1/2
+            slug: studio-1
+            args: --project=studio --shard=1/2
           - group: studio 2/2
-            args: --grep-invert "(terrain-3d|frame|tools|route|hud)\.spec" --shard=2/2
+            slug: studio-2
+            args: --project=studio --shard=2/2
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -92,7 +95,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-traces-${{ strategy.job-index }}
+          name: playwright-traces-${{ matrix.slug }}
           path: test-results
           retention-days: 7
 
