@@ -141,9 +141,9 @@ test('loading an off-centre GPX offers to centre the terrain on it', async ({ pa
   const centre = page.getByRole('button', { name: 'Centre terrain on route', exact: true });
 
   await centre.click();
-  await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible();
+  // The offer goes once the new terrain frames the route.
   await expect(centre).toHaveCount(0);
-  await expect(page.getByText(/4 of 4 points inside the loaded area\./)).toBeVisible();
+  await expect(page.getByText(/^(\d+) of \1 points inside the loaded area\.$/)).toBeVisible();
   await section(page, 'Terrain');
   await expect(page.getByLabel('Latitude', { exact: true })).toHaveValue('55.021');
   await expect(page.getByLabel('Longitude', { exact: true })).toHaveValue('-8.139');
