@@ -5,10 +5,11 @@
  * describe the line, and keeping them would let stale data masquerade as the route's profile.
  */
 import type { ActiveRoute, GeoPoint, RouteEditing } from '../types/terrain-analysis';
-
-export const defaultSlopeThresholdPercent = 15;
-export const minimumSlopeThresholdPercent = 1;
-export const maximumSlopeThresholdPercent = 100;
+import {
+  defaultSlopeThresholdPercent,
+  maximumSlopeThresholdPercent,
+  minimumSlopeThresholdPercent,
+} from '../constants/route-analysis';
 
 export interface RouteEditingState {
   route: ActiveRoute | null;

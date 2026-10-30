@@ -47,11 +47,8 @@ import type { OperationError, Result } from '../types/operations';
 import { parseGpx, routeStats, simplifyRoute } from '../gpx';
 import type { RouteStats } from '../types/route';
 import type { ActiveRoute, GeoPoint, RouteEditing } from '../types/terrain-analysis';
-import {
-  defaultSlopeThresholdPercent,
-  reduceRouteEditing,
-  type RouteEditingAction,
-} from './route-editing';
+import { reduceRouteEditing, type RouteEditingAction } from './route-editing';
+import { defaultSlopeThresholdPercent } from '../constants/route-analysis';
 import type { WaterStyle } from '../terrain-3d';
 import type { FloorStyle } from '../terrain-floor-styles';
 import type { TerrainStillScale } from '../export/still-export';
