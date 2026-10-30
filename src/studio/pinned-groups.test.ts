@@ -16,7 +16,7 @@ function createController(): StudioController {
     newLandscape: () => undefined,
     isSeedLocked: false,
     lockSeed: () => undefined,
-    getShareUrl: () => 'https://topogra.test/',
+    getShareUrl: () => 'https://landcube.test/',
     copyLink: () => Promise.resolve({ ok: true, data: undefined }),
   });
 }

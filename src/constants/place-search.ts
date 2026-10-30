@@ -11,6 +11,7 @@ export const placeSearchMinimumQueryLength = 3;
 export const placeSearchDebounceMs = 300;
 export const cachedPlaceSearchLimit = 20;
 export const placeSearchAttribution = 'Search © OpenStreetMap contributors / Open-Meteo';
+// Legacy storage key kept across the landcube rename so existing data survives.
 export const savedPlacesStorageKey = 'topogra-searched-places';
 /** Searched places kept in the location menu, most recent first. */
 export const savedPlaceLimit = 12;

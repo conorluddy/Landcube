@@ -17,13 +17,13 @@ const executeFile = promisify(execFile);
 void test('CLI reports the package version', async () => {
   const { stdout, stderr } = await runCommand(['--version']);
 
-  assert.equal(stdout, `topogra ${version}\n`);
+  assert.equal(stdout, `landcube ${version}\n`);
   assert.equal(stderr, '');
 });
 
 void test('CLI runs through an npm executable symlink in a path containing spaces', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'topogra npm bin '));
-  const executable = join(directory, 'topogra.ts');
+  const directory = await mkdtemp(join(tmpdir(), 'landcube npm bin '));
+  const executable = join(directory, 'landcube.ts');
 
   await symlink(resolve('src/cli.ts'), executable);
   const { stdout, stderr } = await executeFile(process.execPath, [
@@ -33,7 +33,7 @@ void test('CLI runs through an npm executable symlink in a path containing space
     '--help',
   ]);
 
-  assert.match(stdout, /topogra generate/);
+  assert.match(stdout, /landcube generate/);
   assert.equal(stderr, '');
 });
 
@@ -43,7 +43,7 @@ function runCommand(argumentsList: string[]) {
 }
 
 void test('CLI generates a resolved SVG and metadata through its process entry point', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'topogra-cli-'));
+  const directory = await mkdtemp(join(tmpdir(), 'landcube-cli-'));
   const output = join(directory, 'terrain.svg');
   const { stdout, stderr } = await runCommand([
     'generate',
@@ -68,7 +68,7 @@ void test('CLI generates a resolved SVG and metadata through its process entry p
   };
 
   assert.equal(metadata.output, output);
-  assert.equal(metadata.filename, 'topogra-42-320x240.svg');
+  assert.equal(metadata.filename, 'landcube-42-320x240.svg');
   assert.equal(metadata.settings.seed, 42);
 });
 
@@ -84,7 +84,7 @@ void test('CLI help exposes canonical design defaults and numeric constraints', 
 });
 
 void test('CLI validates saved configuration, applies explicit overrides, and rejects incompatible stdout', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'topogra-cli-'));
+  const directory = await mkdtemp(join(tmpdir(), 'landcube-cli-'));
   const config = join(directory, 'design.json');
   const output = join(directory, 'override.svg');
 
@@ -161,7 +161,7 @@ void test('CLI SVG output exactly matches the shared browser renderer across the
   ];
 
   for (const [index, changes] of scenarios.entries()) {
-    const directory = await mkdtemp(join(tmpdir(), 'topogra-cli-parity-'));
+    const directory = await mkdtemp(join(tmpdir(), 'landcube-cli-parity-'));
     const output = join(directory, `scenario-${index}.svg`);
     const settingsResult = validateDesignSettings({ ...versionOneDesignDefaults, ...changes });
 
@@ -185,7 +185,7 @@ void test('failed generation leaves no outputs and the same real-terrain command
   const { runCli } = await import('./cli');
   const { access } = await import('node:fs/promises');
   const { PNG } = await import('pngjs');
-  const directory = await mkdtemp(join(tmpdir(), 'topogra-retry-'));
+  const directory = await mkdtemp(join(tmpdir(), 'landcube-retry-'));
   const output = join(directory, 'terrain.svg');
   const config = join(directory, 'terrain.json');
   const attribution = join(directory, 'terrain-attribution.txt');
@@ -240,7 +240,7 @@ void test('failed generation leaves no outputs and the same real-terrain command
 
 void test('output conflicts and staging failures leave no companion config', async () => {
   const { access } = await import('node:fs/promises');
-  const directory = await mkdtemp(join(tmpdir(), 'topogra-conflict-'));
+  const directory = await mkdtemp(join(tmpdir(), 'landcube-conflict-'));
   const config = join(directory, 'terrain.json');
   const output = join(directory, 'terrain.svg');
 
@@ -265,7 +265,7 @@ void test('output conflicts and staging failures leave no companion config', asy
 });
 
 void test('negative numeric arguments accept separate and equals forms', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'topogra-negative-'));
+  const directory = await mkdtemp(join(tmpdir(), 'landcube-negative-'));
   const output = join(directory, 'terrain.svg');
   const config = join(directory, 'terrain.json');
 
@@ -304,7 +304,7 @@ void test('negative numeric arguments accept separate and equals forms', async (
 void test('CLI validates elevation floors and keeps them in real-terrain configurations', async (context) => {
   const { runCli } = await import('./cli');
   const { PNG } = await import('pngjs');
-  const directory = await mkdtemp(join(tmpdir(), 'topogra-floor-'));
+  const directory = await mkdtemp(join(tmpdir(), 'landcube-floor-'));
   const output = join(directory, 'terrain.svg');
   const config = join(directory, 'terrain.json');
   const png = new PNG({ width: 256, height: 256 });
@@ -432,7 +432,7 @@ void test('CLI validates elevation floors and keeps them in real-terrain configu
 void test('terrain presets use suggested spans while explicit spans override them', async (context) => {
   const { runCli } = await import('./cli');
   const { PNG } = await import('pngjs');
-  const directory = await mkdtemp(join(tmpdir(), 'topogra-presets-'));
+  const directory = await mkdtemp(join(tmpdir(), 'landcube-presets-'));
   const png = new PNG({ width: 256, height: 256 });
 
   for (let offset = 0; offset < png.data.length; offset += 4) {
@@ -484,7 +484,7 @@ void test('terrain presets use suggested spans while explicit spans override the
 void test('physical contour intervals round-trip through CLI configs and old configs retain density', async (context) => {
   const { runCli } = await import('./cli');
   const { PNG } = await import('pngjs');
-  const directory = await mkdtemp(join(tmpdir(), 'topogra-interval-'));
+  const directory = await mkdtemp(join(tmpdir(), 'landcube-interval-'));
   const tile = new PNG({ width: 256, height: 256 });
 
   for (let i = 0; i < tile.data.length; i += 4) {

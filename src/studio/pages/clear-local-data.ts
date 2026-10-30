@@ -3,6 +3,7 @@ import { operationErrorCodes } from '../../constants/operations';
 import type { Result } from '../../types/operations';
 import type { BrowserStorage } from '../browser-storage';
 
+// Legacy cache prefix kept across the landcube rename so existing data survives.
 const terrainTileCachePrefix = 'topogra-terrain-tiles';
 
 /** Removes every `landcube-*` and `topogra-*` key; resolves to how many keys were removed. */

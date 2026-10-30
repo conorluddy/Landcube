@@ -72,7 +72,7 @@ const stlHeaderBytes = 80;
  */
 export function createBinaryStl(
   mesh: TerrainSurfaceBuffers,
-  label = 'Topogra terrain model',
+  label = 'landcube terrain model',
 ): ArrayBuffer {
   validatePrintableSolid(mesh);
   const header = new TextEncoder().encode(`${label} | units: millimeters | Z up`);

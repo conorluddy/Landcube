@@ -136,7 +136,7 @@ export function StudioFooter({
         <ThemeToggle />
         <a
           className="studio-github"
-          href="https://github.com/conorluddy/Topogra"
+          href="https://github.com/conorluddy/landcube"
           target="_blank"
           rel="noreferrer"
         >

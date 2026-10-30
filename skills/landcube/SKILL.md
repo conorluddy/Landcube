@@ -1,19 +1,19 @@
 ---
-name: topogra
-description: Generate reproducible topographic SVG or PNG assets with the Topogra CLI. Use for requests for contour-map backgrounds, synthetic terrain artwork, or location-based terrain exports; do not use for ordinary geographic maps or GIS analysis.
+name: landcube
+description: Generate reproducible topographic SVG or PNG assets with the LANDCU.BE CLI. Use for requests for contour-map backgrounds, synthetic terrain artwork, or location-based terrain exports; do not use for ordinary geographic maps or GIS analysis.
 ---
 
-# Topogra
+# LANDCU.BE
 
-Create a production-ready image and its versioned Topogra configuration. Use `npx --yes topogra` so the workflow works without a repository checkout.
+Create a production-ready image and its versioned LANDCU.BE configuration. Use `npx --yes landcube` so the workflow works without a repository checkout.
 
 ## Generate an asset
 
-Translate the brief into an SVG or PNG, dimensions, palette, and any relevant terrain or contour controls. Start with `npx --yes topogra presets --json true` when choosing a named palette, size, or terrain preset would help. Use explicit flags rather than relying on unstated defaults whenever a brief specifies a visual decision.
+Translate the brief into an SVG or PNG, dimensions, palette, and any relevant terrain or contour controls. Start with `npx --yes landcube presets --json true` when choosing a named palette, size, or terrain preset would help. Use explicit flags rather than relying on unstated defaults whenever a brief specifies a visual decision.
 
-Always create the image together with a JSON configuration using `--save-config`. Use a matching basename, for example `hero.svg` and `hero.json`. Validate saved configuration with `npx --yes topogra validate --config hero.json` after generation. Report the output paths and exact generation command to the user.
+Always create the image together with a JSON configuration using `--save-config`. Use a matching basename, for example `hero.svg` and `hero.json`. Validate saved configuration with `npx --yes landcube validate --config hero.json` after generation. Report the output paths and exact generation command to the user.
 
-If the request does not specify an output destination, inspect the current workspace for relevant conventions such as an existing asset directory, build output directory, or documentation examples. Use a suitable existing asset directory when the intended destination is clear. For standalone experiments or previews, create a descriptive directory under the system temporary directory (for example `/tmp/topogra-slieve-league/`) and report it. Ask only when the destination would materially affect how the asset is used. Do not put generated files in the workspace root by default.
+If the request does not specify an output destination, inspect the current workspace for relevant conventions such as an existing asset directory, build output directory, or documentation examples. Use a suitable existing asset directory when the intended destination is clear. For standalone experiments or previews, create a descriptive directory under the system temporary directory (for example `/tmp/landcube-slieve-league/`) and report it. Ask only when the destination would materially affect how the asset is used. Do not put generated files in the workspace root by default.
 
 ## Terrain choices
 

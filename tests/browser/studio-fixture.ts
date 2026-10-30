@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { PNG } from 'pngjs';
 
-export const appUrl = 'https://topogra.test/';
+export const appUrl = 'https://landcube.test/';
 export const terrainTileUrl = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/**';
 
 const analyticsUrl = 'https://www.googletagmanager.com/**';

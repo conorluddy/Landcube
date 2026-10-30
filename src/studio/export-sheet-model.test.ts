@@ -77,7 +77,7 @@ async function createState(
     newLandscape: noop,
     isSeedLocked: false,
     lockSeed: noop,
-    getShareUrl: () => 'https://topogra.test/',
+    getShareUrl: () => 'https://landcube.test/',
     copyLink: () => Promise.resolve({ ok: true, data: undefined }),
   });
 

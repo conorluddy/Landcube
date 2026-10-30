@@ -40,7 +40,7 @@ const customized = {
 
 await test('a complete design survives a share link, including inactive index and cursor settings', () => {
   /** Verifies a complete design survives a share link, including inactive index and cursor settings. */
-  const url = getDesignUrl('https://topogra.example/studio?old=value#design', customized);
+  const url = getDesignUrl('https://landcube.example/studio?old=value#design', customized);
   const parsed = parseDesignParameters(new URL(url).searchParams);
 
   assert.ok(parsed.ok);

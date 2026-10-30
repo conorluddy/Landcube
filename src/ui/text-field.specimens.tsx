@@ -27,7 +27,7 @@ export default defineSpecimens('text-field', [
   { variant: 'sans', render: () => <Demo initial="Ben Nevis" isMonospace={false} /> },
   {
     variant: 'invalid',
-    render: () => <Demo initial="not a link" label="Link" error="Paste a Topogra design link." />,
+    render: () => <Demo initial="not a link" label="Link" error="Paste a LANDCU.BE design link." />,
   },
   {
     variant: 'default',

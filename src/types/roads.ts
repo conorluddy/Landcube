@@ -1,6 +1,6 @@
 import type { roadClasses, roadDetails } from '../constants/roads';
 
-/** Mapped OSM `highway` values Topogra draws; anything else is ignored. */
+/** Mapped OSM `highway` values landcube draws; anything else is ignored. */
 export type RoadClass = (typeof roadClasses)[number];
 
 /** How much of the network to draw, from major routes down to unpaved tracks. */

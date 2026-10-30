@@ -1,11 +1,15 @@
 {
-  "name": "topogra",
-  "version": "0.2.0",
-  "description": "Generate reproducible topographic SVG and PNG backgrounds from the command line.",
+  "name": "landcube",
+  "version": "0.3.0",
+  "description": "LANDCU.BE generates reproducible topographic SVG and PNG artwork from the command line.",
   "license": "MIT",
+  "homepage": "https://conorluddy.github.io/landcube/",
+  "bugs": {
+    "url": "https://github.com/conorluddy/landcube/issues"
+  },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/conorluddy/Topogra.git"
+    "url": "git+https://github.com/conorluddy/landcube.git"
   },
   "files": [
     "dist-cli",
@@ -64,7 +68,7 @@
     "node": "^20.19.0 || ^22.13.0 || >=24"
   },
   "bin": {
-    "topogra": "./dist-cli/topogra.mjs"
+    "landcube": "./dist-cli/landcube.mjs"
   },
   "lint-staged": {
     "*": "prettier --write --ignore-unknown"

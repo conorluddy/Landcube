@@ -58,7 +58,7 @@ function setup(fetchRoads?: typeof fetch, placeStorage?: Pick<Storage, 'getItem'
       },
       isSeedLocked: false,
       lockSeed: () => undefined,
-      getShareUrl: () => `https://topogra.test/?${serializeDesignParameters(design).toString()}`,
+      getShareUrl: () => `https://landcube.test/?${serializeDesignParameters(design).toString()}`,
       copyLink: () => Promise.resolve({ ok: true, data: undefined }),
     },
     fetchRoads,
@@ -253,7 +253,7 @@ void test('default location loads bundled tiles and credits only their recorded 
   await c.loadTerrain();
 
   assert.ok(requestedUrls.length > 0);
-  assert.ok(requestedUrls.every((url) => url.startsWith('https://topogra.test/terrain-tiles/')));
+  assert.ok(requestedUrls.every((url) => url.startsWith('https://landcube.test/terrain-tiles/')));
   assert.match(c.getSnapshot().source.terrain?.attribution ?? '', /Copernicus/);
   assert.doesNotMatch(c.getSnapshot().source.terrain?.attribution ?? '', /Geological Survey/);
 });
@@ -559,7 +559,7 @@ function stubBrowserTileDecoding(t: TestContext): void {
   Object.assign(globalThis, {
     createImageBitmap: () => Promise.resolve({ close: () => undefined }),
     document: {
-      baseURI: 'https://topogra.test/',
+      baseURI: 'https://landcube.test/',
       createElement: () => ({
         getContext: () => ({ drawImage: () => undefined, getImageData: () => ({ data: pixels }) }),
       }),
