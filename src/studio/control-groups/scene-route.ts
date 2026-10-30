@@ -14,6 +14,8 @@ import { isRouteComplete } from '../route-editing';
 import { RouteFileField } from '../route-file-field';
 import { countRoutePointsInside, describeRoute } from '../route-overlay';
 import { analyseActiveRoute } from '../active-route-analysis';
+import { isRouteFramed } from '../../route-framing';
+import type { ActiveRoute } from '../../types/terrain-analysis';
 
 // === PUBLIC API ===
 
@@ -39,6 +41,8 @@ function buildRouteGroup(
   const isEditingGeometry = route !== null && route.editing.mode !== 'viewing';
   const insideCount =
     route === null ? undefined : countRoutePointsInside(route.active.waypoints, terrain);
+  const shouldOfferCentring =
+    isComplete && !isEditingGeometry && !isTerrainFramingRoute(route.active, terrain, insideCount);
 
   return {
     id: 'route',
@@ -73,6 +77,16 @@ function buildRouteGroup(
           'route-clip',
           `${insideCount} of ${route.active.waypoints.length} points inside the loaded area.`,
         ),
+      shouldOfferCentring &&
+        hintRow('route-centre-hint', 'The route is off-centre on this terrain.'),
+      shouldOfferCentring &&
+        buttonRow('route-centre', {
+          children: 'Centre terrain on route',
+          disabled: state.source.loading,
+          onClick: () => {
+            void controller.centreTerrainOnRoute();
+          },
+        }),
       buttonRow('route-draw', {
         children: 'Draw route',
         onClick: () => {
@@ -120,4 +134,21 @@ function buildRouteGroup(
       ),
     ],
   };
+}
+
+// === HELPERS ===
+
+/** Real terrain loaded around the route already, so there is nothing to offer. */
+function isTerrainFramingRoute(
+  route: ActiveRoute,
+  terrain: RealTerrain,
+  insideCount: number | undefined,
+): boolean {
+  const { location, spanKm } = terrain;
+
+  return (
+    location === undefined ||
+    spanKm === undefined ||
+    isRouteFramed(route.waypoints, { location, spanKm }, insideCount ?? 0)
+  );
 }

@@ -234,6 +234,7 @@ void test('route commands appear only on real terrain, and clear and export wait
     'action-route-tool',
     'action-route-draw',
     'action-route-finish',
+    'action-route-centre',
     'action-route-reverse',
     'action-route-clear',
     'action-route-export',

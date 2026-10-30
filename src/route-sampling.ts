@@ -22,7 +22,7 @@ export interface RouteSampling {
   strategy: 'densified' | 'decimated';
 }
 
-// Matches src/gpx.ts, whose haversine helper is private.
+// Mean Earth radius; `src/gpx.ts` measures with this module too.
 const earthRadiusMeters = 6371008.8;
 
 // === PUBLIC API ===

@@ -133,6 +133,22 @@ test('a retained route rebuilds against a newly loaded location', async ({ page 
   await expect(canvas).toHaveAttribute('data-route-points', /^[1-9]\d*$/);
 });
 
+test('loading an off-centre GPX offers to centre the terrain on it', async ({ page }) => {
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await loadLocation(page);
+  await section(page, 'Route');
+  await page.getByLabel('GPX file').setInputFiles(routeFile);
+  const centre = page.getByRole('button', { name: 'Centre terrain on route', exact: true });
+
+  await centre.click();
+  await expect(page.getByRole('status').filter({ hasText: 'Real terrain loaded' })).toBeVisible();
+  await expect(centre).toHaveCount(0);
+  await expect(page.getByText(/4 of 4 points inside the loaded area\./)).toBeVisible();
+  await section(page, 'Terrain');
+  await expect(page.getByLabel('Latitude', { exact: true })).toHaveValue('55.021');
+  await expect(page.getByLabel('Longitude', { exact: true })).toHaveValue('-8.139');
+});
+
 test('an invalid GPX file shows an E-206 fault and keeps the previous route', async ({ page }) => {
   await page.goto(`${appUrl}?v=1&seed=123`);
   await loadLocation(page);

@@ -193,6 +193,51 @@ void test('a loaded route shows its stats and a refused file shows an E-206 faul
   assert.match(faultedMarkup, /Bad file\./);
 });
 
+void test('a route off-centre on the loaded terrain offers to centre it, a centred one does not', () => {
+  const ridge = [
+    { latitude: 55.012, longitude: -8.148 },
+    { latitude: 55.024, longitude: -8.132 },
+  ];
+  const routeOn = (terrain: RealTerrain) =>
+    createContext({
+      view: '2d',
+      terrain,
+      route: {
+        active: {
+          id: 'drawn-1',
+          name: 'Ridge',
+          provenance: 'drawn',
+          waypoints: ridge,
+          namedWaypoints: [],
+          slopeThresholdPercent: 15,
+        },
+        editing: { mode: 'viewing' },
+        isVisible: true,
+      },
+    });
+  const offCentre = routeOn({
+    ...realTerrain,
+    location: { latitude: 55.06, longitude: -8.14 },
+    spanKm: 8,
+  });
+  const centred = routeOn({
+    ...realTerrain,
+    location: { latitude: 55.018, longitude: -8.14 },
+    spanKm: 8,
+  });
+
+  assert.ok(
+    listRowIds(buildRouteGroups(offCentre.controller, offCentre.state), 'route').includes(
+      'route-centre',
+    ),
+  );
+  assert.ok(
+    !listRowIds(buildRouteGroups(centred.controller, centred.state), 'route').includes(
+      'route-centre',
+    ),
+  );
+});
+
 // === HELPERS ===
 
 interface ContextOverrides {

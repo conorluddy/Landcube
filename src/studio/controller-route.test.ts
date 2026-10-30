@@ -183,3 +183,26 @@ void test('scrubbing the profile reuses the recorded stats', () => {
   assert.equal(c.getSnapshot().workspace.route?.inspectedDistanceMeters, 5);
   assert.equal(c.getSnapshot().workspace.route?.stats, stats);
 });
+
+void test('centring on a route loads real terrain around it', () => {
+  const c = setupController();
+  const realFetch = globalThis.fetch;
+
+  // The tile download is not under test; it never settles, so only the request state is checked.
+  globalThis.fetch = () => new Promise<Response>(() => undefined);
+
+  try {
+    c.loadRoute(twoPoints);
+    void c.centreTerrainOnRoute();
+
+    const { source } = c.getSnapshot();
+
+    assert.equal(source.selected, 'real');
+    assert.equal(source.latitude, 0.005);
+    assert.equal(source.longitude, 0);
+    assert.equal(source.spanKm, 2);
+    assert.equal(source.loading, true);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

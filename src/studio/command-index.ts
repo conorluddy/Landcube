@@ -245,6 +245,14 @@ function buildRouteCommands(controller: StudioController, state: StudioState): A
     commands.push(
       {
         kind: 'action',
+        id: 'action-route-centre',
+        label: 'Centre terrain on route',
+        run: () => {
+          void controller.centreTerrainOnRoute();
+        },
+      },
+      {
+        kind: 'action',
         id: 'action-route-reverse',
         label: 'Reverse route',
         run: () => {

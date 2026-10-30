@@ -48,6 +48,7 @@ import { parseGpx, routeStats, simplifyRoute } from '../gpx';
 import type { RouteStats } from '../types/route';
 import type { ActiveRoute, GeoPoint, RouteEditing } from '../types/terrain-analysis';
 import { reduceRouteEditing, type RouteEditingAction } from './route-editing';
+import { frameRoute } from '../route-framing';
 import { defaultSlopeThresholdPercent } from '../constants/route-analysis';
 import type { WaterStyle } from '../terrain-3d';
 import type { FloorStyle } from '../terrain-floor-styles';
@@ -331,6 +332,8 @@ export interface StudioController {
   clearRoute: () => void;
   setRouteSlopeThreshold: (percent: number) => void;
   inspectRoute: (distanceMeters: number | undefined) => void;
+  /** Loads real terrain centred on the route at a span that holds it; a no-op without a route. */
+  centreTerrainOnRoute: () => Promise<void>;
   /** Library restore: installs a route in viewing mode, replacing any current one. */
   setRoute: (route: ActiveRoute) => void;
   /**
@@ -954,6 +957,22 @@ export function createStudioController(
     },
     setRoute(active) {
       installRoute(active);
+    },
+    async centreTerrainOnRoute() {
+      const { route } = state.workspace;
+      const framing = route && frameRoute(route.active.originalPoints ?? route.active.waypoints);
+
+      if (!framing) {
+        return;
+      }
+
+      void controller.autoplay({ enabled: false });
+      controller.source({
+        selected: 'real',
+        place: `${framing.latitude},${framing.longitude}`,
+        ...framing,
+      });
+      await controller.loadTerrain();
     },
     async restoreSavedDesign(saved) {
       const settings = readDesignLink(saved.link);
