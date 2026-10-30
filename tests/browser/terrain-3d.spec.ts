@@ -484,6 +484,23 @@ test('grass restyles without errors and never changes the printable STL', async 
   expect(errors).toEqual([]);
 });
 
+test('the camera dial stays inside a phone viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await enter3D(page);
+  await page.getByRole('button', { name: 'Camera angle shortcuts' }).click();
+
+  const box = await page.locator('.camera-selector__dial').boundingBox();
+
+  if (box === null) {
+    throw new Error('Camera dial is not laid out.');
+  }
+
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(390);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+});
+
 test('camera shortcuts move to cardinal positions and a north-up overhead view', async ({
   page,
 }) => {

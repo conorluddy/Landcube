@@ -75,10 +75,11 @@
   pointer-events: none;
 }
 
+/* On phones the instruments sit at the left above the sheet, so the dial opens rightward and upward. */
 @media (max-width: 767px) {
   .camera-selector__dial {
-    top: 44px;
-    bottom: auto;
-    transform-origin: calc(100% - 18px) -18px;
+    right: auto;
+    left: 0;
+    transform-origin: 18px calc(100% + 18px);
   }
 }
