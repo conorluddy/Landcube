@@ -26,7 +26,7 @@ import {
   type TerrainViewPreset,
   type TurntableDirection,
 } from '../terrain-camera';
-import type { CameraShot, CapturedCameraShot } from '../terrain-camera-shots';
+import type { CameraShot, CameraShotBlocker, CapturedCameraShot } from '../terrain-camera-shots';
 import { terrainMaterialPresets, type LandFinish, type WaterFinish } from '../terrain-materials';
 import {
   copyElevationGradient,
@@ -288,10 +288,10 @@ export interface StudioEffects {
   /** Spike: drops into first person at a viewport point (the orbit centre when omitted); false on a miss. */
   walkAt(clientX?: number, clientY?: number): boolean;
   pickFocus(): Promise<boolean>;
-  /** Undefined while the 3D view is not showing. */
-  captureCameraShot(): { shot: CameraShot; thumbnailUrl: string } | undefined;
-  flyToCameraShot(shot: CameraShot): void;
-  playCameraShots(shots: readonly CameraShot[], onStop: () => void): void;
+  /** Shot actions return why the 3D view refused them; undefined (or a capture) when they ran. */
+  captureCameraShot(): { shot: CameraShot; thumbnailUrl: string } | CameraShotBlocker;
+  flyToCameraShot(shot: CameraShot): CameraShotBlocker | undefined;
+  playCameraShots(shots: readonly CameraShot[], onStop: () => void): CameraShotBlocker | undefined;
   stopCameraShots(): void;
   /** Resolves to the saved image's pixel size. */
   downloadStill(scale: TerrainStillScale): Promise<{ width: number; height: number }>;
@@ -451,6 +451,11 @@ export function estimateBinaryStlBytes(part: FramePart): number {
 const daylightFrameMs = 50;
 
 /** Session state is independent of controls, rendering and version-one URL serialization. */
+const cameraShotBlockerMessages: Record<CameraShotBlocker, string> = {
+  'not-3d': 'Switch to the 3D view to use shots',
+  walking: 'Stop walking to use shots',
+};
+
 export function createStudioController(
   actions: DesignControlActions,
   // Roads and place search share one fetch so tests can fake the network once.
@@ -603,6 +608,32 @@ export function createStudioController(
   const setCameraShots = (patch: Partial<StudioState['cameraShots']>) => {
     state = { ...state, cameraShots: { ...state.cameraShots, ...patch } };
     publish();
+  };
+
+  /** Sets the stack; a running tour restarts on the new stack so it never visits removed shots. */
+  const replaceCameraShots = (shots: readonly CapturedCameraShot[]) => {
+    if (state.cameraShots.isPlaying && shots.length > 0) {
+      playCameraShotTour(shots);
+    } else if (state.cameraShots.isPlaying) {
+      effects?.stopCameraShots();
+    }
+
+    setCameraShots({ shots });
+  };
+
+  /** Starts the looping tour; returns why it could not start. */
+  const playCameraShotTour = (
+    shots: readonly CapturedCameraShot[],
+  ): CameraShotBlocker | undefined => {
+    const blocker = effects
+      ? effects.playCameraShots(shots, () => {
+          setCameraShots({ isPlaying: false });
+        })
+      : 'not-3d';
+
+    setCameraShots({ isPlaying: blocker === undefined });
+
+    return blocker;
   };
 
   /** Shots frame the old landscape, so a new one starts with an empty stack. */
@@ -1696,9 +1727,11 @@ export function createStudioController(
       effects?.resetCamera();
     },
     saveCameraShot() {
-      const captured = effects?.captureCameraShot();
+      const captured = effects?.captureCameraShot() ?? 'not-3d';
 
-      if (!captured) {
+      if (typeof captured === 'string') {
+        notify(cameraShotBlockerMessages[captured]);
+
         return;
       }
 
@@ -1707,17 +1740,11 @@ export function createStudioController(
         { ...captured.shot, id: nextCameraShotId++, thumbnailUrl: captured.thumbnailUrl },
       ];
 
-      setCameraShots({ shots });
+      replaceCameraShots(shots);
       notify(`Shot ${shots.length} saved`);
     },
     removeCameraShot(id) {
-      const shots = state.cameraShots.shots.filter((shot) => shot.id !== id);
-
-      if (shots.length === 0) {
-        effects?.stopCameraShots();
-      }
-
-      setCameraShots({ shots, isPlaying: state.cameraShots.isPlaying && shots.length > 0 });
+      replaceCameraShots(state.cameraShots.shots.filter((shot) => shot.id !== id));
     },
     clearCameraShots() {
       effects?.stopCameraShots();
@@ -1727,8 +1754,10 @@ export function createStudioController(
     flyToCameraShot(id) {
       const shot = state.cameraShots.shots.find((candidate) => candidate.id === id);
 
-      if (shot) {
-        effects?.flyToCameraShot(shot);
+      const blocker = shot && effects?.flyToCameraShot(shot);
+
+      if (blocker) {
+        notify(cameraShotBlockerMessages[blocker]);
       }
     },
     toggleCameraShotPlayback() {
@@ -1746,10 +1775,14 @@ export function createStudioController(
         return;
       }
 
-      effects?.playCameraShots(shots, () => {
-        setCameraShots({ isPlaying: false });
-      });
-      setCameraShots({ isPlaying: true });
+      const blocker = playCameraShotTour(shots);
+
+      if (blocker) {
+        notify(cameraShotBlockerMessages[blocker]);
+
+        return;
+      }
+
       notify(`Playing ${shots.length} ${shots.length === 1 ? 'shot' : 'shots'}`);
     },
     stopCameraShots() {

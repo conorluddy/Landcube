@@ -182,15 +182,16 @@
 .lc-shot-strip__remove {
   position: absolute;
   top: var(--lc-s-2);
-  min-width: 18px;
+  min-width: 24px;
   padding: 0 var(--lc-s-2);
   border: 0;
   border-radius: var(--lc-r-control);
-  background: var(--lc-fill-selected);
-  color: var(--lc-text-primary);
+  /* Fixed dark chip with white text: readable over any thumbnail, in either theme. */
+  background: var(--lc-ink-0);
+  color: var(--lc-white);
   font-family: var(--lc-font-sans);
   font-size: var(--lc-fs-hint);
-  line-height: 18px;
+  line-height: 24px;
 }
 
 .lc-shot-strip__number {

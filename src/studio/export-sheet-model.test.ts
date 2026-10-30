@@ -59,7 +59,7 @@ async function createState(
     walkAt: () => false,
     applyViewPreset: noop,
     pickFocus: () => Promise.resolve(false),
-    captureCameraShot: () => undefined,
+    captureCameraShot: () => 'not-3d',
     flyToCameraShot: () => undefined,
     playCameraShots: () => undefined,
     stopCameraShots: () => undefined,

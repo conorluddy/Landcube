@@ -14,7 +14,7 @@ import { getAutoRotateSpeed, type TerrainViewPreset } from '../terrain-camera';
 import { createShellMotion } from './shell-motion';
 import { generatedTerrainSpanMeters } from '../constants/grass';
 import { createCameraPosePublisher } from './camera-pose';
-import type { CameraShot } from '../terrain-camera-shots';
+import type { CameraShot, CameraShotBlocker } from '../terrain-camera-shots';
 
 interface StudioTerrainView {
   isActive: () => boolean;
@@ -29,9 +29,12 @@ interface StudioTerrainView {
   setCameraDirection: (azimuthDegrees: number, elevationDegrees: number) => void;
   walkAt: (clientX?: number, clientY?: number) => boolean;
   pickFocus: () => Promise<boolean>;
-  captureCameraShot: () => { shot: CameraShot; thumbnailUrl: string } | undefined;
-  flyToCameraShot: (shot: CameraShot) => void;
-  playCameraShots: (shots: readonly CameraShot[], onStop: () => void) => void;
+  captureCameraShot: () => { shot: CameraShot; thumbnailUrl: string } | CameraShotBlocker;
+  flyToCameraShot: (shot: CameraShot) => CameraShotBlocker | undefined;
+  playCameraShots: (
+    shots: readonly CameraShot[],
+    onStop: () => void,
+  ) => CameraShotBlocker | undefined;
   stopCameraShots: () => void;
   captureStill: (scale: number) => HTMLCanvasElement;
   /** Arms a morph for the next 3D rebuild; the 2D view and an inactive 3D view always cut. */
@@ -305,9 +308,27 @@ export function createStudioTerrainView(
     setCameraDirection: (azimuth, elevation) => view?.setCameraDirection(azimuth, elevation),
     walkAt,
     pickFocus: () => view?.pickFocus() ?? Promise.resolve(false),
-    captureCameraShot: () => (view && active && !suspended ? view.captureCameraShot() : undefined),
-    flyToCameraShot: (shot) => view?.flyToCameraShot(shot),
-    playCameraShots: (shots, onStop) => view?.playCameraShots(shots, onStop),
+    captureCameraShot() {
+      if (!view || !active || suspended) {
+        return 'not-3d';
+      }
+
+      return view.captureCameraShot() ?? 'walking';
+    },
+    flyToCameraShot(shot) {
+      if (!view || !active || suspended) {
+        return 'not-3d';
+      }
+
+      return view.flyToCameraShot(shot) ? undefined : 'walking';
+    },
+    playCameraShots(shots, onStop) {
+      if (!view || !active || suspended) {
+        return 'not-3d';
+      }
+
+      return view.playCameraShots(shots, onStop) ? undefined : 'walking';
+    },
     stopCameraShots: () => view?.stopCameraShots(),
     captureStill(scale) {
       if (!view || !active) {

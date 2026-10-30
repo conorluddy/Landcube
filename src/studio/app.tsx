@@ -303,7 +303,12 @@ function Studio({
         event.repeat ||
         isTextField(event.target) ||
         workspace.mode !== 'studio' ||
-        workspace.view !== '3d'
+        workspace.view !== '3d' ||
+        // Modal surfaces own the keyboard; the tour must not start behind them.
+        workspace.exporting ||
+        workspace.dossierOpen ||
+        workspace.palette !== null ||
+        workspace.routeReplacement !== null
       ) {
         return;
       }

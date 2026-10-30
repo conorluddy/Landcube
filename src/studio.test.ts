@@ -32,7 +32,7 @@ function setup(fetchRoads?: typeof fetch, placeStorage?: Pick<Storage, 'getItem'
     walkAt: () => false,
     applyViewPreset: () => undefined,
     pickFocus: () => Promise.resolve(false),
-    captureCameraShot: () => undefined,
+    captureCameraShot: () => 'not-3d',
     flyToCameraShot: () => undefined,
     playCameraShots: () => undefined,
     stopCameraShots: () => undefined,
