@@ -3,6 +3,7 @@ import type { HeightField } from './types/terrain';
 import { createSeaLevelGeometry, type SeaLevelGeometry } from './sea-level';
 import { createStudioTerrainView } from './studio/terrain-view';
 import { createStudioController, getSceneCredits } from './studio/controller';
+import { createCompareSceneStore } from './studio/compare-scene';
 import { createCropPreview } from './studio/crop-preview';
 import { mountStudio, phoneViewportQuery } from './studio/app';
 import { applySignalAccent, readSignalAccent } from './studio/accent';
@@ -122,6 +123,7 @@ let designUrlDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingChange: DesignChangeKind | undefined;
 let settingsUpdateFrameIdentifier: number | undefined;
 const hud = createHudStore();
+const compareScenes = createCompareSceneStore();
 let pendingHudPointerEvent: PointerEvent | undefined;
 let hudPointerFrameIdentifier: number | undefined;
 let reliefField: HeightField | undefined;
@@ -363,6 +365,7 @@ function renderCurrentLandscape(): void {
   seaLevel = createSeaLevelGeometry(field, width, height, realTerrain);
   updateTerrain3d();
   renderContoursIntoSvg(terrainSvgElement, contours, width, height, settings, summits, seaLevel);
+  compareScenes.publish({ contours, width, height, summits, seaLevel });
 }
 
 // The source frame is captured once; viewport resizes never change printable terrain.
@@ -752,7 +755,7 @@ controls.workspace({
     browserSessionStorage,
   ),
 });
-mountStudio(controls, terrainSvgElement, outputRenderer, cropPreview, hud);
+mountStudio(controls, terrainSvgElement, outputRenderer, cropPreview, hud, compareScenes);
 const viewport = getRequiredElement(document, '#studio-viewport', HTMLElement);
 
 const resizeViewport = () => {

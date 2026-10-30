@@ -23,6 +23,8 @@ import { StudioFooter } from './studio-footer';
 import { StudioMapControls, StudioSheet } from './studio-sheet';
 import { ViewportStates } from './viewport-states';
 import { StudioHud } from './studio-hud';
+import { CompareHost } from './compare-host';
+import type { CompareSceneStore } from './compare-scene';
 import type { HudStore } from './hud-store';
 import type { CropPreview } from './crop-preview';
 import type { OutputRenderer } from '../types/export';
@@ -167,12 +169,14 @@ function Studio({
   renderer,
   cropPreview,
   hud,
+  compareScenes,
 }: {
   controller: StudioController;
   terrain: SVGSVGElement;
   renderer: OutputRenderer;
   cropPreview: CropPreview;
   hud: HudStore;
+  compareScenes: CompareSceneStore;
 }): ReactNode {
   const state = useSyncExternalStore(c.subscribe, c.getSnapshot);
   const viewport = useRef<HTMLDivElement>(null);
@@ -191,6 +195,10 @@ function Studio({
 
       if (state.workspace.exporting) {
         c.workspace({ exporting: false });
+      } else if (state.workspace.compare !== null) {
+        c.endCompare();
+      } else if (state.workspace.comparePresetsOpen) {
+        c.workspace({ comparePresetsOpen: false });
       } else if (state.workspace.popover !== null) {
         c.workspace({ popover: null });
       } else if (!isPhoneViewport && !state.workspace.collapsed) {
@@ -239,6 +247,7 @@ function Studio({
         aria-label={`${state.workspace.view.toUpperCase()} landscape viewport`}
       />
       <ViewportStates controller={c} state={state} />
+      {!isPhoneViewport && <CompareHost controller={c} state={state} scenes={compareScenes} />}
       <StudioHud state={state} hud={hud} />
       {isPhoneViewport ? (
         <>
@@ -433,6 +442,7 @@ export function mountStudio(
   renderer: OutputRenderer,
   cropPreview: CropPreview,
   hud: HudStore,
+  compareScenes: CompareSceneStore,
 ): void {
   const root = document.createElement('div');
 
@@ -446,6 +456,7 @@ export function mountStudio(
         renderer={renderer}
         cropPreview={cropPreview}
         hud={hud}
+        compareScenes={compareScenes}
       />,
     );
   });
