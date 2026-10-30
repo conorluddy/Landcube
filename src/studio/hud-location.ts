@@ -1,5 +1,4 @@
 import { generatedTerrainSpanMeters } from '../constants/grass';
-import type { GeoBounds } from '../floor-geo';
 import type { RealTerrain } from '../real-terrain';
 import { locateRealTerrainFramePoint, type FramePoint } from '../real-terrain-projection';
 import type { MapLocation } from './hud-store';
@@ -20,7 +19,7 @@ interface FrameCrop extends FrameSize {
 }
 
 export type ModelPlacement =
-  | { kind: 'geographic'; bounds: GeoBounds }
+  | { kind: 'geographic'; placement: Required<TerrainPlacement>; crop: FrameCrop; frame: FrameSize }
   | { kind: 'generated'; crop: FrameCrop; frame: FrameSize };
 
 // === PUBLIC API ===
@@ -52,17 +51,20 @@ export function locateViewportPoint(
 
 /** The place at a fraction across the 3D model (0,0 = north-west corner). */
 export function locateModelFraction(fraction: FramePoint, model: ModelPlacement): MapLocation {
-  if (model.kind === 'geographic') {
-    const { north, south, west, east } = model.bounds;
+  const { crop, frame } = model;
 
+  // The Mercator inverse, as in 2D: degrees are not linear across a crop, so bounds would drift.
+  if (model.kind === 'geographic') {
     return {
       kind: 'geographic',
-      latitude: north + (south - north) * fraction.y,
-      longitude: west + (east - west) * fraction.x,
+      ...locateRealTerrainFramePoint(
+        model.placement,
+        { x: crop.x + crop.width * fraction.x, y: crop.y + crop.height * fraction.y },
+        frame,
+      ),
     };
   }
 
-  const { crop, frame } = model;
   const metersPerUnit = getFrameMetersPerPixel(frame, undefined);
 
   return {

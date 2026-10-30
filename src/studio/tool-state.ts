@@ -1,9 +1,10 @@
 import { getTerrainCropBounds, type TerrainCropSettings } from '../terrain-crop';
 import type { CropFrameHandle } from '../ui/overlays/crop-frame';
 import type { RealTerrain } from '../real-terrain';
+import { measureGroundMeters } from '../route-sampling';
 import { projectToRealTerrainFrame } from '../real-terrain-projection';
 import type { GeoPoint, RouteEditing } from '../types/terrain-analysis';
-import type { MapLocation } from './hud-store';
+import type { LocationProjector, MapLocation } from './hud-store';
 
 /**
  * Pure math for the on-canvas tools (#102): crop frame handles that resize `model.crop` with the
@@ -77,22 +78,25 @@ export function getSegmentMidpoint(from: GeoPoint, to: GeoPoint): GeoPoint {
 }
 
 /**
- * Screen position of a route point in the 2D frame, as `RouteLine` draws it. The 3D view has no
- * world-to-screen projector yet, so it returns undefined and its handles stay hidden.
+ * Screen position of a route point: the 2D frame projection, as `RouteLine` draws it, or in 3D the
+ * camera projector (`view.projectLocation`), which is undefined off the model or behind the camera.
  */
 export function projectRoutePoint(
   point: GeoPoint,
-  view: { is3d: boolean; terrain: Pick<RealTerrain, 'location' | 'spanKm'> | undefined },
+  view: {
+    is3d: boolean;
+    terrain: Pick<RealTerrain, 'location' | 'spanKm'> | undefined;
+    projectLocation?: LocationProjector;
+  },
   frame: { width: number; height: number } | undefined,
 ): { xPx: number; yPx: number } | undefined {
   const { terrain } = view;
 
-  if (
-    view.is3d ||
-    frame === undefined ||
-    terrain?.location === undefined ||
-    terrain.spanKm === undefined
-  ) {
+  if (view.is3d) {
+    return view.projectLocation?.({ kind: 'geographic', ...point });
+  }
+
+  if (frame === undefined || terrain?.location === undefined || terrain.spanKm === undefined) {
     return undefined;
   }
 
@@ -222,6 +226,65 @@ export function formatDistance(meters: number): string {
   }
 
   return `${String(Number((meters / 1000).toPrecision(3)))} km`;
+}
+
+/** Source elevation as `350 m`; a missing one is "unavailable", never 0. */
+export function formatElevation(meters: number | undefined): string {
+  return meters === undefined ? 'unavailable' : `${String(Math.round(meters))} m`;
+}
+
+/** Signed end-minus-start difference as `+250 m`; unavailable unless both elevations exist. */
+export function formatElevationDifference(
+  startMeters: number | undefined,
+  endMeters: number | undefined,
+): string {
+  if (startMeters === undefined || endMeters === undefined) {
+    return 'unavailable';
+  }
+
+  const rounded = Math.round(endMeters - startMeters);
+
+  return `${rounded > 0 ? '+' : ''}${String(rounded)} m`;
+}
+
+export interface MeasureReadout {
+  value: string;
+  meta: string[];
+}
+
+/**
+ * The measure callout. Geographic endpoints get great-circle distance, bearing and source
+ * elevations straight from the sampler (never the mesh, so exaggeration, terraces, crop and camera
+ * cannot change them); generated terrain keeps its nominal distance and bearing only.
+ */
+export function describeMeasurement(
+  start: MapLocation,
+  end: MapLocation,
+  sampleElevationMeters: ((point: GeoPoint) => number | undefined) | undefined,
+): MeasureReadout {
+  const isGeographic = start.kind === 'geographic' && end.kind === 'geographic';
+  const meters = isGeographic ? measureGroundMeters(start, end) : distanceBetweenPlaces(start, end);
+  const bearing = bearingDegrees(start, end);
+  const bearingLine =
+    bearing === undefined || meters === 0 ? '' : `Bearing ${formatBearing(bearing)}`;
+  const value = meters === undefined ? '—' : formatDistance(meters);
+
+  if (!isGeographic) {
+    return { value, meta: [bearingLine] };
+  }
+
+  const startMeters = sampleElevationMeters?.(start);
+  const endMeters = sampleElevationMeters?.(end);
+
+  return {
+    value,
+    meta: [
+      bearingLine,
+      `Start ${formatElevation(startMeters)}`,
+      `End ${formatElevation(endMeters)}`,
+      `Δ ${formatElevationDifference(startMeters, endMeters)}`,
+    ],
+  };
 }
 
 /** Whole degrees, zero-padded like a compass: `007°`. */

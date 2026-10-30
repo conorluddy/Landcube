@@ -3,6 +3,9 @@ import test from 'node:test';
 import { defaultTerrainCrop } from '../terrain-crop';
 import {
   bearingDegrees,
+  describeMeasurement,
+  formatElevation,
+  formatElevationDifference,
   distanceBetweenPlaces,
   formatBearing,
   formatDistance,
@@ -152,4 +155,63 @@ void test('route points project in 2D to the frame centre for the terrain centre
     projectRoutePoint({ latitude: 50, longitude: 10 }, { is3d: false, terrain }, undefined),
     undefined,
   );
+});
+
+void test('in 3D a route point projects through the camera projector', () => {
+  const terrain = { location: { latitude: 50, longitude: 10 }, spanKm: 10 };
+  const projectLocation = () => ({ xPx: 12, yPx: 34 });
+
+  assert.deepEqual(
+    projectRoutePoint(
+      { latitude: 50, longitude: 10 },
+      { is3d: true, terrain, projectLocation },
+      undefined,
+    ),
+    { xPx: 12, yPx: 34 },
+  );
+});
+
+const dublin = { kind: 'geographic', latitude: 53.3498, longitude: -6.2603 } as const;
+const belfast = { kind: 'geographic', latitude: 54.5973, longitude: -5.9301 } as const;
+
+const elevations = (elevationsMeters: number[]) => {
+  const queue = [...elevationsMeters];
+
+  return () => queue.shift();
+};
+
+void test('geographic endpoints show great-circle distance and bearing', () => {
+  const readout = describeMeasurement(dublin, belfast, undefined);
+
+  assert.equal(readout.value, '140 km');
+  assert.equal(readout.meta[0], 'Bearing 009°');
+});
+
+void test('start 100 m and end 350 m read as elevations with a +250 m difference', () => {
+  const { meta } = describeMeasurement(dublin, belfast, elevations([100, 350]));
+
+  assert.deepEqual(meta.slice(1), ['Start 100 m', 'End 350 m', 'Δ +250 m']);
+});
+
+void test('a descent is signed negative and a flat line is unsigned', () => {
+  assert.equal(formatElevationDifference(350, 100), '-250 m');
+  assert.equal(formatElevationDifference(100, 100), '0 m');
+});
+
+void test('a missing elevation is unavailable, never zero, and voids the difference', () => {
+  const { meta } = describeMeasurement(dublin, belfast, elevations([100]));
+
+  assert.deepEqual(meta.slice(1), ['Start 100 m', 'End unavailable', 'Δ unavailable']);
+  assert.equal(formatElevation(undefined), 'unavailable');
+  assert.equal(describeMeasurement(dublin, belfast, undefined).meta[1], 'Start unavailable');
+});
+
+void test('procedural terrain keeps nominal distance and bearing without elevations', () => {
+  const readout = describeMeasurement(
+    { kind: 'local', eastMeters: 0, southMeters: 0 },
+    { kind: 'local', eastMeters: 0, southMeters: 5000 },
+    elevations([1, 2]),
+  );
+
+  assert.deepEqual(readout, { value: '5 km', meta: ['Bearing 180°'] });
 });
