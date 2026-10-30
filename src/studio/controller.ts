@@ -917,10 +917,18 @@ export function createStudioController(
       }
 
       if (saved.route) {
-        const { id, name, provenance, waypoints, namedWaypoints, slopeThresholdPercent } =
-          saved.route;
+        const { id, name, provenance, points, namedWaypoints, slopeThresholdPercent } = saved.route;
 
-        installRoute({ id, name, provenance, waypoints, namedWaypoints, slopeThresholdPercent });
+        // Imported routes get their recorded elevations back so GPX export never terrain-fills them.
+        installRoute({
+          id,
+          name,
+          provenance,
+          waypoints: points.map(({ latitude, longitude }) => ({ latitude, longitude })),
+          namedWaypoints,
+          slopeThresholdPercent,
+          ...(provenance === 'imported' && { originalPoints: points }),
+        });
       }
 
       return { ok: true, data: undefined };

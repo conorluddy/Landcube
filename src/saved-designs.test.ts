@@ -129,7 +129,7 @@ const savedRoute = {
   id: 'route-1',
   name: 'Ridge',
   provenance: 'drawn',
-  waypoints: [
+  points: [
     { latitude: 55.01, longitude: -8.14 },
     { latitude: 55.02, longitude: -8.13 },
   ],
@@ -153,7 +153,7 @@ void test('a design with terrain and a route round-trips through storage unchang
     terrain: savedTerrain,
     route: {
       ...savedRoute,
-      waypoints: [...savedRoute.waypoints],
+      points: [...savedRoute.points],
       namedWaypoints: [...savedRoute.namedWaypoints],
     },
   };
@@ -172,7 +172,7 @@ void test('a malformed route is dropped but the design and its terrain survive',
   const entry = {
     ...design('1'),
     terrain: savedTerrain,
-    route: { ...savedRoute, waypoints: [{ latitude: 'x' }] },
+    route: { ...savedRoute, points: [{ latitude: 'x' }] },
   };
 
   assert.deepEqual(readBack(entry), { ...design('1'), terrain: savedTerrain });

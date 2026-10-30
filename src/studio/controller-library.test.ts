@@ -3,6 +3,8 @@ import test from 'node:test';
 import { versionOneDesignDefaults } from '../constants/design';
 import { getDesignUrl, validateDesignSettings } from '../design-settings';
 import type { SavedDesign } from '../saved-designs';
+import { serializeRouteGpx } from '../gpx-export';
+import { toSavedRoute } from '../saved-designs';
 import { createStudioController } from './controller';
 
 const parsedSettings = validateDesignSettings(versionOneDesignDefaults);
@@ -28,7 +30,7 @@ const route = {
   id: 'route-1',
   name: 'Ridge',
   provenance: 'drawn',
-  waypoints: [
+  points: [
     { latitude: 55.01, longitude: -8.14 },
     { latitude: 55.02, longitude: -8.13 },
   ],
@@ -65,7 +67,7 @@ void test('restoring waits for the terrain load before installing the route', as
     const restoring = c.restoreSavedDesign(
       saved({
         terrain: { latitude: 55.01, longitude: -8.14, spanKm: 12, maxDepth: 40 },
-        route: { ...route, waypoints: [...route.waypoints], namedWaypoints: [] },
+        route: { ...route, points: [...route.points], namedWaypoints: [] },
       }),
     );
 
@@ -90,7 +92,14 @@ void test('restoring waits for the terrain load before installing the route', as
 void test('restoring a design without a route leaves the current route alone', async () => {
   const c = setupController();
 
-  c.setRoute({ ...route, waypoints: [...route.waypoints], namedWaypoints: [] });
+  c.setRoute({
+    id: 'route-1',
+    name: 'Ridge',
+    provenance: 'drawn',
+    waypoints: [...route.points],
+    namedWaypoints: [],
+    slopeThresholdPercent: 20,
+  });
 
   assert.deepEqual(await c.restoreSavedDesign(saved({ source: 'procedural' })), {
     ok: true,
@@ -102,7 +111,7 @@ void test('restoring a design without a route leaves the current route alone', a
 void test('an invalid saved link is reported and restores nothing', async () => {
   const c = setupController();
   const result = await c.restoreSavedDesign(
-    saved({ link: 'not a url', route: { ...route, waypoints: [], namedWaypoints: [] } }),
+    saved({ link: 'not a url', route: { ...route, points: [], namedWaypoints: [] } }),
   );
 
   assert.equal(result.ok, false);
@@ -116,5 +125,45 @@ void test('design links carry no route or location data', () => {
 
   for (const key of ['route', 'waypoints', 'lat', 'latitude', 'lon', 'longitude', 'span']) {
     assert.equal(url.searchParams.has(key), false, key);
+  }
+});
+
+void test('an imported route keeps its recorded elevations through save and restore', async () => {
+  const source = setupController();
+  const gpx = `<gpx><trk><name>Ridge</name><trkseg>
+    <trkpt lat="55" lon="-8"><ele>10.5</ele></trkpt>
+    <trkpt lat="55.01" lon="-7.98"><ele>30</ele></trkpt>
+    <trkpt lat="55.02" lon="-8"><ele>25.25</ele></trkpt></trkseg></trk></gpx>`;
+
+  source.loadRoute(gpx);
+  const original = source.getSnapshot().workspace.route?.active;
+
+  assert.ok(original);
+  const stored = JSON.parse(JSON.stringify(toSavedRoute(original))) as SavedDesign['route'];
+  const restored = setupController();
+
+  await restored.restoreSavedDesign(saved({ source: 'procedural', route: stored }));
+  const active = restored.getSnapshot().workspace.route?.active;
+
+  assert.ok(active);
+  assert.deepEqual(
+    [...serializeRouteGpx(active).matchAll(/<ele>([^<]*)<\/ele>/g)].map((match) => match[1]),
+    [...serializeRouteGpx(original).matchAll(/<ele>([^<]*)<\/ele>/g)].map((match) => match[1]),
+  );
+});
+
+void test('restoring real terrain also restores the place name', async () => {
+  const c = setupController();
+  const realFetch = globalThis.fetch;
+
+  globalThis.fetch = () => Promise.reject(new Error('offline'));
+
+  try {
+    await c.restoreSavedDesign(
+      saved({ terrain: { latitude: 1, longitude: 2, spanKm: 5, place: 'Snowdon' } }),
+    );
+    assert.equal(c.getSnapshot().source.place, 'Snowdon');
+  } finally {
+    globalThis.fetch = realFetch;
   }
 });

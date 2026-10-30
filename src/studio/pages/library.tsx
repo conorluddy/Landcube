@@ -6,11 +6,10 @@ import {
   removeSavedDesign,
   writeSavedDesigns,
   type SavedDesign,
-  type SavedRoute,
+  toSavedRoute,
   type SavedTerrain,
 } from '../../saved-designs';
 import type { OutputRenderer } from '../../types/export';
-import type { ActiveRoute } from '../../types/terrain-analysis';
 import { Button } from '../../ui/button';
 import { EmptyState } from '../../ui/empty-state';
 import { ModelCard } from '../../ui/model-card';
@@ -163,22 +162,16 @@ function createSavedDesign(state: StudioState, renderer: OutputRenderer): SavedD
 }
 
 function getSavedTerrain(state: StudioState): SavedTerrain {
-  const { latitude, longitude, spanKm, elevationFloor, maxDepth } = state.source;
+  const { latitude, longitude, spanKm, elevationFloor, maxDepth, place } = state.source;
 
   return {
     latitude,
     longitude,
     spanKm,
     maxDepth,
+    place,
     ...(elevationFloor !== undefined && { elevationFloor }),
   };
-}
-
-/** Drops session-only `originalPoints`; the simplified waypoints are the saved geometry. */
-function toSavedRoute(route: ActiveRoute): SavedRoute {
-  const { id, name, provenance, waypoints, namedWaypoints, slopeThresholdPercent } = route;
-
-  return { version: 1, id, name, provenance, waypoints, namedWaypoints, slopeThresholdPercent };
 }
 
 function describeSavedDesign(design: SavedDesign): string {

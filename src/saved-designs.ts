@@ -7,7 +7,8 @@ import { operationErrorCodes } from './constants/operations';
 import { maximumRoutePoints } from './gpx';
 import { validateSlopeThresholdPercent } from './route-analysis';
 import type { OperationError, Result } from './types/operations';
-import type { ActiveRoute, GeoPoint } from './types/terrain-analysis';
+import type { RoutePoint } from './types/route';
+import type { ActiveRoute } from './types/terrain-analysis';
 
 /** The real-terrain location a design was saved at; design links deliberately omit it. */
 export interface SavedTerrain {
@@ -16,13 +17,19 @@ export interface SavedTerrain {
   spanKm: number;
   elevationFloor?: number;
   maxDepth?: number;
+  /** The place name the location controls show; absent on older entries. */
+  place?: string;
 }
 
 /**
  * The route as saved: source geometry and settings only. `originalPoints` (recorded elevations)
  * is session-only, and derived profile samples are always recomputed against the restored terrain.
  */
-export type SavedRoute = Omit<ActiveRoute, 'originalPoints'> & { version: 1 };
+export type SavedRoute = Omit<ActiveRoute, 'originalPoints' | 'waypoints'> & {
+  version: 1;
+  /** Simplified geometry; imported routes keep each point's recorded elevation where it had one. */
+  points: RoutePoint[];
+};
 
 /** A design kept in the Library: the design link plus a small preview. Local placeholder until accounts exist. */
 export interface SavedDesign {
@@ -110,6 +117,34 @@ export function fitThumbnail(svg: string): string | null {
   return new TextEncoder().encode(svg).length <= savedDesignThumbnailMaxBytes ? svg : null;
 }
 
+/**
+ * Imported routes keep recorded elevations on the simplified points. `simplifyRoute` keeps original
+ * vertices in order, so a forward scan finds each one even when coordinates repeat.
+ */
+export function toSavedRoute(route: ActiveRoute): SavedRoute {
+  const { id, name, provenance, waypoints, namedWaypoints, slopeThresholdPercent } = route;
+  const recorded = route.originalPoints ?? [];
+  let cursor = 0;
+  const points = waypoints.map((waypoint): RoutePoint => {
+    const found = recorded.findIndex(
+      (point, index) =>
+        index >= cursor &&
+        point.latitude === waypoint.latitude &&
+        point.longitude === waypoint.longitude,
+    );
+
+    if (found === -1) {
+      return { latitude: waypoint.latitude, longitude: waypoint.longitude };
+    }
+
+    cursor = found + 1;
+
+    return recorded[found];
+  });
+
+  return { version: 1, id, name, provenance, points, namedWaypoints, slopeThresholdPercent };
+}
+
 // === HELPERS ===
 
 /**
@@ -151,7 +186,7 @@ function parseSavedTerrain(value: unknown): SavedTerrain | null {
     return null;
   }
 
-  const { latitude, longitude, spanKm, elevationFloor, maxDepth } = value;
+  const { latitude, longitude, spanKm, elevationFloor, maxDepth, place } = value;
 
   if (
     !isDegrees(latitude, 90) ||
@@ -159,7 +194,8 @@ function parseSavedTerrain(value: unknown): SavedTerrain | null {
     !isFiniteNumber(spanKm) ||
     spanKm <= 0 ||
     !(elevationFloor === undefined || isFiniteNumber(elevationFloor)) ||
-    !(maxDepth === undefined || isFiniteNumber(maxDepth))
+    !(maxDepth === undefined || isFiniteNumber(maxDepth)) ||
+    !(place === undefined || typeof place === 'string')
   ) {
     return null;
   }
@@ -170,6 +206,7 @@ function parseSavedTerrain(value: unknown): SavedTerrain | null {
     spanKm,
     ...(elevationFloor !== undefined && { elevationFloor }),
     ...(maxDepth !== undefined && { maxDepth }),
+    ...(place !== undefined && { place }),
   };
 }
 
@@ -178,14 +215,21 @@ function parseSavedRoute(value: unknown): SavedRoute | null {
     return null;
   }
 
-  const { id, name, provenance, waypoints, namedWaypoints, slopeThresholdPercent } = value;
+  const {
+    id,
+    name,
+    provenance,
+    points: savedPoints,
+    namedWaypoints,
+    slopeThresholdPercent,
+  } = value;
 
   if (
     typeof id !== 'string' ||
     typeof name !== 'string' ||
     (provenance !== 'drawn' && provenance !== 'imported') ||
-    !Array.isArray(waypoints) ||
-    waypoints.length > maximumRoutePoints ||
+    !Array.isArray(savedPoints) ||
+    savedPoints.length > maximumRoutePoints ||
     !Array.isArray(namedWaypoints) ||
     !isFiniteNumber(slopeThresholdPercent) ||
     !validateSlopeThresholdPercent(slopeThresholdPercent).ok
@@ -193,14 +237,22 @@ function parseSavedRoute(value: unknown): SavedRoute | null {
     return null;
   }
 
-  const points: GeoPoint[] = [];
+  const points: RoutePoint[] = [];
 
-  for (const point of waypoints) {
+  for (const point of savedPoints) {
     if (!isRecord(point) || !isDegrees(point.latitude, 90) || !isDegrees(point.longitude, 180)) {
       return null;
     }
 
-    points.push({ latitude: point.latitude, longitude: point.longitude });
+    if (point.elevationMeters !== undefined && !isFiniteNumber(point.elevationMeters)) {
+      return null;
+    }
+
+    points.push({
+      latitude: point.latitude,
+      longitude: point.longitude,
+      ...(point.elevationMeters !== undefined && { elevationMeters: point.elevationMeters }),
+    });
   }
 
   const named: SavedRoute['namedWaypoints'] = [];
@@ -227,7 +279,7 @@ function parseSavedRoute(value: unknown): SavedRoute | null {
     id,
     name,
     provenance,
-    waypoints: points,
+    points,
     namedWaypoints: named,
     slopeThresholdPercent,
   };
