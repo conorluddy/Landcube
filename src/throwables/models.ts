@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { centredBalance, stepBalance } from './balance';
 import type { Projectile, Throwable } from './physics';
 import type { BasFace } from './swing';
 
@@ -64,6 +65,9 @@ const hurlRollPerSecond = 12;
 const carryShaftInHand = new THREE.Vector3(-0.35, 0.25, -1).normalize();
 const carryBasFromEye = new THREE.Vector3(-0.02, -0.14, -0.55);
 const carryHandX = 0.3;
+/** Real gravity (9.81 m/s²) over a 1.7 m eye height, for the ball rolling on the bas. */
+const balanceGravityEyeHeightsPerSecondSquared = 9.81 / 1.7;
+const accelerationSmoothingPerSecond = 20;
 const carryHurlQuaternion = createCarryQuaternion(carryShaftInHand);
 
 // === PUBLIC API ===
@@ -102,6 +106,52 @@ export function createThrowableModels(): ThrowableModels {
   void replaceWithModel('boomerang.glb', boomerangSpanEyeHeights, [heldBoomerang, thrownBoomerang]);
   let eyeHeight = 1;
   let hasSettledPose = false;
+  // Balancing the carried ball: it lags the carry point's acceleration, tracked across frames.
+  let balance = centredBalance;
+  let lastCarryPoint: THREE.Vector3 | undefined;
+  const carryVelocity = new THREE.Vector3();
+  const carryAcceleration = new THREE.Vector3();
+
+  /** Steps the ball against how the carry point moved since last frame; returns the carrier's lean. */
+  const balanceSliotar = (elapsedSeconds: number) => {
+    viewmodel.updateMatrixWorld();
+    const carryPoint = viewmodel.localToWorld(scratchCarryPoint.copy(carryBasFromEye));
+
+    if (!lastCarryPoint || elapsedSeconds <= 0) {
+      lastCarryPoint = carryPoint.clone();
+      carryVelocity.set(0, 0, 0);
+      carryAcceleration.set(0, 0, 0);
+    } else {
+      const velocity = scratchPosition
+        .subVectors(carryPoint, lastCarryPoint)
+        .divideScalar(elapsedSeconds);
+
+      // Smoothed: per-frame mouse jitter would otherwise rattle the ball.
+      carryAcceleration.lerp(
+        scratchNormal.subVectors(velocity, carryVelocity).divideScalar(elapsedSeconds),
+        1 - Math.exp(-accelerationSmoothingPerSecond * elapsedSeconds),
+      );
+      carryVelocity.copy(velocity);
+      lastCarryPoint.copy(carryPoint);
+    }
+
+    // Into view axes and eye heights, where the balance works.
+    const viewAcceleration = scratchNormal
+      .copy(carryAcceleration)
+      .applyQuaternion(scratchQuaternion.copy(viewmodel.quaternion).invert())
+      .divideScalar(eyeHeight);
+    const step = stepBalance(
+      balance,
+      viewAcceleration.x,
+      viewAcceleration.z,
+      balanceGravityEyeHeightsPerSecondSquared,
+      elapsedSeconds,
+    );
+
+    balance = step.state;
+
+    return step.tilt;
+  };
 
   heldSliotar.position.copy(sliotarInOffHand);
   // Upright at the right of the view, face to the eye, elbow pointing left (the model's elbow is +Z).
@@ -206,6 +256,14 @@ export function createThrowableModels(): ThrowableModels {
         hand.rotation.z *= 1 - carry;
         hand.position.x = THREE.MathUtils.lerp(handOffset.x, carryHandX, carry);
         hurl.quaternion.slerp(carryHurlQuaternion, carry);
+        const tilt = balanceSliotar(elapsedSeconds);
+
+        // Lean the bas downhill towards the middle (hand axes are the view's here).
+        hurl.quaternion.premultiply(
+          scratchQuaternion.setFromEuler(
+            scratchEuler.set(Math.atan(tilt.slopeZ) * carry, 0, -Math.atan(tilt.slopeX) * carry),
+          ),
+        );
         // Choke up: slide the hurl so the sweet spot (on the shaft axis) lands at the carry point.
         hurl.position
           .copy(carryBasFromEye)
@@ -232,7 +290,11 @@ export function createThrowableModels(): ThrowableModels {
               ),
           ),
         );
+        heldSliotar.position.x += balance.offsetX;
+        heldSliotar.position.z += balance.offsetZ;
       } else {
+        balance = centredBalance;
+        lastCarryPoint = undefined;
         heldSliotar.position
           .copy(sliotarInOffHand)
           .setY(sliotarInOffHand.y + charge * sliotarTossEyeHeights);
@@ -270,6 +332,7 @@ export function createThrowableModels(): ThrowableModels {
 const scratchScale = new THREE.Vector3();
 const scratchPosition = new THREE.Vector3();
 const scratchEuler = new THREE.Euler();
+const scratchCarryPoint = new THREE.Vector3();
 const scratchNormal = new THREE.Vector3();
 
 /** Shaft (local Y) along the given direction, with local X, the face once rolled 90°, pointing up. */
