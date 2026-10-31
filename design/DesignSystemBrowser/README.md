@@ -91,7 +91,7 @@ The shell geometry is identical to the studio: same insets, same panel sizes. On
 
 4. Spacer.
 5. **Secondary:** `← BACK TO STUDIO`, glass-bar style, same as `COPY STYLE LINK`.
-6. **Primary:** `SOURCE ↗`, bone fill, linking to https://github.com/conorluddy/Topogra.
+6. **Primary:** `SOURCE ↗`, bone fill, linking to https://github.com/conorluddy/Landcube.
 
 ### Inspector, flipped (396px, top 60 / right 12 / bottom 60)
 

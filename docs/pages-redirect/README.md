@@ -4,7 +4,7 @@ Keeps old `https://conorluddy.github.io/Topogra/?…` design links working after
 
 ## Why this is needed
 
-The site is served at `https://landcu.be/` (custom domain on the repo's Pages settings). While the repo is named `Topogra`, GitHub 301-redirects `conorluddy.github.io/Topogra/…` to `landcu.be`. That redirect is keyed on the repo name, so after the rename every old `conorluddy.github.io/Topogra/…` link returns 404. Do not create a new repo named `Topogra`: it ends the git redirects.
+The site is served at `https://landcu.be/` (custom domain on the repo's Pages settings). Before the rename, GitHub 301-redirected `conorluddy.github.io/Topogra/…` to `landcu.be`. That redirect is keyed on the repo name, so after the rename every old `conorluddy.github.io/Topogra/…` link returns 404. Do not create a new repo named `Topogra`: it ends the git redirects.
 
 ## Manual steps (in order)
 

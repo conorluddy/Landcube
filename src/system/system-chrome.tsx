@@ -12,7 +12,7 @@ import { formatCount } from './part-search';
 import type { CodedPart, SystemSection } from './registry.types';
 import { terrainPlateCredit } from './terrain-plate';
 
-export const sourceRepositoryUrl = 'https://github.com/conorluddy/Topogra';
+export const sourceRepositoryUrl = 'https://github.com/conorluddy/Landcube';
 
 /** System top bar: brand, breadcrumb, Find, then back to the studio and the source link. */
 export function SystemHeader({
