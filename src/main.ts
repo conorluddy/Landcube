@@ -44,6 +44,7 @@ import { applyTheme, currentTheme, readTheme, subscribeToTheme } from './studio/
 import './ui/ui.css';
 import './studio/studio.css';
 import './studio/studio-surfaces.css';
+import './studio/analytics-consent-dialog.css';
 import './studio/studio-phone.css';
 import { designChangePriority, versionOneDesignDefaults } from './constants/design';
 import { engineConfiguration } from './constants/engine';
