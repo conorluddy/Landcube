@@ -16,7 +16,7 @@ The default appearance is a charcoal background with subtle, lighter contour lin
 - A new random seed on every page load.
 - Smooth procedural terrain and mathematically derived contour lines.
 - Crisp rendering at different viewport sizes and pixel densities.
-- No accounts, backend, or runtime network dependencies beyond public elevation tiles and hosted-site analytics.
+- No accounts, backend, or runtime network dependencies beyond public elevation tiles and consent-gated hosted-site analytics.
 - The hosted site MUST NOT send design-link query strings to Google Analytics. Google also collects standard browser details (IP address, user agent, referrer, screen size).
 - Where the origin is not `landcu.be`, the editor MUST NOT request `googletagmanager.com`.
 

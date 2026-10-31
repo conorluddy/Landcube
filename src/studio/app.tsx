@@ -46,6 +46,7 @@ import { StudioFooter } from './studio-footer';
 import { StudioMapControls, StudioSheet } from './studio-sheet';
 import { ViewportStates } from './viewport-states';
 import { StudioHud } from './studio-hud';
+import { AnalyticsConsentDialog } from './analytics-consent-dialog';
 import { CompareHost } from './compare-host';
 import type { CompareSceneStore } from './compare-scene';
 import { StudioToolBar } from './studio-tools';
@@ -390,6 +391,7 @@ function Studio({
         inert={isSystemShown || state.workspace.mode === 'system'}
       />
       <div className="studio-ground" aria-hidden="true" />
+      <AnalyticsConsentDialog />
       {flip.isBusy && <div key={flip.sweepCount} className="studio-scan" aria-hidden="true" />}
       {isSystemMounted && (
         <Activity mode={isSystemShown ? 'visible' : 'hidden'}>
