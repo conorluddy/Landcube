@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { isSoundMuted } from './sound-preference';
 import type { WalkScale } from './terrain-walk';
 import { createThrowableModels, type ThrowableModels } from './terrain-throwables-models';
 
@@ -163,6 +164,10 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
     projectile = launch(origin, viewDirection, charge, scale);
     swingSecondsLeft = swingSeconds;
     models.setProjectile(projectile, heldItem);
+
+    if (heldItem === 'sliotar') {
+      playHurlSlap(charge);
+    }
   };
 
   return {
@@ -231,6 +236,21 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
 }
 
 // === HELPERS ===
+
+let hurlSlap: HTMLAudioElement | undefined;
+
+/** The ash-on-leather crack of a strike; harder strikes ring louder. */
+function playHurlSlap(charge: number) {
+  if (isSoundMuted()) {
+    return;
+  }
+
+  hurlSlap ??= new Audio(`${import.meta.env.BASE_URL}audio/hurl-slap.mp3`);
+  hurlSlap.currentTime = 0;
+  hurlSlap.volume = THREE.MathUtils.lerp(0.4, 1, charge);
+  // Autoplay refusals are harmless: the strike still flies.
+  hurlSlap.play().catch(() => undefined);
+}
 
 function readCharge(chargeStartedAtMs: number) {
   return THREE.MathUtils.clamp(
