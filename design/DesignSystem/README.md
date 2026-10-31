@@ -161,7 +161,7 @@ All values below are desktop unless marked "mobile".
   - Preview, parameter result: the value diff (`20 M → 25 M`) with a SET VALUE ↵ button.
   - Preview, location result: coordinates.
   - Mobile adds "also matches" rows and a strip of quick-value chips above the keyboard.
-- **Mobile studio:** the map is full-bleed; a bottom sheet has three snap heights (peek / half / full).
+- **Mobile studio:** the map is full-bleed; a bottom sheet has four snap heights (closed / peek / half / full); closed leaves only the grip.
   - Peek shows readouts and the export button.
   - Half shows the section tab strip plus the controls.
   - Full hides the map controls.

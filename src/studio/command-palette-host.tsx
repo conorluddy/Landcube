@@ -183,7 +183,10 @@ function revealParameter(
 ): void {
   c.selectSection(command.sectionId);
 
-  if (isMobile && state.workspace.sheetSnap === 'peek') {
+  if (
+    isMobile &&
+    (state.workspace.sheetSnap === 'closed' || state.workspace.sheetSnap === 'peek')
+  ) {
     c.workspace({ sheetSnap: 'half' });
   }
 

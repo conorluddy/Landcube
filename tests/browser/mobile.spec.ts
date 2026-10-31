@@ -70,7 +70,7 @@ test('the phone inspector is a bottom sheet that opens at half', async ({ page }
   await expect(page.getByRole('button', { name: 'Export ↗' })).toHaveCount(1);
 });
 
-test('keyboard on the handle steps between peek, half and full', async ({ page }) => {
+test('keyboard on the handle steps between closed, peek, half and full', async ({ page }) => {
   const handle = page.getByRole('button', { name: 'Resize sheet' });
 
   await handle.focus();
@@ -84,9 +84,58 @@ test('keyboard on the handle steps between peek, half and full', async ({ page }
   await expect.poll(() => sheetHeight(page)).toBe(190);
   await expect(handle).toHaveAttribute('aria-valuetext', 'peek');
   await page.keyboard.press('ArrowDown');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
+  await expect.poll(() => sheetHeight(page)).toBe(44);
+  await page.keyboard.press('ArrowDown');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
+  await page.keyboard.press('ArrowUp');
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'peek');
   await page.keyboard.press('ArrowUp');
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'half');
+});
+
+test('a closed sheet leaves only its notch, and a tap on the notch reopens it', async ({
+  page,
+}) => {
+  const handle = page.getByRole('button', { name: 'Resize sheet' });
+
+  await handle.focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
+  await expect(page.getByRole('button', { name: 'Export ↗' })).not.toBeInViewport();
+  await page.keyboard.press('Escape');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Export ↗' })).not.toBeFocused();
+  await handle.click();
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'peek');
+});
+
+test('a slow drag down from peek closes the sheet, and a tap on the grip reopens it', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await dragHandle(page, 150, 6, 50);
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
+  await waitForSettledSheet(page);
+  const grip = await page.locator('.lc-bottom-sheet__grip').boundingBox();
+
+  if (grip === null) {
+    throw new Error('Sheet grip is not laid out.');
+  }
+
+  await page.mouse.click(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'peek');
+});
+
+test('a tool leaves a closed sheet closed', async ({ page }) => {
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Measure tool' }).click();
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
 });
 
 test('a full sheet hides the map controls and the scale bar', async ({ page }) => {

@@ -35,9 +35,9 @@ interface DragSample {
 const dragThresholdPx = 4;
 
 /**
- * Three-snap bottom sheet (C-14), pinned to the bottom of its containing block: heights resolve
- * against that block (peek `peekHeightPx`, half 55%, full less `fullTopInsetPx`). The handle drags
- * by pointer and steps by keyboard; the body scrolls at half and full, never at peek.
+ * Four-snap bottom sheet (C-14), pinned to the bottom of its containing block: heights resolve
+ * against that block (closed is the handle alone, peek `peekHeightPx`, half 55%, full less `fullTopInsetPx`). The handle drags
+ * by pointer, steps by keyboard and reopens on a tap when closed; the body scrolls at half and full.
  */
 export function BottomSheet({
   snap,
@@ -75,6 +75,7 @@ export function BottomSheet({
         sheet.parentElement?.clientHeight ?? window.innerHeight,
         peekHeightPx,
         fullTopInsetPx,
+        readClosedHeightPx(sheet),
       ),
     };
   };
@@ -117,6 +118,11 @@ export function BottomSheet({
     drag.current = null;
 
     if (sheet.dataset.dragging === undefined) {
+      // Pointer capture retargets the tap's click to the grip, so the closed notch reopens here.
+      if (!isCancelled && snap === 'closed') {
+        onSnapChange('peek');
+      }
+
       return;
     }
 
@@ -135,6 +141,7 @@ export function BottomSheet({
     }
   };
 
+  const isClosed = snap === 'closed';
   const sizeVariables = {
     '--lc-sheet-peek-height': `${String(peekHeightPx)}px`,
     '--lc-sheet-full-inset': `${String(fullTopInsetPx)}px`,
@@ -165,9 +172,20 @@ export function BottomSheet({
       >
         <SheetHandle snap={snap} onSnapChange={onSnapChange} controlsId={sheetId} />
       </div>
-      {peek !== undefined && <div className="lc-bottom-sheet__peek">{peek}</div>}
-      {header !== undefined && <div className="lc-bottom-sheet__header">{header}</div>}
-      <div className="lc-bottom-sheet__body">{children}</div>
+      {/* A closed sheet only clips its content, so inert keeps Tab off the hidden controls. */}
+      {peek !== undefined && (
+        <div className="lc-bottom-sheet__peek" inert={isClosed}>
+          {peek}
+        </div>
+      )}
+      {header !== undefined && (
+        <div className="lc-bottom-sheet__header" inert={isClosed}>
+          {header}
+        </div>
+      )}
+      <div className="lc-bottom-sheet__body" inert={isClosed}>
+        {children}
+      </div>
     </Element>
   );
 }
@@ -177,5 +195,10 @@ export function BottomSheet({
 function clampDragHeight(sample: DragSample, clientY: number): number {
   const heightPx = sample.startHeightPx + sample.startY - clientY;
 
-  return Math.min(Math.max(heightPx, sample.heights.peek), sample.heights.full);
+  return Math.min(Math.max(heightPx, sample.heights.closed), sample.heights.full);
+}
+
+/** The closed height is the `--lc-h-l` token bottom-sheet.css sizes a closed sheet with. */
+function readClosedHeightPx(sheet: HTMLElement): number {
+  return Number.parseFloat(getComputedStyle(sheet).getPropertyValue('--lc-h-l')) || 44;
 }

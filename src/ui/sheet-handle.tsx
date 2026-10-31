@@ -1,6 +1,7 @@
 import type { KeyboardEvent, Ref } from 'react';
 
-export type SheetSnap = 'peek' | 'half' | 'full';
+/** `closed` leaves only the handle showing, so the canvas gets the whole screen. */
+export type SheetSnap = 'closed' | 'peek' | 'half' | 'full';
 
 export interface SheetHandleProps {
   label?: string;
@@ -11,7 +12,7 @@ export interface SheetHandleProps {
   ref?: Ref<HTMLButtonElement>;
 }
 
-const snapOrder: readonly SheetSnap[] = ['peek', 'half', 'full'];
+const snapOrder: readonly SheetSnap[] = ['closed', 'peek', 'half', 'full'];
 
 /** Keyboard-operable grabber for the bottom sheet (P-21). Dragging belongs to BottomSheet. */
 export function SheetHandle({
@@ -64,7 +65,7 @@ function resolveNextSnap(snap: SheetSnap, key: string): SheetSnap | undefined {
     case 'Enter':
       return snap === 'half' ? 'full' : 'half';
     case 'Escape':
-      return 'peek';
+      return snap === 'peek' || snap === 'closed' ? 'closed' : 'peek';
     default:
       return undefined;
   }
