@@ -46,9 +46,7 @@ const sliotarTossEyeHeights = 0.25;
 /** Long enough that the grip end sits off-screen, in eye heights. */
 const hurlLengthEyeHeights = 1.25;
 const sliotarRadius = 0.06;
-const basHalfThickness = 0.0075;
 const hurlRollPerSecond = 12;
-const worldUp = new THREE.Vector3(0, 1, 0);
 
 // === PUBLIC API ===
 
@@ -65,12 +63,14 @@ export function createThrowableModels(): ThrowableModels {
   const hurlContent = createHurl(ash);
   const basSweetSpot = new THREE.Object3D();
   const restBasPosition = new THREE.Vector3();
+  // Replaced with the modelled bas's measured thickness once it loads.
+  const basShape = { halfThickness: 0.0075 };
 
   basSweetSpot.position.set(0, -0.08, 0);
   hurlContent.add(basSweetSpot);
   hurlRoll.add(hurlContent);
   hurl.add(hurlRoll);
-  void replaceWithModelledHurl(hurl, hurlContent, ash, basSweetSpot);
+  void replaceWithModelledHurl(hurl, hurlContent, ash, basSweetSpot, basShape);
   const heldSliotar = createSliotar(leather, seam);
   const heldBoomerang = createBoomerang(boomerangWood);
   const projectileMesh = new THREE.Group();
@@ -157,7 +157,10 @@ export function createThrowableModels(): ThrowableModels {
           hand.worldToLocal(
             basSweetSpot
               .getWorldPosition(scratchPosition)
-              .addScaledVector(worldUp, (sliotarRadius + basHalfThickness) * eyeHeight),
+              .addScaledVector(
+                getUpwardBasNormal(hurlContent, scratchNormal),
+                (sliotarRadius + basShape.halfThickness) * eyeHeight,
+              ),
           ),
         );
       } else {
@@ -192,6 +195,15 @@ export function createThrowableModels(): ThrowableModels {
 
 const scratchScale = new THREE.Vector3();
 const scratchPosition = new THREE.Vector3();
+const scratchNormal = new THREE.Vector3();
+
+/** The bas face normal (content ±Z) on whichever side faces up, so the ball sits on top, not inside. */
+function getUpwardBasNormal(hurlContent: THREE.Object3D, target: THREE.Vector3) {
+  target.set(0, 0, 1).applyQuaternion(hurlContent.getWorldQuaternion(scratchQuaternion));
+
+  return target.y < 0 ? target.negate() : target;
+}
+
 const scratchQuaternion = new THREE.Quaternion();
 
 /** Charge pulls the item back; the swing sweeps through (hurl: sideways arc; boomerang: overhand). */
@@ -221,6 +233,7 @@ async function replaceWithModelledHurl(
   hurlContent: THREE.Group,
   material: THREE.Material,
   basSweetSpot: THREE.Object3D,
+  basShape: { halfThickness: number },
 ) {
   // Read lazily: Vite's env doesn't exist when tests load this module in Node.
   const hurlModelUrl = `${import.meta.env.BASE_URL}models/hurl.glb`;
@@ -235,9 +248,12 @@ async function replaceWithModelledHurl(
 
     hurlContent.clear();
     hurlContent.rotation.set(0, 0, 0);
-    hurlContent.add(new THREE.Mesh(fitHurlGeometry(mesh as THREE.Mesh), material), basSweetSpot);
+    const geometry = fitHurlGeometry(mesh as THREE.Mesh);
+
+    hurlContent.add(new THREE.Mesh(geometry, material), basSweetSpot);
     // The modelled hurl stands grip-down, so the bas's middle sits near the top.
     basSweetSpot.position.set(0, hurlLengthEyeHeights * 0.88, 0);
+    basShape.halfThickness = measureHalfThicknessNear(geometry, basSweetSpot.position.y);
     // Across the lower view, as when held: the grip off-screen right, rising to the bas at left.
     hurl.rotation.set(-0.15, 0, THREE.MathUtils.degToRad(90 - 17));
   } catch (error) {
@@ -273,6 +289,21 @@ function fitHurlGeometry(mesh: THREE.Mesh) {
   geometry.rotateY(Math.PI);
 
   return geometry;
+}
+
+/** Deepest face-axis (Z) extent of the vertices around a height, for resting things on the face. */
+function measureHalfThicknessNear(geometry: THREE.BufferGeometry, heightY: number) {
+  const positions = geometry.getAttribute('position');
+  const bandHalfHeight = hurlLengthEyeHeights * 0.05;
+  let halfThickness = 0;
+
+  for (let index = 0; index < positions.count; index += 1) {
+    if (Math.abs(positions.getY(index) - heightY) < bandHalfHeight) {
+      halfThickness = Math.max(halfThickness, Math.abs(positions.getZ(index)));
+    }
+  }
+
+  return halfThickness;
 }
 
 /** A flattened bas on an ash handle, in eye-height units, held up and slightly across. */
