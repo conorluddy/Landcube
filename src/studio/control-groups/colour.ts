@@ -4,6 +4,7 @@
  * Row ids are the original field ids the e2e tests bind to. The pattern is in ./README.md.
  */
 import { createElement } from 'react';
+import { track } from '../../analytics';
 import { designPalettePresets } from '../../constants/palettes';
 import { resetDesignStyle } from '../../design-settings';
 import { createRandomPalette } from '../../random-palette';
@@ -77,6 +78,7 @@ function buildPaletteGroup(
         isPressedComputed: (option) => isPaletteApplied(state, option.value),
         onChange: (name) => {
           controller.design(designPalettePresets[name]);
+          track('preset_apply', { name });
         },
       }),
       buttonRow('palette-random', {

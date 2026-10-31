@@ -101,6 +101,16 @@ test('analytics loads only on the hosted site and never sees the design-link que
   await page.goto('https://landcu.be/?v=1&seed=123');
   await page.getByRole('button', { name: 'New landscape' }).click();
   await expect(page).not.toHaveURL(/seed=123/);
+  await page.getByRole('button', { name: 'Copy style link' }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Array.from((window as unknown as { dataLayer: ArrayLike<unknown>[] }).dataLayer).some(
+          (entry) => Array.from(entry)[1] === 'share_link',
+        ),
+      ),
+    )
+    .toBe(true);
   const dataLayer = JSON.stringify(
     await page.evaluate(() =>
       Array.from((window as unknown as { dataLayer: ArrayLike<unknown>[] }).dataLayer, (entry) =>

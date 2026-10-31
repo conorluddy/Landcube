@@ -56,6 +56,7 @@ import type { WaterStyle } from '../terrain-3d';
 import type { FloorStyle } from '../terrain-floor-styles';
 import type { TerrainStillScale } from '../export/still-export';
 import { defaultRoadStyle, roadDetailClasses, roadSpanLimitsKm } from '../constants/roads';
+import { track } from '../analytics';
 import { operationErrorCodes } from '../constants/operations';
 import { parseDesignParameters } from '../design-settings';
 import type { SavedDesign } from '../saved-designs';
@@ -716,6 +717,7 @@ export function createStudioController(
       namedWaypoints: waypoints,
       slopeThresholdPercent: defaultSlopeThresholdPercent,
     });
+    track('route_import', {});
 
     return { needsConfirmation: false };
   };
@@ -1166,6 +1168,8 @@ export function createStudioController(
       const url = actions.getShareUrl();
       const result = await actions.copyLink(url);
 
+      track('share_link', { ok: result.ok });
+
       state = { ...state, manualLink: result.ok ? '' : url };
       notify(
         result.ok
@@ -1193,6 +1197,7 @@ export function createStudioController(
       try {
         await effects?.activate(view);
         workspace({ view, activating: false });
+        track('view_change', { view });
       } catch {
         workspace({ view: '2d', activating: false });
         notify('Showing 2D: the 3D preview needs WebGL 2, which this browser does not support.');
@@ -1279,7 +1284,13 @@ export function createStudioController(
       effects?.setCameraDirection(azimuth, elevation);
     },
     walkAt(clientX, clientY) {
-      return effects?.walkAt(clientX, clientY) ?? false;
+      const hasStarted = effects?.walkAt(clientX, clientY) ?? false;
+
+      if (hasStarted) {
+        track('walk_start', {});
+      }
+
+      return hasStarted;
     },
     async pickFocus() {
       const pickId = ++latestFocusPickId;
@@ -1355,6 +1366,7 @@ export function createStudioController(
 
       try {
         effects?.downloadFrameStl(part);
+        track('export', { format: 'frame_stl' });
 
         return true;
       } catch (error) {
@@ -1386,6 +1398,7 @@ export function createStudioController(
 
         try {
           effects?.downloadFrameStl(part);
+          track('export', { format: 'frame_stl' });
           updateExportJob(part.id, {
             status: 'done',
             fraction: 1,
@@ -1534,6 +1547,7 @@ export function createStudioController(
         status: 'Using generated terrain.',
       });
       applySource(undefined, true);
+      track('terrain_load', { source: 'generated' });
     },
     async useCoordinates() {
       controller.selectSection('Terrain');
@@ -1618,11 +1632,13 @@ export function createStudioController(
           selected: 'real',
           status: 'Real terrain loaded. Location is session-only.',
         });
+        track('terrain_load', { source: 'real', span_km: source.spanKm });
       } catch (error) {
         if (version === requestVersion) {
           const fault = describeTerrainFault(error, latestProgress);
 
           controller.source({ status: fault.message, fault });
+          track('terrain_load_failed', { fault: fault.code });
         }
       } finally {
         if (version === requestVersion) {
@@ -1787,6 +1803,7 @@ export function createStudioController(
         return;
       }
 
+      track('camera_tour_play', { shots: shots.length });
       notify(`Playing ${shots.length} ${shots.length === 1 ? 'shot' : 'shots'}`);
     },
     stopCameraShots() {
@@ -1795,6 +1812,7 @@ export function createStudioController(
     downloadStl() {
       try {
         effects?.downloadStl();
+        track('export', { format: 'stl' });
 
         return true;
       } catch (error) {
@@ -1808,6 +1826,7 @@ export function createStudioController(
         const size = await effects?.downloadStill(scale);
 
         if (size) {
+          track('export', { format: 'still' });
           notify(`Saved a ${size.width} × ${size.height} px 3D still.`);
         }
       } catch (error) {
