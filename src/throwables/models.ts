@@ -46,6 +46,7 @@ const sliotarTossEyeHeights = 0.25;
 /** Long enough that the grip end sits off-screen, in eye heights. */
 const hurlLengthEyeHeights = 1.25;
 const sliotarRadius = 0.06;
+const boomerangSpanEyeHeights = 0.6;
 const hurlRollPerSecond = 12;
 // Carrying the ball: gripped near the bas and held close to the chest, face up, the shaft
 // running back down to the hand off-screen right. The bas sits just below the middle of the view.
@@ -84,6 +85,10 @@ export function createThrowableModels(): ThrowableModels {
   const projectileMesh = new THREE.Group();
   const thrownSliotar = createSliotar(leather, seam);
   const thrownBoomerang = createBoomerang(boomerangWood);
+
+  // Sized to the procedural stand-ins: the sliotar to its physics radius, the boomerang to its span.
+  void replaceWithModel('sliotar.glb', 2 * sliotarRadius, [heldSliotar, thrownSliotar]);
+  void replaceWithModel('boomerang.glb', boomerangSpanEyeHeights, [heldBoomerang, thrownBoomerang]);
   let eyeHeight = 1;
   let hasSettledPose = false;
 
@@ -210,6 +215,11 @@ export function createThrowableModels(): ThrowableModels {
         root.traverse((object) => {
           if (object instanceof THREE.Mesh) {
             (object.geometry as THREE.BufferGeometry).dispose();
+
+            // Loaded models bring their own materials; disposing a shared one twice is harmless.
+            for (const material of [object.material].flat() as THREE.Material[]) {
+              material.dispose();
+            }
           }
         });
       }
@@ -298,6 +308,34 @@ async function replaceWithModelledHurl(
     restHurlRotation.set(-0.15, 0, THREE.MathUtils.degToRad(90 - 17));
   } catch (error) {
     console.warn(JSON.stringify({ event: 'hurl_model_failed', message: String(error) }));
+  }
+}
+
+/**
+ * Swaps a loaded model into each group in place of its procedural children, centred and scaled
+ * so its longest side is `longestSide`. The procedural mesh stays if the model can't load.
+ */
+async function replaceWithModel(fileName: string, longestSide: number, groups: THREE.Group[]) {
+  const modelUrl = `${import.meta.env.BASE_URL}models/${fileName}`;
+
+  try {
+    const model = (await new GLTFLoader().loadAsync(modelUrl)).scene;
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+
+    model.position.sub(box.getCenter(new THREE.Vector3()));
+    const fitted = new THREE.Group().add(model);
+
+    fitted.scale.setScalar(longestSide / Math.max(size.x, size.y, size.z));
+
+    for (const group of groups) {
+      group.clear();
+      group.add(fitted.clone());
+    }
+  } catch (error) {
+    console.warn(
+      JSON.stringify({ event: 'model_failed', model_url: modelUrl, message: String(error) }),
+    );
   }
 }
 
@@ -398,5 +436,6 @@ function createBoomerang(material: THREE.Material) {
   geometry.center();
   geometry.rotateX(-Math.PI / 2);
 
-  return new THREE.Mesh(geometry, material);
+  // A group, so a loaded model can replace the mesh without moving the held pose.
+  return new THREE.Group().add(new THREE.Mesh(geometry, material));
 }
