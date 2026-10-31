@@ -53,7 +53,7 @@ const hurlLengthMm = 864;
 /** Adult limit is 16–17 cm at the widest point. */
 const basWidthMm = 160;
 /** Trial: the true-proportion ball read as too small, so it's drawn larger than life. */
-const sliotarSizeBoost = 2;
+const sliotarSizeBoost = 1.32;
 const sliotarRadius =
   (sliotarSizeBoost * (sliotarDiameterMm / hurlLengthMm) * hurlLengthEyeHeights) / 2;
 const boomerangSpanEyeHeights = 0.6;
