@@ -31,7 +31,7 @@
   }
 
   .studio-shell[data-sheet-snap='closed'] {
-    --studio-sheet-height: 28px;
+    --studio-sheet-height: var(--lc-h-s);
   }
 
   .studio-shell[data-sheet-snap='peek'] {

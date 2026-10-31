@@ -7,8 +7,6 @@ export type SheetSnapHeights = Readonly<Record<SheetSnap, number>>;
 export const flickVelocityPxPerMs = 0.5;
 /** Half is about 50% in the design; 55% keeps it under the 62% the mobile e2e test allows. */
 export const halfSnapFraction = 0.55;
-/** A closed sheet is just its grip (`--lc-h-s` in bottom-sheet.css). */
-export const closedSheetHeightPx = 28;
 
 const snapOrder: readonly SheetSnap[] = ['closed', 'peek', 'half', 'full'];
 
@@ -39,7 +37,8 @@ export function measureSnapHeights(
   containerHeightPx: number,
   peekHeightPx: number,
   fullTopInsetPx: number,
-  closedHeightPx = closedSheetHeightPx,
+  /** The grip's laid-out height: a closed sheet is the grip alone (`--lc-h-s`). */
+  closedHeightPx: number,
 ): SheetSnapHeights {
   const full = Math.max(containerHeightPx - fullTopInsetPx, peekHeightPx);
 

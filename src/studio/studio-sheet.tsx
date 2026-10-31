@@ -68,7 +68,7 @@ export function StudioSheet({
           onSelectSection={(section) => {
             c.selectSection(section);
 
-            if (workspace.sheetSnap === 'closed' || workspace.sheetSnap === 'peek') {
+            if (workspace.sheetSnap === 'peek') {
               c.workspace({ sheetSnap: 'half' });
             }
           }}
@@ -158,7 +158,7 @@ export function StudioMapControls({
 
 // === HELPERS ===
 
-/** The phone mode bar: a tool drops the sheet to peek so the canvas is free to work on. */
+/** The phone mode bar: a tool drops the sheet to peek (or leaves it closed) so the canvas is free to work on. */
 function toggleTool(
   c: StudioController,
   state: StudioState,
@@ -167,7 +167,10 @@ function toggleTool(
   if (getActiveTool(state) === tool) {
     c.workspace({ toolMode: 'none' });
   } else {
-    c.workspace({ toolMode: tool, sheetSnap: 'peek' });
+    c.workspace({
+      toolMode: tool,
+      sheetSnap: state.workspace.sheetSnap === 'closed' ? 'closed' : 'peek',
+    });
   }
 }
 

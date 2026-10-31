@@ -75,6 +75,7 @@ export function BottomSheet({
         sheet.parentElement?.clientHeight ?? window.innerHeight,
         peekHeightPx,
         fullTopInsetPx,
+        event.currentTarget.offsetHeight,
       ),
     };
   };
@@ -140,6 +141,7 @@ export function BottomSheet({
     }
   };
 
+  const isClosed = snap === 'closed';
   const sizeVariables = {
     '--lc-sheet-peek-height': `${String(peekHeightPx)}px`,
     '--lc-sheet-full-inset': `${String(fullTopInsetPx)}px`,
@@ -170,9 +172,20 @@ export function BottomSheet({
       >
         <SheetHandle snap={snap} onSnapChange={onSnapChange} controlsId={sheetId} />
       </div>
-      {peek !== undefined && <div className="lc-bottom-sheet__peek">{peek}</div>}
-      {header !== undefined && <div className="lc-bottom-sheet__header">{header}</div>}
-      <div className="lc-bottom-sheet__body">{children}</div>
+      {/* A closed sheet only clips its content, so inert keeps Tab off the hidden controls. */}
+      {peek !== undefined && (
+        <div className="lc-bottom-sheet__peek" inert={isClosed}>
+          {peek}
+        </div>
+      )}
+      {header !== undefined && (
+        <div className="lc-bottom-sheet__header" inert={isClosed}>
+          {header}
+        </div>
+      )}
+      <div className="lc-bottom-sheet__body" inert={isClosed}>
+        {children}
+      </div>
     </Element>
   );
 }

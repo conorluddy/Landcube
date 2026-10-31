@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { measureSnapHeights, pickSnap } from './bottom-sheet-snap';
 
-const heights = measureSnapHeights(844, 190, 64);
+const heights = measureSnapHeights(844, 190, 64, 28);
 
 void test('snap heights on a 390x844 phone: peek 190, half 55%, full 64px from the top', () => {
   assert.deepEqual(heights, { closed: 28, peek: 190, half: 844 * 0.55, full: 780 });
@@ -37,7 +37,7 @@ void test('exactly the threshold velocity is not a flick', () => {
 });
 
 void test('a short container never lets half or full drop below peek', () => {
-  assert.deepEqual(measureSnapHeights(200, 190, 64), {
+  assert.deepEqual(measureSnapHeights(200, 190, 64, 28), {
     closed: 28,
     peek: 190,
     half: 190,

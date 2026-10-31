@@ -71,7 +71,7 @@ function resolveNextSnap(snap: SheetSnap, key: string): SheetSnap | undefined {
     case 'Enter':
       return snap === 'half' ? 'full' : 'half';
     case 'Escape':
-      return snap === 'peek' ? 'closed' : 'peek';
+      return snap === 'peek' || snap === 'closed' ? 'closed' : 'peek';
     default:
       return undefined;
   }
