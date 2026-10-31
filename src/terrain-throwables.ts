@@ -61,6 +61,11 @@ export const boomerangDurationSeconds = 2.5;
 const boomerangReachEyeHeights = { min: 6, max: 20 };
 const boomerangLiftEyeHeights = 1.5;
 const fullChargeSeconds = 1;
+/** A gentle toss from the off hand: it peaks this far above the hand. */
+const tossPeakEyeHeights = 1.2;
+
+/** How near the bas the falling ball must be when the swing is released to connect. */
+export const strikeZoneEyeHeights = 0.6;
 const swingSeconds = 0.3;
 
 // Reused every step so throwing doesn't churn the garbage collector.
@@ -87,6 +92,27 @@ export function launchSliotar(
     .multiplyScalar(speed);
 
   return { kind: 'flying', item: 'sliotar', position: origin.clone(), velocity };
+}
+
+/** The first stage of a strike: the sliotar goes straight up out of the off hand. */
+export function launchToss(origin: THREE.Vector3, scale: WalkScale): Projectile {
+  const speed = Math.sqrt(2 * scale.gravityPerSecondSquared * tossPeakEyeHeights * scale.eyeHeight);
+
+  return {
+    kind: 'flying',
+    item: 'sliotar',
+    position: origin.clone(),
+    velocity: new THREE.Vector3(0, speed, 0),
+  };
+}
+
+/** True when a swing released now meets the ball; anything else is a whiff. */
+export function isInStrikeZone(
+  ballPosition: THREE.Vector3,
+  basPosition: THREE.Vector3,
+  scale: WalkScale,
+): boolean {
+  return ballPosition.distanceTo(basPosition) <= strikeZoneEyeHeights * scale.eyeHeight;
 }
 
 export function launchBoomerang(
@@ -144,9 +170,12 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
   let projectile: Projectile | undefined;
   let chargeStartedAtMs: number | undefined;
   let swingSecondsLeft = 0;
+  /** A tossed sliotar still in the air, waiting for the swing. */
+  let isTossed = false;
 
   const recall = () => {
     projectile = undefined;
+    isTossed = false;
     models?.setProjectile(undefined, heldItem);
   };
 
@@ -156,18 +185,37 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
     }
 
     const charge = readCharge(chargeStartedAtMs);
-    const origin = models.getHandPosition(new THREE.Vector3());
-    const viewDirection = camera.getWorldDirection(scratchDirection);
-    const launch = heldItem === 'sliotar' ? launchSliotar : launchBoomerang;
 
     chargeStartedAtMs = undefined;
-    projectile = launch(origin, viewDirection, charge, scale);
-    swingSecondsLeft = swingSeconds;
-    models.setProjectile(projectile, heldItem);
 
-    if (heldItem === 'sliotar') {
-      playHurlSlap(charge);
+    if (heldItem === 'boomerang') {
+      const origin = models.getHandPosition(new THREE.Vector3());
+
+      projectile = launchBoomerang(
+        origin,
+        camera.getWorldDirection(scratchDirection),
+        charge,
+        scale,
+      );
+      swingSecondsLeft = swingSeconds;
+    } else if (!isTossed) {
+      projectile = launchToss(models.getSliotarPosition(new THREE.Vector3()), scale);
+      isTossed = true;
+    } else {
+      // A swing always plays; only a well-timed one meets the ball.
+      swingSecondsLeft = swingSeconds;
+      const bas = models.getBasPosition(new THREE.Vector3());
+
+      if (projectile && isInStrikeZone(projectile.position, bas, scale)) {
+        const viewDirection = camera.getWorldDirection(scratchDirection);
+
+        projectile = launchSliotar(projectile.position, viewDirection, charge, scale);
+        isTossed = false;
+        playHurlSlap(charge);
+      }
     }
+
+    models.setProjectile(projectile, heldItem);
   };
 
   return {
@@ -182,8 +230,11 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
       recall();
     },
     charge() {
-      // Throwing again recalls the last one, like pressing E.
-      recall();
+      // With a ball in the air this charges the swing; otherwise it recalls the last one, like E.
+      if (!isTossed) {
+        recall();
+      }
+
       chargeStartedAtMs = performance.now();
     },
     release,
@@ -206,6 +257,12 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
           scale,
           camera.position,
         );
+        // Once a tossed ball drops past the bas it's a whiff; it falls, and the next click picks it up.
+        const basHeight = models.getBasPosition(scratchDirection).y;
+
+        isTossed &&=
+          projectile !== undefined &&
+          projectile.position.y > basHeight - strikeZoneEyeHeights * scale.eyeHeight;
         models.setProjectile(projectile, heldItem);
       }
 
@@ -220,6 +277,7 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
     },
     stop() {
       projectile = undefined;
+      isTossed = false;
       chargeStartedAtMs = undefined;
       swingSecondsLeft = 0;
 

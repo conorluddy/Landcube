@@ -9,6 +9,10 @@ export interface ThrowableModels {
   projectileMesh: THREE.Group;
   setScale(eyeHeight: number): void;
   getHandPosition(target: THREE.Vector3): THREE.Vector3;
+  /** Where the held sliotar sits in the off hand, ready to toss. */
+  getSliotarPosition(target: THREE.Vector3): THREE.Vector3;
+  /** The bas's sweet spot at rest, ignoring the charge pull-back, so the strike zone stays put. */
+  getBasPosition(target: THREE.Vector3): THREE.Vector3;
   setProjectile(projectile: Projectile | undefined, heldItem: Throwable): void;
   updateViewmodel(camera: THREE.Camera, pose: ViewmodelPose): void;
   dispose(): void;
@@ -45,8 +49,12 @@ export function createThrowableModels(): ThrowableModels {
   const viewmodel = new THREE.Group();
   const hand = new THREE.Group();
   const hurl = createHurl(ash);
+  const basSweetSpot = new THREE.Object3D();
+  const restBasPosition = new THREE.Vector3();
 
-  void replaceWithModelledHurl(hurl, ash);
+  basSweetSpot.position.set(0, -0.08, 0);
+  hurl.add(basSweetSpot);
+  void replaceWithModelledHurl(hurl, ash, basSweetSpot);
   const heldSliotar = createSliotar(leather, seam);
   const heldBoomerang = createBoomerang(boomerangWood);
   const projectileMesh = new THREE.Group();
@@ -75,6 +83,12 @@ export function createThrowableModels(): ThrowableModels {
     getHandPosition(target) {
       return hand.getWorldPosition(target);
     },
+    getSliotarPosition(target) {
+      return heldSliotar.getWorldPosition(target);
+    },
+    getBasPosition(target) {
+      return target.copy(restBasPosition);
+    },
     setProjectile(projectile, heldItem) {
       projectileMesh.visible = projectile !== undefined;
       thrownSliotar.visible = projectile?.item === 'sliotar';
@@ -99,6 +113,8 @@ export function createThrowableModels(): ThrowableModels {
       hasSettledPose = true;
       viewmodel.scale.setScalar(eyeHeight);
       hand.position.copy(handOffset);
+      hand.rotation.set(0, 0, 0);
+      basSweetSpot.getWorldPosition(restBasPosition);
       poseHand(hand, heldItem, charge, swing);
       heldSliotar.position
         .copy(sliotarInOffHand)
@@ -148,7 +164,11 @@ function poseHand(hand: THREE.Group, heldItem: Throwable, charge: number, swing:
 }
 
 /** Swaps in the modelled hurl once it loads; the procedural one stays if it can't. */
-async function replaceWithModelledHurl(hurl: THREE.Group, material: THREE.Material) {
+async function replaceWithModelledHurl(
+  hurl: THREE.Group,
+  material: THREE.Material,
+  basSweetSpot: THREE.Object3D,
+) {
   // Read lazily: Vite's env doesn't exist when tests load this module in Node.
   const hurlModelUrl = `${import.meta.env.BASE_URL}models/hurl.glb`;
 
@@ -161,7 +181,9 @@ async function replaceWithModelledHurl(hurl: THREE.Group, material: THREE.Materi
     }
 
     hurl.clear();
-    hurl.add(new THREE.Mesh(fitHurlGeometry(mesh as THREE.Mesh), material));
+    hurl.add(new THREE.Mesh(fitHurlGeometry(mesh as THREE.Mesh), material), basSweetSpot);
+    // The modelled hurl stands grip-down, so the bas's middle sits near the top.
+    basSweetSpot.position.set(0, hurlLengthEyeHeights * 0.88, 0);
     // Across the lower view, as when held: the grip off-screen right, rising to the bas at left.
     hurl.rotation.set(-0.15, 0, THREE.MathUtils.degToRad(90 - 17));
   } catch (error) {

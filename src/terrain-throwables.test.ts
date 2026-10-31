@@ -3,8 +3,11 @@ import { test } from 'node:test';
 import * as THREE from 'three';
 import {
   boomerangDurationSeconds,
+  isInStrikeZone,
   launchBoomerang,
   launchSliotar,
+  launchToss,
+  strikeZoneEyeHeights,
   stepProjectile,
   type Projectile,
 } from './terrain-throwables';
@@ -91,4 +94,27 @@ void test('a sliotar struck off the model edge is lost and resets', () => {
 
   assert.equal(final, undefined);
   assert.equal(kinds.at(-1), 'gone');
+});
+
+void test('a tossed sliotar rises about an eye height and falls back past the hand', () => {
+  const origin = new THREE.Vector3(0, 2 * scale.eyeHeight, 0);
+  const { heights } = simulate(launchToss(origin, scale), 1.2);
+  const peak = Math.max(...heights) - origin.y;
+
+  assert.ok(
+    peak > scale.eyeHeight && peak < 1.5 * scale.eyeHeight,
+    `peak ${peak / scale.eyeHeight}`,
+  );
+  assert.ok(heights.some((height) => height < origin.y));
+});
+
+void test('a swing connects only when the ball is at the bas', () => {
+  const bas = new THREE.Vector3(0, scale.eyeHeight, 0);
+  const near = bas
+    .clone()
+    .add(new THREE.Vector3(0, strikeZoneEyeHeights * scale.eyeHeight * 0.5, 0));
+  const high = bas.clone().add(new THREE.Vector3(0, strikeZoneEyeHeights * scale.eyeHeight * 2, 0));
+
+  assert.equal(isInStrikeZone(near, bas, scale), true);
+  assert.equal(isInStrikeZone(high, bas, scale), false);
 });
