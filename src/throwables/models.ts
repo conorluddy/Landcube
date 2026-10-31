@@ -47,8 +47,10 @@ const sliotarTossEyeHeights = 0.25;
 const hurlLengthEyeHeights = 1.25;
 const sliotarRadius = 0.06;
 const hurlRollPerSecond = 12;
-// Carrying the ball: the shaft runs level and out ahead, a little left, with the bas face up.
-const carryShaftInHand = new THREE.Vector3(-0.25, 0.08, -1).normalize();
+// Carrying the ball: gripped near the bas and held close to the chest, face up, the shaft
+// running back down to the hand off-screen right. The bas sits just below the middle of the view.
+const carryShaftInHand = new THREE.Vector3(-0.35, 0.25, -1).normalize();
+const carryBasFromEye = new THREE.Vector3(-0.02, -0.14, -0.55);
 const carryHandX = 0.3;
 const carryHurlQuaternion = createCarryQuaternion(carryShaftInHand);
 
@@ -153,6 +155,7 @@ export function createThrowableModels(): ThrowableModels {
         ((isBasFlat ? Math.PI / 2 : 0) - hurlRoll.rotation.y) *
         (1 - Math.exp(-hurlRollPerSecond * elapsedSeconds));
       hurl.quaternion.setFromEuler(restHurlRotation);
+      hurl.position.set(0, 0, 0);
       hand.updateMatrixWorld(true);
       // The sweet spot lies on the shaft axis, so the roll doesn't move it.
       basSweetSpot.getWorldPosition(restBasPosition);
@@ -164,6 +167,17 @@ export function createThrowableModels(): ThrowableModels {
         hand.rotation.z *= 1 - carry;
         hand.position.x = THREE.MathUtils.lerp(handOffset.x, carryHandX, carry);
         hurl.quaternion.slerp(carryHurlQuaternion, carry);
+        // Choke up: slide the hurl so the sweet spot (on the shaft axis) lands at the carry point.
+        hurl.position
+          .copy(carryBasFromEye)
+          .sub(hand.position)
+          .sub(
+            scratchPosition
+              .copy(basSweetSpot.position)
+              .applyQuaternion(hurlContent.quaternion)
+              .applyQuaternion(hurl.quaternion),
+          )
+          .multiplyScalar(carry);
       }
 
       hand.updateMatrixWorld(true);
