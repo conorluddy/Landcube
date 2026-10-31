@@ -70,7 +70,7 @@ test('the phone inspector is a bottom sheet that opens at half', async ({ page }
   await expect(page.getByRole('button', { name: 'Export ↗' })).toHaveCount(1);
 });
 
-test('keyboard on the handle steps between peek, half and full', async ({ page }) => {
+test('keyboard on the handle steps between closed, peek, half and full', async ({ page }) => {
   const handle = page.getByRole('button', { name: 'Resize sheet' });
 
   await handle.focus();
@@ -84,9 +84,28 @@ test('keyboard on the handle steps between peek, half and full', async ({ page }
   await expect.poll(() => sheetHeight(page)).toBe(190);
   await expect(handle).toHaveAttribute('aria-valuetext', 'peek');
   await page.keyboard.press('ArrowDown');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
+  await expect.poll(() => sheetHeight(page)).toBe(28);
+  await page.keyboard.press('ArrowDown');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
+  await page.keyboard.press('ArrowUp');
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'peek');
   await page.keyboard.press('ArrowUp');
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'half');
+});
+
+test('a closed sheet leaves only its notch, and a tap on the notch reopens it', async ({
+  page,
+}) => {
+  const handle = page.getByRole('button', { name: 'Resize sheet' });
+
+  await handle.focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
+  await expect(page.getByRole('button', { name: 'Export ↗' })).not.toBeInViewport();
+  await handle.click();
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'peek');
 });
 
 test('a full sheet hides the map controls and the scale bar', async ({ page }) => {
