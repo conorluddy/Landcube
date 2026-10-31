@@ -6,7 +6,7 @@ This handoff is implemented. Tokens live at `src/ui/tokens.css` (a byte-equal co
 
 ## Overview
 
-A monochrome "surgical planning" design system for **LANDCU.BE** (repo: `conorluddy/Topogra`). Floating dark frosted-glass panels over a full-bleed terrain canvas, hairline borders, small tight type, all-caps tracked monospace labels, numbered section codes. It covers the desktop studio, the mobile app (21 screens), and a set of feature experiments.
+A monochrome "surgical planning" design system for **LANDCU.BE** (repo: `conorluddy/Landcube`). Floating dark frosted-glass panels over a full-bleed terrain canvas, hairline borders, small tight type, all-caps tracked monospace labels, numbered section codes. It covers the desktop studio, the mobile app (21 screens), and a set of feature experiments.
 
 The terrain canvas itself is out of scope — keep the existing renderer. The monochrome UI is meant to sit around a full-colour terrain view.
 
