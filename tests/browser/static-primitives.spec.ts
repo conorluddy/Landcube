@@ -51,6 +51,12 @@ test('SheetHandle steps snaps with arrows, toggles with Enter and resets with Es
   await expectSnap(handle, 'peek');
 
   await page.keyboard.press('ArrowDown');
+  await expectSnap(handle, 'closed');
+
+  await page.keyboard.press('ArrowDown');
+  await expectSnap(handle, 'closed');
+
+  await page.keyboard.press('ArrowUp');
   await expectSnap(handle, 'peek');
 
   await page.keyboard.press('ArrowUp');

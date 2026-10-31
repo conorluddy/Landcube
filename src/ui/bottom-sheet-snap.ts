@@ -1,4 +1,4 @@
-import type { SheetSnap } from './sheet-handle';
+import { sheetSnapOrder as snapOrder, type SheetSnap } from './sheet-handle';
 
 /** Sheet heights in px for each snap, measured against the sheet's container. */
 export type SheetSnapHeights = Readonly<Record<SheetSnap, number>>;
@@ -7,8 +7,6 @@ export type SheetSnapHeights = Readonly<Record<SheetSnap, number>>;
 export const flickVelocityPxPerMs = 0.5;
 /** Half is about 50% in the design; 55% keeps it under the 62% the mobile e2e test allows. */
 export const halfSnapFraction = 0.55;
-
-const snapOrder: readonly SheetSnap[] = ['peek', 'half', 'full'];
 
 // === PUBLIC API ===
 
@@ -37,10 +35,13 @@ export function measureSnapHeights(
   containerHeightPx: number,
   peekHeightPx: number,
   fullTopInsetPx: number,
+  /** A closed sheet is the grip alone, at the `--lc-h-l` hit target. */
+  closedHeightPx: number,
 ): SheetSnapHeights {
   const full = Math.max(containerHeightPx - fullTopInsetPx, peekHeightPx);
 
   return {
+    closed: Math.min(closedHeightPx, peekHeightPx),
     peek: peekHeightPx,
     half: Math.min(Math.max(containerHeightPx * halfSnapFraction, peekHeightPx), full),
     full,
@@ -54,5 +55,5 @@ function nextSnapAbove(positionPx: number, heights: SheetSnapHeights): SheetSnap
 }
 
 function nextSnapBelow(positionPx: number, heights: SheetSnapHeights): SheetSnap {
-  return [...snapOrder].reverse().find((snap) => heights[snap] < positionPx) ?? 'peek';
+  return [...snapOrder].reverse().find((snap) => heights[snap] < positionPx) ?? 'closed';
 }

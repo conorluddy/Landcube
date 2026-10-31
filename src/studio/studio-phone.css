@@ -3,7 +3,7 @@
 /*
  * One header row, the inspector as a bottom sheet (BottomSheet in src/ui), 44px map controls
  * down the right edge and the scale bar above the sheet. Sheet heights mirror bottom-sheet.css:
- * peek 190px, half 55%, full 64px from the top.
+ * closed 44px (grip only), peek 190px, half 55%, full 64px from the top.
  */
 @media (max-width: 767px) {
   .studio-brand,
@@ -28,6 +28,10 @@
 
   .studio-shell[data-sheet-snap='full'] > .lc-bottom-sheet {
     bottom: 0;
+  }
+
+  .studio-shell[data-sheet-snap='closed'] {
+    --studio-sheet-height: var(--lc-h-l);
   }
 
   .studio-shell[data-sheet-snap='peek'] {

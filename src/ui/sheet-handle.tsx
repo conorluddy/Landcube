@@ -1,6 +1,7 @@
 import type { KeyboardEvent, Ref } from 'react';
 
-export type SheetSnap = 'peek' | 'half' | 'full';
+/** `closed` leaves only the handle showing, so the canvas gets the whole screen. */
+export type SheetSnap = 'closed' | 'peek' | 'half' | 'full';
 
 export interface SheetHandleProps {
   label?: string;
@@ -11,7 +12,8 @@ export interface SheetHandleProps {
   ref?: Ref<HTMLButtonElement>;
 }
 
-const snapOrder: readonly SheetSnap[] = ['peek', 'half', 'full'];
+/** Snaps from lowest to highest; the one order keys and drags step through. */
+export const sheetSnapOrder: readonly SheetSnap[] = ['closed', 'peek', 'half', 'full'];
 
 /** Keyboard-operable grabber for the bottom sheet (P-21). Dragging belongs to BottomSheet. */
 export function SheetHandle({
@@ -43,6 +45,7 @@ export function SheetHandle({
       aria-label={label}
       aria-controls={controlsId}
       aria-valuetext={snap}
+      aria-expanded={snap !== 'closed'}
       onKeyDown={handleKeyDown}
     >
       <span className="lc-sheet-handle__grabber" aria-hidden="true" />
@@ -52,19 +55,20 @@ export function SheetHandle({
 
 // === HELPERS ===
 
-/** Returns undefined for keys the handle ignores, so the browser default still runs. */
-function resolveNextSnap(snap: SheetSnap, key: string): SheetSnap | undefined {
-  const index = snapOrder.indexOf(snap);
+/** Exported for tests. Returns undefined for keys the handle ignores, so the browser default still runs. */
+export function resolveNextSnap(snap: SheetSnap, key: string): SheetSnap | undefined {
+  const index = sheetSnapOrder.indexOf(snap);
 
   switch (key) {
     case 'ArrowUp':
-      return snapOrder[Math.min(index + 1, snapOrder.length - 1)];
+      return sheetSnapOrder[Math.min(index + 1, sheetSnapOrder.length - 1)];
     case 'ArrowDown':
-      return snapOrder[Math.max(index - 1, 0)];
+      return sheetSnapOrder[Math.max(index - 1, 0)];
     case 'Enter':
-      return snap === 'half' ? 'full' : 'half';
+      // From closed, Enter opens to peek like a tap on the grip.
+      return snap === 'closed' ? 'peek' : snap === 'half' ? 'full' : 'half';
     case 'Escape':
-      return 'peek';
+      return snap === 'peek' || snap === 'closed' ? 'closed' : 'peek';
     default:
       return undefined;
   }
