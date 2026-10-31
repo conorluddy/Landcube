@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Projectile, Throwable } from './terrain-throwables';
 
 /** Procedural low-poly hurl, sliotar and boomerang: a held viewmodel plus the thrown mesh. */
@@ -26,6 +27,11 @@ export interface ViewmodelPose {
 // Hand offset from the eye, in eye heights: lower right, just past the near plane.
 const handOffset = new THREE.Vector3(0.6, -0.55, -1.4);
 const spinRadiansPerSecond = 18;
+// The off hand holds the sliotar left of the hurl, ready to toss it up while charging.
+const sliotarInOffHand = new THREE.Vector3(-0.55, 0.05, 0);
+const sliotarTossEyeHeights = 0.45;
+/** Matches the procedural hurl's length, in eye heights. */
+const hurlLengthEyeHeights = 0.62;
 
 // === PUBLIC API ===
 
@@ -37,6 +43,8 @@ export function createThrowableModels(): ThrowableModels {
   const viewmodel = new THREE.Group();
   const hand = new THREE.Group();
   const hurl = createHurl(ash);
+
+  void replaceWithModelledHurl(hurl, ash);
   const heldSliotar = createSliotar(leather, seam);
   const heldBoomerang = createBoomerang(boomerangWood);
   const projectileMesh = new THREE.Group();
@@ -44,7 +52,7 @@ export function createThrowableModels(): ThrowableModels {
   const thrownBoomerang = createBoomerang(boomerangWood);
   let eyeHeight = 1;
 
-  heldSliotar.position.set(-0.12, 0.05, -0.1);
+  heldSliotar.position.copy(sliotarInOffHand);
   heldBoomerang.rotation.set(1.1, 0, 0.4);
   hand.add(hurl, heldSliotar, heldBoomerang);
   viewmodel.add(hand);
@@ -81,6 +89,9 @@ export function createThrowableModels(): ThrowableModels {
       viewmodel.scale.setScalar(eyeHeight);
       hand.position.copy(handOffset);
       poseHand(hand, heldItem, charge, swing);
+      heldSliotar.position
+        .copy(sliotarInOffHand)
+        .setY(sliotarInOffHand.y + charge * sliotarTossEyeHeights);
 
       if (projectileMesh.visible && thrownBoomerang.visible) {
         thrownBoomerang.rotation.y += spinRadiansPerSecond * elapsedSeconds;
@@ -122,6 +133,56 @@ function poseHand(hand: THREE.Group, heldItem: Throwable, charge: number, swing:
     hand.rotation.x = charge * 0.9 - follow * 1.6;
     hand.position.y += charge * 0.12 - follow * 0.1;
   }
+}
+
+/** Swaps in the modelled hurl once it loads; the procedural one stays if it can't. */
+async function replaceWithModelledHurl(hurl: THREE.Group, material: THREE.Material) {
+  // Read lazily: Vite's env doesn't exist when tests load this module in Node.
+  const hurlModelUrl = `${import.meta.env.BASE_URL}models/hurl.glb`;
+
+  try {
+    const gltf = await new GLTFLoader().loadAsync(hurlModelUrl);
+    const mesh = gltf.scene.getObjectByProperty('isMesh', true);
+
+    if (!(mesh instanceof THREE.Mesh)) {
+      throw new Error(`${hurlModelUrl} has no mesh`);
+    }
+
+    hurl.clear();
+    hurl.add(new THREE.Mesh(fitHurlGeometry(mesh as THREE.Mesh), material));
+    // Across the body, as in play: handle low right, bas up and left, tipped away from the eye.
+    hurl.rotation.set(-0.5, 0, 0.95);
+  } catch (error) {
+    console.warn(JSON.stringify({ event: 'hurl_model_failed', message: String(error) }));
+  }
+}
+
+/** Bakes the node transform, stands the long axis upright, and sizes it like the procedural hurl. */
+function fitHurlGeometry(mesh: THREE.Mesh) {
+  mesh.updateWorldMatrix(true, false);
+  const geometry = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+
+  geometry.computeBoundingBox();
+  const size = geometry.boundingBox?.getSize(new THREE.Vector3()) ?? new THREE.Vector3(1, 1, 1);
+
+  // The model lies flat along X; turn it to run up Y like the procedural handle.
+  if (size.x >= size.y && size.x >= size.z) {
+    // Bas down, and its face (the model's thin axis) towards the eye.
+    geometry.rotateZ(-Math.PI / 2).rotateY(Math.PI / 2);
+  } else if (size.z >= size.y) {
+    geometry.rotateX(-Math.PI / 2);
+  }
+
+  geometry.computeBoundingBox();
+  const box = geometry.boundingBox ?? new THREE.Box3();
+  const length = box.max.y - box.min.y;
+
+  geometry.translate(-(box.min.x + box.max.x) / 2, -box.min.y, -(box.min.z + box.max.z) / 2);
+  const fit = hurlLengthEyeHeights / length;
+
+  geometry.scale(fit, fit, fit);
+
+  return geometry;
 }
 
 /** A flattened bas on an ash handle, in eye-height units, held up and slightly across. */
