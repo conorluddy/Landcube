@@ -3,6 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { appUrl, download, enter3D, section, serveHostedSite, serveStudio } from './studio-fixture';
 
+// Software-rendered 3D makes CI boot the studio slowly, and a reload boots it again.
+const appBootTimeoutMs = 60_000;
+
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 
 test('GitHub Pages repository subpath loads the studio, lazy 3D, style links and exports', async ({
@@ -146,7 +149,9 @@ test('analytics asks on the hosted site, loads nothing until allowed, and rememb
   await expect.poll(() => tagRequests.length).toBeGreaterThan(0);
 
   await page.reload();
-  await expect(page.getByRole('button', { name: 'New landscape' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New landscape' })).toBeVisible({
+    timeout: appBootTimeoutMs,
+  });
   await expect(dialog).toBeHidden();
 });
 
@@ -166,7 +171,9 @@ test('declining analytics loads no tag and is remembered', async ({ page }) => {
     .getByRole('button', { name: 'No thanks' })
     .click();
   await page.reload();
-  await expect(page.getByRole('button', { name: 'New landscape' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New landscape' })).toBeVisible({
+    timeout: appBootTimeoutMs,
+  });
   await expect(page.getByRole('alertdialog', { name: 'Usage analytics' })).toBeHidden();
   expect(tagRequests).toEqual([]);
 });

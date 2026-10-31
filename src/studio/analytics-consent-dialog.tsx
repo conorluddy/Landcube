@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  isAnalyticsHost,
-  loadAnalytics,
-  readAnalyticsConsent,
-  saveAnalyticsConsent,
-} from '../analytics-consent';
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from 'react';
+import { applyAnalyticsChoice, isAnalyticsHost, readAnalyticsConsent } from '../analytics-consent';
 import { logOperationError } from '../operation-logging';
 import { Button } from '../ui/button';
 import { SignalMark } from '../ui/signal-mark';
@@ -22,11 +23,22 @@ export function AnalyticsConsentDialog({
     () => isAnalyticsHost(hostname) && readAnalyticsConsent(storage) === 'unset',
   );
   const declineButton = useRef<HTMLButtonElement>(null);
+  const allowButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      declineButton.current?.focus();
+    if (!isOpen) {
+      return;
     }
+
+    const previouslyFocused = document.activeElement;
+
+    declineButton.current?.focus();
+
+    return () => {
+      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
+        previouslyFocused.focus();
+      }
+    };
   }, [isOpen]);
 
   if (!isOpen) {
@@ -34,22 +46,31 @@ export function AnalyticsConsentDialog({
   }
 
   const choose = (consent: 'granted' | 'denied'): void => {
-    const saved = saveAnalyticsConsent(storage, consent);
-
-    if (!saved.ok) {
-      logOperationError(saved.error);
-    }
-
-    if (consent === 'granted') {
-      loadAnalytics();
-    }
-
+    applyAnalyticsChoice(consent, storage, logOperationError);
     setIsOpen(false);
+  };
+
+  // The dialog is modal: Tab cycles between its two buttons instead of reaching the studio behind it.
+  const keepFocusInside = (event: ReactKeyboardEvent): void => {
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    event.preventDefault();
+    (document.activeElement === declineButton.current
+      ? allowButton
+      : declineButton
+    ).current?.focus();
   };
 
   return (
     <div className="lc-route-confirm">
-      <div role="alertdialog" aria-modal="true" aria-label="Usage analytics">
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-label="Usage analytics"
+        onKeyDown={keepFocusInside}
+      >
         <section className="lc-readout-card lc-glass lc-consent-card" data-ui-surface>
           <div className="lc-readout-card__header">
             <span className="lc-readout-card__label">
@@ -60,11 +81,12 @@ export function AnalyticsConsentDialog({
           </div>
           <div className="lc-readout-card__identity">
             <p className="lc-readout-card__title">Usage data</p>
-            <p className="lc-readout-card__place">Anonymous · Google Analytics</p>
+            <p className="lc-readout-card__place">Google Analytics</p>
           </div>
           <p className="lc-consent-card__body">
             Help improve LANDCU.BE by sharing which features get used and when something fails.
-            Seeds, locations and routes are never sent.
+            Google also receives your IP address and browser details. Seeds, locations and routes
+            are never sent.
           </p>
           <div className="lc-consent-card__actions">
             <Button
@@ -77,6 +99,7 @@ export function AnalyticsConsentDialog({
               No thanks
             </Button>
             <Button
+              ref={allowButton}
               isFullWidth
               onClick={() => {
                 choose('granted');

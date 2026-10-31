@@ -19,6 +19,7 @@ The default appearance is a charcoal background with subtle, lighter contour lin
 - No accounts, backend, or runtime network dependencies beyond public elevation tiles and consent-gated hosted-site analytics.
 - The hosted site MUST NOT send design-link query strings to Google Analytics. Google also collects standard browser details (IP address, user agent, referrer, screen size).
 - Where the origin is not `landcu.be`, the editor MUST NOT request `googletagmanager.com`.
+- Where the origin is `landcu.be`, the editor MUST NOT request `googletagmanager.com` before the visitor selects "Allow analytics". Given a first visit to `https://landcu.be/` with no stored choice, when the page loads, then an analytics dialog is shown and no `googletagmanager.com` request has been made; when the visitor selects "No thanks", then none is ever made and the dialog does not reappear on reload; when they select "Allow analytics", then the tag loads, now and on later visits, without asking again.
 
 Controls, export buttons, animation, real geographic data, 3D previews, and website-content previews are outside this version.
 
