@@ -45,7 +45,13 @@ const sliotarInOffHand = new THREE.Vector3(-1.05, -0.15, 0);
 const sliotarTossEyeHeights = 0.25;
 /** Long enough that the grip end sits off-screen, in eye heights. */
 const hurlLengthEyeHeights = 1.25;
-const sliotarRadius = 0.06;
+// Real proportions (GAA rules): a 70 mm sliotar against a 34" (864 mm) adult hurl. The held
+// viewmodel is drawn larger than life, like most first-person games, but keeps that ratio.
+const sliotarDiameterMm = 70;
+const hurlLengthMm = 864;
+/** Adult limit is 16–17 cm at the widest point. */
+const basWidthMm = 160;
+const sliotarRadius = ((sliotarDiameterMm / hurlLengthMm) * hurlLengthEyeHeights) / 2;
 const boomerangSpanEyeHeights = 0.6;
 const hurlRollPerSecond = 12;
 // Carrying the ball: gripped near the bas and held close to the chest, face up, the shaft
@@ -363,6 +369,12 @@ function fitHurlGeometry(mesh: THREE.Mesh) {
   const fit = hurlLengthEyeHeights / length;
 
   geometry.scale(fit, fit, fit);
+  // Narrow (or widen) the bas to its real width; the length and thickness stay as modelled.
+  geometry.scale(
+    ((basWidthMm / hurlLengthMm) * hurlLengthEyeHeights) / measureBasWidth(geometry),
+    1,
+    1,
+  );
   // Turned over about the shaft so the bas's toe points up when held across the view.
   geometry.rotateY(Math.PI);
 
@@ -382,6 +394,22 @@ function measureHalfThicknessNear(geometry: THREE.BufferGeometry, heightY: numbe
   }
 
   return halfThickness;
+}
+
+/** Widest side-to-side (X) extent in the top fifth of an upright hurl, where the bas is. */
+function measureBasWidth(geometry: THREE.BufferGeometry) {
+  const positions = geometry.getAttribute('position');
+  let minX = Infinity;
+  let maxX = -Infinity;
+
+  for (let index = 0; index < positions.count; index += 1) {
+    if (positions.getY(index) > hurlLengthEyeHeights * 0.8) {
+      minX = Math.min(minX, positions.getX(index));
+      maxX = Math.max(maxX, positions.getX(index));
+    }
+  }
+
+  return maxX - minX;
 }
 
 /** A flattened bas on an ash handle, in eye-height units, held up and slightly across. */
