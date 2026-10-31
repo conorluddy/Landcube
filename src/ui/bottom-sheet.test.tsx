@@ -57,3 +57,12 @@ void test('without an id the sheet generates one for the handle to control', () 
   assert.notEqual(id, '');
   assert.match(markup, new RegExp(`aria-controls="${id}"`));
 });
+
+void test('a closed sheet makes its peek, header and body inert; an open one does not', () => {
+  const closed = renderSheet({ snap: 'closed' });
+
+  assert.match(closed, /class="lc-bottom-sheet__peek" inert=""/);
+  assert.match(closed, /class="lc-bottom-sheet__header" inert=""/);
+  assert.match(closed, /class="lc-bottom-sheet__body" inert=""/);
+  assert.doesNotMatch(renderSheet({ snap: 'peek' }), /inert/);
+});

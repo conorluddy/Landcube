@@ -44,6 +44,7 @@ export function SheetHandle({
       aria-label={label}
       aria-controls={controlsId}
       aria-valuetext={snap}
+      aria-expanded={snap !== 'closed'}
       onKeyDown={handleKeyDown}
     >
       <span className="lc-sheet-handle__grabber" aria-hidden="true" />
@@ -53,8 +54,8 @@ export function SheetHandle({
 
 // === HELPERS ===
 
-/** Returns undefined for keys the handle ignores, so the browser default still runs. */
-function resolveNextSnap(snap: SheetSnap, key: string): SheetSnap | undefined {
+/** Exported for tests. Returns undefined for keys the handle ignores, so the browser default still runs. */
+export function resolveNextSnap(snap: SheetSnap, key: string): SheetSnap | undefined {
   const index = snapOrder.indexOf(snap);
 
   switch (key) {
@@ -63,7 +64,8 @@ function resolveNextSnap(snap: SheetSnap, key: string): SheetSnap | undefined {
     case 'ArrowDown':
       return snapOrder[Math.max(index - 1, 0)];
     case 'Enter':
-      return snap === 'half' ? 'full' : 'half';
+      // From closed, Enter opens to peek like a tap on the grip.
+      return snap === 'closed' ? 'peek' : snap === 'half' ? 'full' : 'half';
     case 'Escape':
       return snap === 'peek' || snap === 'closed' ? 'closed' : 'peek';
     default:

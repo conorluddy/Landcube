@@ -1,4 +1,11 @@
-import { useId, useRef, type CSSProperties, type PointerEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  type CSSProperties,
+  type PointerEvent,
+  type ReactNode,
+} from 'react';
 import { measureSnapHeights, pickSnap, type SheetSnapHeights } from './bottom-sheet-snap';
 import { SheetHandle, type SheetSnap } from './sheet-handle';
 
@@ -55,6 +62,20 @@ export function BottomSheet({
   const sheetId = id ?? generatedId;
   const sheetRef = useRef<HTMLElement | null>(null);
   const drag = useRef<DragSample | null>(null);
+  const handleRef = useRef<HTMLButtonElement | null>(null);
+
+  // Closing makes the content inert, which would drop focus held inside it to <body>.
+  useEffect(() => {
+    const sheet = sheetRef.current;
+
+    if (snap === 'closed' && sheet !== null) {
+      const focused = document.activeElement;
+
+      if (focused !== handleRef.current && (focused === document.body || sheet.contains(focused))) {
+        handleRef.current?.focus();
+      }
+    }
+  }, [snap]);
 
   const startDrag = (event: PointerEvent<HTMLDivElement>): void => {
     const sheet = sheetRef.current;
@@ -170,7 +191,7 @@ export function BottomSheet({
           endDrag(event, true);
         }}
       >
-        <SheetHandle snap={snap} onSnapChange={onSnapChange} controlsId={sheetId} />
+        <SheetHandle ref={handleRef} snap={snap} onSnapChange={onSnapChange} controlsId={sheetId} />
       </div>
       {/* A closed sheet only clips its content, so inert keeps Tab off the hidden controls. */}
       {peek !== undefined && (
