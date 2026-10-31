@@ -25,12 +25,12 @@ export interface ViewmodelPose {
 }
 
 // Hand offset from the eye, in eye heights: lower right, just past the near plane.
-const handOffset = new THREE.Vector3(0.75, -0.88, -0.85);
+const handOffset = new THREE.Vector3(0.55, -0.8, -0.85);
 const spinRadiansPerSecond = 18;
 /** How quickly the held item catches up with the look; lower trails further. */
 const lookFollowPerSecond = 14;
 // The off hand holds the sliotar left of the hurl, ready to toss it up while charging.
-const sliotarInOffHand = new THREE.Vector3(-1.1, 0.36, 0);
+const sliotarInOffHand = new THREE.Vector3(-1.1, 0.62, 0);
 const sliotarTossEyeHeights = 0.25;
 /** Long enough that the grip end sits off-screen, in eye heights. */
 const hurlLengthEyeHeights = 1.25;
@@ -163,7 +163,7 @@ async function replaceWithModelledHurl(hurl: THREE.Group, material: THREE.Materi
     hurl.clear();
     hurl.add(new THREE.Mesh(fitHurlGeometry(mesh as THREE.Mesh), material));
     // Across the lower view, as when held: the grip off-screen right, rising to the bas at left.
-    hurl.rotation.set(-0.15, 0, THREE.MathUtils.degToRad(90 - 9));
+    hurl.rotation.set(-0.15, 0, THREE.MathUtils.degToRad(90 - 17));
   } catch (error) {
     console.warn(JSON.stringify({ event: 'hurl_model_failed', message: String(error) }));
   }
