@@ -117,3 +117,23 @@ test('phones open the palette from the map controls as a bottom sheet', async ({
   await expect(palette(page)).toHaveCount(0);
   await expect(opener).toBeFocused();
 });
+
+test('on a phone, a parameter from the palette opens a closed sheet to half', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  const shell = page.locator('.studio-shell');
+
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(shell).toHaveAttribute('data-sheet-snap', 'closed');
+  await page.getByRole('button', { name: 'Command palette', exact: true }).click();
+  await paletteInput(page).fill('opacity');
+  await expect(palette(page).getByRole('option', { name: /CONT\.02\s*Opacity/ })).toBeVisible();
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('0.5');
+  await page.keyboard.press('Enter');
+  await expect(palette(page)).toHaveCount(0);
+  await expect(shell).toHaveAttribute('data-sheet-snap', 'half');
+  await expect(page.getByRole('region', { name: 'Contours settings' })).toBeVisible();
+});

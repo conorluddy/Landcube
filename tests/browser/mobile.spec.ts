@@ -85,7 +85,7 @@ test('keyboard on the handle steps between closed, peek, half and full', async (
   await expect(handle).toHaveAttribute('aria-valuetext', 'peek');
   await page.keyboard.press('ArrowDown');
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
-  await expect.poll(() => sheetHeight(page)).toBe(28);
+  await expect.poll(() => sheetHeight(page)).toBe(44);
   await page.keyboard.press('ArrowDown');
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
   await page.keyboard.press('ArrowUp');

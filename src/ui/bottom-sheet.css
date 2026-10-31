@@ -21,7 +21,8 @@
 }
 
 .lc-bottom-sheet[data-snap='closed'] {
-  --lc-sheet-height: var(--lc-h-s); /* the grip alone; mirrors closedSheetHeightPx */
+  /* The grip alone, grown to the 44px mobile hit target; BottomSheet reads this token for the drag snap. */
+  --lc-sheet-height: var(--lc-h-l);
 }
 
 .lc-bottom-sheet[data-snap='peek'] {
@@ -51,6 +52,10 @@
 .lc-bottom-sheet__grip .lc-sheet-handle {
   height: var(--lc-h-s);
   cursor: grab;
+}
+
+.lc-bottom-sheet[data-snap='closed'] .lc-bottom-sheet__grip .lc-sheet-handle {
+  height: var(--lc-h-l);
 }
 
 .lc-bottom-sheet[data-dragging] .lc-sheet-handle {

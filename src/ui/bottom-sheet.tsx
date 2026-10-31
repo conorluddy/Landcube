@@ -75,7 +75,7 @@ export function BottomSheet({
         sheet.parentElement?.clientHeight ?? window.innerHeight,
         peekHeightPx,
         fullTopInsetPx,
-        event.currentTarget.offsetHeight,
+        readClosedHeightPx(sheet),
       ),
     };
   };
@@ -196,4 +196,9 @@ function clampDragHeight(sample: DragSample, clientY: number): number {
   const heightPx = sample.startHeightPx + sample.startY - clientY;
 
   return Math.min(Math.max(heightPx, sample.heights.closed), sample.heights.full);
+}
+
+/** The closed height is the `--lc-h-l` token bottom-sheet.css sizes a closed sheet with. */
+function readClosedHeightPx(sheet: HTMLElement): number {
+  return Number.parseFloat(getComputedStyle(sheet).getPropertyValue('--lc-h-l')) || 44;
 }

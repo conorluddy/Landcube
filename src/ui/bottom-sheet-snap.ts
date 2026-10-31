@@ -37,7 +37,7 @@ export function measureSnapHeights(
   containerHeightPx: number,
   peekHeightPx: number,
   fullTopInsetPx: number,
-  /** The grip's laid-out height: a closed sheet is the grip alone (`--lc-h-s`). */
+  /** A closed sheet is the grip alone, at the `--lc-h-l` hit target. */
   closedHeightPx: number,
 ): SheetSnapHeights {
   const full = Math.max(containerHeightPx - fullTopInsetPx, peekHeightPx);

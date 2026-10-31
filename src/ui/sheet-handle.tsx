@@ -45,12 +45,6 @@ export function SheetHandle({
       aria-controls={controlsId}
       aria-valuetext={snap}
       onKeyDown={handleKeyDown}
-      onClick={() => {
-        // A tap on the notch of a closed sheet brings it back up.
-        if (snap === 'closed') {
-          onSnapChange('peek');
-        }
-      }}
     >
       <span className="lc-sheet-handle__grabber" aria-hidden="true" />
     </button>
