@@ -101,7 +101,15 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
   const tossSliotar = (charge: number, held: ThrowableModels, walkScale: WalkScale) => {
     const peakHeight = getTossPeakHeight(charge, walkScale);
 
-    projectile = launchToss(held.getSliotarPosition(new THREE.Vector3()), peakHeight, walkScale);
+    // Off the bas, the ball has to drift back over to where the swing sweeps.
+    const dropThrough = isBalanced ? held.getBasPosition(new THREE.Vector3()) : undefined;
+
+    projectile = launchToss(
+      held.getSliotarPosition(new THREE.Vector3()),
+      peakHeight,
+      walkScale,
+      dropThrough,
+    );
     toss = planTossView(
       camera.position,
       projectile.position,

@@ -74,20 +74,31 @@ export function getTossPeakHeight(charge: number, scale: WalkScale): number {
   );
 }
 
-/** The first stage of a strike: the sliotar goes straight up out of the off hand. */
+/**
+ * The first stage of a strike: the sliotar goes up out of the off hand. With `dropThrough`, it
+ * drifts sideways so it comes down through that point, as when hopped off a bas held out of the strike zone.
+ */
 export function launchToss(
   origin: THREE.Vector3,
   peakHeight: number,
   scale: WalkScale,
+  dropThrough?: THREE.Vector3,
 ): Projectile {
-  const speed = Math.sqrt(2 * scale.gravityPerSecondSquared * peakHeight);
+  const gravity = scale.gravityPerSecondSquared;
+  const speed = Math.sqrt(2 * gravity * peakHeight);
+  const velocity = new THREE.Vector3(0, speed, 0);
 
-  return {
-    kind: 'flying',
-    item: 'sliotar',
-    position: origin.clone(),
-    velocity: new THREE.Vector3(0, speed, 0),
-  };
+  if (dropThrough) {
+    const rise = dropThrough.y - origin.y;
+    // Descending root of y(t) = speed·t − g·t²/2 = rise; past the peak if the point sits below it.
+    const secondsToDrop =
+      (speed + Math.sqrt(Math.max(speed * speed - 2 * gravity * rise, 0))) / gravity;
+
+    velocity.x = (dropThrough.x - origin.x) / secondsToDrop;
+    velocity.z = (dropThrough.z - origin.z) / secondsToDrop;
+  }
+
+  return { kind: 'flying', item: 'sliotar', position: origin.clone(), velocity };
 }
 
 export function launchBoomerang(

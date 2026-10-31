@@ -116,3 +116,34 @@ void test('a longer hold tosses the sliotar higher, up to twice the half-charge 
   assert.ok(tap < half && half < full);
   assert.ok(Math.abs(full - 5 * scale.eyeHeight) < 1e-9);
 });
+
+void test('a sliotar hopped off the bas drifts over and drops through the strike zone', () => {
+  const origin = new THREE.Vector3(0, 2 * scale.eyeHeight, 0);
+  const strikeZone = new THREE.Vector3(-0.6, -0.1, 0.4).multiplyScalar(scale.eyeHeight).add(origin);
+  let current: Projectile | undefined = launchToss(
+    origin,
+    getTossPeakHeight(0.5, scale),
+    scale,
+    strikeZone,
+  );
+  let sidewaysMiss = Infinity;
+
+  // Sideways offset as it falls past the strike height, where the swing meets it.
+  for (let elapsed = 0; elapsed < 3 && current; elapsed += stepSeconds) {
+    current = stepProjectile(current, stepSeconds, flat, scale, farAway);
+
+    if (
+      current?.kind === 'flying' &&
+      current.velocity.y < 0 &&
+      current.position.y <= strikeZone.y
+    ) {
+      sidewaysMiss = Math.hypot(
+        current.position.x - strikeZone.x,
+        current.position.z - strikeZone.z,
+      );
+      break;
+    }
+  }
+
+  assert.ok(sidewaysMiss < 0.02 * scale.eyeHeight, `missed by ${sidewaysMiss / scale.eyeHeight}`);
+});

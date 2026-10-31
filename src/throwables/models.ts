@@ -47,6 +47,10 @@ const sliotarTossEyeHeights = 0.25;
 const hurlLengthEyeHeights = 1.25;
 const sliotarRadius = 0.06;
 const hurlRollPerSecond = 12;
+// Carrying the ball: the shaft runs level and out ahead, a little left, with the bas face up.
+const carryShaftInHand = new THREE.Vector3(-0.25, 0.08, -1).normalize();
+const carryHandX = 0.3;
+const carryHurlQuaternion = createCarryQuaternion(carryShaftInHand);
 
 // === PUBLIC API ===
 
@@ -65,12 +69,14 @@ export function createThrowableModels(): ThrowableModels {
   const restBasPosition = new THREE.Vector3();
   // Replaced with the modelled bas's measured thickness once it loads.
   const basShape = { halfThickness: 0.0075 };
+  // The hurl's swing-ready orientation in the hand; the modelled hurl sets its own on load.
+  const restHurlRotation = new THREE.Euler();
 
   basSweetSpot.position.set(0, -0.08, 0);
   hurlContent.add(basSweetSpot);
   hurlRoll.add(hurlContent);
   hurl.add(hurlRoll);
-  void replaceWithModelledHurl(hurl, hurlContent, ash, basSweetSpot, basShape);
+  void replaceWithModelledHurl(restHurlRotation, hurlContent, ash, basSweetSpot, basShape);
   const heldSliotar = createSliotar(leather, seam);
   const heldBoomerang = createBoomerang(boomerangWood);
   const projectileMesh = new THREE.Group();
@@ -146,10 +152,20 @@ export function createThrowableModels(): ThrowableModels {
       hurlRoll.rotation.y +=
         ((isBasFlat ? Math.PI / 2 : 0) - hurlRoll.rotation.y) *
         (1 - Math.exp(-hurlRollPerSecond * elapsedSeconds));
+      hurl.quaternion.setFromEuler(restHurlRotation);
       hand.updateMatrixWorld(true);
       // The sweet spot lies on the shaft axis, so the roll doesn't move it.
       basSweetSpot.getWorldPosition(restBasPosition);
       poseHand(hand, heldItem, charge, swing, hurlSwingRadians);
+      // Blends with the roll, so the hurl comes level as the bas turns up.
+      const carry = hurlRoll.rotation.y / (Math.PI / 2);
+
+      if (heldItem === 'sliotar' && carry > 0.001) {
+        hand.rotation.z *= 1 - carry;
+        hand.position.x = THREE.MathUtils.lerp(handOffset.x, carryHandX, carry);
+        hurl.quaternion.slerp(carryHurlQuaternion, carry);
+      }
+
       hand.updateMatrixWorld(true);
 
       if (isBasFlat) {
@@ -197,6 +213,16 @@ const scratchScale = new THREE.Vector3();
 const scratchPosition = new THREE.Vector3();
 const scratchNormal = new THREE.Vector3();
 
+/** Shaft (local Y) along the given direction, with local X, the face once rolled 90°, pointing up. */
+function createCarryQuaternion(shaft: THREE.Vector3) {
+  const faceUp = new THREE.Vector3(0, 1, 0).addScaledVector(shaft, -shaft.y).normalize();
+  const side = new THREE.Vector3().crossVectors(faceUp, shaft);
+
+  return new THREE.Quaternion().setFromRotationMatrix(
+    new THREE.Matrix4().makeBasis(faceUp, shaft, side),
+  );
+}
+
 /** The bas face normal (content ±Z) on whichever side faces up, so the ball sits on top, not inside. */
 function getUpwardBasNormal(hurlContent: THREE.Object3D, target: THREE.Vector3) {
   target.set(0, 0, 1).applyQuaternion(hurlContent.getWorldQuaternion(scratchQuaternion));
@@ -229,7 +255,7 @@ function poseHand(
 
 /** Swaps in the modelled hurl once it loads; the procedural one stays if it can't. */
 async function replaceWithModelledHurl(
-  hurl: THREE.Group,
+  restHurlRotation: THREE.Euler,
   hurlContent: THREE.Group,
   material: THREE.Material,
   basSweetSpot: THREE.Object3D,
@@ -255,7 +281,7 @@ async function replaceWithModelledHurl(
     basSweetSpot.position.set(0, hurlLengthEyeHeights * 0.88, 0);
     basShape.halfThickness = measureHalfThicknessNear(geometry, basSweetSpot.position.y);
     // Across the lower view, as when held: the grip off-screen right, rising to the bas at left.
-    hurl.rotation.set(-0.15, 0, THREE.MathUtils.degToRad(90 - 17));
+    restHurlRotation.set(-0.15, 0, THREE.MathUtils.degToRad(90 - 17));
   } catch (error) {
     console.warn(JSON.stringify({ event: 'hurl_model_failed', message: String(error) }));
   }
