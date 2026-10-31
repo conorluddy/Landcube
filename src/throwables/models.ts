@@ -51,8 +51,13 @@ const sliotarDiameterMm = 70;
 const hurlLengthMm = 864;
 /** Adult limit is 16–17 cm at the widest point. */
 const basWidthMm = 160;
-const sliotarRadius = ((sliotarDiameterMm / hurlLengthMm) * hurlLengthEyeHeights) / 2;
+/** Trial: the true-proportion ball read as too small, so it's drawn larger than life. */
+const sliotarSizeBoost = 2;
+const sliotarRadius =
+  (sliotarSizeBoost * (sliotarDiameterMm / hurlLengthMm) * hurlLengthEyeHeights) / 2;
 const boomerangSpanEyeHeights = 0.6;
+/** Thrown boomerangs fly near-upright, leaning back a little off vertical. */
+const thrownBoomerangLeanRadians = 0.35;
 const hurlRollPerSecond = 12;
 // Carrying the ball: gripped near the bas and held close to the chest, face up, the shaft
 // running back down to the hand off-screen right. The bas sits just below the middle of the view.
@@ -99,7 +104,16 @@ export function createThrowableModels(): ThrowableModels {
   let hasSettledPose = false;
 
   heldSliotar.position.copy(sliotarInOffHand);
-  heldBoomerang.rotation.set(1.1, 0, 0.4);
+  // Upright at the right of the view, face to the eye, elbow pointing left (the model's elbow is +Z).
+  heldBoomerang.quaternion.setFromRotationMatrix(
+    new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(0, -1, 0),
+      new THREE.Vector3(0, 0, 1),
+      new THREE.Vector3(-1, 0, 0),
+    ),
+  );
+  heldBoomerang.rotateY(-0.35);
+  heldBoomerang.position.set(-0.1, 0.62, 0);
   hand.add(hurl, heldSliotar, heldBoomerang);
   viewmodel.add(hand);
   projectileMesh.add(thrownSliotar, thrownBoomerang);
@@ -134,6 +148,20 @@ export function createThrowableModels(): ThrowableModels {
       return target;
     },
     setProjectile(projectile, heldItem) {
+      const isNewBoomerangThrow = projectile?.item === 'boomerang' && !thrownBoomerang.visible;
+
+      if (isNewBoomerangThrow) {
+        // Face the throw, as held: the boomerang flies near-upright across the look direction.
+        projectileMesh.rotation.set(
+          0,
+          scratchEuler.setFromQuaternion(viewmodel.quaternion, 'YXZ').y,
+          0,
+        );
+        thrownBoomerang.rotation.set(Math.PI / 2 - thrownBoomerangLeanRadians, 0, 0);
+      } else if (!projectile) {
+        projectileMesh.rotation.set(0, 0, 0);
+      }
+
       projectileMesh.visible = projectile !== undefined;
       thrownSliotar.visible = projectile?.item === 'sliotar';
       thrownBoomerang.visible = projectile?.item === 'boomerang';
@@ -241,6 +269,7 @@ export function createThrowableModels(): ThrowableModels {
 
 const scratchScale = new THREE.Vector3();
 const scratchPosition = new THREE.Vector3();
+const scratchEuler = new THREE.Euler();
 const scratchNormal = new THREE.Vector3();
 
 /** Shaft (local Y) along the given direction, with local X, the face once rolled 90°, pointing up. */
@@ -278,8 +307,11 @@ function poseHand(
     // A level sweep about the hand, so the bas passes back through its rest pose mid-swing.
     hand.rotation.set(0, hurlSwingRadians, restHandRollRadians);
   } else {
-    hand.rotation.x = charge * 0.9 - follow * 1.6;
-    hand.position.y += charge * 0.12 - follow * 0.1;
+    // A longer hold cocks it further back past the shoulder; the release whips it forward and left.
+    hand.rotation.set(-follow * 1.2, charge * 0.1 - follow * 0.5, -charge * 0.12);
+    hand.position.x += -charge * 0.05 - follow * 0.35;
+    hand.position.y += charge * 0.04 - follow * 0.1;
+    hand.position.z += charge * 0.12 - follow * 0.3;
   }
 }
 

@@ -23,8 +23,8 @@ export type Projectile =
   | { kind: 'resting'; item: Throwable; position: THREE.Vector3 };
 
 // Sizes are in eye heights, so the toys feel the same on any map.
-// Matches the drawn sliotar: 70 mm against the viewmodel's 1.25-eye-height hurl (864 mm).
-const sliotarRadiusEyeHeights = 0.0506;
+// Matches the drawn sliotar (models.ts): 70 mm against an 864 mm hurl, doubled for visibility.
+const sliotarRadiusEyeHeights = 0.1013;
 const sliotarSpeedEyeHeights = { min: 8, max: 30 };
 const strikeLoftRadians = 0.25;
 const restitution = 0.5;
