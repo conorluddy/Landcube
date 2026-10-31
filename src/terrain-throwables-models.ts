@@ -33,8 +33,8 @@ const handOffset = new THREE.Vector3(0.55, -0.8, -0.85);
 const spinRadiansPerSecond = 18;
 /** How quickly the held item catches up with the look; lower trails further. */
 const lookFollowPerSecond = 14;
-// The off hand holds the sliotar left of the hurl, ready to toss it up while charging.
-const sliotarInOffHand = new THREE.Vector3(-1.1, 0.62, 0);
+// Below the bottom edge, under the bas: the toss rises into view and drops past the sweet spot.
+const sliotarInOffHand = new THREE.Vector3(-1.05, -0.15, 0);
 const sliotarTossEyeHeights = 0.25;
 /** Long enough that the grip end sits off-screen, in eye heights. */
 const hurlLengthEyeHeights = 1.25;
