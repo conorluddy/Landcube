@@ -7,7 +7,7 @@ import {
   getSwingRadians,
   strikePhaseSeconds,
   type ContactFrame,
-} from './terrain-throwables-swing';
+} from './swing';
 
 const forward = new THREE.Vector3(0, 0, -1);
 

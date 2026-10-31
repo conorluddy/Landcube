@@ -86,7 +86,7 @@ import {
   type CameraShotPlayback,
 } from './terrain-camera-shots';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { createTerrainThrowables } from './terrain-throwables';
+import { createTerrainThrowables } from './throwables/throwables';
 import { createTerrainWalk } from './terrain-walk';
 import { createTerrainTransitionAudio } from './terrain-transition-audio';
 import { createTerrainPostProcessing, type TerrainPostProcessing } from './terrain-post-processing';

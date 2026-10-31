@@ -3,16 +3,14 @@ import { test } from 'node:test';
 import * as THREE from 'three';
 import {
   boomerangDurationSeconds,
-  getTossLookLift,
   getTossPeakHeight,
   launchBoomerang,
   launchSliotar,
   launchToss,
-  planTossView,
   stepProjectile,
   type Projectile,
-} from './terrain-throwables';
-import { getWalkScale } from './terrain-walk';
+} from './physics';
+import { getWalkScale } from '../terrain-walk';
 
 const scale = getWalkScale(100);
 const stepSeconds = 1 / 60;
@@ -107,18 +105,6 @@ void test('a tossed sliotar rises a couple of eye heights and falls back past th
     `peak ${peak / scale.eyeHeight}`,
   );
   assert.ok(heights.some((height) => height < origin.y));
-});
-
-void test('the look lifts with a toss so the ball meets the top edge at its peak', () => {
-  const eye = new THREE.Vector3(0, scale.eyeHeight, 0);
-  const ball = new THREE.Vector3(0, 0.2 * scale.eyeHeight, -0.8 * scale.eyeHeight);
-  const halfFov = THREE.MathUtils.degToRad(35);
-  const view = planTossView(eye, ball, getTossPeakHeight(0.5, scale), 0, halfFov);
-
-  assert.ok(view.peakLift > 0);
-  assert.equal(getTossLookLift(view, view.startAngle), 0);
-  assert.ok(Math.abs(getTossLookLift(view, view.peakAngle) - view.peakLift) < 1e-9);
-  assert.ok(view.peakAngle - view.peakLift < halfFov);
 });
 
 void test('a longer hold tosses the sliotar higher, up to twice the half-charge toss', () => {

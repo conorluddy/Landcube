@@ -22,7 +22,7 @@ interface TerrainWalkOptions {
   toy?: WalkToy;
 }
 
-/** A walk-only plaything; see `terrain-throwables.ts`. */
+/** A walk-only plaything; see `throwables/throwables.ts`. */
 export interface WalkToy {
   start(scale: WalkScale): void;
   charge(): void;

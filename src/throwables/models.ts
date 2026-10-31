@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import type { Projectile, Throwable } from './terrain-throwables';
-import type { BasFace } from './terrain-throwables-swing';
+import type { Projectile, Throwable } from './physics';
+import type { BasFace } from './swing';
 
 /** Procedural low-poly hurl, sliotar and boomerang: a held viewmodel plus the thrown mesh. */
 export interface ThrowableModels {
@@ -23,7 +23,6 @@ export interface ThrowableModels {
 
 export interface ViewmodelPose {
   heldItem: Throwable;
-  isThrown: boolean;
   /** 0–1 pull-back while the button is held. */
   charge: number;
   /** 0–1 progress through the boomerang's release flick; 1 at rest. */

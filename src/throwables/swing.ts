@@ -10,6 +10,8 @@ export interface HurlSwing {
   pullbackRadians: number;
   /** The hold that powered this swing, 0–1. */
   charge: number;
+  /** Ball and bas last frame, for the swept contact test; unset on the swing's first frame. */
+  lastContactFrame?: ContactFrame;
 }
 
 /** The bas at one instant, in world space. */
@@ -22,6 +24,12 @@ export interface BasFace {
 export interface ContactFrame {
   ball: THREE.Vector3;
   face: BasFace;
+}
+
+/** How a contact sends the ball: which way, and how cleanly it was struck (0.5 rim to 1 centre). */
+export interface Strike {
+  aim: THREE.Vector3;
+  quality: number;
 }
 
 export interface BasContact {
@@ -38,6 +46,8 @@ export const strikePhaseSeconds = 0.22;
 const recoverySeconds = 0.25;
 const followThroughRadians = 1;
 const pullback = { min: 0.15, max: 1.2 };
+/** How much the bas's face, against the view, aims a strike; timing skews the face. */
+const faceAimWeight = 0.6;
 
 // === PUBLIC API ===
 
@@ -102,6 +112,21 @@ export function findBasContact(
 
   // The face swept through the ball from its far side, so it drives the ball back that way.
   return { point, offset, direction: normal.multiplyScalar(Math.sign(previousDistance)) };
+}
+
+/** Blends the face's push with the view, and docks power for hitting off the sweet spot. */
+export function aimStrike(
+  contact: BasContact,
+  viewDirection: THREE.Vector3,
+  contactRadius: number,
+): Strike {
+  const aim = contact.direction
+    .clone()
+    .multiplyScalar(faceAimWeight)
+    .addScaledVector(viewDirection, 1 - faceAimWeight)
+    .normalize();
+
+  return { aim, quality: 1 - 0.5 * (contact.offset / contactRadius) ** 2 };
 }
 
 // === HELPERS ===
