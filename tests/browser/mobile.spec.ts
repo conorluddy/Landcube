@@ -130,6 +130,41 @@ test('a slow drag down from peek closes the sheet, and a tap on the grip reopens
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'peek');
 });
 
+test('closing the sheet by touch moves focus from its content to the grip', async ({ page }) => {
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await waitForSettledSheet(page);
+  const grip = await page.getByRole('button', { name: 'Resize sheet' }).boundingBox();
+
+  if (grip === null) {
+    throw new Error('Sheet handle is not laid out.');
+  }
+
+  // Touch, unlike a mouse press, does not focus the grip, so focus stays on Export until the close.
+  const exportButton = page.getByRole('button', { name: 'Export ↗' });
+
+  await exportButton.focus();
+  const x = grip.x + grip.width / 2;
+  const startY = grip.y + grip.height / 2;
+  const touch = await page.context().newCDPSession(page);
+  const send = (type: 'touchStart' | 'touchMove' | 'touchEnd', y: number) =>
+    touch.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
+    });
+
+  await send('touchStart', startY);
+
+  for (let step = 1; step <= 5; step++) {
+    await send('touchMove', startY + step * 30);
+    await page.waitForTimeout(150);
+  }
+
+  await send('touchEnd', startY + 150);
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
+  await expect(page.getByRole('button', { name: 'Resize sheet' })).toBeFocused();
+});
+
 test('a tool leaves a closed sheet closed', async ({ page }) => {
   await page.getByRole('button', { name: 'Resize sheet' }).focus();
   await page.keyboard.press('Escape');

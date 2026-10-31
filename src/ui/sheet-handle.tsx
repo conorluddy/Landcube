@@ -12,7 +12,8 @@ export interface SheetHandleProps {
   ref?: Ref<HTMLButtonElement>;
 }
 
-const snapOrder: readonly SheetSnap[] = ['closed', 'peek', 'half', 'full'];
+/** Snaps from lowest to highest; the one order keys and drags step through. */
+export const sheetSnapOrder: readonly SheetSnap[] = ['closed', 'peek', 'half', 'full'];
 
 /** Keyboard-operable grabber for the bottom sheet (P-21). Dragging belongs to BottomSheet. */
 export function SheetHandle({
@@ -56,13 +57,13 @@ export function SheetHandle({
 
 /** Exported for tests. Returns undefined for keys the handle ignores, so the browser default still runs. */
 export function resolveNextSnap(snap: SheetSnap, key: string): SheetSnap | undefined {
-  const index = snapOrder.indexOf(snap);
+  const index = sheetSnapOrder.indexOf(snap);
 
   switch (key) {
     case 'ArrowUp':
-      return snapOrder[Math.min(index + 1, snapOrder.length - 1)];
+      return sheetSnapOrder[Math.min(index + 1, sheetSnapOrder.length - 1)];
     case 'ArrowDown':
-      return snapOrder[Math.max(index - 1, 0)];
+      return sheetSnapOrder[Math.max(index - 1, 0)];
     case 'Enter':
       // From closed, Enter opens to peek like a tap on the grip.
       return snap === 'closed' ? 'peek' : snap === 'half' ? 'full' : 'half';

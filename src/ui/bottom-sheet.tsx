@@ -1,11 +1,4 @@
-import {
-  useEffect,
-  useId,
-  useRef,
-  type CSSProperties,
-  type PointerEvent,
-  type ReactNode,
-} from 'react';
+import { useId, useRef, type CSSProperties, type PointerEvent, type ReactNode } from 'react';
 import { measureSnapHeights, pickSnap, type SheetSnapHeights } from './bottom-sheet-snap';
 import { SheetHandle, type SheetSnap } from './sheet-handle';
 
@@ -65,17 +58,15 @@ export function BottomSheet({
   const handleRef = useRef<HTMLButtonElement | null>(null);
 
   // Closing makes the content inert, which would drop focus held inside it to <body>.
-  useEffect(() => {
+  const changeSnap = (nextSnap: SheetSnap): void => {
     const sheet = sheetRef.current;
 
-    if (snap === 'closed' && sheet !== null) {
-      const focused = document.activeElement;
-
-      if (focused !== handleRef.current && (focused === document.body || sheet.contains(focused))) {
-        handleRef.current?.focus();
-      }
+    if (nextSnap === 'closed' && sheet?.contains(document.activeElement) === true) {
+      handleRef.current?.focus();
     }
-  }, [snap]);
+
+    onSnapChange(nextSnap);
+  };
 
   const startDrag = (event: PointerEvent<HTMLDivElement>): void => {
     const sheet = sheetRef.current;
@@ -141,7 +132,7 @@ export function BottomSheet({
     if (sheet.dataset.dragging === undefined) {
       // Pointer capture retargets the tap's click to the grip, so the closed notch reopens here.
       if (!isCancelled && snap === 'closed') {
-        onSnapChange('peek');
+        changeSnap('peek');
       }
 
       return;
@@ -158,7 +149,7 @@ export function BottomSheet({
     sheet.style.removeProperty('height');
 
     if (nextSnap !== snap) {
-      onSnapChange(nextSnap);
+      changeSnap(nextSnap);
     }
   };
 
@@ -191,7 +182,7 @@ export function BottomSheet({
           endDrag(event, true);
         }}
       >
-        <SheetHandle ref={handleRef} snap={snap} onSnapChange={onSnapChange} controlsId={sheetId} />
+        <SheetHandle ref={handleRef} snap={snap} onSnapChange={changeSnap} controlsId={sheetId} />
       </div>
       {/* A closed sheet only clips its content, so inert keeps Tab off the hidden controls. */}
       {peek !== undefined && (
