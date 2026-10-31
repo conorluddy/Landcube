@@ -40,7 +40,7 @@ export interface TerrainThrowables {
 
 interface TerrainThrowablesOptions {
   scene: THREE.Scene;
-  camera: THREE.Camera;
+  camera: THREE.PerspectiveCamera;
   getGroundHeight: GroundHeight;
 }
 
@@ -62,7 +62,10 @@ const boomerangReachEyeHeights = { min: 6, max: 20 };
 const boomerangLiftEyeHeights = 1.5;
 const fullChargeSeconds = 1;
 /** A gentle toss from the off hand: it peaks this far above the hand. */
-const tossPeakEyeHeights = 1.2;
+const tossPeakEyeHeights = 2.5;
+/** At its peak the tossed ball sits this far inside the top edge. */
+const tossTopMarginRadians = THREE.MathUtils.degToRad(4);
+const lookSettlePerSecond = 4;
 
 /** How near the bas the falling ball must be when the swing is released to connect. */
 export const strikeZoneEyeHeights = 0.6;
@@ -104,6 +107,42 @@ export function launchToss(origin: THREE.Vector3, scale: WalkScale): Projectile 
     position: origin.clone(),
     velocity: new THREE.Vector3(0, speed, 0),
   };
+}
+
+/** Elevation angles (radians) of a toss as seen from the eye, fixed at the moment of release. */
+export interface TossView {
+  startAngle: number;
+  peakAngle: number;
+  /** How far the look must lift for the peak to touch the top edge; 0 when it already fits. */
+  peakLift: number;
+}
+
+export function planTossView(
+  eye: THREE.Vector3,
+  ball: THREE.Vector3,
+  scale: WalkScale,
+  lookPitch: number,
+  halfFovRadians: number,
+): TossView {
+  const startAngle = getElevationAngle(eye, ball);
+  const peak = ball.clone().setY(ball.y + tossPeakEyeHeights * scale.eyeHeight);
+  const peakAngle = getElevationAngle(eye, peak);
+
+  return {
+    startAngle,
+    peakAngle,
+    peakLift: Math.max(0, peakAngle - lookPitch - (halfFovRadians - tossTopMarginRadians)),
+  };
+}
+
+/**
+ * The look lifts in step with the ball's climb, so the ball meets the top edge exactly at its peak
+ * and the view eases back down with it.
+ */
+export function getTossLookLift(tossView: TossView, ballAngle: number): number {
+  const climb = (ballAngle - tossView.startAngle) / (tossView.peakAngle - tossView.startAngle);
+
+  return THREE.MathUtils.clamp(climb, 0, 1) * tossView.peakLift;
 }
 
 /** True when a swing released now meets the ball; anything else is a whiff. */
@@ -172,6 +211,9 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
   let swingSecondsLeft = 0;
   /** A tossed sliotar still in the air, waiting for the swing. */
   let isTossed = false;
+  let tossView: TossView | undefined;
+  /** Pitch the toss has added on top of the walker's own look. */
+  let lookLift = 0;
 
   const recall = () => {
     projectile = undefined;
@@ -201,6 +243,13 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
     } else if (!isTossed) {
       projectile = launchToss(models.getSliotarPosition(new THREE.Vector3()), scale);
       isTossed = true;
+      tossView = planTossView(
+        camera.position,
+        projectile.position,
+        scale,
+        getLookPitch(camera),
+        THREE.MathUtils.degToRad(camera.fov / 2),
+      );
     } else {
       // A swing always plays; only a well-timed one meets the ball.
       swingSecondsLeft = swingSeconds;
@@ -266,6 +315,14 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
         models.setProjectile(projectile, heldItem);
       }
 
+      const targetLift =
+        isTossed && tossView && projectile
+          ? getTossLookLift(tossView, getElevationAngle(camera.position, projectile.position))
+          : lookLift * Math.exp(-lookSettlePerSecond * elapsedSeconds);
+
+      // Applied as a delta, so the walker's own mouse look carries on underneath.
+      camera.rotateX(targetLift - lookLift);
+      lookLift = targetLift;
       swingSecondsLeft = Math.max(swingSecondsLeft - elapsedSeconds, 0);
       models.updateViewmodel(camera, {
         heldItem,
@@ -278,6 +335,8 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
     stop() {
       projectile = undefined;
       isTossed = false;
+      tossView = undefined;
+      lookLift = 0;
       chargeStartedAtMs = undefined;
       swingSecondsLeft = 0;
 
@@ -308,6 +367,14 @@ function playHurlSlap(charge: number) {
   hurlSlap.volume = THREE.MathUtils.lerp(0.4, 1, charge);
   // Autoplay refusals are harmless: the strike still flies.
   hurlSlap.play().catch(() => undefined);
+}
+
+function getElevationAngle(eye: THREE.Vector3, point: THREE.Vector3) {
+  return Math.atan2(point.y - eye.y, Math.hypot(point.x - eye.x, point.z - eye.z));
+}
+
+function getLookPitch(camera: THREE.Camera) {
+  return Math.asin(THREE.MathUtils.clamp(camera.getWorldDirection(scratchDirection).y, -1, 1));
 }
 
 function readCharge(chargeStartedAtMs: number) {

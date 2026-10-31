@@ -3,10 +3,12 @@ import { test } from 'node:test';
 import * as THREE from 'three';
 import {
   boomerangDurationSeconds,
+  getTossLookLift,
   isInStrikeZone,
   launchBoomerang,
   launchSliotar,
   launchToss,
+  planTossView,
   strikeZoneEyeHeights,
   stepProjectile,
   type Projectile,
@@ -96,13 +98,13 @@ void test('a sliotar struck off the model edge is lost and resets', () => {
   assert.equal(kinds.at(-1), 'gone');
 });
 
-void test('a tossed sliotar rises about an eye height and falls back past the hand', () => {
+void test('a tossed sliotar rises a couple of eye heights and falls back past the hand', () => {
   const origin = new THREE.Vector3(0, 2 * scale.eyeHeight, 0);
-  const { heights } = simulate(launchToss(origin, scale), 1.2);
+  const { heights } = simulate(launchToss(origin, scale), 2);
   const peak = Math.max(...heights) - origin.y;
 
   assert.ok(
-    peak > scale.eyeHeight && peak < 1.5 * scale.eyeHeight,
+    peak > 2 * scale.eyeHeight && peak < 3 * scale.eyeHeight,
     `peak ${peak / scale.eyeHeight}`,
   );
   assert.ok(heights.some((height) => height < origin.y));
@@ -117,4 +119,16 @@ void test('a swing connects only when the ball is at the bas', () => {
 
   assert.equal(isInStrikeZone(near, bas, scale), true);
   assert.equal(isInStrikeZone(high, bas, scale), false);
+});
+
+void test('the look lifts with a toss so the ball meets the top edge at its peak', () => {
+  const eye = new THREE.Vector3(0, scale.eyeHeight, 0);
+  const ball = new THREE.Vector3(0, 0.2 * scale.eyeHeight, -0.8 * scale.eyeHeight);
+  const halfFov = THREE.MathUtils.degToRad(35);
+  const view = planTossView(eye, ball, scale, 0, halfFov);
+
+  assert.ok(view.peakLift > 0);
+  assert.equal(getTossLookLift(view, view.startAngle), 0);
+  assert.ok(Math.abs(getTossLookLift(view, view.peakAngle) - view.peakLift) < 1e-9);
+  assert.ok(view.peakAngle - view.peakLift < halfFov);
 });
