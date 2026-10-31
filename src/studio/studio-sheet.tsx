@@ -68,7 +68,7 @@ export function StudioSheet({
           onSelectSection={(section) => {
             c.selectSection(section);
 
-            if (workspace.sheetSnap === 'peek') {
+            if (workspace.sheetSnap === 'closed' || workspace.sheetSnap === 'peek') {
               c.workspace({ sheetSnap: 'half' });
             }
           }}

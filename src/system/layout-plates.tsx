@@ -96,6 +96,7 @@ function toPercentages(box: DesktopBox): CSSProperties {
 const ignore = (): void => undefined;
 
 const snapOptions = [
+  { value: 'closed', label: 'Closed' },
   { value: 'peek', label: 'Peek' },
   { value: 'half', label: 'Half' },
   { value: 'full', label: 'Full' },

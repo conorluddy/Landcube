@@ -20,6 +20,10 @@
   transition: height var(--lc-dur-sheet) var(--lc-ease);
 }
 
+.lc-bottom-sheet[data-snap='closed'] {
+  --lc-sheet-height: var(--lc-h-s); /* the grip alone; mirrors closedSheetHeightPx */
+}
+
 .lc-bottom-sheet[data-snap='peek'] {
   --lc-sheet-height: var(--lc-sheet-peek-height);
 }
@@ -79,6 +83,7 @@
 }
 
 /* Peek is a summary: the body cannot scroll until the sheet opens. */
+.lc-bottom-sheet[data-snap='closed'] .lc-bottom-sheet__body,
 .lc-bottom-sheet[data-snap='peek'] .lc-bottom-sheet__body {
   overflow-y: hidden;
 }

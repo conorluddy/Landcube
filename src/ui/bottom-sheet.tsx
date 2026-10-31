@@ -35,9 +35,9 @@ interface DragSample {
 const dragThresholdPx = 4;
 
 /**
- * Three-snap bottom sheet (C-14), pinned to the bottom of its containing block: heights resolve
- * against that block (peek `peekHeightPx`, half 55%, full less `fullTopInsetPx`). The handle drags
- * by pointer and steps by keyboard; the body scrolls at half and full, never at peek.
+ * Four-snap bottom sheet (C-14), pinned to the bottom of its containing block: heights resolve
+ * against that block (closed is the handle alone, peek `peekHeightPx`, half 55%, full less `fullTopInsetPx`). The handle drags
+ * by pointer, steps by keyboard and reopens on a tap when closed; the body scrolls at half and full.
  */
 export function BottomSheet({
   snap,
@@ -117,6 +117,11 @@ export function BottomSheet({
     drag.current = null;
 
     if (sheet.dataset.dragging === undefined) {
+      // Pointer capture retargets the tap's click to the grip, so the closed notch reopens here.
+      if (!isCancelled && snap === 'closed') {
+        onSnapChange('peek');
+      }
+
       return;
     }
 
@@ -177,5 +182,5 @@ export function BottomSheet({
 function clampDragHeight(sample: DragSample, clientY: number): number {
   const heightPx = sample.startHeightPx + sample.startY - clientY;
 
-  return Math.min(Math.max(heightPx, sample.heights.peek), sample.heights.full);
+  return Math.min(Math.max(heightPx, sample.heights.closed), sample.heights.full);
 }
