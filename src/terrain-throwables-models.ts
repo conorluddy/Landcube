@@ -181,6 +181,8 @@ function fitHurlGeometry(mesh: THREE.Mesh) {
   const fit = hurlLengthEyeHeights / length;
 
   geometry.scale(fit, fit, fit);
+  // Turned over about the shaft so the bas's toe points up when held across the view.
+  geometry.rotateY(Math.PI);
 
   return geometry;
 }
