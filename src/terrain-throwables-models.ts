@@ -25,11 +25,11 @@ export interface ViewmodelPose {
 }
 
 // Hand offset from the eye, in eye heights: lower right, just past the near plane.
-const handOffset = new THREE.Vector3(1.4, -1.05, -1.5);
+const handOffset = new THREE.Vector3(0.75, -0.62, -0.85);
 const spinRadiansPerSecond = 18;
 // The off hand holds the sliotar left of the hurl, ready to toss it up while charging.
-const sliotarInOffHand = new THREE.Vector3(-0.95, 0.55, 0);
-const sliotarTossEyeHeights = 0.45;
+const sliotarInOffHand = new THREE.Vector3(-1.05, 0.42, 0);
+const sliotarTossEyeHeights = 0.25;
 /** Long enough that the grip end sits off-screen, in eye heights. */
 const hurlLengthEyeHeights = 1.25;
 
