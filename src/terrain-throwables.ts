@@ -62,7 +62,8 @@ const boomerangReachEyeHeights = { min: 6, max: 20 };
 const boomerangLiftEyeHeights = 1.5;
 const fullChargeSeconds = 1;
 /** A gentle toss from the off hand: it peaks this far above the hand. */
-const tossPeakEyeHeights = 2.5;
+/** A tap barely lifts the ball (too low to swing at); a full hold sends it twice the old 2.5. */
+const tossPeakEyeHeights = { min: 0.3, max: 5 };
 /** At its peak the tossed ball sits this far inside the top edge. */
 const tossTopMarginRadians = THREE.MathUtils.degToRad(4);
 const lookSettlePerSecond = 4;
@@ -98,8 +99,19 @@ export function launchSliotar(
 }
 
 /** The first stage of a strike: the sliotar goes straight up out of the off hand. */
-export function launchToss(origin: THREE.Vector3, scale: WalkScale): Projectile {
-  const speed = Math.sqrt(2 * scale.gravityPerSecondSquared * tossPeakEyeHeights * scale.eyeHeight);
+/** How far above the hand a toss peaks; a longer hold throws it higher. */
+export function getTossPeakHeight(charge: number, scale: WalkScale): number {
+  return (
+    THREE.MathUtils.lerp(tossPeakEyeHeights.min, tossPeakEyeHeights.max, charge) * scale.eyeHeight
+  );
+}
+
+export function launchToss(
+  origin: THREE.Vector3,
+  peakHeight: number,
+  scale: WalkScale,
+): Projectile {
+  const speed = Math.sqrt(2 * scale.gravityPerSecondSquared * peakHeight);
 
   return {
     kind: 'flying',
@@ -120,12 +132,12 @@ export interface TossView {
 export function planTossView(
   eye: THREE.Vector3,
   ball: THREE.Vector3,
-  scale: WalkScale,
+  peakHeight: number,
   lookPitch: number,
   halfFovRadians: number,
 ): TossView {
   const startAngle = getElevationAngle(eye, ball);
-  const peak = ball.clone().setY(ball.y + tossPeakEyeHeights * scale.eyeHeight);
+  const peak = ball.clone().setY(ball.y + peakHeight);
   const peakAngle = getElevationAngle(eye, peak);
 
   return {
@@ -241,12 +253,14 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
       );
       swingSecondsLeft = swingSeconds;
     } else if (!isTossed) {
-      projectile = launchToss(models.getSliotarPosition(new THREE.Vector3()), scale);
+      const peakHeight = getTossPeakHeight(charge, scale);
+
+      projectile = launchToss(models.getSliotarPosition(new THREE.Vector3()), peakHeight, scale);
       isTossed = true;
       tossView = planTossView(
         camera.position,
         projectile.position,
-        scale,
+        peakHeight,
         getLookPitch(camera),
         THREE.MathUtils.degToRad(camera.fov / 2),
       );
