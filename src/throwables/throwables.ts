@@ -38,6 +38,8 @@ export interface TerrainThrowables {
   toggle(): void;
   recall(): void;
   step(elapsedSeconds: number): void;
+  /** Draws the held items over the frame just rendered, so they never clip into the near plane or terrain. */
+  renderViewmodel(renderer: THREE.WebGLRenderer): void;
   stop(): void;
   dispose(): void;
 }
@@ -49,6 +51,11 @@ interface TerrainThrowablesOptions {
 }
 
 const fullChargeSeconds = 1;
+
+/** Lights that should shade the held items must enable this layer too. */
+export const viewmodelLayer = 1;
+/** The held-item pass can use a far closer near plane than the world, which needs depth precision. */
+const viewmodelNearEyeHeights = 0.01;
 /** Below this a release is a tap: it balances the sliotar on the bas instead of tossing. */
 const tapCharge = 0.15;
 /** Once a tossed ball falls this far below the bas the chance has gone. */
@@ -280,6 +287,34 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
       if (hurlSwing && getSwingRadians(hurlSwing) === undefined) {
         hurlSwing = undefined;
       }
+    },
+    renderViewmodel(renderer) {
+      if (!models || !scale || models.viewmodel.parent !== scene) {
+        return;
+      }
+
+      // Loaded models swap in after start, so (re)tag every frame; it's a handful of objects.
+      models.viewmodel.traverse((object) => {
+        object.layers.set(viewmodelLayer);
+      });
+      const worldLayers = camera.layers.mask;
+      const worldNear = camera.near;
+      const wasAutoClearing = renderer.autoClear;
+      // The background draws on every render call; left on, it would paint over the world.
+      const worldBackground = scene.background;
+
+      camera.layers.set(viewmodelLayer);
+      camera.near = viewmodelNearEyeHeights * scale.eyeHeight;
+      camera.updateProjectionMatrix();
+      renderer.autoClear = false;
+      renderer.clearDepth();
+      scene.background = null;
+      renderer.render(scene, camera);
+      scene.background = worldBackground;
+      renderer.autoClear = wasAutoClearing;
+      camera.layers.mask = worldLayers;
+      camera.near = worldNear;
+      camera.updateProjectionMatrix();
     },
     stop() {
       projectile = undefined;

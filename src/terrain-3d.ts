@@ -86,7 +86,7 @@ import {
   type CameraShotPlayback,
 } from './terrain-camera-shots';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { createTerrainThrowables } from './throwables/throwables';
+import { createTerrainThrowables, viewmodelLayer } from './throwables/throwables';
 import { createTerrainWalk } from './terrain-walk';
 import { createTerrainTransitionAudio } from './terrain-transition-audio';
 import { createTerrainPostProcessing, type TerrainPostProcessing } from './terrain-post-processing';
@@ -345,6 +345,9 @@ export function createTerrain3d(
   const sunlight = new THREE.DirectionalLight(0xfff4df, defaultTerrainLighting.intensity);
   const fillLight = new THREE.HemisphereLight(0xe8f0ff, 0x36382c, defaultTerrainLighting.fill);
 
+  // The walk's held items render in their own pass and still need the scene's light.
+  sunlight.layers.enable(viewmodelLayer);
+  fillLight.layers.enable(viewmodelLayer);
   sunlight.castShadow = true;
   sunlight.shadow.mapSize.set(2048, 2048);
   sunlight.shadow.camera.left = sunlight.shadow.camera.bottom = -4;
@@ -594,6 +597,9 @@ export function createTerrain3d(
     }
   };
 
+  // Set once the walk toys exist; they draw their held items after the world.
+  const viewmodelPass: { render?: () => void } = {};
+
   const render = () => {
     updateFog();
 
@@ -606,6 +612,8 @@ export function createTerrain3d(
     } else {
       renderer.render(scene, camera);
     }
+
+    viewmodelPass.render?.();
   };
 
   const syncPostProcessing = () => {
@@ -866,6 +874,11 @@ export function createTerrain3d(
   };
 
   const throwables = createTerrainThrowables({ scene, camera: perspectiveCamera, getGroundHeight });
+
+  viewmodelPass.render = () => {
+    throwables.renderViewmodel(renderer);
+  };
+
   const walk = createTerrainWalk({
     camera: perspectiveCamera,
     canvas: renderer.domElement,
