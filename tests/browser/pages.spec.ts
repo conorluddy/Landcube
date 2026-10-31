@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { appUrl, download, enter3D, section, serveStudio } from './studio-fixture';
+import { appUrl, download, enter3D, section, serveHostedSite, serveStudio } from './studio-fixture';
 
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 
@@ -90,14 +90,7 @@ test('analytics loads only on the hosted site and never sees the design-link que
   await page.route('https://www.googletagmanager.com/**', (route) =>
     route.fulfill({ body: '', contentType: 'text/javascript' }),
   );
-  await page.route('https://landcu.be/**', async (route) => {
-    const filename = new URL(route.request().url()).pathname.slice(1) || 'index.html';
-
-    await route.fulfill({
-      body: await readFile(resolve('dist', filename)),
-      contentType: filename.endsWith('.js') ? 'text/javascript' : 'text/html',
-    });
-  });
+  await serveHostedSite(page);
   await page.addInitScript(() => {
     localStorage.setItem('landcube-analytics-consent', 'granted');
   });
@@ -135,14 +128,7 @@ test('analytics asks on the hosted site, loads nothing until allowed, and rememb
   await page.route('https://www.googletagmanager.com/**', (route) =>
     route.fulfill({ body: '', contentType: 'text/javascript' }),
   );
-  await page.route('https://landcu.be/**', async (route) => {
-    const filename = new URL(route.request().url()).pathname.slice(1) || 'index.html';
-
-    await route.fulfill({
-      body: await readFile(resolve('dist', filename)),
-      contentType: filename.endsWith('.js') ? 'text/javascript' : 'text/html',
-    });
-  });
+  await serveHostedSite(page);
   page.on('request', (request) => {
     if (request.url().includes('googletagmanager.com')) {
       tagRequests.push(request.url());
@@ -167,14 +153,7 @@ test('analytics asks on the hosted site, loads nothing until allowed, and rememb
 test('declining analytics loads no tag and is remembered', async ({ page }) => {
   const tagRequests: string[] = [];
 
-  await page.route('https://landcu.be/**', async (route) => {
-    const filename = new URL(route.request().url()).pathname.slice(1) || 'index.html';
-
-    await route.fulfill({
-      body: await readFile(resolve('dist', filename)),
-      contentType: filename.endsWith('.js') ? 'text/javascript' : 'text/html',
-    });
-  });
+  await serveHostedSite(page);
   page.on('request', (request) => {
     if (request.url().includes('googletagmanager.com')) {
       tagRequests.push(request.url());
