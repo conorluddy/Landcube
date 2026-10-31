@@ -29,6 +29,8 @@ export interface ViewmodelPose {
   swing: number;
   /** The hurl's yaw: positive pulled back, 0 at rest, negative following through. */
   hurlSwingRadians: number;
+  /** Rolls the hurl so the bas faces up, with the sliotar resting on it. */
+  isBasFlat: boolean;
   elapsedSeconds: number;
 }
 
@@ -43,6 +45,10 @@ const sliotarInOffHand = new THREE.Vector3(-1.05, -0.15, 0);
 const sliotarTossEyeHeights = 0.25;
 /** Long enough that the grip end sits off-screen, in eye heights. */
 const hurlLengthEyeHeights = 1.25;
+const sliotarRadius = 0.06;
+const basHalfThickness = 0.0075;
+const hurlRollPerSecond = 12;
+const worldUp = new THREE.Vector3(0, 1, 0);
 
 // === PUBLIC API ===
 
@@ -53,13 +59,18 @@ export function createThrowableModels(): ThrowableModels {
   const boomerangWood = new THREE.MeshStandardMaterial({ color: 0x8a5a33, roughness: 0.6 });
   const viewmodel = new THREE.Group();
   const hand = new THREE.Group();
-  const hurl = createHurl(ash);
+  // hurl: resting orientation; hurlRoll: roll about the shaft; hurlContent: the mesh and sweet spot.
+  const hurl = new THREE.Group();
+  const hurlRoll = new THREE.Group();
+  const hurlContent = createHurl(ash);
   const basSweetSpot = new THREE.Object3D();
   const restBasPosition = new THREE.Vector3();
 
   basSweetSpot.position.set(0, -0.08, 0);
-  hurl.add(basSweetSpot);
-  void replaceWithModelledHurl(hurl, ash, basSweetSpot);
+  hurlContent.add(basSweetSpot);
+  hurlRoll.add(hurlContent);
+  hurl.add(hurlRoll);
+  void replaceWithModelledHurl(hurl, hurlContent, ash, basSweetSpot);
   const heldSliotar = createSliotar(leather, seam);
   const heldBoomerang = createBoomerang(boomerangWood);
   const projectileMesh = new THREE.Group();
@@ -97,7 +108,9 @@ export function createThrowableModels(): ThrowableModels {
     getBasFace(target) {
       basSweetSpot.getWorldPosition(target.center);
       // The bas faces the eye at rest; the swing drives it forward, along the hurl's -Z.
-      target.normal.set(0, 0, -1).applyQuaternion(hurl.getWorldQuaternion(scratchQuaternion));
+      target.normal
+        .set(0, 0, -1)
+        .applyQuaternion(hurlContent.getWorldQuaternion(scratchQuaternion));
 
       return target;
     },
@@ -114,7 +127,10 @@ export function createThrowableModels(): ThrowableModels {
       heldSliotar.visible = heldItem === 'sliotar' && !projectile;
       heldBoomerang.visible = heldItem === 'boomerang' && !projectile;
     },
-    updateViewmodel(camera, { heldItem, charge, swing, hurlSwingRadians, elapsedSeconds }) {
+    updateViewmodel(
+      camera,
+      { heldItem, charge, swing, hurlSwingRadians, isBasFlat, elapsedSeconds },
+    ) {
       camera.updateMatrixWorld();
       camera.matrixWorld.decompose(viewmodel.position, scratchQuaternion, scratchScale);
       // The hurl trails the look slightly, as if carried by an arm rather than bolted to the eye.
@@ -126,13 +142,29 @@ export function createThrowableModels(): ThrowableModels {
       viewmodel.scale.setScalar(eyeHeight);
       hand.position.copy(handOffset);
       hand.rotation.set(0, 0, heldItem === 'sliotar' ? restHandRollRadians : 0);
+      // A +90° roll turns the bas face (content +Z) to the hurl's local +X, mostly up across the view.
+      hurlRoll.rotation.y +=
+        ((isBasFlat ? Math.PI / 2 : 0) - hurlRoll.rotation.y) *
+        (1 - Math.exp(-hurlRollPerSecond * elapsedSeconds));
       hand.updateMatrixWorld(true);
+      // The sweet spot lies on the shaft axis, so the roll doesn't move it.
       basSweetSpot.getWorldPosition(restBasPosition);
       poseHand(hand, heldItem, charge, swing, hurlSwingRadians);
       hand.updateMatrixWorld(true);
-      heldSliotar.position
-        .copy(sliotarInOffHand)
-        .setY(sliotarInOffHand.y + charge * sliotarTossEyeHeights);
+
+      if (isBasFlat) {
+        heldSliotar.position.copy(
+          hand.worldToLocal(
+            basSweetSpot
+              .getWorldPosition(scratchPosition)
+              .addScaledVector(worldUp, (sliotarRadius + basHalfThickness) * eyeHeight),
+          ),
+        );
+      } else {
+        heldSliotar.position
+          .copy(sliotarInOffHand)
+          .setY(sliotarInOffHand.y + charge * sliotarTossEyeHeights);
+      }
 
       if (projectileMesh.visible && thrownBoomerang.visible) {
         thrownBoomerang.rotation.y += spinRadiansPerSecond * elapsedSeconds;
@@ -159,6 +191,7 @@ export function createThrowableModels(): ThrowableModels {
 // === HELPERS ===
 
 const scratchScale = new THREE.Vector3();
+const scratchPosition = new THREE.Vector3();
 const scratchQuaternion = new THREE.Quaternion();
 
 /** Charge pulls the item back; the swing sweeps through (hurl: sideways arc; boomerang: overhand). */
@@ -185,6 +218,7 @@ function poseHand(
 /** Swaps in the modelled hurl once it loads; the procedural one stays if it can't. */
 async function replaceWithModelledHurl(
   hurl: THREE.Group,
+  hurlContent: THREE.Group,
   material: THREE.Material,
   basSweetSpot: THREE.Object3D,
 ) {
@@ -199,8 +233,9 @@ async function replaceWithModelledHurl(
       throw new Error(`${hurlModelUrl} has no mesh`);
     }
 
-    hurl.clear();
-    hurl.add(new THREE.Mesh(fitHurlGeometry(mesh as THREE.Mesh), material), basSweetSpot);
+    hurlContent.clear();
+    hurlContent.rotation.set(0, 0, 0);
+    hurlContent.add(new THREE.Mesh(fitHurlGeometry(mesh as THREE.Mesh), material), basSweetSpot);
     // The modelled hurl stands grip-down, so the bas's middle sits near the top.
     basSweetSpot.position.set(0, hurlLengthEyeHeights * 0.88, 0);
     // Across the lower view, as when held: the grip off-screen right, rising to the bas at left.
@@ -268,7 +303,7 @@ function createHurl(material: THREE.Material) {
 /** A white ball with a raised seam ring, sized to its physics radius. */
 function createSliotar(leather: THREE.Material, seam: THREE.Material) {
   const group = new THREE.Group();
-  const radius = 0.06;
+  const radius = sliotarRadius;
   const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(radius, 1), leather);
   const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, radius * 0.12, 4, 16), seam);
 

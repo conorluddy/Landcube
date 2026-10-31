@@ -107,7 +107,9 @@ export function createTerrainWalk(options: TerrainWalkOptions): TerrainWalk {
   hint.setAttribute('aria-live', 'polite');
 
   const updateHint = () => {
-    const toyHint = toy ? ' · Click toss, click again to strike · Q hurl/boomerang · E recall' : '';
+    const toyHint = toy
+      ? ' · Tap: ball on hurl · Hold: toss, again to strike · Q hurl/boomerang · E recall'
+      : '';
 
     hint.textContent = `WASD move · Shift sprint · Space jump${toyHint} · I invert look (${isLookInverted ? 'on' : 'off'}) · Esc exit`;
   };

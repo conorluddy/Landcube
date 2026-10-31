@@ -49,6 +49,8 @@ interface TerrainThrowablesOptions {
 }
 
 const fullChargeSeconds = 1;
+/** Below this a release is a tap: it balances the sliotar on the bas instead of tossing. */
+const tapCharge = 0.15;
 /** Once a tossed ball falls this far below the bas the chance has gone. */
 const whiffBelowBasEyeHeights = 0.6;
 const lookSettlePerSecond = 4;
@@ -73,10 +75,12 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
   let boomerangFlickSecondsLeft = 0;
   /** Pitch the toss has added on top of the walker's own look. */
   let lookLift = 0;
+  let isBalanced = false;
 
   const recall = () => {
     projectile = undefined;
     toss = undefined;
+    isBalanced = false;
     models?.setProjectile(undefined, heldItem);
   };
 
@@ -121,8 +125,14 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
     } else if (toss) {
       // The swing always plays; the ball flies only if the bas actually sweeps through it.
       hurlSwing = { elapsedSeconds: 0, pullbackRadians: getPullbackRadians(charge), charge };
+    } else if (charge < tapCharge) {
+      isBalanced = !isBalanced;
+
+      return;
     } else {
+      // From the off hand, or from the bas when balanced: the origin is the held ball either way.
       tossSliotar(charge, models, scale);
+      isBalanced = false;
     }
 
     models.setProjectile(projectile, heldItem);
@@ -180,6 +190,7 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
       charge,
       swing: 1 - boomerangFlickSecondsLeft / boomerangFlickSeconds,
       hurlSwingRadians: swingRadians ?? (isChargingSwing ? getPullbackRadians(charge) : 0),
+      isBasFlat: isBalanced,
       elapsedSeconds,
     });
   };
@@ -227,7 +238,8 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
     },
     charge() {
       // With a ball in the air this charges the swing; otherwise it recalls the last one, like E.
-      if (!toss) {
+      // Only with a ball out, so a tap on the held ball keeps its balanced state to toggle.
+      if (!toss && projectile) {
         recall();
       }
 
@@ -268,6 +280,7 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
       chargeStartedAtMs = undefined;
       boomerangFlickSecondsLeft = 0;
       lookLift = 0;
+      isBalanced = false;
 
       if (models) {
         scene.remove(models.viewmodel, models.projectileMesh);

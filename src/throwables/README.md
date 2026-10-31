@@ -2,6 +2,8 @@
 
 Walk-only toys (spike): toss a sliotar and swing the hurl through it, or throw a boomerang that loops back. `terrain-walk.ts` drives them through the `WalkToy` interface; `terrain-3d.ts` creates them. State is ephemeral and never reaches links or exports.
 
+A short tap (under ~150 ms) with the sliotar held rolls the hurl bas-up and rests the ball on it; tap again to return it to the off hand. A hold-release from there hops the ball off the bas into the usual toss → swing.
+
 | File            | Owns                                                                               |
 | --------------- | ---------------------------------------------------------------------------------- |
 | `throwables.ts` | The controller: input stages (toss → swing, boomerang), per-frame order, look lift |
