@@ -58,6 +58,7 @@ import type { TerrainStillScale } from '../export/still-export';
 import { defaultRoadStyle, roadDetailClasses, roadSpanLimitsKm } from '../constants/roads';
 import { track } from '../analytics';
 import { operationErrorCodes } from '../constants/operations';
+import { designPalettePresets, type PalettePresetName } from '../constants/palettes';
 import { parseDesignParameters } from '../design-settings';
 import type { SavedDesign } from '../saved-designs';
 import type { RoadNetwork, RoadStyle } from '../types/roads';
@@ -364,6 +365,8 @@ export interface StudioController {
   restoreSavedDesign: (saved: SavedDesign) => Promise<Result<void>>;
   toggleRoute: () => void;
   design: (patch: Partial<DesignSettings>) => boolean;
+  /** Applies a named palette preset and reports it; the one entry point for every preset control. */
+  applyPalettePreset: (name: PalettePresetName) => boolean;
   /** Starts (or retargets) the A/B wipe against a palette preset; unknown ids are ignored. */
   startCompare: (presetId: string) => void;
   /** Moves the wipe divider, clamped to 0-1; a no-op while not comparing. */
@@ -1115,6 +1118,15 @@ export function createStudioController(
 
       if (ok) {
         sync();
+      }
+
+      return ok;
+    },
+    applyPalettePreset(name: PalettePresetName) {
+      const ok = controller.design(designPalettePresets[name]);
+
+      if (ok) {
+        track('preset_apply', { name });
       }
 
       return ok;

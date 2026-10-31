@@ -11,25 +11,51 @@ import { Button } from '../ui/button';
 import { SignalMark } from '../ui/signal-mark';
 import { browserLocalStorage, type BrowserStorage } from './browser-storage';
 
-/** Asks once, on the hosted site, whether anonymous usage analytics may load; the answer is remembered. */
-export function AnalyticsConsentDialog({
-  hostname = location.hostname,
-  storage = browserLocalStorage,
-}: {
-  hostname?: string;
-  storage?: Pick<BrowserStorage, 'getItem' | 'setItem'>;
-}): ReactNode {
-  const [isOpen, setIsOpen] = useState(
+export interface AnalyticsConsentPrompt {
+  /** True on the hosted site until the visitor has chosen. */
+  isAsking: boolean;
+  choose: (consent: 'granted' | 'denied') => void;
+}
+
+// === PUBLIC API ===
+
+/** Whether to ask for analytics consent, and how to record the answer. */
+export function useAnalyticsConsentPrompt(
+  hostname: string = location.hostname,
+  storage: Pick<BrowserStorage, 'getItem' | 'setItem'> = browserLocalStorage,
+): AnalyticsConsentPrompt {
+  const [isAsking, setIsAsking] = useState(
     () => isAnalyticsHost(hostname) && readAnalyticsConsent(storage) === 'unset',
   );
+
+  return {
+    isAsking,
+    choose: (consent) => {
+      applyAnalyticsChoice(consent, storage, logOperationError);
+      setIsAsking(false);
+    },
+  };
+}
+
+/** Index of the button to focus next; Tab and Shift+Tab wrap, so focus never leaves a modal. */
+export function getTrappedFocusIndex(
+  activeIndex: number,
+  count: number,
+  isBackward: boolean,
+): number {
+  return (activeIndex + (isBackward ? -1 : 1) + count) % count;
+}
+
+/** Modal card asking whether anonymous usage analytics may load. Render it only while asking. */
+export function AnalyticsConsentDialog({
+  onChoose,
+}: {
+  onChoose: AnalyticsConsentPrompt['choose'];
+}): ReactNode {
   const declineButton = useRef<HTMLButtonElement>(null);
   const allowButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
     const previouslyFocused = document.activeElement;
 
     declineButton.current?.focus();
@@ -39,28 +65,24 @@ export function AnalyticsConsentDialog({
         previouslyFocused.focus();
       }
     };
-  }, [isOpen]);
+  }, []);
 
-  if (!isOpen) {
-    return null;
-  }
-
-  const choose = (consent: 'granted' | 'denied'): void => {
-    applyAnalyticsChoice(consent, storage, logOperationError);
-    setIsOpen(false);
-  };
-
-  // The dialog is modal: Tab cycles between its two buttons instead of reaching the studio behind it.
+  // The studio behind is inert; this keeps Tab cycling between the two buttons.
   const keepFocusInside = (event: ReactKeyboardEvent): void => {
     if (event.key !== 'Tab') {
       return;
     }
 
+    const buttons = [declineButton.current, allowButton.current];
+
     event.preventDefault();
-    (document.activeElement === declineButton.current
-      ? allowButton
-      : declineButton
-    ).current?.focus();
+    buttons[
+      getTrappedFocusIndex(
+        buttons.indexOf(document.activeElement as HTMLButtonElement),
+        2,
+        event.shiftKey,
+      )
+    ]?.focus();
   };
 
   return (
@@ -93,7 +115,7 @@ export function AnalyticsConsentDialog({
               ref={declineButton}
               isFullWidth
               onClick={() => {
-                choose('denied');
+                onChoose('denied');
               }}
             >
               No thanks
@@ -102,7 +124,7 @@ export function AnalyticsConsentDialog({
               ref={allowButton}
               isFullWidth
               onClick={() => {
-                choose('granted');
+                onChoose('granted');
               }}
             >
               Allow analytics

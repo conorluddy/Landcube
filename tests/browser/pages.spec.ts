@@ -144,12 +144,18 @@ test('analytics asks on the hosted site, loads nothing until allowed, and rememb
   await expect(dialog).toBeVisible();
   expect(tagRequests).toEqual([]);
 
+  await expect(dialog.getByRole('button', { name: 'No thanks' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByRole('button', { name: 'Allow analytics' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByRole('button', { name: 'No thanks' })).toBeFocused();
+
   await dialog.getByRole('button', { name: 'Allow analytics' }).click();
   await expect(dialog).toBeHidden();
   await expect.poll(() => tagRequests.length).toBeGreaterThan(0);
 
   await page.reload();
-  await expect(page.getByRole('button', { name: 'New landscape' })).toBeVisible({
+  await expect(page.getByRole('button', { name: 'Copy style link' })).toBeVisible({
     timeout: appBootTimeoutMs,
   });
   await expect(dialog).toBeHidden();
@@ -171,7 +177,7 @@ test('declining analytics loads no tag and is remembered', async ({ page }) => {
     .getByRole('button', { name: 'No thanks' })
     .click();
   await page.reload();
-  await expect(page.getByRole('button', { name: 'New landscape' })).toBeVisible({
+  await expect(page.getByRole('button', { name: 'Copy style link' })).toBeVisible({
     timeout: appBootTimeoutMs,
   });
   await expect(page.getByRole('alertdialog', { name: 'Usage analytics' })).toBeHidden();

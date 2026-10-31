@@ -1,34 +1,23 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { analyticsConsentStorageKey } from '../analytics-consent';
 import { renderMarkup } from '../ui/test-helpers';
-import { AnalyticsConsentDialog } from './analytics-consent-dialog';
+import { AnalyticsConsentDialog, getTrappedFocusIndex } from './analytics-consent-dialog';
 
-const storageWith = (value: string | null) => ({
-  getItem: () => value,
-  setItem: () => undefined,
-});
-
-void test('the hosted site asks until a choice is remembered', () => {
-  const markup = renderMarkup(
-    <AnalyticsConsentDialog hostname="landcu.be" storage={storageWith(null)} />,
-  );
+void test('the dialog offers equal accept and decline actions', () => {
+  const markup = renderMarkup(<AnalyticsConsentDialog onChoose={() => undefined} />);
 
   assert.match(markup, /role="alertdialog"/);
+  assert.match(markup, /aria-modal="true"/);
   assert.match(markup, /No thanks/);
   assert.match(markup, /Allow analytics/);
 });
 
-void test('a remembered choice or another host shows no dialog', () => {
-  for (const [hostname, stored] of [
-    ['landcu.be', 'granted'],
-    ['landcu.be', 'denied'],
-    ['localhost', null],
-  ] as const) {
-    assert.equal(
-      renderMarkup(<AnalyticsConsentDialog hostname={hostname} storage={storageWith(stored)} />),
-      '',
-      `${hostname} ${String(stored)} (${analyticsConsentStorageKey})`,
-    );
-  }
+void test('Tab cycles decline, allow, decline and Shift+Tab goes back', () => {
+  assert.equal(getTrappedFocusIndex(0, 2, false), 1);
+  assert.equal(getTrappedFocusIndex(1, 2, false), 0);
+  assert.equal(getTrappedFocusIndex(0, 2, true), 1);
+  assert.equal(getTrappedFocusIndex(1, 2, true), 0);
+  // Focus outside the dialog (index -1) enters it at the first or last button.
+  assert.equal(getTrappedFocusIndex(-1, 2, false), 0);
+  assert.equal(getTrappedFocusIndex(-1, 2, true), 1);
 });

@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { track } from '../../analytics';
 import { designPalettePresets } from '../../constants/palettes';
 import { ListRow } from '../../ui/list-row';
 import { PresetCard, PresetStrip } from '../../ui/preset-card';
@@ -25,8 +24,7 @@ export function PresetsPage({
     designPalettePresets[name].lineColor === state.design.lineColor;
 
   const apply = (name: PaletteName): void => {
-    c.design(designPalettePresets[name]);
-    track('preset_apply', { name });
+    c.applyPalettePreset(name);
   };
 
   return (

@@ -1,6 +1,6 @@
 /** Typed Google Analytics events for the hosted site; every call is a no-op until a visitor allows analytics. */
 
-import type { designPalettePresets } from './constants/palettes';
+import type { PalettePresetName } from './constants/palettes';
 import type { FaultCode, OperationErrorCode } from './constants/faults';
 
 type NoParameters = Record<string, never>;
@@ -12,7 +12,7 @@ export interface AnalyticsEvents {
   terrain_load: { source: 'real' | 'generated'; span_km?: number };
   terrain_load_failed: { fault: FaultCode };
   view_change: { view: '2d' | '3d' };
-  preset_apply: { name: keyof typeof designPalettePresets };
+  preset_apply: { name: PalettePresetName };
   route_import: NoParameters;
   route_export: NoParameters;
   walk_start: NoParameters;
