@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Projectile, Throwable } from './terrain-throwables';
+import type { BasFace } from './terrain-throwables-swing';
 
 /** Procedural low-poly hurl, sliotar and boomerang: a held viewmodel plus the thrown mesh. */
 export interface ThrowableModels {
@@ -13,6 +14,8 @@ export interface ThrowableModels {
   getSliotarPosition(target: THREE.Vector3): THREE.Vector3;
   /** The bas's sweet spot at rest, ignoring the charge pull-back, so the strike zone stays put. */
   getBasPosition(target: THREE.Vector3): THREE.Vector3;
+  /** The bas as posed this frame: where it is and which way the swing drives it. */
+  getBasFace(target: BasFace): BasFace;
   setProjectile(projectile: Projectile | undefined, heldItem: Throwable): void;
   updateViewmodel(camera: THREE.Camera, pose: ViewmodelPose): void;
   dispose(): void;
@@ -23,14 +26,17 @@ export interface ViewmodelPose {
   isThrown: boolean;
   /** 0–1 pull-back while the button is held. */
   charge: number;
-  /** 0–1 progress through the release swing; 1 at rest. */
+  /** 0–1 progress through the boomerang's release flick; 1 at rest. */
   swing: number;
+  /** The hurl's yaw: positive pulled back, 0 at rest, negative following through. */
+  hurlSwingRadians: number;
   elapsedSeconds: number;
 }
 
 // Hand offset from the eye, in eye heights: lower right, just past the near plane.
 const handOffset = new THREE.Vector3(0.55, -0.8, -0.85);
 const spinRadiansPerSecond = 18;
+const restHandRollRadians = -0.3;
 /** How quickly the held item catches up with the look; lower trails further. */
 const lookFollowPerSecond = 14;
 // Below the bottom edge, under the bas: the toss rises into view and drops past the sweet spot.
@@ -89,6 +95,13 @@ export function createThrowableModels(): ThrowableModels {
     getBasPosition(target) {
       return target.copy(restBasPosition);
     },
+    getBasFace(target) {
+      basSweetSpot.getWorldPosition(target.center);
+      // The bas faces the eye at rest; the swing drives it forward, along the hurl's -Z.
+      target.normal.set(0, 0, -1).applyQuaternion(hurl.getWorldQuaternion(scratchQuaternion));
+
+      return target;
+    },
     setProjectile(projectile, heldItem) {
       projectileMesh.visible = projectile !== undefined;
       thrownSliotar.visible = projectile?.item === 'sliotar';
@@ -102,7 +115,7 @@ export function createThrowableModels(): ThrowableModels {
       heldSliotar.visible = heldItem === 'sliotar' && !projectile;
       heldBoomerang.visible = heldItem === 'boomerang' && !projectile;
     },
-    updateViewmodel(camera, { heldItem, charge, swing, elapsedSeconds }) {
+    updateViewmodel(camera, { heldItem, charge, swing, hurlSwingRadians, elapsedSeconds }) {
       camera.updateMatrixWorld();
       camera.matrixWorld.decompose(viewmodel.position, scratchQuaternion, scratchScale);
       // The hurl trails the look slightly, as if carried by an arm rather than bolted to the eye.
@@ -113,9 +126,11 @@ export function createThrowableModels(): ThrowableModels {
       hasSettledPose = true;
       viewmodel.scale.setScalar(eyeHeight);
       hand.position.copy(handOffset);
-      hand.rotation.set(0, 0, 0);
+      hand.rotation.set(0, 0, heldItem === 'sliotar' ? restHandRollRadians : 0);
+      hand.updateMatrixWorld(true);
       basSweetSpot.getWorldPosition(restBasPosition);
-      poseHand(hand, heldItem, charge, swing);
+      poseHand(hand, heldItem, charge, swing, hurlSwingRadians);
+      hand.updateMatrixWorld(true);
       heldSliotar.position
         .copy(sliotarInOffHand)
         .setY(sliotarInOffHand.y + charge * sliotarTossEyeHeights);
@@ -148,15 +163,20 @@ const scratchScale = new THREE.Vector3();
 const scratchQuaternion = new THREE.Quaternion();
 
 /** Charge pulls the item back; the swing sweeps through (hurl: sideways arc; boomerang: overhand). */
-function poseHand(hand: THREE.Group, heldItem: Throwable, charge: number, swing: number) {
+function poseHand(
+  hand: THREE.Group,
+  heldItem: Throwable,
+  charge: number,
+  swing: number,
+  hurlSwingRadians: number,
+) {
   const follow = Math.sin(Math.PI * Math.min(swing, 1));
 
   hand.rotation.set(0, 0, 0);
 
   if (heldItem === 'sliotar') {
-    hand.rotation.y = charge * 0.9 - follow * 1.4;
-    hand.rotation.z = -0.3;
-    hand.position.x += charge * 0.15 - follow * 0.3;
+    // A level sweep about the hand, so the bas passes back through its rest pose mid-swing.
+    hand.rotation.set(0, hurlSwingRadians, restHandRollRadians);
   } else {
     hand.rotation.x = charge * 0.9 - follow * 1.6;
     hand.position.y += charge * 0.12 - follow * 0.1;

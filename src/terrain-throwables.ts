@@ -2,6 +2,15 @@ import * as THREE from 'three';
 import { isSoundMuted } from './sound-preference';
 import type { WalkScale } from './terrain-walk';
 import { createThrowableModels, type ThrowableModels } from './terrain-throwables-models';
+import {
+  basContactRadiusEyeHeights,
+  findBasContact,
+  getPullbackRadians,
+  getSwingRadians,
+  isInStrikePhase,
+  type ContactFrame,
+  type HurlSwing,
+} from './terrain-throwables-swing';
 
 /** Spike: walk-only toys. A hurl strikes a sliotar across the terrain; a boomerang loops back. */
 export type Throwable = 'sliotar' | 'boomerang';
@@ -61,15 +70,16 @@ export const boomerangDurationSeconds = 2.5;
 const boomerangReachEyeHeights = { min: 6, max: 20 };
 const boomerangLiftEyeHeights = 1.5;
 const fullChargeSeconds = 1;
-/** A gentle toss from the off hand: it peaks this far above the hand. */
 /** A tap barely lifts the ball (too low to swing at); a full hold sends it twice the old 2.5. */
 const tossPeakEyeHeights = { min: 0.3, max: 5 };
 /** At its peak the tossed ball sits this far inside the top edge. */
 const tossTopMarginRadians = THREE.MathUtils.degToRad(4);
 const lookSettlePerSecond = 4;
 
-/** How near the bas the falling ball must be when the swing is released to connect. */
-export const strikeZoneEyeHeights = 0.6;
+/** Once a tossed ball falls this far below the bas the chance has gone. */
+const whiffBelowBasEyeHeights = 0.6;
+/** How much the bas's face, against the view, aims a strike; timing skews the face. */
+const faceAimWeight = 0.6;
 const swingSeconds = 0.3;
 
 // Reused every step so throwing doesn't churn the garbage collector.
@@ -157,15 +167,6 @@ export function getTossLookLift(tossView: TossView, ballAngle: number): number {
   return THREE.MathUtils.clamp(climb, 0, 1) * tossView.peakLift;
 }
 
-/** True when a swing released now meets the ball; anything else is a whiff. */
-export function isInStrikeZone(
-  ballPosition: THREE.Vector3,
-  basPosition: THREE.Vector3,
-  scale: WalkScale,
-): boolean {
-  return ballPosition.distanceTo(basPosition) <= strikeZoneEyeHeights * scale.eyeHeight;
-}
-
 export function launchBoomerang(
   origin: THREE.Vector3,
   viewDirection: THREE.Vector3,
@@ -226,11 +227,62 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
   let tossView: TossView | undefined;
   /** Pitch the toss has added on top of the walker's own look. */
   let lookLift = 0;
+  let hurlSwing: HurlSwing | undefined;
+  let previousContactFrame: ContactFrame | undefined;
+
+  const strikeAt = (contact: NonNullable<ReturnType<typeof findBasContact>>, swing: HurlSwing) => {
+    if (!scale) {
+      return;
+    }
+
+    const contactRadius = basContactRadiusEyeHeights * scale.eyeHeight;
+    // Dead centre keeps all the power; the rim of the bas loses up to half.
+    const quality = 1 - 0.5 * (contact.offset / contactRadius) ** 2;
+    const aim = contact.direction
+      .multiplyScalar(faceAimWeight)
+      .addScaledVector(camera.getWorldDirection(scratchDirection), 1 - faceAimWeight)
+      .normalize();
+
+    projectile = launchSliotar(contact.point, aim, swing.charge * quality, scale);
+    isTossed = false;
+    playHurlSlap(swing.charge * quality);
+  };
 
   const recall = () => {
     projectile = undefined;
     isTossed = false;
     models?.setProjectile(undefined, heldItem);
+  };
+
+  /** Tests the ball against the bas as it sweeps, between last frame and this one. */
+  const checkBasContact = () => {
+    if (
+      !hurlSwing ||
+      !isInStrikePhase(hurlSwing) ||
+      !isTossed ||
+      !projectile ||
+      !models ||
+      !scale
+    ) {
+      previousContactFrame = undefined;
+
+      return;
+    }
+
+    const current: ContactFrame = {
+      ball: projectile.position.clone(),
+      face: models.getBasFace({ center: new THREE.Vector3(), normal: new THREE.Vector3() }),
+    };
+    const contact =
+      previousContactFrame &&
+      findBasContact(previousContactFrame, current, basContactRadiusEyeHeights * scale.eyeHeight);
+
+    previousContactFrame = current;
+
+    if (contact) {
+      strikeAt(contact, hurlSwing);
+      models.setProjectile(projectile, heldItem);
+    }
   };
 
   const release = () => {
@@ -265,17 +317,9 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
         THREE.MathUtils.degToRad(camera.fov / 2),
       );
     } else {
-      // A swing always plays; only a well-timed one meets the ball.
-      swingSecondsLeft = swingSeconds;
-      const bas = models.getBasPosition(new THREE.Vector3());
-
-      if (projectile && isInStrikeZone(projectile.position, bas, scale)) {
-        const viewDirection = camera.getWorldDirection(scratchDirection);
-
-        projectile = launchSliotar(projectile.position, viewDirection, charge, scale);
-        isTossed = false;
-        playHurlSlap(charge);
-      }
+      // The swing always plays; the ball flies only if the bas actually sweeps through it.
+      hurlSwing = { elapsedSeconds: 0, pullbackRadians: getPullbackRadians(charge), charge };
+      previousContactFrame = undefined;
     }
 
     models.setProjectile(projectile, heldItem);
@@ -325,7 +369,7 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
 
         isTossed &&=
           projectile !== undefined &&
-          projectile.position.y > basHeight - strikeZoneEyeHeights * scale.eyeHeight;
+          projectile.position.y > basHeight - whiffBelowBasEyeHeights * scale.eyeHeight;
         models.setProjectile(projectile, heldItem);
       }
 
@@ -338,13 +382,28 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
       camera.rotateX(targetLift - lookLift);
       lookLift = targetLift;
       swingSecondsLeft = Math.max(swingSecondsLeft - elapsedSeconds, 0);
+      const charge = chargeStartedAtMs === undefined ? 0 : readCharge(chargeStartedAtMs);
+
+      if (hurlSwing) {
+        hurlSwing.elapsedSeconds += elapsedSeconds;
+      }
+
+      const swingRadians = hurlSwing ? getSwingRadians(hurlSwing) : undefined;
+      const isChargingSwing = isTossed && chargeStartedAtMs !== undefined;
+
       models.updateViewmodel(camera, {
         heldItem,
         isThrown: projectile !== undefined,
-        charge: chargeStartedAtMs === undefined ? 0 : readCharge(chargeStartedAtMs),
+        charge,
         swing: 1 - swingSecondsLeft / swingSeconds,
+        hurlSwingRadians: swingRadians ?? (isChargingSwing ? getPullbackRadians(charge) : 0),
         elapsedSeconds,
       });
+      checkBasContact();
+
+      if (swingRadians === undefined) {
+        hurlSwing = undefined;
+      }
     },
     stop() {
       projectile = undefined;
@@ -353,6 +412,8 @@ export function createTerrainThrowables(options: TerrainThrowablesOptions): Terr
       lookLift = 0;
       chargeStartedAtMs = undefined;
       swingSecondsLeft = 0;
+      hurlSwing = undefined;
+      previousContactFrame = undefined;
 
       if (models) {
         scene.remove(models.viewmodel, models.projectileMesh);

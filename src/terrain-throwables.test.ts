@@ -5,12 +5,10 @@ import {
   boomerangDurationSeconds,
   getTossLookLift,
   getTossPeakHeight,
-  isInStrikeZone,
   launchBoomerang,
   launchSliotar,
   launchToss,
   planTossView,
-  strikeZoneEyeHeights,
   stepProjectile,
   type Projectile,
 } from './terrain-throwables';
@@ -109,17 +107,6 @@ void test('a tossed sliotar rises a couple of eye heights and falls back past th
     `peak ${peak / scale.eyeHeight}`,
   );
   assert.ok(heights.some((height) => height < origin.y));
-});
-
-void test('a swing connects only when the ball is at the bas', () => {
-  const bas = new THREE.Vector3(0, scale.eyeHeight, 0);
-  const near = bas
-    .clone()
-    .add(new THREE.Vector3(0, strikeZoneEyeHeights * scale.eyeHeight * 0.5, 0));
-  const high = bas.clone().add(new THREE.Vector3(0, strikeZoneEyeHeights * scale.eyeHeight * 2, 0));
-
-  assert.equal(isInStrikeZone(near, bas, scale), true);
-  assert.equal(isInStrikeZone(high, bas, scale), false);
 });
 
 void test('the look lifts with a toss so the ball meets the top edge at its peak', () => {
