@@ -520,3 +520,16 @@ test('a fresh phone session shows the splash until Enter studio, then not again'
   await page.reload();
   await expect(enter).toBeHidden();
 });
+
+test('closing the sheet after a shortcut opened it keeps focus on the handle, not body', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Colour controls' }).click();
+  await expect(page.locator('[data-group-id="palette"] :focus')).toHaveCount(1);
+  await dragHandle(page, 700, 10, 60);
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
+  await expect(page.getByRole('button', { name: 'Resize sheet' })).toBeFocused();
+});
