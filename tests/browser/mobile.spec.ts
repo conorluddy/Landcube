@@ -219,6 +219,11 @@ test('on a short phone the shortcuts wrap beside the tools instead of reaching t
 
   expect(exportBox && measureBox && exportBox.x < measureBox.x).toBe(true);
   expect(exportBox && gripBox && exportBox.y + exportBox.height <= gripBox.y).toBe(true);
+  // The second column grows leftwards into the canvas, never past the viewport's left edge.
+  expect(exportBox && exportBox.x >= 0).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
 });
 
 test('a sheet shortcut opens the sheet full on its section with focus in its group', async ({

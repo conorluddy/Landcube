@@ -7,9 +7,11 @@
 import { getHiddenSections, type InspectorSection, type StudioState } from './controller';
 import type { ControlGroupId } from './sections';
 
+export type GroupShortcutId = 'terrain' | 'contours' | 'colour' | 'camera';
+
 export interface GroupShortcut {
   kind: 'group';
-  id: string;
+  id: GroupShortcutId;
   glyph: string;
   label: string;
   sectionId: InspectorSection;
@@ -24,6 +26,21 @@ export interface ExportShortcut {
 }
 
 export type SheetShortcut = GroupShortcut | ExportShortcut;
+
+/** `requestAnimationFrame` and `cancelAnimationFrame`, injectable for tests. */
+export interface FrameScheduler {
+  request: (callback: () => void) => number;
+  cancel: (handle: number) => void;
+}
+
+export interface RevealPoller {
+  /** Runs `attempt` once a frame until it returns true or the budget runs out, then `onGiveUp`. */
+  schedule: (attempt: () => boolean, onGiveUp: () => void) => void;
+  cancel: () => void;
+}
+
+/** Frames to wait for a newly selected section to lay out before giving up on the reveal. */
+export const revealFrameBudget = 5;
 
 // === PUBLIC API ===
 
@@ -101,6 +118,51 @@ export function revealControlGroup(root: ParentNode, groupId: string): boolean {
   }
 
   return true;
+}
+
+/**
+ * A poller for one pending reveal: a section mounts on a later frame than the tap, so the reveal
+ * retries for `frameBudget` frames. Scheduling again, or cancelling, drops the pending attempt.
+ */
+export function createRevealPoller(
+  frames: FrameScheduler,
+  frameBudget = revealFrameBudget,
+): RevealPoller {
+  let pending: number | undefined;
+
+  const cancel = () => {
+    if (pending !== undefined) {
+      frames.cancel(pending);
+      pending = undefined;
+    }
+  };
+
+  return {
+    cancel,
+    schedule(attempt, onGiveUp) {
+      cancel();
+
+      let framesLeft = frameBudget;
+
+      const tick = () => {
+        pending = undefined;
+
+        if (attempt()) {
+          return;
+        }
+
+        framesLeft -= 1;
+
+        if (framesLeft > 0) {
+          pending = frames.request(tick);
+        } else {
+          onGiveUp();
+        }
+      };
+
+      pending = frames.request(tick);
+    },
+  };
 }
 
 // === HELPERS ===

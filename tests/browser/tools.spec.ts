@@ -190,6 +190,30 @@ test('the phone mode bar toggles the measure tool and drops the sheet to peek', 
   await expect(page.locator('.lc-measure-line')).toHaveCount(0);
 });
 
+test('phone sheet shortcuts reach the real-location and 3D lens groups', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await loadLocation(page);
+  await enter3D(page);
+  const handle = page.getByRole('button', { name: 'Resize sheet' });
+  const focusIn = (groupId: string) =>
+    page.locator(`[data-group-id="${groupId}"]:focus, [data-group-id="${groupId}"] :focus`);
+
+  await handle.focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Terrain controls' }).click();
+  await expect(page.locator('.studio-shell')).toHaveAttribute('data-sheet-snap', 'full');
+  await expect(focusIn('real-location')).toHaveCount(1);
+
+  await handle.focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Camera controls' }).click();
+  await expect(page.getByRole('region', { name: 'Camera settings' })).toBeVisible();
+  await expect(focusIn('lens')).toHaveCount(1);
+});
+
 const elevationLine = /^(Start|End) -?\d+ m$/;
 const differenceLine = /^Δ (\+|-)?\d+ m$/;
 

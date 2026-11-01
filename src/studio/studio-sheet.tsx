@@ -16,7 +16,12 @@ import {
 import { describeSheetReadouts, describeTarget } from './hud-readouts';
 import type { HudStore } from './hud-store';
 import { studioSections } from './sections';
-import { describeSheetShortcuts, revealControlGroup } from './sheet-shortcuts';
+import {
+  createRevealPoller,
+  describeSheetShortcuts,
+  revealControlGroup,
+  type RevealPoller,
+} from './sheet-shortcuts';
 import { getActiveTool } from './studio-tools';
 import { StudioSheetStatus } from './studio-footer';
 
@@ -220,48 +225,41 @@ function SheetShortcuts({
   );
 }
 
-/** Frames to wait for a newly selected section to lay out before giving up on the reveal. */
-const revealFrameBudget = 5;
-
 /**
- * Reveals a group once its section has rendered: the section mounts on a later frame, so this
- * polls a few frames for it. A newer reveal or an unmount cancels the pending one.
+ * Reveals a group once its section has rendered, polling a few frames for it. A newer reveal or
+ * an unmount cancels the pending one. The tapped shortcut goes inert as the sheet opens, so a
+ * reveal that never finds its group parks focus on the sheet handle rather than dropping it.
  */
 function usePendingReveal(sheetId: string): (groupId: string) => void {
-  const frame = useRef<number | undefined>(undefined);
+  const poller = useRef<RevealPoller | undefined>(undefined);
 
-  useEffect(
-    () => () => {
-      if (frame.current !== undefined) {
-        cancelAnimationFrame(frame.current);
-      }
-    },
-    [],
-  );
+  useEffect(() => {
+    poller.current = createRevealPoller({
+      request: (callback) => requestAnimationFrame(callback),
+      cancel: (handle) => {
+        cancelAnimationFrame(handle);
+      },
+    });
+
+    return () => {
+      poller.current?.cancel();
+      poller.current = undefined;
+    };
+  }, []);
 
   return (groupId) => {
-    if (frame.current !== undefined) {
-      cancelAnimationFrame(frame.current);
-    }
+    const findSheet = () => document.getElementById(sheetId);
 
-    let framesLeft = revealFrameBudget;
+    poller.current?.schedule(
+      () => {
+        const sheet = findSheet();
 
-    const attempt = () => {
-      frame.current = undefined;
-      const sheet = document.getElementById(sheetId);
-
-      if (sheet !== null && revealControlGroup(sheet, groupId)) {
-        return;
-      }
-
-      framesLeft -= 1;
-
-      if (framesLeft > 0) {
-        frame.current = requestAnimationFrame(attempt);
-      }
-    };
-
-    frame.current = requestAnimationFrame(attempt);
+        return sheet !== null && revealControlGroup(sheet, groupId);
+      },
+      () => {
+        findSheet()?.querySelector<HTMLElement>('.lc-sheet-handle')?.focus();
+      },
+    );
   };
 }
 
