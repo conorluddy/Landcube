@@ -643,6 +643,13 @@
   opacity: 0;
 }
 
+.system-mobile-shell__shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-s-3);
+  margin-top: var(--lc-s-6);
+}
+
 .system-mobile-shell__peek {
   display: flex;
   gap: var(--lc-s-6);

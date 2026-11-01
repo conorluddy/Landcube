@@ -179,7 +179,9 @@ test('the phone mode bar toggles the measure tool and drops the sheet to peek', 
   await page.goto(`${appUrl}?v=1&seed=123`);
   const measure = page.getByRole('button', { name: 'Measure tool' });
 
-  await expect(page.getByRole('button', { name: 'Crop tool' })).toBeDisabled();
+  // Crop and Reset view act only in 3D, so the 2D column leaves them out rather than disabling them.
+  await expect(page.getByRole('button', { name: 'Crop tool' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Reset view' })).toHaveCount(0);
   await measure.click();
   await expect(measure).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.lc-measure-line')).toHaveCount(1);
@@ -187,6 +189,33 @@ test('the phone mode bar toggles the measure tool and drops the sheet to peek', 
   await measure.click();
   await expect(measure).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('.lc-measure-line')).toHaveCount(0);
+});
+
+test('phone sheet shortcuts reach the real-location and 3D lens groups', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${appUrl}?v=1&seed=123`);
+  await loadLocation(page);
+  await enter3D(page);
+  // The 3D-only tools the 2D column leaves out are back, and live.
+  await expect(page.getByRole('button', { name: 'Reset view' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Crop tool' })).toBeEnabled();
+  const handle = page.getByRole('button', { name: 'Resize sheet' });
+  const focusIn = (groupId: string) =>
+    page.locator(`[data-group-id="${groupId}"]:focus, [data-group-id="${groupId}"] :focus`);
+
+  await handle.focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Terrain controls' }).click();
+  await expect(page.locator('.studio-shell')).toHaveAttribute('data-sheet-snap', 'full');
+  await expect(focusIn('real-location')).toHaveCount(1);
+
+  await handle.focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Camera controls' }).click();
+  await expect(page.getByRole('region', { name: 'Camera settings' })).toBeVisible();
+  await expect(focusIn('lens')).toHaveCount(1);
 });
 
 const elevationLine = /^(Start|End) -?\d+ m$/;

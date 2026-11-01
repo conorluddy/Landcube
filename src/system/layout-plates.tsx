@@ -134,6 +134,19 @@ function MobileShell(): React.JSX.Element {
             <IconButton glyph="N" label="Reset view" onClick={ignore} />
             <IconButton glyph="◫" label="Overlays" onClick={ignore} />
             <IconButton glyph="↔" label="Measure tool" onClick={ignore} />
+            {/* The studio staggers these in once the sheet closes; the plate shows their resting place. */}
+            {snap === 'closed' && (
+              <div
+                className="system-mobile-shell__shortcuts"
+                role="group"
+                aria-label="Open controls"
+              >
+                <IconButton glyph="▲" label="Terrain controls" onClick={ignore} />
+                <IconButton glyph="≋" label="Contour controls" onClick={ignore} />
+                <IconButton glyph="◐" label="Colour controls" onClick={ignore} />
+                <IconButton glyph="↗" label="Export" onClick={ignore} />
+              </div>
+            )}
           </FloatingBar>
         </div>
         <BottomSheet

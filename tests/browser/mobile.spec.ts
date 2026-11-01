@@ -173,6 +173,98 @@ test('a tool leaves a closed sheet closed', async ({ page }) => {
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
 });
 
+test('closing the sheet staggers in the sheet shortcuts, and reopening it takes them away', async ({
+  page,
+}) => {
+  const shortcuts = page.getByRole('group', { name: 'Open controls' });
+  const colour = page.getByRole('button', { name: 'Colour controls' });
+
+  await expect(shortcuts).toBeHidden();
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
+  await expect(colour).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Export', exact: true })).toBeVisible();
+  // Later items wait for the earlier ones, so the stagger reads as a cascade.
+  const delaySeconds = async (name: string) =>
+    Number.parseFloat(
+      await page
+        .getByRole('button', { name })
+        .locator('xpath=..')
+        .evaluate((element) => getComputedStyle(element).transitionDelay),
+    );
+
+  expect(await delaySeconds('Colour controls')).toBeGreaterThan(
+    await delaySeconds('Terrain controls'),
+  );
+  await page.keyboard.press('ArrowUp');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'peek');
+  await expect(shortcuts).toBeHidden();
+});
+
+test('reduced motion shows the shortcuts without a stagger', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  const item = page.getByRole('button', { name: 'Colour controls' }).locator('xpath=..');
+
+  await expect(item).toBeVisible();
+  await expect(item).toHaveCSS('transition-duration', '0s');
+  await expect(item).toHaveCSS('transition-delay', '0s');
+});
+
+test('on a short phone the shortcuts wrap beside the tools instead of reaching the sheet', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 420 });
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  const exportShortcut = page.getByRole('button', { name: 'Export', exact: true });
+
+  await expect(exportShortcut).toBeVisible();
+  // The grip is still travelling down while the sheet closes; measure once it has settled.
+  await waitForSettledSheet(page);
+  const exportBox = await exportShortcut.boundingBox();
+  const measureBox = await page.getByRole('button', { name: 'Measure tool' }).boundingBox();
+  const gripBox = await page.getByRole('button', { name: 'Resize sheet' }).boundingBox();
+
+  expect(exportBox && measureBox && exportBox.x < measureBox.x).toBe(true);
+  expect(exportBox && gripBox && exportBox.y + exportBox.height <= gripBox.y).toBe(true);
+  // The second column grows leftwards into the canvas, never past the viewport's left edge.
+  expect(exportBox && exportBox.x >= 0).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
+test('a sheet shortcut opens the sheet full on its section with focus in its group', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Colour controls' }).click();
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'full');
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Editing section' })
+      .getByRole('button', { name: 'Colour', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('region', { name: 'Colour settings' })).toBeVisible();
+  await expect(page.locator('[data-group-id="palette"] :focus')).toHaveCount(1);
+});
+
+test('the Export shortcut opens export from a closed sheet', async ({ page }) => {
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Close Export' })).toBeVisible();
+});
+
 test('a full sheet hides the map controls and the scale bar', async ({ page }) => {
   const measure = page.getByRole('button', { name: 'Measure tool', exact: true });
   const scaleBar = page.locator('[data-hud] .lc-hud-layer__instruments .lc-scale-bar');
@@ -427,4 +519,30 @@ test('a fresh phone session shows the splash until Enter studio, then not again'
   await expect(enter).toBeHidden();
   await page.reload();
   await expect(enter).toBeHidden();
+});
+
+test('closing the sheet after a shortcut opened it keeps focus on the handle, not body', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Colour controls' }).click();
+  await expect(page.locator('[data-group-id="palette"] :focus')).toHaveCount(1);
+  await dragHandle(page, 700, 10, 60);
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
+  await expect(page.getByRole('button', { name: 'Resize sheet' })).toBeFocused();
+});
+
+test('closing the export dialog returns focus to the Export shortcut', async ({ page }) => {
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  const exportShortcut = page.getByRole('button', { name: 'Export', exact: true });
+
+  await exportShortcut.click();
+  await expect(page.getByRole('button', { name: 'Close Export' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Close Export' })).toBeHidden();
+  await expect(exportShortcut).toBeFocused();
 });

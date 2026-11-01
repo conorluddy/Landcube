@@ -42,13 +42,19 @@
     --studio-sheet-height: min(55%, calc(100% - 64px));
   }
 
+  /*
+   * A column that may not reach the closed sheet's grip: once the tools plus shortcuts outgrow
+   * the room above it, the shortcut group wraps into a second column on the left.
+   */
   .studio-map-controls {
     position: absolute;
     top: 64px;
     right: var(--lc-s-6);
     z-index: 3;
-    flex-direction: column;
+    flex-flow: column wrap-reverse;
+    align-content: flex-start;
     height: auto;
+    max-height: calc(100% - 64px - var(--studio-tab-bar-height) - var(--lc-h-l) - var(--lc-s-6));
   }
 
   .studio-shell[data-sheet-snap] .lc-hud-layer__instruments {
@@ -72,6 +78,69 @@
 
   .studio-compare {
     display: none;
+  }
+
+  /*
+   * Sheet shortcuts: a second group under the tools, staggered in from the right once the sheet
+   * closes and back out as it reopens. Visibility waits for the last item either way, so the
+   * group never takes taps while fading.
+   */
+  .studio-sheet-shortcuts {
+    --studio-shortcut-step: 40ms;
+    --studio-shortcut-leave: calc(
+      var(--studio-shortcut-count, 1) * var(--studio-shortcut-step) + var(--lc-dur)
+    );
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--lc-s-3);
+    /* Hidden, the group also leaves layout: height 0, and a negative margin swallows the bar's gap. */
+    height: 0;
+    margin-top: calc(-1 * var(--lc-s-3));
+    overflow: hidden;
+    visibility: hidden;
+    transition:
+      visibility 0s var(--studio-shortcut-leave),
+      height 0s var(--studio-shortcut-leave),
+      margin-top 0s var(--studio-shortcut-leave);
+  }
+
+  .studio-shell[data-sheet-snap='closed'] .studio-sheet-shortcuts {
+    height: calc(
+      var(--studio-shortcut-count, 1) * var(--lc-h-l) + (var(--studio-shortcut-count, 1) - 1) *
+        var(--lc-s-3)
+    );
+    margin-top: var(--lc-s-6);
+    overflow: visible;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  .studio-sheet-shortcuts__item {
+    opacity: 0;
+    transform: translateX(var(--lc-s-8));
+    transition:
+      opacity var(--lc-dur) var(--lc-ease),
+      transform var(--lc-dur) var(--lc-ease);
+    /* Leaving: the last item goes first, so the column folds up toward the tools. */
+    transition-delay: calc(
+      (var(--studio-shortcut-count, 1) - 1 - var(--studio-shortcut-index, 0)) *
+        var(--studio-shortcut-step)
+    );
+  }
+
+  .studio-shell[data-sheet-snap='closed'] .studio-sheet-shortcuts__item {
+    opacity: 1;
+    transform: none;
+    transition-delay: calc(var(--studio-shortcut-index, 0) * var(--studio-shortcut-step));
+  }
+
+  /* Scoped to the shell so these outrank the closed-state delays above. */
+  @media (prefers-reduced-motion: reduce) {
+    .studio-shell[data-sheet-snap] .studio-sheet-shortcuts,
+    .studio-shell[data-sheet-snap] .studio-sheet-shortcuts__item {
+      transition: none;
+    }
   }
 
   .studio-sheet-peek {

@@ -165,7 +165,7 @@ All values below are desktop unless marked "mobile".
   - Peek shows readouts and the export button.
   - Half shows the section tab strip plus the controls.
   - Full hides the map controls.
-  - Map controls are 44px icon buttons on the right.
+  - Map controls are 44px icon buttons on the right: the canvas tools, then, while the sheet is closed, shortcuts into Terrain, Contours, Colour, Camera (3D) and Export that stagger in. A shortcut opens the sheet full on its section with focus in the group.
 - **Mobile tab bar:** 84px tall including the home-indicator area. Four items: LIBRARY ▦ · STUDIO ≋ · PRESETS ◧ · ACCOUNT ○. The glyph is 17px over a Mono 8.5px label; the active item is bone and has a 24×2px bar on its top edge.
 - **List row (mobile):** 50–56px tall with a hairline bottom border. A 28px glyph tile, then the title (Geist 15px) over the meta (Mono 9px ink-5), then a trailing value or ›.
 - **Model card:** thumbnail 132px tall, then name (Geist 13px) with a status tag, over the meta (Mono 8.5px). Laid out in a 2-column grid with a 10px gap.

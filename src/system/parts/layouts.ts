@@ -27,10 +27,13 @@ export const layoutParts: LayoutPart[] = [
     usedIn: '3E–3J',
     source: 'src/studio/studio-phone.css',
     summary:
-      'The map stays full-bleed under a sheet with four snaps. Map controls step aside when the sheet is full. Pick a snap, or drag the handle.',
+      'The map stays full-bleed under a sheet with four snaps. Map controls step aside when the sheet is full and gain sheet shortcuts when it is closed. Pick a snap, or drag the handle.',
     cells: [{ k: 'mobileShell', label: 'Sheet snaps', note: 'Closed · peek · half · full' }],
     spec: [
-      { property: 'Closed', value: '44 · grip only, tap to reopen' },
+      {
+        property: 'Closed',
+        value: '44 · grip only, tap to reopen · sheet shortcuts join the map controls',
+      },
       { property: 'Peek', value: '190 · readouts + export' },
       { property: 'Half', value: '55% · tabs + controls' },
       { property: 'Full', value: '64 from top · map controls hide' },
