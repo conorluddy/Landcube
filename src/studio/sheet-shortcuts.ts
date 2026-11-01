@@ -39,8 +39,11 @@ export interface RevealPoller {
   cancel: () => void;
 }
 
-/** Frames to wait for a newly selected section to lay out before giving up on the reveal. */
-export const revealFrameBudget = 5;
+/**
+ * Frames to wait for a newly selected section to lay out before giving up on the reveal: about a
+ * quarter second at 60 Hz, generous for a throttled phone, and only the fallback focus waits.
+ */
+export const revealFrameBudget = 15;
 
 // === PUBLIC API ===
 

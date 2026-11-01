@@ -533,3 +533,16 @@ test('closing the sheet after a shortcut opened it keeps focus on the handle, no
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
   await expect(page.getByRole('button', { name: 'Resize sheet' })).toBeFocused();
 });
+
+test('closing the export dialog returns focus to the Export shortcut', async ({ page }) => {
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  const exportShortcut = page.getByRole('button', { name: 'Export', exact: true });
+
+  await exportShortcut.click();
+  await expect(page.getByRole('button', { name: 'Close Export' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Close Export' })).toBeHidden();
+  await expect(exportShortcut).toBeFocused();
+});
