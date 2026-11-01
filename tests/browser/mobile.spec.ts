@@ -203,6 +203,18 @@ test('closing the sheet staggers in the sheet shortcuts, and reopening it takes 
   await expect(shortcuts).toBeHidden();
 });
 
+test('reduced motion shows the shortcuts without a stagger', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  const item = page.getByRole('button', { name: 'Colour controls' }).locator('xpath=..');
+
+  await expect(item).toBeVisible();
+  await expect(item).toHaveCSS('transition-duration', '0s');
+  await expect(item).toHaveCSS('transition-delay', '0s');
+});
+
 test('on a short phone the shortcuts wrap beside the tools instead of reaching the sheet', async ({
   page,
 }) => {

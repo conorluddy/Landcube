@@ -94,9 +94,9 @@
     display: flex;
     flex-direction: column;
     gap: var(--lc-s-3);
-    /* Hidden, the group also leaves layout (height 0) so the column is only its visible buttons. */
+    /* Hidden, the group also leaves layout: height 0, and a negative margin swallows the bar's gap. */
     height: 0;
-    margin-top: 0;
+    margin-top: calc(-1 * var(--lc-s-3));
     overflow: hidden;
     visibility: hidden;
     transition:
@@ -135,9 +135,10 @@
     transition-delay: calc(var(--studio-shortcut-index, 0) * var(--studio-shortcut-step));
   }
 
+  /* Scoped to the shell so these outrank the closed-state delays above. */
   @media (prefers-reduced-motion: reduce) {
-    .studio-sheet-shortcuts,
-    .studio-sheet-shortcuts__item {
+    .studio-shell[data-sheet-snap] .studio-sheet-shortcuts,
+    .studio-shell[data-sheet-snap] .studio-sheet-shortcuts__item {
       transition: none;
     }
   }

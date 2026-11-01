@@ -179,8 +179,9 @@ test('the phone mode bar toggles the measure tool and drops the sheet to peek', 
   await page.goto(`${appUrl}?v=1&seed=123`);
   const measure = page.getByRole('button', { name: 'Measure tool' });
 
-  // Crop exists only in 3D, so the 2D column leaves it out rather than disabling it.
+  // Crop and Reset view act only in 3D, so the 2D column leaves them out rather than disabling them.
   await expect(page.getByRole('button', { name: 'Crop tool' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Reset view' })).toHaveCount(0);
   await measure.click();
   await expect(measure).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.lc-measure-line')).toHaveCount(1);
