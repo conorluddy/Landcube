@@ -196,6 +196,9 @@ test('phone sheet shortcuts reach the real-location and 3D lens groups', async (
   await page.goto(`${appUrl}?v=1&seed=123`);
   await loadLocation(page);
   await enter3D(page);
+  // The 3D-only tools the 2D column leaves out are back, and live.
+  await expect(page.getByRole('button', { name: 'Reset view' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Crop tool' })).toBeEnabled();
   const handle = page.getByRole('button', { name: 'Resize sheet' });
   const focusIn = (groupId: string) =>
     page.locator(`[data-group-id="${groupId}"]:focus, [data-group-id="${groupId}"] :focus`);

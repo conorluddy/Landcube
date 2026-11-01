@@ -97,7 +97,8 @@ export function describeSheetShortcuts(
 /**
  * Scrolls the group to the top of the sheet body and focuses its first control. Text entry is
  * skipped so a shortcut never raises the phone keyboard; a group with nothing else focusable
- * takes focus itself, which announces its title.
+ * takes focus itself, which announces its title. True only once focus has landed: a control
+ * that is not yet rendered ignores `focus()`, and the caller retries on a later frame.
  */
 export function revealControlGroup(root: ParentNode, groupId: string): boolean {
   const group = root.querySelector<HTMLElement>(`[data-group-id="${groupId}"]`);
@@ -109,15 +110,15 @@ export function revealControlGroup(root: ParentNode, groupId: string): boolean {
   group.scrollIntoView({ block: 'start' });
 
   const control = findFirstTapControl(group);
+  const target = control ?? group;
 
   if (control === null) {
     group.tabIndex = -1;
-    group.focus({ preventScroll: true });
-  } else {
-    control.focus({ preventScroll: true });
   }
 
-  return true;
+  target.focus({ preventScroll: true });
+
+  return group.ownerDocument.activeElement === target;
 }
 
 /**
@@ -172,10 +173,9 @@ const textEntryTypes = new Set(['text', 'number', 'search', 'email', 'url', 'tel
 
 function findFirstTapControl(group: HTMLElement): HTMLElement | null {
   for (const candidate of group.querySelectorAll<HTMLElement>(tapControlSelector)) {
-    const isDisabled = candidate instanceof HTMLButtonElement && candidate.disabled;
     const isTextEntry = candidate instanceof HTMLInputElement && textEntryTypes.has(candidate.type);
 
-    if (!isDisabled && !isTextEntry && candidate.tabIndex >= 0) {
+    if (!candidate.matches(':disabled') && !isTextEntry && candidate.tabIndex >= 0) {
       return candidate;
     }
   }
