@@ -213,6 +213,8 @@ test('on a short phone the shortcuts wrap beside the tools instead of reaching t
   const exportShortcut = page.getByRole('button', { name: 'Export', exact: true });
 
   await expect(exportShortcut).toBeVisible();
+  // The grip is still travelling down while the sheet closes; measure once it has settled.
+  await waitForSettledSheet(page);
   const exportBox = await exportShortcut.boundingBox();
   const measureBox = await page.getByRole('button', { name: 'Measure tool' }).boundingBox();
   const gripBox = await page.getByRole('button', { name: 'Resize sheet' }).boundingBox();
