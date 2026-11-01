@@ -429,7 +429,7 @@ function Studio({
           <StudioHud controller={c} state={state} hud={hud} />
           {isPhoneViewport ? (
             <>
-              <StudioMapControls controller={c} state={state} />
+              <StudioMapControls controller={c} state={state} sheetId={inspectorId} />
               <StudioSheet
                 controller={c}
                 state={state}

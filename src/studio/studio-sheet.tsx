@@ -1,4 +1,4 @@
-import { useSyncExternalStore, type ReactNode } from 'react';
+import { useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import { BottomSheet } from '../ui/bottom-sheet';
 import { Button } from '../ui/button';
 import { FloatingBar } from '../ui/floating-bar';
@@ -16,6 +16,7 @@ import {
 import { describeSheetReadouts, describeTarget } from './hud-readouts';
 import type { HudStore } from './hud-store';
 import { studioSections } from './sections';
+import { describeSheetShortcuts, revealControlGroup } from './sheet-shortcuts';
 import { getActiveTool } from './studio-tools';
 import { StudioSheetStatus } from './studio-footer';
 
@@ -92,29 +93,35 @@ export function StudioSheet({
 }
 
 /**
- * Phone map controls (P-04 in a mobile FloatingBar) down the right edge: reset the 3D camera,
- * the command palette, the crop (3D), measure and route (real terrain) tools. Hidden while the sheet is full (CSS on `[data-sheet-snap]`).
+ * Phone map controls (P-04 in a mobile FloatingBar) down the right edge: the canvas tools (reset
+ * the 3D camera, the command palette, crop in 3D, measure, route on real terrain), then, while the
+ * sheet is closed, the sheet shortcuts that stagger in below them. Tools that cannot act in the
+ * current view are left out rather than disabled: a dead button would push the column into the
+ * sheet. Hidden while the sheet is full (CSS on `[data-sheet-snap]`).
  */
 export function StudioMapControls({
   controller: c,
   state,
+  sheetId,
 }: {
   controller: StudioController;
   state: StudioState;
+  sheetId: string;
 }): ReactNode {
   const { workspace } = state;
   const is3d = workspace.view === '3d';
 
   return (
     <FloatingBar size="mobile" className="studio-map-controls">
-      <IconButton
-        glyph="N"
-        label="Reset view"
-        disabled={!is3d}
-        onClick={() => {
-          c.resetCamera();
-        }}
-      />
+      {is3d && (
+        <IconButton
+          glyph="N"
+          label="Reset view"
+          onClick={() => {
+            c.resetCamera();
+          }}
+        />
+      )}
       <IconButton
         glyph="⌘"
         label="Command palette"
@@ -124,15 +131,16 @@ export function StudioMapControls({
           c.workspace({ palette: { query: '' } });
         }}
       />
-      <IconButton
-        glyph="◢"
-        label="Crop tool"
-        isActive={getActiveTool(state) === 'crop'}
-        disabled={!is3d}
-        onClick={() => {
-          toggleTool(c, state, 'crop');
-        }}
-      />
+      {is3d && (
+        <IconButton
+          glyph="◢"
+          label="Crop tool"
+          isActive={getActiveTool(state) === 'crop'}
+          onClick={() => {
+            toggleTool(c, state, 'crop');
+          }}
+        />
+      )}
       <IconButton
         glyph="↔"
         label="Measure tool"
@@ -141,7 +149,6 @@ export function StudioMapControls({
           toggleTool(c, state, 'measure');
         }}
       />
-      {/* Like the desktop toolbar, Route exists only on real terrain; a dead button would also push the column into the sheet. */}
       {state.source.terrain !== undefined && (
         <IconButton
           glyph="⌇"
@@ -152,11 +159,83 @@ export function StudioMapControls({
           }}
         />
       )}
+      <SheetShortcuts controller={c} state={state} sheetId={sheetId} />
     </FloatingBar>
   );
 }
 
 // === HELPERS ===
+
+/**
+ * One-tap routes into the closed sheet. Always in the tree so CSS can stagger them in and out on
+ * `[data-sheet-snap]`; inert and hidden from assistive tech whenever the sheet is open, since
+ * the sheet itself is the route then.
+ */
+function SheetShortcuts({
+  controller: c,
+  state,
+  sheetId,
+}: {
+  controller: StudioController;
+  state: StudioState;
+  sheetId: string;
+}): ReactNode {
+  const isShown = state.workspace.sheetSnap === 'closed';
+  const shortcuts = describeSheetShortcuts(state);
+
+  return (
+    <div
+      className="studio-sheet-shortcuts"
+      role="group"
+      aria-label="Open controls"
+      aria-hidden={!isShown}
+      inert={!isShown}
+      style={{ '--studio-shortcut-count': shortcuts.length } as CSSProperties}
+    >
+      {shortcuts.map((shortcut, index) => (
+        <div
+          key={shortcut.id}
+          className="studio-sheet-shortcuts__item"
+          style={{ '--studio-shortcut-index': index } as CSSProperties}
+        >
+          <IconButton
+            glyph={shortcut.glyph}
+            label={shortcut.label}
+            hasPopup={shortcut.kind === 'export' ? 'dialog' : undefined}
+            onClick={() => {
+              if (shortcut.kind === 'export') {
+                c.workspace({ exporting: true });
+
+                return;
+              }
+
+              openSheetOnGroup(c, sheetId, shortcut.sectionId, shortcut.groupId);
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Opens the sheet full on `sectionId`, then (once the section is laid out) reveals the group. */
+function openSheetOnGroup(
+  c: StudioController,
+  sheetId: string,
+  sectionId: InspectorSection,
+  groupId: string,
+): void {
+  c.selectSection(sectionId);
+  c.workspace({ sheetSnap: 'full' });
+
+  requestAnimationFrame(() => {
+    const sheet = document.getElementById(sheetId);
+
+    if (sheet !== null) {
+      revealControlGroup(sheet, groupId);
+    }
+  });
+}
 
 /** The phone mode bar: a tool drops the sheet to peek (or leaves it closed) so the canvas is free to work on. */
 function toggleTool(

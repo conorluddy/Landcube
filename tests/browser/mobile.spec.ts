@@ -173,6 +173,51 @@ test('a tool leaves a closed sheet closed', async ({ page }) => {
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
 });
 
+test('closing the sheet staggers in the sheet shortcuts, and reopening it takes them away', async ({
+  page,
+}) => {
+  const shortcuts = page.getByRole('group', { name: 'Open controls' });
+  const colour = page.getByRole('button', { name: 'Colour controls' });
+
+  await expect(shortcuts).toBeHidden();
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
+  await expect(colour).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Export', exact: true })).toBeVisible();
+  // Later items wait for the earlier ones: the stagger is the delay step times the index.
+  await expect(colour.locator('xpath=..')).toHaveCSS('transition-delay', '0.08s');
+  await page.keyboard.press('ArrowUp');
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'peek');
+  await expect(shortcuts).toBeHidden();
+});
+
+test('a sheet shortcut opens the sheet full on its section with focus in its group', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Colour controls' }).click();
+  await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'full');
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Editing section' })
+      .getByRole('button', { name: 'Colour', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('region', { name: 'Colour settings' })).toBeVisible();
+  await expect(page.locator('[data-group-id="palette"] :focus')).toHaveCount(1);
+});
+
+test('the Export shortcut opens export from a closed sheet', async ({ page }) => {
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Close Export' })).toBeVisible();
+});
+
 test('a full sheet hides the map controls and the scale bar', async ({ page }) => {
   const measure = page.getByRole('button', { name: 'Measure tool', exact: true });
   const scaleBar = page.locator('[data-hud] .lc-hud-layer__instruments .lc-scale-bar');

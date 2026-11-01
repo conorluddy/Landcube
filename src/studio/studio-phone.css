@@ -74,6 +74,54 @@
     display: none;
   }
 
+  /*
+   * Sheet shortcuts: a second group under the tools, staggered in from the right once the sheet
+   * closes and back out as it reopens. Visibility waits for the last item either way, so the
+   * group never takes taps while fading.
+   */
+  .studio-sheet-shortcuts {
+    --studio-shortcut-step: 40ms;
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--lc-s-3);
+    margin-top: var(--lc-s-6);
+    visibility: hidden;
+    transition: visibility 0s
+      calc(var(--studio-shortcut-count, 1) * var(--studio-shortcut-step) + var(--lc-dur));
+  }
+
+  .studio-shell[data-sheet-snap='closed'] .studio-sheet-shortcuts {
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  .studio-sheet-shortcuts__item {
+    opacity: 0;
+    transform: translateX(var(--lc-s-8));
+    transition:
+      opacity var(--lc-dur) var(--lc-ease),
+      transform var(--lc-dur) var(--lc-ease);
+    /* Leaving: the last item goes first, so the column folds up toward the tools. */
+    transition-delay: calc(
+      (var(--studio-shortcut-count, 1) - 1 - var(--studio-shortcut-index, 0)) *
+        var(--studio-shortcut-step)
+    );
+  }
+
+  .studio-shell[data-sheet-snap='closed'] .studio-sheet-shortcuts__item {
+    opacity: 1;
+    transform: none;
+    transition-delay: calc(var(--studio-shortcut-index, 0) * var(--studio-shortcut-step));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .studio-sheet-shortcuts,
+    .studio-sheet-shortcuts__item {
+      transition: none;
+    }
+  }
+
   .studio-sheet-peek {
     display: grid;
     gap: var(--lc-s-3);
