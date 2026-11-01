@@ -1,4 +1,4 @@
-import { useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import { BottomSheet } from '../ui/bottom-sheet';
 import { Button } from '../ui/button';
 import { FloatingBar } from '../ui/floating-bar';
@@ -182,13 +182,13 @@ function SheetShortcuts({
 }): ReactNode {
   const isShown = state.workspace.sheetSnap === 'closed';
   const shortcuts = describeSheetShortcuts(state);
+  const reveal = usePendingReveal(sheetId);
 
   return (
     <div
       className="studio-sheet-shortcuts"
       role="group"
       aria-label="Open controls"
-      aria-hidden={!isShown}
       inert={!isShown}
       style={{ '--studio-shortcut-count': shortcuts.length } as CSSProperties}
     >
@@ -209,7 +209,9 @@ function SheetShortcuts({
                 return;
               }
 
-              openSheetOnGroup(c, sheetId, shortcut.sectionId, shortcut.groupId);
+              c.selectSection(shortcut.sectionId);
+              c.workspace({ sheetSnap: 'full' });
+              reveal(shortcut.groupId);
             }}
           />
         </div>
@@ -218,23 +220,49 @@ function SheetShortcuts({
   );
 }
 
-/** Opens the sheet full on `sectionId`, then (once the section is laid out) reveals the group. */
-function openSheetOnGroup(
-  c: StudioController,
-  sheetId: string,
-  sectionId: InspectorSection,
-  groupId: string,
-): void {
-  c.selectSection(sectionId);
-  c.workspace({ sheetSnap: 'full' });
+/** Frames to wait for a newly selected section to lay out before giving up on the reveal. */
+const revealFrameBudget = 5;
 
-  requestAnimationFrame(() => {
-    const sheet = document.getElementById(sheetId);
+/**
+ * Reveals a group once its section has rendered: the section mounts on a later frame, so this
+ * polls a few frames for it. A newer reveal or an unmount cancels the pending one.
+ */
+function usePendingReveal(sheetId: string): (groupId: string) => void {
+  const frame = useRef<number | undefined>(undefined);
 
-    if (sheet !== null) {
-      revealControlGroup(sheet, groupId);
+  useEffect(
+    () => () => {
+      if (frame.current !== undefined) {
+        cancelAnimationFrame(frame.current);
+      }
+    },
+    [],
+  );
+
+  return (groupId) => {
+    if (frame.current !== undefined) {
+      cancelAnimationFrame(frame.current);
     }
-  });
+
+    let framesLeft = revealFrameBudget;
+
+    const attempt = () => {
+      frame.current = undefined;
+      const sheet = document.getElementById(sheetId);
+
+      if (sheet !== null && revealControlGroup(sheet, groupId)) {
+        return;
+      }
+
+      framesLeft -= 1;
+
+      if (framesLeft > 0) {
+        frame.current = requestAnimationFrame(attempt);
+      }
+    };
+
+    frame.current = requestAnimationFrame(attempt);
+  };
 }
 
 /** The phone mode bar: a tool drops the sheet to peek (or leaves it closed) so the canvas is free to work on. */

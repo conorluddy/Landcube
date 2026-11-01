@@ -186,11 +186,39 @@ test('closing the sheet staggers in the sheet shortcuts, and reopening it takes 
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'closed');
   await expect(colour).toBeVisible();
   await expect(page.getByRole('button', { name: 'Export', exact: true })).toBeVisible();
-  // Later items wait for the earlier ones: the stagger is the delay step times the index.
-  await expect(colour.locator('xpath=..')).toHaveCSS('transition-delay', '0.08s');
+  // Later items wait for the earlier ones, so the stagger reads as a cascade.
+  const delaySeconds = async (name: string) =>
+    Number.parseFloat(
+      await page
+        .getByRole('button', { name })
+        .locator('xpath=..')
+        .evaluate((element) => getComputedStyle(element).transitionDelay),
+    );
+
+  expect(await delaySeconds('Colour controls')).toBeGreaterThan(
+    await delaySeconds('Terrain controls'),
+  );
   await page.keyboard.press('ArrowUp');
   await expect(shell(page)).toHaveAttribute('data-sheet-snap', 'peek');
   await expect(shortcuts).toBeHidden();
+});
+
+test('on a short phone the shortcuts wrap beside the tools instead of reaching the sheet', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 420 });
+  await page.getByRole('button', { name: 'Resize sheet' }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  const exportShortcut = page.getByRole('button', { name: 'Export', exact: true });
+
+  await expect(exportShortcut).toBeVisible();
+  const exportBox = await exportShortcut.boundingBox();
+  const measureBox = await page.getByRole('button', { name: 'Measure tool' }).boundingBox();
+  const gripBox = await page.getByRole('button', { name: 'Resize sheet' }).boundingBox();
+
+  expect(exportBox && measureBox && exportBox.x < measureBox.x).toBe(true);
+  expect(exportBox && gripBox && exportBox.y + exportBox.height <= gripBox.y).toBe(true);
 });
 
 test('a sheet shortcut opens the sheet full on its section with focus in its group', async ({

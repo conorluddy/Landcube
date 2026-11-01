@@ -39,6 +39,22 @@ void test('2D procedural terrain offers Terrain, Contours, Colour and Export, wi
   assert.equal(terrain.groupId, 'procedural-landscape');
 });
 
+void test('real terrain sends the Terrain shortcut to the location group and keeps the order', () => {
+  const state = setupState();
+  const shortcuts = describeSheetShortcuts({
+    workspace: { ...state.workspace, view: '2d' },
+    source: { ...state.source, terrain: {} as NonNullable<typeof state.source.terrain> },
+  });
+  const terrain = shortcuts[0];
+
+  assert.ok(terrain.kind === 'group');
+  assert.equal(terrain.groupId, 'real-location');
+  assert.deepEqual(
+    shortcuts.map((shortcut) => shortcut.id),
+    ['terrain', 'contours', 'colour', 'export'],
+  );
+});
+
 void test('3D adds the Camera shortcut before Export', () => {
   const state = setupState();
   const shortcuts = describeSheetShortcuts({

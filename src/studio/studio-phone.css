@@ -42,13 +42,19 @@
     --studio-sheet-height: min(55%, calc(100% - 64px));
   }
 
+  /*
+   * A column that may not reach the closed sheet's grip: once the tools plus shortcuts outgrow
+   * the room above it, the shortcut group wraps into a second column on the left.
+   */
   .studio-map-controls {
     position: absolute;
     top: 64px;
     right: var(--lc-s-6);
     z-index: 3;
-    flex-direction: column;
+    flex-flow: column wrap-reverse;
+    align-content: flex-start;
     height: auto;
+    max-height: calc(100% - 64px - var(--studio-tab-bar-height) - var(--lc-h-l) - var(--lc-s-6));
   }
 
   .studio-shell[data-sheet-snap] .lc-hud-layer__instruments {
@@ -81,17 +87,31 @@
    */
   .studio-sheet-shortcuts {
     --studio-shortcut-step: 40ms;
+    --studio-shortcut-leave: calc(
+      var(--studio-shortcut-count, 1) * var(--studio-shortcut-step) + var(--lc-dur)
+    );
 
     display: flex;
     flex-direction: column;
     gap: var(--lc-s-3);
-    margin-top: var(--lc-s-6);
+    /* Hidden, the group also leaves layout (height 0) so the column is only its visible buttons. */
+    height: 0;
+    margin-top: 0;
+    overflow: hidden;
     visibility: hidden;
-    transition: visibility 0s
-      calc(var(--studio-shortcut-count, 1) * var(--studio-shortcut-step) + var(--lc-dur));
+    transition:
+      visibility 0s var(--studio-shortcut-leave),
+      height 0s var(--studio-shortcut-leave),
+      margin-top 0s var(--studio-shortcut-leave);
   }
 
   .studio-shell[data-sheet-snap='closed'] .studio-sheet-shortcuts {
+    height: calc(
+      var(--studio-shortcut-count, 1) * var(--lc-h-l) + (var(--studio-shortcut-count, 1) - 1) *
+        var(--lc-s-3)
+    );
+    margin-top: var(--lc-s-6);
+    overflow: visible;
     visibility: visible;
     transition-delay: 0s;
   }
